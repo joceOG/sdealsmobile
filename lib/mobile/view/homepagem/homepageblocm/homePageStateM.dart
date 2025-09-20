@@ -1,9 +1,6 @@
-
 import 'package:equatable/equatable.dart';
 import 'package:flutter/cupertino.dart';
-
 import 'package:sdealsmobile/data/models/categorie.dart';
-
 
 class HomePageStateM extends Equatable {
   final bool isLoading;
@@ -39,9 +36,3 @@ class HomePageStateM extends Equatable {
   @override
   List<Object?> get props => [isLoading, listItems, error];
 }
-
-
-
-
-
-

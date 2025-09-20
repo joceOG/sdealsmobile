@@ -16,13 +16,13 @@ class ProviderPricingStep extends StatefulWidget {
 }
 
 class _ProviderPricingStepState extends State<ProviderPricingStep> {
-  final TextEditingController _tarifHoraireMinController = TextEditingController();
-  final TextEditingController _tarifHoraireMaxController = TextEditingController();
-  final TextEditingController _montantFraisDeDeplacementController = TextEditingController();
-  String _modeDeFacturation = 'Heure';
-  bool _boolFraisDeDeplacement = false;
+  final TextEditingController _minimumRateController = TextEditingController();
+  final TextEditingController _maximumRateController = TextEditingController();
+  final TextEditingController _travelFeesController = TextEditingController();
+  String _billingMode = 'Heure';
+  bool _hasTravelFees = false;
 
-  final List<String> _listmodeDeFacturation = [
+  final List<String> _billingModes = [
     'Heure', 'Jour', 'Forfait', 'Devis'
   ];
 
@@ -33,28 +33,28 @@ class _ProviderPricingStepState extends State<ProviderPricingStep> {
   }
 
   void _initializeFormValues() {
-    _tarifHoraireMinController.text = widget.formData['tarifHoraireMin']?.toString() ?? '';
-    _tarifHoraireMaxController.text = widget.formData['tarifHoiraireMax']?.toString() ?? '';
-    _modeDeFacturation = widget.formData['modeDeFacturation'] ?? 'Heure';
-    _boolFraisDeDeplacement = widget.formData['boolFraisDeDeplacement'] ?? false;
-    _montantFraisDeDeplacementController.text = widget.formData['montantFraisDeDeplacement']?.toString() ?? '';
+    _minimumRateController.text = widget.formData['minimumHourlyRate']?.toString() ?? '';
+    _maximumRateController.text = widget.formData['maximumHourlyRate']?.toString() ?? '';
+    _billingMode = widget.formData['billingMode'] ?? 'Heure';
+    _hasTravelFees = widget.formData['travelFees'] ?? false;
+    _travelFeesController.text = widget.formData['travelFeesAmount']?.toString() ?? '';
   }
 
   @override
   void dispose() {
-    _tarifHoraireMinController.dispose();
-    _tarifHoraireMaxController.dispose();
-    _montantFraisDeDeplacementController.dispose();
+    _minimumRateController.dispose();
+    _maximumRateController.dispose();
+    _travelFeesController.dispose();
     super.dispose();
   }
 
   void _updateFormData() {
     Map<String, dynamic> updatedData = {
-      'tarifHorareMin': double.tryParse(_tarifHoraireMinController.text) ?? 0.0,
-      'tarifHoraireMax': double.tryParse(_tarifHoraireMaxController.text) ?? 0.0,
-      'modeDeFacturation': _modeDeFacturation,
-      'boolFraisDeDeplacement': _boolFraisDeDeplacement,
-      'montantFraisDeDeplacement': _boolFraisDeDeplacement ? double.tryParse(_montantFraisDeDeplacementController.text) ?? 0.0 : 0.0,
+      'minimumHourlyRate': double.tryParse(_minimumRateController.text) ?? 0.0,
+      'maximumHourlyRate': double.tryParse(_maximumRateController.text) ?? 0.0,
+      'billingMode': _billingMode,
+      'travelFees': _hasTravelFees,
+      'travelFeesAmount': _hasTravelFees ? double.tryParse(_travelFeesController.text) ?? 0.0 : 0.0,
     };
     widget.onDataChanged(updatedData);
   }
@@ -73,7 +73,7 @@ class _ProviderPricingStepState extends State<ProviderPricingStep> {
 
           // Tarif horaire minimum
           TextFormField(
-            controller: _tarifHoraireMinController,
+            controller: _minimumRateController,
             decoration: const InputDecoration(
               labelText: 'Tarif horaire minimum (FCFA) *',
               border: OutlineInputBorder(),
@@ -96,7 +96,7 @@ class _ProviderPricingStepState extends State<ProviderPricingStep> {
 
           // Tarif horaire maximum
           TextFormField(
-            controller: _tarifHoraireMaxController,
+            controller: _maximumRateController,
             decoration: const InputDecoration(
               labelText: 'Tarif horaire maximum (FCFA) *',
               border: OutlineInputBorder(),
@@ -111,7 +111,7 @@ class _ProviderPricingStepState extends State<ProviderPricingStep> {
               if (value == null || value.isEmpty) {
                 return 'Veuillez entrer un tarif maximum';
               }
-              final minRate = double.tryParse(_tarifHoraireMaxController.text) ?? 0;
+              final minRate = double.tryParse(_minimumRateController.text) ?? 0;
               final maxRate = double.tryParse(value) ?? 0;
               if (maxRate < minRate) {
                 return 'Le tarif maximum doit être supérieur au tarif minimum';
@@ -129,8 +129,8 @@ class _ProviderPricingStepState extends State<ProviderPricingStep> {
               border: OutlineInputBorder(),
               prefixIcon: Icon(Icons.receipt),
             ),
-            value: _modeDeFacturation,
-            items: _listmodeDeFacturation.map((mode) {
+            value: _billingMode,
+            items: _billingModes.map((mode) {
               return DropdownMenuItem<String>(
                 value: mode,
                 child: Text(mode),
@@ -138,7 +138,7 @@ class _ProviderPricingStepState extends State<ProviderPricingStep> {
             }).toList(),
             onChanged: (value) {
               setState(() {
-                _modeDeFacturation = value!;
+                _billingMode = value!;
               });
               _updateFormData();
             },
@@ -149,20 +149,20 @@ class _ProviderPricingStepState extends State<ProviderPricingStep> {
           SwitchListTile(
             title: const Text('Frais de déplacement'),
             subtitle: const Text('Appliquez-vous des frais de déplacement ?'),
-            value: _boolFraisDeDeplacement,
+            value: _hasTravelFees,
             activeColor: Colors.orange,
             onChanged: (bool value) {
               setState(() {
-                _boolFraisDeDeplacement = value;
+                _hasTravelFees = value;
               });
               _updateFormData();
             },
           ),
           
-          if (_boolFraisDeDeplacement) ...[
+          if (_hasTravelFees) ...[
             const SizedBox(height: 16),
             TextFormField(
-              controller: _montantFraisDeDeplacementController,
+              controller: _travelFeesController,
               decoration: const InputDecoration(
                 labelText: 'Montant des frais de déplacement (FCFA)',
                 border: OutlineInputBorder(),

@@ -30,14 +30,14 @@ class _ProviderVerificationStepState extends State<ProviderVerificationStep> {
   }
 
   void _initializeFormValues() {
-    _idNumberController.text = widget.formData['numeroCNI'] ?? '';
+    _idNumberController.text = widget.formData['idCardNumber'] ?? '';
     
-    if (widget.formData['cni1'] != null) {
-      _idCardFront = File(widget.formData['cni1']);
+    if (widget.formData['idCardFront'] != null) {
+      _idCardFront = File(widget.formData['idCardFront']);
     }
     
-    if (widget.formData['cni2'] != null) {
-      _idCardBack = File(widget.formData['cni2']);
+    if (widget.formData['idCardBack'] != null) {
+      _idCardBack = File(widget.formData['idCardBack']);
     }
   }
 
@@ -66,9 +66,9 @@ class _ProviderVerificationStepState extends State<ProviderVerificationStep> {
 
   void _updateFormData() {
     Map<String, dynamic> updatedData = {
-      'numeroCNI': _idNumberController.text,
-      'cni1': _idCardFront?.path,
-      'cni2': _idCardBack?.path,
+      'idCardNumber': _idNumberController.text,
+      'idCardFront': _idCardFront?.path,
+      'idCardBack': _idCardBack?.path,
     };
     
     widget.onDataChanged(updatedData);

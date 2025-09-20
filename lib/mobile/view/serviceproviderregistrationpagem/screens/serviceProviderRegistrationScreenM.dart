@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
+import 'package:sdealsmobile/data/services/authCubit.dart';
+import 'package:sdealsmobile/mobile/view/provider_dashboard/screens/provider_main_screen.dart';
 import 'package:sdealsmobile/mobile/view/serviceproviderregistrationpagem/screens/steps/provider_personal_info_step.dart';
-import 'package:sdealsmobile/mobile/view/serviceproviderregistrationpagem/screens/steps/providerprofessionalinfo/providerProfessionalInfoStep.dart';
+import 'package:sdealsmobile/mobile/view/serviceproviderregistrationpagem/screens/steps/provider_professional_info_step.dart';
 import 'package:sdealsmobile/mobile/view/serviceproviderregistrationpagem/screens/steps/provider_pricing_step.dart';
 import 'package:sdealsmobile/mobile/view/serviceproviderregistrationpagem/screens/steps/provider_verification_step.dart';
 import 'package:sdealsmobile/mobile/view/serviceproviderregistrationpagem/screens/steps/provider_qualifications_step.dart';
@@ -26,35 +27,31 @@ class _ServiceProviderRegistrationScreenMState
 
   final Map<String, dynamic> formData = {
     'fullName': '',
-    'telephone': '',
+    'phone': '',
     'email': '',
     'password': '',
-    'photoProfil': null,
-    'dateNaissance': null,
-    'genre': 'Homme',
-    'categorie': 'Plombier',
-    'business': '',
-    'service': '',
-    'specialite': <String>[],
-    'anneeExperience': 0,
-    'description': '',
-    'rayonIntervention': 0.0,           // doit être un double
-    'zoneIntervention': <String>[],
-    'localisation': '',
-    'localisationMaps': null,
-    'tarifHoraireMin': 0.0,
-    'tarifHoraireMax': 0.0,
-    'prixprestataire': 0.0,
-    'modeDeFacturation': 'Heure',
-    'boolFraisDeDeplacement': false,
-    'montantFraisDeDeplacement': 0.0,
-    'numeroCNI': '',
-    'cni1': null,
-    'cni2': null,
-    'diplomeCertificat': <dynamic>[],
-    'numeroAssurance': '',
-    'attestationAssurance': null,
-    'numeroRCCM': '',
+    'profileImage': null,
+    'birthDate': null,
+    'gender': 'Homme',
+    'businessName': '',
+    'category': 'Plombier',
+    'specialties': <String>[],
+    'yearsOfExperience': 0,
+    'serviceDescription': '',
+    'serviceAreas': <String>[],
+    'serviceRadius': 0.0,
+    'location': null,
+    'minimumHourlyRate': 0.0,
+    'maximumHourlyRate': 0.0,
+    'billingMode': 'Heure',
+    'travelFees': false,
+    'travelFeesAmount': 0.0,
+    'idCardNumber': '',
+    'idCardFront': null,
+    'idCardBack': null,
+    'certificates': <dynamic>[],
+    'insurance': {'number': '', 'document': null},
+    'businessRegistry': '',
   };
 
   late List<Step> _steps;
@@ -118,6 +115,11 @@ class _ServiceProviderRegistrationScreenMState
 
   void _submitForm() {
     if (_formKey.currentState!.validate()) {
+      // ✅ Injecter l'userId existant s'il est connecté
+      final auth = context.read<AuthCubit>().state;
+      if (auth is AuthAuthenticated) {
+        formData['existingUserId'] = auth.utilisateur.idutilisateur;
+      }
       context.read<ServiceProviderRegistrationBlocM>().add(
         SubmitServiceProviderRegistrationEvent(formData: formData),
       );
@@ -126,28 +128,35 @@ class _ServiceProviderRegistrationScreenMState
 
   @override
   Widget build(BuildContext context) {
-    return BlocListener<ServiceProviderRegistrationBlocM,
-        ServiceProviderRegistrationStateM>(
+    return BlocListener<
+      ServiceProviderRegistrationBlocM,
+      ServiceProviderRegistrationStateM
+    >(
       listener: (context, state) {
         if (state is ServiceProviderRegistrationLoading) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Envoi en cours...")),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text("Envoi en cours...")));
         } else if (state is ServiceProviderRegistrationSuccess) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(state.message)),
-          );
-
-          Future.delayed(const Duration(seconds: 1), () {
-            context.goNamed(
-              'providermain',
-              extra: state.utilisateur, // ⚡ passe l'objet complet
-            );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(state.message)));
+          Future.delayed(const Duration(seconds: 2), () {
+            final auth = context.read<AuthCubit>().state;
+            if (auth is AuthAuthenticated) {
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder:
+                      (context) =>
+                          ProviderMainScreen(utilisateur: auth.utilisateur),
+                ),
+              );
+            }
           });
         } else if (state is ServiceProviderRegistrationFailure) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(state.error)),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(state.error)));
         }
       },
       child: Scaffold(

@@ -17,11 +17,11 @@ class ProviderQualificationsStep extends StatefulWidget {
 }
 
 class _ProviderQualificationsStepState extends State<ProviderQualificationsStep> {
-  final TextEditingController _numeroAssuranceController = TextEditingController();
-  final TextEditingController _numeroRCCMController = TextEditingController();
+  final TextEditingController _insuranceNumberController = TextEditingController();
+  final TextEditingController _businessRegistryController = TextEditingController();
   
-  List<File> _diplomeCertificat = [];
-  File? _attestationAssurance;
+  List<File> _certificates = [];
+  File? _insuranceDocument;
 
   @override
   void initState() {
@@ -30,27 +30,27 @@ class _ProviderQualificationsStepState extends State<ProviderQualificationsStep>
   }
 
   void _initializeFormValues() {
-    _numeroAssuranceController.text = widget.formData['numeroAssurance'] ?? '';
-    _numeroRCCMController.text = widget.formData['numeroRCCM'] ?? '';
+    _insuranceNumberController.text = widget.formData['insurance']?['number'] ?? '';
+    _businessRegistryController.text = widget.formData['businessRegistry'] ?? '';
     
     // Initialiser les certificats
-    if (widget.formData['diplomeCertificat'] != null && widget.formData['diplomeCertificat'] is List) {
-      _diplomeCertificat = (widget.formData['diplomeCertificat'] as List)
+    if (widget.formData['certificates'] != null && widget.formData['certificates'] is List) {
+      _certificates = (widget.formData['certificates'] as List)
           .where((cert) => cert is String)
           .map((path) => File(path))
           .toList();
     }
     
     // Initialiser le document d'assurance
-    if (widget.formData['attestationAssurance'] != null) {
-      _attestationAssurance = File(widget.formData['attestationAssurance']);
+    if (widget.formData['insurance']?['document'] != null) {
+      _insuranceDocument = File(widget.formData['insurance']['document']);
     }
   }
 
   @override
   void dispose() {
-    _numeroAssuranceController.dispose();
-    _numeroRCCMController.dispose();
+    _insuranceNumberController.dispose();
+    _businessRegistryController.dispose();
     super.dispose();
   }
 
@@ -60,7 +60,7 @@ class _ProviderQualificationsStepState extends State<ProviderQualificationsStep>
 
     if (pickedFile != null) {
       setState(() {
-        _diplomeCertificat.add(File(pickedFile.path));
+        _certificates.add(File(pickedFile.path));
       });
       
       _updateFormData();
@@ -69,7 +69,7 @@ class _ProviderQualificationsStepState extends State<ProviderQualificationsStep>
   
   void _removeCertificate(int index) {
     setState(() {
-      _diplomeCertificat.removeAt(index);
+      _certificates.removeAt(index);
     });
     
     _updateFormData();
@@ -81,7 +81,7 @@ class _ProviderQualificationsStepState extends State<ProviderQualificationsStep>
 
     if (pickedFile != null) {
       setState(() {
-        _attestationAssurance = File(pickedFile.path);
+        _insuranceDocument = File(pickedFile.path);
       });
       
       _updateFormData();
@@ -90,10 +90,12 @@ class _ProviderQualificationsStepState extends State<ProviderQualificationsStep>
 
   void _updateFormData() {
     Map<String, dynamic> updatedData = {
-      'diplomeCertificat': _diplomeCertificat.map((file) => file.path).toList(),
-      'numeroAssurance': _numeroAssuranceController.text,
-      'attestationAssurance': _attestationAssurance?.path ,
-      'numeroRCCM': _numeroRCCMController.text,
+      'certificates': _certificates.map((file) => file.path).toList(),
+      'insurance': {
+        'number': _insuranceNumberController.text,
+        'document': _insuranceDocument?.path,
+      },
+      'businessRegistry': _businessRegistryController.text,
     };
     
     widget.onDataChanged(updatedData);
@@ -142,7 +144,7 @@ class _ProviderQualificationsStepState extends State<ProviderQualificationsStep>
               const SizedBox(height: 8),
               
               // Liste des certificats ajoutés
-              if (_diplomeCertificat.isNotEmpty) ...[
+              if (_certificates.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 GridView.builder(
                   shrinkWrap: true,
@@ -153,7 +155,7 @@ class _ProviderQualificationsStepState extends State<ProviderQualificationsStep>
                     mainAxisSpacing: 10,
                     childAspectRatio: 1,
                   ),
-                  itemCount: _diplomeCertificat.length,
+                  itemCount: _certificates.length,
                   itemBuilder: (context, index) {
                     return Stack(
                       children: [
@@ -165,7 +167,7 @@ class _ProviderQualificationsStepState extends State<ProviderQualificationsStep>
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(8),
                             child: Image.file(
-                              _diplomeCertificat[index],
+                              _certificates[index],
                               fit: BoxFit.cover,
                               width: double.infinity,
                               height: double.infinity,
@@ -231,7 +233,7 @@ class _ProviderQualificationsStepState extends State<ProviderQualificationsStep>
               
               // Numéro d'assurance
               TextFormField(
-                controller: _numeroAssuranceController,
+                controller: _insuranceNumberController,
                 decoration: const InputDecoration(
                   labelText: 'Numéro d\'assurance',
                   border: OutlineInputBorder(),
@@ -251,11 +253,11 @@ class _ProviderQualificationsStepState extends State<ProviderQualificationsStep>
                     border: Border.all(color: Colors.grey),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: _attestationAssurance != null
+                  child: _insuranceDocument != null
                       ? ClipRRect(
                           borderRadius: BorderRadius.circular(8),
                           child: Image.file(
-                            _attestationAssurance!,
+                            _insuranceDocument!,
                             fit: BoxFit.cover,
                           ),
                         )
@@ -293,7 +295,7 @@ class _ProviderQualificationsStepState extends State<ProviderQualificationsStep>
               ),
               const SizedBox(height: 8),
               TextFormField(
-                controller: _numeroRCCMController,
+                controller: _businessRegistryController,
                 decoration: const InputDecoration(
                   labelText: 'Numéro du registre du commerce',
                   border: OutlineInputBorder(),
