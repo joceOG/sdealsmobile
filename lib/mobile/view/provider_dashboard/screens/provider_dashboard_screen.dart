@@ -107,7 +107,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
     final revenue = 450000; // Simulé pour l'exemple
     final loyalClients = 3; // Simulé pour l'exemple */
 
-    final providerName = widget.utilisateur.nom + widget.utilisateur.prenom! ;
+    final providerName = widget.utilisateur.nom + " " + widget.utilisateur.prenom! ;
   /*  final rating = widget.prestataire.note ?? 0.0;
     final completedJobs = widget.prestataire.nbMission ?? 0;
     final revenue = widget.prestataire.revenus ?? 0;

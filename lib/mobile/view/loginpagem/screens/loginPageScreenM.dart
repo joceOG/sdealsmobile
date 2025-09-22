@@ -5,8 +5,7 @@ import 'package:go_router/go_router.dart';
 // ✅ import de ton AuthCubit
 import '../../../../data/models/utilisateur.dart';
 import '../../../../data/services/authCubit.dart';
-// import '../../registerpagem/screens/registerPageScreenM.dart';
-import '../../../../data/services/api_client.dart';
+import '../../registerpagem/screens/registerPageScreenM.dart';
 import '../loginpageblocm/loginPageBlocM.dart';
 import '../loginpageblocm/loginPageEventM.dart';
 import '../loginpageblocm/loginPageStateM.dart';
@@ -61,31 +60,25 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
           ),
         ),
         body: BlocListener<LoginPageBlocM, LoginPageStateM>(
-          listener: (context, state) async {
+          listener: (context, state) {
             if (state is LoginPageSuccessM) {
               final utilisateur = Utilisateur.fromMap(state.utilisateur);
-              // ✅ Mettre à jour auth sans rôles d'abord
-              final authCubit = context.read<AuthCubit>();
-              authCubit.setAuthenticated(
+              // ✅ On met à jour l'état global d'auth
+              context.read<AuthCubit>().setAuthenticated(
                 token: state.token,
                 utilisateur: utilisateur,
               );
 
-              // ✅ Charger les rôles depuis le backend
-              final api = ApiClient();
-              try {
-                final rolesResp =
-                    await api.getUserRoles(utilisateur.idutilisateur);
-                final roles =
-                    (rolesResp['roles'] as List<dynamic>?)?.cast<String>() ??
-                        ['CLIENT'];
-                final details = rolesResp['details'] as Map<String, dynamic>?;
-                authCubit.setRoles(roles: roles, roleDetails: details);
-              } catch (_) {}
+              // ✅ Redirection selon le rôle
+              if (utilisateur.role.toLowerCase() == "client") {
+                context.push('/homepage');
+              } else if (utilisateur.role.toLowerCase() == "prestataire") {
+                context.push('/providermain');
+              }
+              print('🔐 Connecté en tant que ${utilisateur.role}');
 
-              // ✅ Redirection vers Home
-              context.push('/homepage');
-              print('go to homepage');
+              // ✅ Puis on redirige vers la Home
+              print('go to homepage') ;
             } else if (state is LoginPageFailureM) {
               ScaffoldMessenger.of(context)
                   .showSnackBar(SnackBar(content: Text(state.error)));
@@ -178,31 +171,29 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
                             onPressed: state is LoginPageLoadingM
                                 ? null
                                 : () {
-                                    final identifiant =
-                                        identifiantController.text.trim();
-                                    final password =
-                                        passwordController.text.trim();
-
-                                    if (identifiant.isEmpty ||
-                                        password.isEmpty) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                              "Mot de passe ou identifiant requis"),
-                                        ),
-                                      );
-                                      return;
-                                    }
-
-                                    context.read<LoginPageBlocM>().add(
-                                          LoginSubmittedM(
-                                            identifiant: identifiant,
-                                            password: password,
-                                            rememberMe: rememberMe,
-                                          ),
-                                        );
-                                  },
+                              final identifiant =
+                              identifiantController.text.trim();
+                              final password =
+                              passwordController.text.trim();
+                              if (identifiant.isEmpty ||
+                                  password.isEmpty) {
+                                ScaffoldMessenger.of(context)
+                                    .showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                        "Mot de passe ou identifiant requis"),
+                                  ),
+                                );
+                                return;
+                              }
+                              context.read<LoginPageBlocM>().add(
+                                LoginSubmittedM(
+                                  identifiant: identifiant,
+                                  password: password,
+                                  rememberMe: rememberMe,
+                                ),
+                              );
+                            },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green.shade700,
                               minimumSize: const Size(double.infinity, 50),
@@ -212,13 +203,13 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
                             ),
                             child: state is LoginPageLoadingM
                                 ? const CircularProgressIndicator(
-                                    color: Colors.white,
-                                  )
+                              color: Colors.white,
+                            )
                                 : const Text(
-                                    "JE ME CONNECTE",
-                                    style: TextStyle(
-                                        fontSize: 16, color: Colors.white),
-                                  ),
+                              "JE ME CONNECTE",
+                              style: TextStyle(
+                                  fontSize: 16, color: Colors.white),
+                            ),
                           );
                         },
                       ),
@@ -251,7 +242,8 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
                           const Text('Vous n\'avez pas de compte?'),
                           TextButton(
                             onPressed: () {
-                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                              WidgetsBinding.instance
+                                  .addPostFrameCallback((_) {
                                 context.push("/register");
                               });
                             },
