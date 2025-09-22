@@ -46,6 +46,8 @@ class LoginPageBlocM extends Bloc<LoginPageEventM, LoginPageStateM> {
         await prefs.setString("utilisateur", jsonEncode(utilisateur.toMap()));
       }
 
+
+
       // ✅ Émettre l'état succès
       emit(LoginPageSuccessM(
         token: token,

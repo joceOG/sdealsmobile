@@ -18,14 +18,14 @@ class ProviderPersonalInfoStep extends StatefulWidget {
 
 class _ProviderPersonalInfoStepState extends State<ProviderPersonalInfoStep> {
   final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _telephoneController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController = TextEditingController();
 
   DateTime? _selectedDate;
-  String? _selectedGenre;
-  File? _photoProfil;
+  String? _selectedGender;
+  File? _profileImage;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
 
@@ -37,21 +37,21 @@ class _ProviderPersonalInfoStepState extends State<ProviderPersonalInfoStep> {
 
   void _initializeFormValues() {
     _nameController.text = widget.formData['fullName'] ?? '';
-    _telephoneController.text = widget.formData['telephone'] ?? '';
+    _phoneController.text = widget.formData['phone'] ?? '';
     _emailController.text = widget.formData['email'] ?? '';
     _passwordController.text = widget.formData['password'] ?? '';
-    _selectedDate = widget.formData['dateNaissance'];
-    _selectedGenre = widget.formData['genre'] ?? 'Homme'; // Valeur par défaut
+    _selectedDate = widget.formData['birthDate'];
+    _selectedGender = widget.formData['gender'] ?? 'Homme'; // Valeur par défaut
     
-    if (widget.formData['photoProfil'] != null) {
-      _photoProfil = File(widget.formData['photoProfil']);
+    if (widget.formData['profileImage'] != null) {
+      _profileImage = File(widget.formData['profileImage']);
     }
   }
 
   @override
   void dispose() {
     _nameController.dispose();
-    _telephoneController.dispose();
+    _phoneController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
@@ -81,7 +81,7 @@ class _ProviderPersonalInfoStepState extends State<ProviderPersonalInfoStep> {
 
     if (pickedFile != null) {
       setState(() {
-        _photoProfil = File(pickedFile.path);
+        _profileImage = File(pickedFile.path);
       });
       
       _updateFormData();
@@ -91,12 +91,12 @@ class _ProviderPersonalInfoStepState extends State<ProviderPersonalInfoStep> {
   void _updateFormData() {
     Map<String, dynamic> updatedData = {
       'fullName': _nameController.text,
-      'telephone': _telephoneController.text,
+      'phone': _phoneController.text,
       'email': _emailController.text,
       'password': _passwordController.text,
-      'dateNaissance': _selectedDate,
-      'genre': _selectedGenre,
-      'photoProfil': _photoProfil?.path,
+      'birthDate': _selectedDate,
+      'gender': _selectedGender,
+      'profileImage': _profileImage?.path,
     };
     
     widget.onDataChanged(updatedData);
@@ -123,8 +123,8 @@ class _ProviderPersonalInfoStepState extends State<ProviderPersonalInfoStep> {
                   child: CircleAvatar(
                     radius: 60,
                     backgroundColor: Colors.grey[300],
-                    backgroundImage: _photoProfil != null ? FileImage(_photoProfil!) : null,
-                    child: _photoProfil == null
+                    backgroundImage: _profileImage != null ? FileImage(_profileImage!) : null,
+                    child: _profileImage == null
                         ? const Icon(Icons.add_a_photo, size: 40, color: Colors.grey)
                         : null,
                   ),
@@ -159,7 +159,7 @@ class _ProviderPersonalInfoStepState extends State<ProviderPersonalInfoStep> {
 
           // Téléphone
           TextFormField(
-            controller: _telephoneController,
+            controller: _phoneController,
             decoration: const InputDecoration(
               labelText: 'Téléphone *',
               border: OutlineInputBorder(),
@@ -287,7 +287,7 @@ class _ProviderPersonalInfoStepState extends State<ProviderPersonalInfoStep> {
               border: OutlineInputBorder(),
               prefixIcon: Icon(Icons.people),
             ),
-            value: _selectedGenre ?? 'Homme', // Assure une valeur valide
+            value: _selectedGender ?? 'Homme', // Assure une valeur valide
             items: const [
               DropdownMenuItem(value: 'Homme', child: Text('Homme')),
               DropdownMenuItem(value: 'Femme', child: Text('Femme')),
@@ -295,7 +295,7 @@ class _ProviderPersonalInfoStepState extends State<ProviderPersonalInfoStep> {
             ],
             onChanged: (value) {
               setState(() {
-                _selectedGenre = value;
+                _selectedGender = value;
               });
               _updateFormData();
             },

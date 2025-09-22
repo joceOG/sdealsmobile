@@ -9,6 +9,7 @@ abstract class JobPageEventM extends Equatable {
 }
 
 class LoadCategorieDataJobM extends JobPageEventM {}
+
 class LoadServiceDataJobM extends JobPageEventM {}
 
 class LoadPriceEstimationM extends JobPageEventM {
@@ -40,5 +41,3 @@ class LoadProviderMatchingM extends JobPageEventM {
   @override
   List<Object> get props => [serviceType, location, preferences ?? []];
 }
-
-

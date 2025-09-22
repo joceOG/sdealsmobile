@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:sdealsmobile/data/models/categorie.dart';
 
 abstract class HomePageEventM extends Equatable {
   const HomePageEventM();
@@ -8,5 +9,3 @@ abstract class HomePageEventM extends Equatable {
 }
 
 class LoadCategorieDataM extends HomePageEventM {}
-
-

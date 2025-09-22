@@ -27,7 +27,8 @@ class RegisterPageBlocM extends Bloc<RegisterPageEventM, RegisterPageStateM> {
 
     on<RegisterSubmitted>((event, emit) async {
       if (state.password != state.confirmPassword) {
-        emit(state.copyWith(errorMessage: "Les mots de passe ne correspondent pas"));
+        emit(state.copyWith(
+            errorMessage: "Les mots de passe ne correspondent pas"));
         return;
       }
 
@@ -49,7 +50,7 @@ class RegisterPageBlocM extends Bloc<RegisterPageEventM, RegisterPageStateM> {
           email: null,
           password: state.password,
           telephone: state.phone,
-          genre: "",       // valeur par défaut
+          genre: "", // valeur par défaut
           note: null,
           photoProfil: null,
           dateNaissance: null,
@@ -57,13 +58,14 @@ class RegisterPageBlocM extends Bloc<RegisterPageEventM, RegisterPageStateM> {
         );
 
         // Appel API
-        final newuser = await apiClient.registerUser(utilisateur);
+        final newuser = await apiClient.registerUser(
+          fullName: state.fullName,
+          phone: state.phone,
+          password: state.password,
+        );
 
         emit(state.copyWith(
-          isSubmitting: false,
-          isSuccess: true,
-          utilisateur : utilisateur
-        ));
+            isSubmitting: false, isSuccess: true, utilisateur: utilisateur));
       } catch (e) {
         emit(state.copyWith(
           isSubmitting: false,
@@ -71,7 +73,5 @@ class RegisterPageBlocM extends Bloc<RegisterPageEventM, RegisterPageStateM> {
         ));
       }
     });
-
-    }
-
+  }
 }

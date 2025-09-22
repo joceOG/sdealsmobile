@@ -1,6 +1,4 @@
 import 'package:equatable/equatable.dart';
-import 'package:sdealsmobile/data/models/prestataire.dart';
-import 'package:sdealsmobile/data/models/utilisateur.dart';
 
 abstract class ServiceProviderRegistrationStateM extends Equatable {
   @override
@@ -13,15 +11,11 @@ class ServiceProviderRegistrationLoading extends ServiceProviderRegistrationStat
 
 class ServiceProviderRegistrationSuccess extends ServiceProviderRegistrationStateM {
   final String message;
-  final Utilisateur utilisateur;
 
-  ServiceProviderRegistrationSuccess({
-    required this.message,
-    required this.utilisateur,
-  });
+  ServiceProviderRegistrationSuccess({required this.message});
 
   @override
-  List<Object?> get props => [message,utilisateur];
+  List<Object?> get props => [message];
 }
 
 class ServiceProviderRegistrationFailure extends ServiceProviderRegistrationStateM {
