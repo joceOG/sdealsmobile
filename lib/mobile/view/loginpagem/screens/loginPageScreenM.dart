@@ -175,7 +175,6 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
                               identifiantController.text.trim();
                               final password =
                               passwordController.text.trim();
-
                               if (identifiant.isEmpty ||
                                   password.isEmpty) {
                                 ScaffoldMessenger.of(context)
@@ -187,7 +186,6 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
                                 );
                                 return;
                               }
-
                               context.read<LoginPageBlocM>().add(
                                 LoginSubmittedM(
                                   identifiant: identifiant,
