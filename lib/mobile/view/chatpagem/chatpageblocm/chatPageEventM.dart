@@ -41,17 +41,15 @@ class SendMessage extends ChatPageEventM {
   final String conversationId;
   final String content;
   final MessageType type;
-  final dynamic imageFile; // File? pour upload image
 
   const SendMessage({
     required this.conversationId,
     required this.content,
     this.type = MessageType.text,
-    this.imageFile,
   });
 
   @override
-  List<Object?> get props => [conversationId, content, type, imageFile];
+  List<Object> get props => [conversationId, content, type];
 }
 
 // Événement pour marquer un message comme lu
@@ -168,28 +166,4 @@ class ChatNotificationReceived extends ChatPageEventM {
 
   @override
   List<Object> get props => [notificationData];
-}
-
-// 🔍 ÉVÉNEMENT RECHERCHE MESSAGES
-class SearchMessages extends ChatPageEventM {
-  final String query;
-
-  const SearchMessages(this.query);
-
-  @override
-  List<Object> get props => [query];
-}
-
-// 🗑️ ÉVÉNEMENT SUPPRESSION MESSAGE
-class DeleteMessage extends ChatPageEventM {
-  final String conversationId;
-  final String messageId;
-
-  const DeleteMessage({
-    required this.conversationId,
-    required this.messageId,
-  });
-
-  @override
-  List<Object> get props => [conversationId, messageId];
 }

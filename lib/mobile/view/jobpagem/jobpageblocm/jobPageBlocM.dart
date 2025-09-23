@@ -272,38 +272,17 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
 
     try {
       ApiClient apiClient = ApiClient();
-      print("📍 🚀 DÉBUT - Chargement des prestataires à proximité...");
+      print("📍 Chargement des prestataires à proximité...");
       print("📍 Position: ${event.latitude}, ${event.longitude}");
       print("📍 Rayon: ${event.radius} km");
-      print("🌐 API URL: ${apiClient.apiUrl}");
 
       // Charger tous les prestataires
-      print("📡 Appel API fetchPrestataires()...");
       final List<Map<String, dynamic>> prestatairesData =
           await apiClient.fetchPrestataires();
-      
-      print("✅ API Response: ${prestatairesData.length} prestataires reçus");
-      if (prestatairesData.isNotEmpty) {
-        print("📋 Premier prestataire sample: ${prestatairesData[0].keys}");
-        print("📋 Premier prestataire data: ${prestatairesData[0]}");
-      }
 
-      print("🔄 Conversion vers modèle Prestataire...");
-      List<Prestataire> allProviders = [];
-      for (int i = 0; i < prestatairesData.length; i++) {
-        try {
-          print("🔄 Conversion prestataire $i...");
-          final provider = Prestataire.fromBackend(prestatairesData[i]);
-          allProviders.add(provider);
-          print("✅ Prestataire $i converti: ${provider.utilisateur.nom} ${provider.utilisateur.prenom}");
-        } catch (e) {
-          print("⚠️ Erreur conversion prestataire $i: $e");
-          print("⚠️ Données problématiques: ${prestatairesData[i]}");
-          // Continue avec les autres
-        }
-      }
-      
-      print("✅ ${allProviders.length} prestataires convertis avec succès");
+      List<Prestataire> allProviders = prestatairesData
+          .map((data) => Prestataire.fromBackend(data))
+          .toList();
 
       // Filtrer par catégorie si spécifiée
       if (event.category != null && event.category!.isNotEmpty) {
@@ -325,11 +304,6 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
             .toList();
       }
 
-      print("🔍 Filtrage par distance...");
-      print("📍 Position utilisateur: ${event.latitude}, ${event.longitude}");
-      print("📍 Rayon de recherche: ${event.radius} km");
-      print("📍 Prestataires avant filtrage: ${allProviders.length}");
-      
       // ✅ NOUVEAU : Filtrage par distance via API backend
       List<Prestataire> nearbyProviders = await _filterByDistance(
         allProviders,
@@ -338,23 +312,19 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
         event.radius,
       );
 
-      print("📍 Prestataires après filtrage distance: ${nearbyProviders.length}");
-
       // Trier par distance et note
       nearbyProviders.sort((a, b) {
         // Priorité aux prestataires vérifiés
         if (a.verifier && !b.verifier) return -1;
         if (!a.verifier && b.verifier) return 1;
 
-        // Puis par note (conversion sécurisée)
-        final noteA = (a.note is num) ? (a.note as num).toDouble() : 0.0;
-        final noteB = (b.note is num) ? (b.note as num).toDouble() : 0.0;
+        // Puis par note
+        final noteA = (a.note ?? 0.0) as double;
+        final noteB = (b.note ?? 0.0) as double;
         if (noteB > noteA) return 1;
         if (noteB < noteA) return -1;
         return 0;
       });
-      
-      print("✅ Prestataires finaux après tri: ${nearbyProviders.length}");
 
       print("✅ Prestataires à proximité trouvés: ${nearbyProviders.length}");
 
@@ -410,10 +380,10 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
         );
       }
 
-      // Trier par note (conversion sécurisée)
+      // Trier par note
       providers.sort((a, b) {
-        final noteA = (a.note is num) ? (a.note as num).toDouble() : 0.0;
-        final noteB = (b.note is num) ? (b.note as num).toDouble() : 0.0;
+        final noteA = (a.note ?? 0.0) as double;
+        final noteB = (b.note ?? 0.0) as double;
         if (noteB > noteA) return 1;
         if (noteB < noteA) return -1;
         return 0;
@@ -472,8 +442,8 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
       providers.sort((a, b) {
         if (a.verifier && !b.verifier) return -1;
         if (!a.verifier && b.verifier) return 1;
-        final noteA = (a.note is num) ? (a.note as num).toDouble() : 0.0;
-        final noteB = (b.note is num) ? (b.note as num).toDouble() : 0.0;
+        final noteA = (a.note ?? 0.0) as double;
+        final noteB = (b.note ?? 0.0) as double;
         if (noteB > noteA) return 1;
         if (noteB < noteA) return -1;
         return 0;
@@ -501,45 +471,26 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
     double userLng,
     double radiusKm,
   ) async {
-    // 🚀 UTILISATION DES VRAIES COORDONNÉES !
+    // Simulation du calcul de distance
+    // En réalité, ceci devrait être fait côté backend avec une vraie base de données géospatiale
     List<Prestataire> nearbyProviders = [];
 
     for (Prestataire provider in providers) {
-      // 📍 EXTRAIRE LES VRAIES COORDONNÉES DU PRESTATAIRE
-      double? providerLat;
-      double? providerLng;
+      // Simuler des coordonnées pour les prestataires (en réalité, ces données viendraient de la DB)
+      double providerLat =
+          userLat + (0.01 * (provider.hashCode % 10 - 5)); // Simulation
+      double providerLng =
+          userLng + (0.01 * (provider.hashCode % 10 - 5)); // Simulation
 
-      // Récupérer les coordonnées depuis localisationMaps
-      if (provider.localisationMaps != null) {
-        try {
-          providerLat = provider.localisationMaps?.latitude;
-          providerLng = provider.localisationMaps?.longitude;
-        } catch (e) {
-          print('Erreur extraction coordonnées prestataire ${provider.utilisateur?.idutilisateur}: $e');
-          continue; // Ignorer ce prestataire s'il n'a pas de coordonnées
-        }
-      }
-
-      // Vérifier que les coordonnées sont valides
-      if (providerLat == null || providerLng == null || 
-          providerLat == 0.0 || providerLng == 0.0) {
-        print('Prestataire ${provider.utilisateur.idutilisateur} ignoré: coordonnées invalides');
-        continue;
-      }
-
-      // 🔢 CALCUL DE DISTANCE RÉEL
-      double distance = _calculateLocalDistance(userLat, userLng, providerLat, providerLng);
-
-      final providerName = '${provider.utilisateur?.prenom ?? ''} ${provider.utilisateur?.nom ?? ''}'.trim();
-      print('Distance pour $providerName: ${distance.toStringAsFixed(2)} km');
+      // ✅ NOUVEAU : Calcul de distance via l'API backend
+      double distance =
+          await _calculateDistance(userLat, userLng, providerLat, providerLng);
 
       if (distance <= radiusKm) {
         nearbyProviders.add(provider);
-        print('✅ Prestataire $providerName ajouté (${distance.toStringAsFixed(2)} km)');
       }
     }
 
-    print('🎯 ${nearbyProviders.length} prestataires dans un rayon de ${radiusKm} km');
     return nearbyProviders;
   }
 

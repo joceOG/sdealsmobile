@@ -11,8 +11,6 @@ import 'mobile/view/home.dart';
 import 'mobile/view/loginpagem/loginpageblocm/loginPageBlocM.dart';
 import 'mobile/view/loginpagem/screens/loginPageScreenM.dart';
 import 'mobile/view/provider_dashboard/screens/provider_main_screen.dart';
-import 'mobile/view/provider_dashboard/screens/prestataire_finalization_screen.dart';
-import 'mobile/view/onboarding/onboarding_screen.dart';
 import 'mobile/view/registerpagem/registerpageblocm/registerPageBlocM.dart';
 import 'mobile/view/registerpagem/screens/registerPageScreenM.dart';
 import 'mobile/view/serviceproviderregistrationpagem/screens/serviceProviderRegistrationScreenM.dart';
@@ -21,23 +19,15 @@ import 'mobile/view/serviceproviderwelcomepagem/screens/serviceProviderWelcomeSc
 import 'mobile/view/shoppingpagem/screens/productDetailsScreenM.dart';
 import 'mobile/view/shoppingpagem/shoppingpageblocm/shoppingPageBlocM.dart';
 import 'mobile/view/shoppingpagem/shoppingpageblocm/shoppingPageEventM.dart'
-as shoppingPageEventM;
+    as shoppingPageEventM;
 import 'mobile/view/splashcreenm/screens/splashScreenM.dart';
 import 'mobile/view/splashcreenm/splashscreenblocm/splashscreenBlocM.dart';
 import 'mobile/view/splashcreenm/splashscreenblocm/splashscreenEventM.dart';
-import 'mobile/view/walletpagem/screens/walletPageScreenM.dart';
-import 'mobile/view/walletpagem/soutrapayblocm/soutra_wallet_bloc.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
-import 'package:hive_flutter/hive_flutter.dart';
-
-// Design System
-import 'design_system/design_system.dart';
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Hive.initFlutter();
   await dotenv.load(fileName: ".env");
   await initializeDateFormatting('fr_FR', null);
 
@@ -59,10 +49,6 @@ class MyApp extends StatelessWidget {
       GoRoute(
         path: '/homepage',
         builder: (context, state) => const Home(),
-      ),
-      GoRoute(
-        path: '/onboarding',
-        builder: (context, state) => const OnboardingScreen(),
       ),
       GoRoute(
         path: '/register',
@@ -102,111 +88,8 @@ class MyApp extends StatelessWidget {
         path: '/providermain',
         name: 'providermain',
         builder: (context, state) {
-          final utilisateur = state.extra as Utilisateur?;
+          final utilisateur = state.extra as Utilisateur;
           return ProviderMainScreen(utilisateur: utilisateur);
-        },
-      ),
-      GoRoute(
-        path: '/prestataire-finalization',
-        name: 'prestataire-finalization',
-        builder: (context, state) {
-          return PrestataireFinalizationScreen();
-        },
-      ),
-      GoRoute(
-        path: '/wallet',
-        builder: (context, state) {
-          return BlocProvider(
-            create: (context) => SoutraWalletBloc(),
-            child: const WalletPageScreenM(),
-          );
-        },
-      ),
-      GoRoute(
-        path: '/wallet/profile',
-        builder: (context, state) {
-          return BlocProvider(
-            create: (context) => SoutraWalletBloc(),
-            child: const WalletPageScreenM(), // Ou créer un ProfileScreen dédié
-          );
-        },
-      ),
-      // 🎯 Route pour les détails de mission (depuis notifications)
-      GoRoute(
-        path: '/mission-details/:missionId',
-        name: 'mission-details',
-        builder: (context, state) {
-          final missionId = state.pathParameters['missionId'] ?? '';
-          // TODO: Créer MissionDetailsScreen
-          return Scaffold(
-            appBar: AppBar(
-              title: const Text('Détails Mission'),
-              backgroundColor: const Color(0xFF2E7D32),
-              foregroundColor: Colors.white,
-            ),
-            body: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.assignment, size: 64, color: Color(0xFF2E7D32)),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Écran Mission à implémenter',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Mission ID: $missionId',
-                    style: const TextStyle(color: Colors.grey),
-                  ),
-                  const SizedBox(height: 24),
-                  const Text(
-                    'TODO: Créer MissionDetailsScreen',
-                    style: TextStyle(fontSize: 14, fontStyle: FontStyle.italic),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-      // 💬 Route pour le chat (depuis notifications)
-      GoRoute(
-        path: '/chat/:conversationId',
-        name: 'chat',
-        builder: (context, state) {
-          final conversationId = state.pathParameters['conversationId'] ?? '';
-          // TODO: Créer ou utiliser ChatScreen existant
-          return Scaffold(
-            appBar: AppBar(
-              title: const Text('Conversation'),
-              backgroundColor: const Color(0xFF2E7D32),
-              foregroundColor: Colors.white,
-            ),
-            body: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.chat_bubble, size: 64, color: Color(0xFF2E7D32)),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Écran Chat à implémenter',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Conversation ID: $conversationId',
-                    style: const TextStyle(color: Colors.grey),
-                  ),
-                  const SizedBox(height: 24),
-                  const Text(
-                    'TODO: Utiliser ChatPageScreenM existant',
-                    style: TextStyle(fontSize: 14, fontStyle: FontStyle.italic),
-                  ),
-                ],
-              ),
-            ),
-          );
         },
       ),
     ],
@@ -235,180 +118,24 @@ class MyApp extends StatelessWidget {
           title: 'Soutrali Deals',
           debugShowCheckedModeBanner: false,
           theme: ThemeData(
-            // ═══════════════════════════════════════
-            // COLORS
-            // ═══════════════════════════════════════
+            colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
             useMaterial3: true,
-            primaryColor: SDColors.primary500,
-            scaffoldBackgroundColor: SDColors.neutral50,
-            cardColor: SDColors.white,
-            dividerColor: SDColors.neutral300,
-
-            colorScheme: ColorScheme.light(
-              primary: SDColors.primary600,
-              secondary: SDColors.secondary500,
-              surface: SDColors.white,
-              background: SDColors.neutral50,
-              error: SDColors.error500,
-              onPrimary: SDColors.white,
-              onSecondary: SDColors.white,
-              onSurface: SDColors.neutral900,
-              onBackground: SDColors.neutral900,
-              onError: SDColors.white,
-            ),
-
-            // ═══════════════════════════════════════
-            // TYPOGRAPHY
-            // ═══════════════════════════════════════
-            fontFamily: SDTypography.fontFamily,
-            textTheme: TextTheme(
-              displayLarge: SDTypography.displayLarge,
-              displayMedium: SDTypography.displayMedium,
-              displaySmall: SDTypography.displaySmall,
-              titleLarge: SDTypography.titleLarge,
-              titleMedium: SDTypography.titleMedium,
-              titleSmall: SDTypography.titleSmall,
-              bodyLarge: SDTypography.bodyLarge,
-              bodyMedium: SDTypography.bodyMedium,
-              bodySmall: SDTypography.bodySmall,
-              labelLarge: SDTypography.labelLarge,
-              labelMedium: SDTypography.labelMedium,
-              labelSmall: SDTypography.labelSmall,
-            ),
-
-            // ═══════════════════════════════════════
-            // APPBAR
-            // ═══════════════════════════════════════
-            appBarTheme: AppBarTheme(
-              backgroundColor: SDColors.primary500,
-              elevation: 0,
-              centerTitle: true,
-              titleTextStyle: SDTypography.titleLarge.copyWith(
-                color: SDColors.white,
-              ),
-              iconTheme: const IconThemeData(
-                color: SDColors.white,
-                size: 24,
-              ),
-            ),
-
-            // ═══════════════════════════════════════
-            // BUTTONS
-            // ═══════════════════════════════════════
-            elevatedButtonTheme: ElevatedButtonThemeData(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: SDColors.primary600,
-                foregroundColor: SDColors.white,
-                textStyle: SDTypography.labelLarge,
-                padding: SDSpacing.buttonPadding,
-                minimumSize: const Size(120, SDSpacing.buttonHeight),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-                ),
-                elevation: 2,
-              ),
-            ),
-
-            outlinedButtonTheme: OutlinedButtonThemeData(
-              style: OutlinedButton.styleFrom(
-                foregroundColor: SDColors.primary600,
-                textStyle: SDTypography.labelLarge,
-                padding: SDSpacing.buttonPadding,
-                minimumSize: const Size(120, SDSpacing.buttonHeight),
-                side: const BorderSide(color: SDColors.primary600, width: 2),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-                ),
-              ),
-            ),
-
-            textButtonTheme: TextButtonThemeData(
-              style: TextButton.styleFrom(
-                foregroundColor: SDColors.primary600,
-                textStyle: SDTypography.labelLarge,
-                padding: SDSpacing.buttonPadding,
-              ),
-            ),
-
-            // ═══════════════════════════════════════
-            // INPUT FIELDS
-            // ═══════════════════════════════════════
-            inputDecorationTheme: InputDecorationTheme(
-              filled: true,
-              fillColor: SDColors.white,
-              contentPadding: SDSpacing.inputPadding,
-
-              labelStyle: SDTypography.bodyMedium.copyWith(
-                color: SDColors.neutral600,
-              ),
-              hintStyle: SDTypography.bodyMedium.copyWith(
-                color: SDColors.neutral400,
-              ),
-              errorStyle: SDTypography.bodySmall.copyWith(
-                color: SDColors.error500,
-              ),
-
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-                borderSide: const BorderSide(color: SDColors.neutral300, width: 1),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-                borderSide: const BorderSide(color: SDColors.neutral300, width: 1),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-                borderSide: const BorderSide(color: SDColors.primary600, width: 2),
-              ),
-              errorBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-                borderSide: const BorderSide(color: SDColors.error500, width: 1),
-              ),
-            ),
-
-            // ═══════════════════════════════════════
-            // CARDS
-            // ═══════════════════════════════════════
-            cardTheme: CardThemeData(
-              color: SDColors.white,
-              elevation: 2,
-              shadowColor: SDColors.neutral900.withOpacity(0.1),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
-              ),
-            ),
-
-            // ═══════════════════════════════════════
-            // LIST TILES
-            // ═══════════════════════════════════════
-            listTileTheme: ListTileThemeData(
-              contentPadding: const EdgeInsets.all(SDSpacing.sm),
-              titleTextStyle: SDTypography.titleMedium,
-              subtitleTextStyle: SDTypography.bodyMedium.copyWith(
-                color: SDColors.neutral600,
-              ),
-            ),
-
-            // ═══════════════════════════════════════
-            // FLOATING ACTION BUTTON
-            // ═══════════════════════════════════════
-            floatingActionButtonTheme: FloatingActionButtonThemeData(
-              backgroundColor: SDColors.primary600,
-              foregroundColor: SDColors.white,
-              elevation: 4,
-            ),
-
-            // ═══════════════════════════════════════
-            // BOTTOM NAVIGATION BAR
-            // ═══════════════════════════════════════
-            bottomNavigationBarTheme: BottomNavigationBarThemeData(
-              backgroundColor: SDColors.white,
-              selectedItemColor: SDColors.primary600,
-              unselectedItemColor: SDColors.neutral500,
-              selectedLabelStyle: SDTypography.labelSmall,
-              unselectedLabelStyle: SDTypography.labelSmall,
-              type: BottomNavigationBarType.fixed,
-            ),
+            inputDecorationTheme: const InputDecorationTheme(
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.all(Radius.circular(8.0)),
+                    borderSide: BorderSide(
+                      color: Colors.grey,
+                      width: 1.5,
+                    )),
+                enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.all(Radius.circular(8.0)),
+                    borderSide: BorderSide(
+                      color: Colors.grey,
+                      width: 1.5,
+                    )),
+                focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.grey)),
+                hintStyle: TextStyle(color: Colors.grey, fontSize: 14)),
           ),
         );
       }),

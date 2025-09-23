@@ -1,33 +1,22 @@
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:sdealsmobile/mobile/view/searchpagem/screens/searchPageScreenM.dart';
 import 'package:sdealsmobile/data/services/authCubit.dart';
 import 'package:sdealsmobile/mobile/view/loginpagem/screens/loginPageScreenM.dart';
 import 'package:sdealsmobile/mobile/view/serviceproviderwelcomepagem/screens/serviceProviderWelcomeScreenM.dart';
 import 'package:sdealsmobile/mobile/view/jobpagem/screens/detailPageScreenM.dart';
 import 'package:sdealsmobile/mobile/view/jobpagem/screens/fullMapScreenM.dart';
-import 'package:sdealsmobile/mobile/view/jobpagem/screens/categories_list_screen.dart';
-import 'package:sdealsmobile/mobile/view/jobpagem/screens/services_list_screen.dart';
-import 'package:sdealsmobile/mobile/view/jobpagem/screens/providers_list_screen.dart';
+import 'package:sdealsmobile/mobile/view/common/screens/ai_assistant_chat_screen.dart';
 import 'package:sdealsmobile/mobile/view/common/widgets/ai_price_estimator_widget.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter/foundation.dart';
 import '../services/custom_marker_service.dart';
-import '../utils/navigation_helper.dart';
-import '../../common/widgets/app_image.dart';
 
 import '../../../../data/models/service.dart';
-// import '../../../../data/models/prestataire.dart'; // ✅ Import manquant - supprimé car non utilisé
 import '../jobpageblocm/jobPageBlocM.dart';
 import '../jobpageblocm/jobPageStateM.dart';
 import '../jobpageblocm/jobPageEventM.dart';
-
-// Design System
-import '../../../../design_system/colors.dart';
-import '../../../../design_system/typography.dart';
-import '../../../../design_system/spacing.dart';
 
 class JobPageScreenM extends StatefulWidget {
   final List<dynamic> categories;
@@ -39,13 +28,12 @@ class JobPageScreenM extends StatefulWidget {
 }
 
 class _JobPageScreenMState extends State<JobPageScreenM> {
-  // GoogleMapController? _mapController; // Supprimé car non utilisé
+  GoogleMapController? _mapController;
   Set<Marker> _markers = {};
   LatLng? _userLocation;
   double _searchRadius = 5.0;
   String _selectedCategory = '';
   String _selectedService = '';
-  bool _showWelcomeBanner = true; // ✅ Contrôle l'affichage du banner
 
   // Catégories par défaut si pas de données API
   final List<Map<String, dynamic>> defaultCategories = const [
@@ -65,39 +53,46 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
       "icon": Icons.flash_on,
       "title": "Urgence",
       "subtitle": "24h/24",
-      "color": SDColors.error500,
+      "color": Colors.red,
       "action": "urgent"
     },
     {
       "icon": Icons.star,
       "title": "Top Rated",
       "subtitle": "Les meilleurs",
-      "color": SDColors.warning500,
+      "color": Colors.amber,
       "action": "toprated"
     },
     {
       "icon": Icons.location_on,
       "title": "Proche",
       "subtitle": "À proximité",
-      "color": SDColors.info500,
+      "color": Colors.blue,
       "action": "nearby"
     },
     {
       "icon": Icons.savings,
       "title": "Promo",
       "subtitle": "Économisez",
-      "color": SDColors.primary600,
+      "color": Colors.green,
       "action": "promo"
+    },
+    {
+      "icon": Icons.smart_toy,
+      "title": "IA Conseil",
+      "subtitle": "Assistant",
+      "color": Colors.purple,
+      "action": "ai"
     },
   ];
 
-  // Messages promotionnels pour la bannière (supprimé car non utilisé)
-  // static const List<String> bannerMessages = [
-  //   "✨ Obtenez 10% de réduction sur votre première commande !",
-  //   "🎯 Trouvez le prestataire idéal à proximité",
-  //   "🛠️ Des services de qualité à portée de main",
-  //   "💼 Rejoignez notre communauté de prestataires",
-  // ];
+  // Messages promotionnels pour la bannière
+  static const List<String> bannerMessages = [
+    "✨ Obtenez 10% de réduction sur votre première commande !",
+    "🎯 Trouvez le prestataire idéal à proximité",
+    "🛠️ Des services de qualité à portée de main",
+    "💼 Rejoignez notre communauté de prestataires",
+  ];
 
   // Données fictives pour les carrousels (à remplacer par API)
   static const List<Map<String, String>> topServices = [
@@ -128,40 +123,58 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
     },
   ];
 
-  // Données fictives pour les prestataires (supprimé car non utilisé)
-  // static const List<Map<String, dynamic>> topPrestataires = [
-  //   {
-  //     "image": "assets/categories/Image1.png",
-  //     "title": "Électricien",
-  //     "subtitle": "Disponible 24h/24",
-  //     "location": "Abidjan",
-  //     "rating": "4.8",
-  //     "verified": true,
-  //     "online": true
-  //   },
-  //   // ... autres prestataires
-  // ];
+  static const List<Map<String, dynamic>> topPrestataires = [
+    {
+      "image": "assets/categories/Image1.png",
+      "title": "Électricien",
+      "subtitle": "Disponible 24h/24",
+      "location": "Abidjan",
+      "rating": "4.8",
+      "verified": true,
+      "online": true
+    },
+    {
+      "image": "assets/categories/Image2.png",
+      "title": "Maçon",
+      "subtitle": "Spécialiste rénovation",
+      "location": "yamoussoukro",
+      "rating": "4.6",
+      "verified": false,
+      "online": false
+    },
+    {
+      "image": "assets/categories/Image3.png",
+      "title": "Peintre",
+      "subtitle": "Peinture intérieure/extérieure",
+      "location": "Abobo PK18",
+      "rating": "4.7",
+      "verified": true,
+      "online": true
+    },
+    {
+      "image": "assets/categories/Image4.png",
+      "title": "Jardinier",
+      "subtitle": "Entretien & aménagement",
+      "location": "Cocody",
+      "rating": "4.5",
+      "verified": false,
+      "online": true
+    },
+    {
+      "image": "assets/categories/Image5.png",
+      "title": "Cuisinier",
+      "subtitle": "Cuisine africaine & européenne",
+      "location": "Plateau",
+      "rating": "4.9",
+      "verified": true,
+      "online": false
+    },
+  ];
 
   @override
   void initState() {
     super.initState();
     _getCurrentLocation();
-    // ✅ NOUVEAU : Charger les prestataires par défaut (fallback)
-    // Utiliser addPostFrameCallback pour s'assurer que le contexte est prêt
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        _loadDefaultProviders();
-      }
-    });
-  }
-
-  // ✅ NOUVEAU : Charger les prestataires même sans géolocalisation
-  void _loadDefaultProviders() {
-    print('📍 Chargement des prestataires par défaut (sans géolocalisation)');
-    context.read<JobPageBlocM>().add(const LoadProviderMatchingM(
-          serviceType: '',
-          location: '',
-        ));
   }
 
   Future<void> _getCurrentLocation() async {
@@ -173,7 +186,6 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
 
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {
-        print('❌ Permission de localisation refusée - utilisation des prestataires par défaut');
         return;
       }
 
@@ -185,9 +197,8 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
         _userLocation = LatLng(position.latitude, position.longitude);
       });
 
-      // Charger les prestataires à proximité (remplace les prestataires par défaut)
+      // Charger les prestataires à proximité
       if (_userLocation != null) {
-        print('📍 Position obtenue - chargement des prestataires à proximité');
         context.read<JobPageBlocM>().add(LoadNearbyProvidersM(
               latitude: _userLocation!.latitude,
               longitude: _userLocation!.longitude,
@@ -197,7 +208,7 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
             ));
       }
     } catch (e) {
-      print('❌ Erreur géolocalisation: $e - utilisation des prestataires par défaut');
+      print('Erreur géolocalisation: $e');
     }
   }
 
@@ -231,17 +242,29 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
           ? _userLocation!.longitude + (0.01 * (i - 2))
           : -4.0083;
 
-      // Déterminer le type de marqueur selon le service (simplifié)
-      // serviceName supprimé car non utilisé
+      // Déterminer le type de marqueur selon le service
+      IconData? serviceIcon;
+      String serviceName = provider.service?.nomservice ?? '';
+      if (serviceName.toLowerCase().contains('médical') ||
+          serviceName.toLowerCase().contains('santé') ||
+          serviceName.toLowerCase().contains('docteur')) {
+        serviceIcon = Icons.local_hospital;
+      } else if (serviceName.toLowerCase().contains('réparation') ||
+          serviceName.toLowerCase().contains('plomberie') ||
+          serviceName.toLowerCase().contains('électricité')) {
+        serviceIcon = Icons.build;
+      } else {
+        serviceIcon = Icons.work;
+      }
 
       // Créer le marqueur personnalisé avec couleur intelligente
       final providerIcon = await CustomMarkerService.createSmartProviderMarker(
         name: provider.utilisateur?.fullName ?? 'Prestataire',
-        category: provider.service.categorie?.nomcategorie ?? '',
+        category: provider.categorie?.nomcategorie ?? '',
         service: provider.service?.nomservice ?? '',
         isVerified: provider.verifier == true,
-        isUrgent:
-            false, // Simplification - pas de données de disponibilité dans le modèle
+        isUrgent: provider.disponibilite == 'urgent' ||
+            (provider.note != null && provider.note < 3.0),
       );
 
       markers.add(
@@ -270,8 +293,9 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
           ..add(LoadCategorieDataJobM())
           ..add(LoadServiceDataJobM()),
         child: Scaffold(
-          backgroundColor: SDColors.white,
-          floatingActionButton: FloatingActionButton(
+          backgroundColor: Colors.white,
+          // ✅ CTA Flottant
+          floatingActionButton: FloatingActionButton.extended(
             onPressed: () {
               final authState = context.read<AuthCubit>().state;
               if (authState is! AuthAuthenticated) {
@@ -293,80 +317,86 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                 ),
               );
             },
-            backgroundColor: SDColors.primary600,
-            child: const Icon(Icons.handyman, color: SDColors.white),
-            tooltip: 'Devenir Prestataire',
+            backgroundColor: Colors.green, // Vert de base de l'app
+            icon: const Icon(Icons.handyman, color: Colors.white),
+            label: const Text(
+              '🔧 Devenir Prestataire',
+              style:
+                  TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            ),
           ),
+          // ✅ NOUVEAU : CustomScrollView pour performance optimale
           body: BlocListener<JobPageBlocM, JobPageStateM>(
             listener: (context, state) {
+              // Mettre à jour les marqueurs de la carte quand les prestataires changent
               if (state.nearbyProviders.isNotEmpty) {
                 _updateMapMarkers(state.nearbyProviders);
               }
             },
             child: CustomScrollView(
               slivers: [
+                // AppBar slim moderne
+                _buildModernSliverAppBar(),
+
                 // Banner promo sticky (si newbie)
                 _buildPromoStickyBanner(context),
 
-                // Bannière (remplace SoutraPay + IA)
-                _buildHomeBannerSliver(context),
+                // Chips SoutraPay + IA
+                _buildToolChipsSliver(context),
 
                 // Contenu principal
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: SDSpacing.md),
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        SizedBox(height: SDSpacing.lg),
-                        
-                        // 🎯 SECTION 1 : HERO SEARCH BAR
-                        _buildHeroSearchBar(),
-                        SizedBox(height: SDSpacing.md),
+                        const SizedBox(height: 16),
+                        // Quick Actions section (remplace les stories)
+                        _buildQuickActionsSection(),
+                        const SizedBox(height: 20),
 
-                        // Catégories (en avant)
+                        // Titre catégories
                         Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Icon(Icons.category, color: SDColors.primary600, size: 22),
-                            SizedBox(width: SDSpacing.xs),
-                            Expanded(
-                              child: Text(
-                                'Catégories',
-                                style: SDTypography.titleLarge.copyWith(color: SDColors.neutral900),
-                                overflow: TextOverflow.ellipsis,
+                            const Text(
+                              'Top Catégories',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 20,
+                                color: Colors.black,
                               ),
                             ),
-                            TextButton.icon(
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const CategoriesListScreen(),
-                                  ),
-                                );
-                              },
-                              icon: const Icon(Icons.arrow_forward, size: 14),
-                              label: Text('Tout', style: SDTypography.labelSmall),
-                              style: TextButton.styleFrom(
-                                foregroundColor: SDColors.primary600,
-                                padding: SDSpacing.chipPadding,
-                                minimumSize: const Size(0, 32),
+                            GestureDetector(
+                              onTap: () {},
+                              child: const Text(
+                                'Voir plus',
+                                style: TextStyle(
+                                  color: Colors.green,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 15,
+                                ),
                               ),
                             ),
                           ],
                         ),
-                        SizedBox(height: SDSpacing.sm),
-                        
+                        const SizedBox(height: 12),
+                        // Liste horizontale des catégories avec design amélioré
+
                         BlocBuilder<JobPageBlocM, JobPageStateM>(
                           builder: (context, state) {
                             if (state.isLoading) {
-                              return _buildSkeletonLoader(height: 120, count: 4);
+                              return const Center(
+                                  child: CircularProgressIndicator(
+                                      color: Colors.green));
                             }
                             if (state.error.isNotEmpty) {
-                              return _buildErrorCard(state.error);
+                              return Text("Erreur: ${state.error}",
+                                  style: const TextStyle(color: Colors.red));
                             }
                             if (state.listItems.isEmpty) {
-                              return _buildEmptyState('Aucune catégorie disponible');
+                              return const Text("Aucune catégorie disponible");
                             }
 
                             return SizedBox(
@@ -374,7 +404,8 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                               child: ListView.separated(
                                 scrollDirection: Axis.horizontal,
                                 itemCount: state.listItems.length,
-                                separatorBuilder: (_, __) => SizedBox(width: SDSpacing.sm),
+                                separatorBuilder: (_, __) =>
+                                    const SizedBox(width: 14),
                                 itemBuilder: (context, index) {
                                   final cat = state.listItems[index];
                                   return _buildCategoryCardWithImage(
@@ -387,459 +418,139 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                             );
                           },
                         ),
-                        SizedBox(height: SDSpacing.lg),
-                        
-                        // Services populaires
+                        const SizedBox(height: 20),
+
+                        // Titre Top Services
                         Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Icon(Icons.build, color: SDColors.primary600, size: 22),
-                            SizedBox(width: SDSpacing.xs),
-                            Expanded(
-                              child: Text(
-                                'Services populaires',
-                                style: SDTypography.titleLarge.copyWith(color: SDColors.neutral900),
-                                overflow: TextOverflow.ellipsis,
+                            const Text(
+                              'Top Services',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 20,
+                                color: Colors.black,
                               ),
                             ),
-                            TextButton.icon(
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const ServicesListScreen(),
-                                  ),
-                                );
-                              },
-                              icon: const Icon(Icons.arrow_forward, size: 14),
-                              label: Text('Tout', style: SDTypography.labelSmall),
-                              style: TextButton.styleFrom(
-                                foregroundColor: SDColors.primary600,
-                                padding: SDSpacing.chipPadding,
-                                minimumSize: const Size(0, 32),
+                            GestureDetector(
+                              onTap: () {},
+                              child: const Text(
+                                'Voir plus',
+                                style: TextStyle(
+                                  color: Colors.green,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 15,
+                                ),
                               ),
                             ),
                           ],
                         ),
-                        SizedBox(height: SDSpacing.sm),
-                        
-                        // Carrousel Services
+                        const SizedBox(height: 12),
+                        // Estimation IA de prix pour un service populaire
+                        AIPriceEstimatorWidget(
+                          serviceCategory: topServices.isNotEmpty
+                              ? topServices[0]['title']!
+                              : 'Service',
+                          location: 'Abidjan',
+                          jobDescription: 'Besoin standard',
+                        ),
+                        const SizedBox(height: 16),
+                        // Carrousel Top Services
                         BlocBuilder<JobPageBlocM, JobPageStateM>(
                           builder: (context, state) {
                             if (state.isLoading2) {
-                              return _buildSkeletonLoader(height: 150, count: 3);
+                              return const Center(
+                                  child: CircularProgressIndicator());
                             }
+
                             if (state.listItems2.isEmpty) {
-                              return _buildEmptyState('Aucun service disponible');
+                              return const Center(
+                                  child: Text('Aucun service disponible'));
                             }
 
-                            return SizedBox(
-                              height: 150,
-                              child: ListView.separated(
-                                scrollDirection: Axis.horizontal,
-                                itemCount: state.listItems2.length,
-                                separatorBuilder: (_, __) => SizedBox(width: SDSpacing.sm),
-                                itemBuilder: (context, index) {
-                                  final service = state.listItems2[index];
-                                  
-                                  return GestureDetector(
-                                    onTap: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) => DetailPage(
-                                            title: service.nomservice,
-                                            image: service.imageservice,
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                    child: Container(
-                                      width: 280,
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(16),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withOpacity(0.1),
-                                            blurRadius: 8,
-                                            offset: const Offset(0, 2),
-                                          ),
-                                        ],
-                                      ),
-                                      child: Card(
-                                        elevation: 0,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(16),
-                                        ),
-                                        color: const Color(0xFF2E7D32).withOpacity(0.05),
-                                        child: Row(
-                                          children: [
-                                            // Image
-                                            ClipRRect(
-                                              borderRadius: const BorderRadius.horizontal(
-                                                left: Radius.circular(16),
-                                              ),
-                                              child: service.imageservice.isNotEmpty
-                                                  ? AppImage(
-                                                      imageUrl: service.imageservice,
-                                                      width: 110,
-                                                      height: 150,
-                                                      fit: BoxFit.cover,
-                                                      placeholderAsset: 'assets/products/default.png',
-                                                    )
-                                                  : Container(
-                                                      width: 110,
-                                                      height: 150,
-                                                      color: const Color(0xFF2E7D32).withOpacity(0.1),
-                                                      child: const Icon(
-                                                        Icons.handyman,
-                                                        size: 40,
-                                                        color: const Color(0xFF2E7D32),
-                                                      ),
-                                                    ),
-                                            ),
-                                            // Contenu
-                                            Expanded(
-                                              child: Padding(
-                                                padding: SDSpacing.cardPadding,
-                                                child: Column(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                  mainAxisAlignment: MainAxisAlignment.center,
-                                                  mainAxisSize: MainAxisSize.min,
-                                                  children: [
-                                                    Text(
-                                                      service.nomservice,
-                                                      style: SDTypography.titleSmall.copyWith(
-                                                        color: SDColors.neutral900,
-                                                      ),
-                                                      maxLines: 2,
-                                                      overflow: TextOverflow.ellipsis,
-                                                    ),
-                                                    SizedBox(height: SDSpacing.xxxs),
-                                                    if (service.categorie?.nomcategorie != null)
-                                                      Text(
-                                                        service.categorie!.nomcategorie,
-                                                        style: SDTypography.bodySmall.copyWith(
-                                                          color: SDColors.neutral500,
-                                                        ),
-                                                        maxLines: 1,
-                                                        overflow: TextOverflow.ellipsis,
-                                                      ),
-                                                    const Spacer(),
-                                                    Row(
-                                                      children: [
-                                                        Expanded(
-                                                          child: Text(
-                                                            '${service.prixmoyen} FCFA/h',
-                                                            style: SDTypography.labelMedium.copyWith(
-                                                              color: SDColors.primary600,
-                                                            ),
-                                                            overflow: TextOverflow.ellipsis,
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          padding: EdgeInsets.symmetric(
-                                                            horizontal: SDSpacing.xxxs,
-                                                            vertical: SDSpacing.xxxs,
-                                                          ),
-                                                          decoration: BoxDecoration(
-                                                            color: SDColors.primary600,
-                                                            borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
-                                                          ),
-                                                          child: Icon(
-                                                            Icons.arrow_forward,
-                                                            color: SDColors.white,
-                                                            size: 14,
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ),
-                                          ],
+                            return CarouselSlider.builder(
+                              itemCount: state.listItems2.length,
+                              options: CarouselOptions(
+                                height: 180.0,
+                                autoPlay: true,
+                                autoPlayInterval: const Duration(seconds: 3),
+                                enlargeCenterPage: true,
+                                viewportFraction: 0.78,
+                              ),
+                              itemBuilder: (context, index, realIndex) {
+                                final Service item = state.listItems2[index];
+
+                                return GestureDetector(
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => DetailPage(
+                                          title: item.nomservice,
+                                          image: item.imageservice,
                                         ),
                                       ),
+                                    );
+                                  },
+                                  child: Card(
+                                    elevation: 2,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14.0),
                                     ),
-                                  );
-                                },
-                              ),
-                            );
-                          },
-                        ),
-                        SizedBox(height: SDSpacing.lg),
-
-                        // Prestataires
-                        Row(
-                          children: [
-                            Icon(Icons.people, color: SDColors.primary600, size: 22),
-                            SizedBox(width: SDSpacing.xs),
-                            Expanded(
-                              child: Text(
-                                'Prestataires',
-                                style: SDTypography.titleLarge.copyWith(color: SDColors.neutral900),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            TextButton.icon(
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const ProvidersListScreen(),
-                                  ),
-                                );
-                              },
-                              icon: const Icon(Icons.arrow_forward, size: 14),
-                              label: Text('Tout', style: SDTypography.labelSmall),
-                              style: TextButton.styleFrom(
-                                foregroundColor: SDColors.primary600,
-                                padding: SDSpacing.chipPadding,
-                                minimumSize: const Size(0, 32),
-                              ),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: SDSpacing.sm),
-
-                        // Carrousel Top Prestataires (vraies données)
-                        BlocBuilder<JobPageBlocM, JobPageStateM>(
-                          builder: (context, state) {
-                            // ✅ AMÉLIORÉ : Utiliser nearbyProviders si disponible, sinon matchedProviders
-                            List<dynamic> topPrestatairesReal;
-                            
-                            if (state.nearbyProviders.isNotEmpty) {
-                              // Prestataires à proximité (avec géolocalisation)
-                              topPrestatairesReal = state.nearbyProviders.take(5).toList();
-                              print('✅ Affichage de ${topPrestatairesReal.length} prestataires à proximité');
-                            } else if (state.matchedProviders.isNotEmpty) {
-                              // Prestataires par défaut (sans géolocalisation)
-                              topPrestatairesReal = state.matchedProviders.take(5).toList();
-                              print('✅ Affichage de ${topPrestatairesReal.length} prestataires par défaut');
-                            } else {
-                              // Aucun prestataire
-                              topPrestatairesReal = [];
-                            }
-
-                          if (topPrestatairesReal.isEmpty) {
-                            // Afficher un loader si en cours de chargement
-                            if (state.isNearbyLoading || state.isMatchingLoading) {
-                              return SizedBox(
-                                height: 150,
-                                child: Center(
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: const [
-                                      CircularProgressIndicator(color: Color(0xFF2E7D32)),
-                                      SizedBox(height: 8),
-                                      Text('Chargement des prestataires...'),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            }
-                            
-                            return SizedBox(
-                              height: 150,
-                              child: Center(
-                                child: Text('Aucun prestataire trouvé',
-                                    style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral500)),
-                              ),
-                            );
-                          }
-
-                          return CarouselSlider.builder(
-                            itemCount: topPrestatairesReal.length,
-                            options: CarouselOptions(
-                              height: 150.0, // Réduit de 170 à 150 pour meilleur UX
-                              autoPlay: true,
-                              autoPlayInterval: const Duration(seconds: 5), // Plus lent
-                              enlargeCenterPage: true,
-                              viewportFraction: 0.88, // Montre plus de contexte
-                            ),
-                            itemBuilder: (context, index, realIndex) {
-                              final prestataire = topPrestatairesReal[index];
-                              // Extraire les données du prestataire réel
-                              String providerName = 'Prestataire';
-                              String serviceName = 'Service';
-                              String location = 'Localisation';
-                              String rating = 'N/A';
-                              bool isVerified = false;
-                              String imageUrl = '';
-
-                              // Extraction sécurisée des données depuis objet Prestataire
-                              try {
-                                // Les données viennent maintenant sous forme d'objets Prestataire convertis
-                                providerName = prestataire.utilisateur.fullName;
-                                if (providerName.isEmpty)
-                                  providerName = 'Prestataire';
-                                imageUrl =
-                                    prestataire.utilisateur.photoProfil ?? '';
-                                serviceName = prestataire.service.nomservice;
-                                location = prestataire.localisation;
-                                rating = prestataire.note ?? 'N/A';
-                                isVerified = prestataire.verifier;
-                              } catch (e) {
-                                print(
-                                    'Erreur extraction données prestataire: $e');
-                              }
-
-                              return GestureDetector(
-                                onTap: () {
-                                  // ✅ Navigation vers le profil complet du prestataire
-                                  NavigationHelper.navigateToProviderProfile(
-                                    context,
-                                    providerId: prestataire.idprestataire,
-                                    providerData: prestataire.toJson(),
-                                  );
-                                },
-                                child: Card(
-                                  elevation: 4, // Standardisé
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(
-                                        16), // Standardisé
-                                  ),
-                                  color: Colors.white,
-                                  child: Padding(
-                                    padding: SDSpacing.cardPadding,
-                                    child: Row(
+                                    color: Colors.green.withOpacity(0.07),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
-                                        // Image du prestataire
-                                        Stack(
-                                          children: [
-                                            ClipRRect(
-                                              borderRadius:
-                                                  BorderRadius.circular(14.0),
-                                              child: imageUrl.isNotEmpty
-                                                  ? AppImage(
-                                                      imageUrl: imageUrl,
-                                                      fit: BoxFit.cover,
-                                                      width: 90,
-                                                      height: 130,
-                                                      placeholderAsset: 'assets/profil.png',
-                                                    )
-                                                  : Image.asset(
-                                                      'assets/profil.png',
-                                                      fit: BoxFit.cover,
-                                                      width: 90,
-                                                      height: 130,
-                                                    ),
-                                            ),
-                                            // Indicateur vérification
-                                            if (isVerified)
-                                              Positioned(
-                                                top: 8,
-                                                right: 8,
-                                                child: Container(
-                                                  padding:
-                                                      EdgeInsets.all(SDSpacing.xxxs),
-                                                  decoration:
-                                                      BoxDecoration(
-                                                    color:
-                                                        SDColors.primary600,
-                                                    shape: BoxShape.circle,
-                                                  ),
-                                                  child: const Icon(
-                                                    Icons.verified,
-                                                    color: Colors.white,
-                                                    size: 12,
-                                                  ),
-                                                ),
-                                              ),
-                                          ],
-                                        ),
-                                        SizedBox(width: SDSpacing.sm),
-                                        // Infos du prestataire
                                         Expanded(
+                                          child: ClipRRect(
+                                            borderRadius:
+                                                const BorderRadius.vertical(
+                                              top: Radius.circular(14.0),
+                                            ),
+                                            child: item.imageservice.isNotEmpty
+                                                ? Image.network(
+                                                    item.imageservice,
+                                                    fit: BoxFit.cover,
+                                                    width: double.infinity,
+                                                  )
+                                                : Image.asset(
+                                                    'assets/default.png',
+                                                    fit: BoxFit.cover,
+                                                    width: double.infinity,
+                                                  ),
+                                          ),
+                                        ),
+                                        Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 10, vertical: 6),
                                           child: Column(
                                             crossAxisAlignment:
                                                 CrossAxisAlignment.start,
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
                                             children: [
-                                              Row(
-                                                children: [
-                                                  Expanded(
-                                                    child: Text(
-                                                      providerName,
-                                                      style: SDTypography.titleSmall.copyWith(
-                                                        color: SDColors.neutral900,
-                                                      ),
-                                                      overflow:
-                                                          TextOverflow.ellipsis,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                              SizedBox(height: SDSpacing.xxxs),
                                               Text(
-                                                serviceName,
-                                                style: SDTypography.bodySmall.copyWith(
-                                                  color: SDColors.neutral600,
+                                                item.nomservice,
+                                                style: const TextStyle(
+                                                  color: Colors.black87,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 16.0,
                                                 ),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
                                               ),
-                                              SizedBox(height: SDSpacing.xxs),
-                                              Row(
-                                                children: [
-                                                  Icon(Icons.location_on,
-                                                      size: 14,
-                                                      color: SDColors.primary600),
-                                                  SizedBox(width: SDSpacing.xxxs),
-                                                  Expanded(
-                                                    flex: 3,
-                                                    child: Text(
-                                                      location,
-                                                      style: SDTypography.bodySmall.copyWith(
-                                                        color: SDColors.primary600,
-                                                      ),
-                                                      maxLines: 1,
-                                                      overflow:
-                                                          TextOverflow.ellipsis,
-                                                    ),
-                                                  ),
-                                                  SizedBox(width: SDSpacing.xxxs),
-                                                  Icon(Icons.star,
-                                                      size: 14,
-                                                      color: SDColors.warning500),
-                                                  SizedBox(width: SDSpacing.xxxs),
-                                                  Flexible(
-                                                    flex: 1,
-                                                    child: Text(
-                                                      rating,
-                                                      style: SDTypography.labelSmall.copyWith(
-                                                        color: SDColors.warning500,
-                                                      ),
-                                                      maxLines: 1,
-                                                      overflow: TextOverflow.ellipsis,
-                                                    ),
-                                                  ),
-                                                ],
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                'À partir de ${item.prixmoyen} FCFA/h',
+                                                style: const TextStyle(
+                                                  color: Colors.green,
+                                                  fontSize: 12.0,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
                                               ),
-                                              SizedBox(height: SDSpacing.xxxs),
-                                              SizedBox(
-                                                height: 28,
-                                                child: ElevatedButton(
-                                                  onPressed: () {
-                                                    // Action contacter
-                                                  },
-                                                  style:
-                                                      ElevatedButton.styleFrom(
-                                                    backgroundColor:
-                                                        SDColors.primary600,
-                                                    foregroundColor:
-                                                        SDColors.white,
-                                                    padding: SDSpacing.chipPadding,
-                                                    shape:
-                                                        RoundedRectangleBorder(
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                              SDSpacing.borderRadiusMedium),
-                                                    ),
-                                                  ),
-                                                  child: Text('Contacter',
-                                                      style: SDTypography.labelSmall),
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                'Catégorie: ${item.categorie?.nomcategorie}',
+                                                style: const TextStyle(
+                                                  color: Colors.black54,
+                                                  fontSize: 11.0,
                                                 ),
                                               ),
                                             ],
@@ -848,25 +559,214 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                                       ],
                                     ),
                                   ),
-                                ),
-                              );
-                            },
-                          );
-                        }),
-                        SizedBox(height: SDSpacing.lg),
-                        
-                        // 📍 AUTOUR DE MOI (Carte interactive + liste)
+                                );
+                              },
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 32),
+
+                        // ✅ NOUVEAU : Section "Autour de moi" avec carte
                         _buildAroundMeSection(),
-                        SizedBox(height: SDSpacing.xl),
 
-                        // 🔥 Promotions
-                        _buildActivePromotionsSection(),
-                        SizedBox(height: SDSpacing.xl),
+                        const SizedBox(height: 32),
 
-                        // Actions rapides (en dernier)
-                        _buildQuickActionsSection(),
-                        
-                        SizedBox(height: SDSpacing.xxl), // Espacement final pour FAB
+                        // Titre Top Prestataires
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Top Prestataires',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 20,
+                                color: Colors.black,
+                              ),
+                            ),
+                            GestureDetector(
+                              onTap: () {},
+                              child: const Text(
+                                'Voir plus',
+                                style: TextStyle(
+                                  color: Colors.green,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 15,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+
+                        // À la une cette semaine
+                        _buildFeaturedSection(),
+                        const SizedBox(height: 24),
+
+                        // Carrousel Top Prestataires (design différent)
+                        CarouselSlider.builder(
+                          itemCount: topPrestataires.length,
+                          options: CarouselOptions(
+                            height: 170.0,
+                            autoPlay: true,
+                            autoPlayInterval: const Duration(seconds: 4),
+                            enlargeCenterPage: true,
+                            viewportFraction: 0.85,
+                          ),
+                          itemBuilder: (context, index, realIndex) {
+                            final item = topPrestataires[index];
+                            return GestureDetector(
+                              onTap: () {
+                                // Redirection vers la page de détails du prestataire
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => DetailPage(
+                                      title: item['title']!,
+                                      image: item['image']!,
+                                    ),
+                                  ),
+                                );
+                              },
+                              child: Card(
+                                elevation: 5,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(18.0),
+                                ),
+                                color: Colors.white,
+                                child: Padding(
+                                  padding: const EdgeInsets.all(12.0),
+                                  child: Row(
+                                    children: [
+                                      // Image du prestataire
+                                      Stack(
+                                        children: [
+                                          ClipRRect(
+                                            borderRadius:
+                                                BorderRadius.circular(14.0),
+                                            child: Image.asset(
+                                              item['image']!,
+                                              fit: BoxFit.cover,
+                                              width: 90,
+                                              height: 130,
+                                            ),
+                                          ),
+                                          // Indicateur en ligne
+                                          Positioned(
+                                            top: 8,
+                                            right: 8,
+                                            child: Container(
+                                              width: 12,
+                                              height: 12,
+                                              decoration: BoxDecoration(
+                                                color: item['online'] == true
+                                                    ? Colors.green
+                                                    : Colors.grey,
+                                                shape: BoxShape.circle,
+                                                border: Border.all(
+                                                    color: Colors.white,
+                                                    width: 2),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(width: 16),
+                                      // Infos du prestataire
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                Text(
+                                                  item['title'] ?? '',
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 17.0,
+                                                    color: Colors.black87,
+                                                  ),
+                                                ),
+                                                if (item['verified'] == true)
+                                                  const Padding(
+                                                    padding: EdgeInsets.only(
+                                                        left: 4),
+                                                    child: Icon(Icons.verified,
+                                                        color: Colors.green,
+                                                        size: 16),
+                                                  ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              item['subtitle'] ?? '',
+                                              style: const TextStyle(
+                                                fontSize: 13.5,
+                                                color: Colors.black54,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 6),
+                                            Row(
+                                              children: [
+                                                const Icon(Icons.location_on,
+                                                    size: 15,
+                                                    color: Colors.green),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  item['location'] ?? '',
+                                                  style: const TextStyle(
+                                                    fontSize: 13,
+                                                    color: Colors.green,
+                                                  ),
+                                                ),
+                                                const Spacer(),
+                                                const Icon(Icons.star,
+                                                    size: 15,
+                                                    color: Colors.amber),
+                                                const SizedBox(width: 2),
+                                                Text(
+                                                  item['rating'] ?? '',
+                                                  style: const TextStyle(
+                                                    fontSize: 13,
+                                                    color: Colors.amber,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 8),
+                                            ElevatedButton(
+                                              onPressed: () {
+                                                // Action contacter
+                                              },
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: Colors.green,
+                                                foregroundColor: Colors.white,
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 12,
+                                                        vertical: 6),
+                                                minimumSize: const Size(
+                                                    double.infinity, 30),
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(20),
+                                                ),
+                                              ),
+                                              child: const Text('Contacter'),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
                       ],
                     ),
                   ),
@@ -877,71 +777,112 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
         ));
   }
 
-
+  // ✅ NOUVEAU : AppBar slim moderne avec Sliver
+  Widget _buildModernSliverAppBar() {
+    return SliverAppBar(
+      expandedHeight: 60,
+      floating: true,
+      pinned: false,
+      snap: true,
+      backgroundColor: Colors.green,
+      elevation: 0,
+      automaticallyImplyLeading: false,
+      flexibleSpace: FlexibleSpaceBar(
+        background: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Colors.green, Colors.green],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+          child: const SafeArea(
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Métiers',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      Icon(Icons.search, color: Colors.white, size: 20),
+                      SizedBox(width: 12),
+                      Icon(Icons.notifications_outlined,
+                          color: Colors.white, size: 20),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
   // ✅ NOUVEAU : Banner promo sticky pour newbies
   Widget _buildPromoStickyBanner(BuildContext context) {
-    // Si le banner est masqué, retourner un widget vide
-    if (!_showWelcomeBanner) {
-      return const SliverToBoxAdapter(child: SizedBox.shrink());
-    }
-
     // Affichage du banner promo pour tous les utilisateurs (peut être conditionné plus tard)
     return SliverPersistentHeader(
-      floating: true,
+      pinned: true,
       delegate: _PromoStickyDelegate(
         child: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                const Color(0xFF2E7D32)
-                    .withOpacity(0.1), // Vert Soutrali transparent
-                const Color(0xFF2E7D32).withOpacity(0.15),
+                Colors.green.withOpacity(0.1), // Vert Soutrali transparent
+                Colors.green.withOpacity(0.15),
               ],
               begin: Alignment.centerLeft,
               end: Alignment.centerRight,
             ),
             border: Border(
-              bottom: BorderSide(
-                  color: const Color(0xFF2E7D32).withOpacity(0.3), width: 1),
+              bottom:
+                  BorderSide(color: Colors.green.withOpacity(0.3), width: 1),
             ),
           ),
-          padding: EdgeInsets.symmetric(horizontal: SDSpacing.sm, vertical: SDSpacing.xs),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           child: Row(
             children: [
               Container(
-                padding: EdgeInsets.all(SDSpacing.xxxs),
+                padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
-                  color: SDColors.primary600.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                  color: Colors.green.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(Icons.verified_user,
-                    color: SDColors.primary600, size: 16),
+                child: Icon(Icons.verified_user, color: Colors.green, size: 16),
               ),
-              SizedBox(width: SDSpacing.xs),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   '✨ Bienvenue ! Découvre nos prestataires vérifiés',
-                  style: SDTypography.labelSmall.copyWith(
-                    color: SDColors.primary600.withOpacity(0.9),
+                  style: TextStyle(
+                    color: Colors.green.withOpacity(0.9),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
                   ),
                 ),
               ),
               Container(
-                padding: EdgeInsets.all(SDSpacing.xxxs),
+                padding: const EdgeInsets.all(2),
                 decoration: BoxDecoration(
-                  color: SDColors.primary600.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
+                  color: Colors.green.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(10),
                 ),
                 child: InkWell(
                   onTap: () {
-                    setState(() {
-                      _showWelcomeBanner = false;
-                    });
+                    // TODO: Masquer le banner définitivement pour cet utilisateur
                   },
                   child: Icon(
                     Icons.close,
-                    color: const Color(0xFF2E7D32),
+                    color: Colors.green,
                     size: 14,
                   ),
                 ),
@@ -953,45 +894,106 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
     );
   }
 
-  // Bannière Métiers : carousel avec 3 bannières PNG (~25% de l'écran pour plus d'espace)
-  Widget _buildHomeBannerSliver(BuildContext context) {
-    final screenHeight = MediaQuery.of(context).size.height;
-    final bannerHeight = screenHeight * 0.25; // ~25% de la hauteur de l'écran (réduit de 40%)
-    
-    final List<String> bannerImages = [
-      'assets/banner/metiers/banner1.png',
-      'assets/banner/metiers/banner2.png',
-      'assets/banner/metiers/banner3.png',
-    ];
-    
+  // ✅ NOUVEAU : Chips horizontales SoutraPay + IA
+  Widget _buildToolChipsSliver(BuildContext context) {
     return SliverToBoxAdapter(
-      child: SizedBox(
-        height: bannerHeight,
-        width: double.infinity,
-        child: CarouselSlider.builder(
-          itemCount: bannerImages.length,
-          options: CarouselOptions(
-            height: bannerHeight,
-            viewportFraction: 1.0,
-            autoPlay: true,
-            autoPlayInterval: const Duration(seconds: 4),
-            autoPlayAnimationDuration: const Duration(milliseconds: 800),
-            autoPlayCurve: Curves.fastOutSlowIn,
-            enlargeCenterPage: false,
-            scrollDirection: Axis.horizontal,
-          ),
-          itemBuilder: (context, index, realIndex) {
-            return Image.asset(
-              bannerImages[index],
-              fit: BoxFit.cover,
-              width: double.infinity,
-              errorBuilder: (_, __, ___) => Container(
-                color: SDColors.primary50,
-                alignment: Alignment.center,
-                child: Icon(Icons.image_not_supported, color: SDColors.primary600, size: 40),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            // Chip SoutraPay
+            InkWell(
+              onTap: () => Navigator.pushNamed(context, '/wallet'),
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.green.withOpacity(0.1),
+                      Colors.green.withOpacity(0.15),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                      color: Colors.green.withOpacity(0.4), width: 1.2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.green.withOpacity(0.15),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.account_balance_wallet,
+                        color: Colors.green, size: 16),
+                    const SizedBox(width: 4),
+                    Text(
+                      '💳 SoutraPay',
+                      style: TextStyle(
+                          color: Colors.green,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12),
+                    ),
+                  ],
+                ),
               ),
-            );
-          },
+            ),
+            const SizedBox(width: 8),
+            // Chip IA Assistant
+            InkWell(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const AIAssistantChatScreen()),
+                );
+              },
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.blue.shade50, Colors.blue.shade100],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.blue.shade300, width: 1.2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.blue.withOpacity(0.15),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.smart_toy,
+                        color: Colors.blue.shade700, size: 16),
+                    const SizedBox(width: 4),
+                    Text(
+                      '🤖 IA Assistant',
+                      style: TextStyle(
+                          color: Colors.blue.shade800,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -1003,30 +1005,32 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Expanded(
-              child: Text(
-                'Actions rapides',
-                style: SDTypography.titleMedium.copyWith(
-                  color: SDColors.neutral900,
-                ),
-                overflow: TextOverflow.ellipsis,
+            const Text(
+              'Actions rapides',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 20,
+                color: Colors.black,
               ),
             ),
             GestureDetector(
               onTap: () {
-                // TODO: Navigation vers la page complète des actions rapides
+                // TODO: Naviguer vers page complète des actions
               },
-              child: Text(
+              child: const Text(
                 'Voir tout',
-                style: SDTypography.labelMedium.copyWith(
-                  color: SDColors.primary600,
+                style: TextStyle(
+                  color: Colors.green,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 15,
                 ),
               ),
             ),
           ],
         ),
-        SizedBox(height: SDSpacing.sm),
+        const SizedBox(height: 12),
         SizedBox(
           height: 95, // Augmenté de 90 à 95 pour éviter l'overflow
           child: ListView.builder(
@@ -1035,7 +1039,7 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
             itemBuilder: (context, index) {
               final action = quickActions[index];
               return Padding(
-                padding: EdgeInsets.only(right: SDSpacing.sm),
+                padding: const EdgeInsets.only(right: 12),
                 child: _buildQuickActionCard(
                   icon: action['icon'],
                   title: action['title'],
@@ -1051,7 +1055,7 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
     );
   }
 
-  // ✅ NOUVEAU : Carte d'action rapide moderne (Optimisée Compact)
+  // ✅ NOUVEAU : Carte d'action rapide moderne
   Widget _buildQuickActionCard({
     required IconData icon,
     required String title,
@@ -1062,65 +1066,52 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 80,
-        padding: EdgeInsets.symmetric(vertical: SDSpacing.xxxs, horizontal: SDSpacing.xxs),
+        width: 85,
+        padding: const EdgeInsets.all(6), // Réduit de 8 à 6
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              SDColors.white,
-              color.withOpacity(0.05),
-            ],
-          ),
-          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-          border: Border.all(color: color.withOpacity(0.3), width: 1.5),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color.withOpacity(0.2), width: 1.5),
           boxShadow: [
             BoxShadow(
               color: color.withOpacity(0.1),
               blurRadius: 8,
-              offset: const Offset(0, 2),
+              offset: const Offset(0, 4),
             ),
           ],
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              padding: EdgeInsets.all(SDSpacing.xxxs),
+              padding: const EdgeInsets.all(6), // Réduit de 8 à 6
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    color.withOpacity(0.15),
-                    color.withOpacity(0.05),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10), // Réduit de 12 à 10
               ),
               child: Icon(
                 icon,
                 color: color,
-                size: 16,
+                size: 20, // Réduit de 24 à 20
               ),
             ),
-            SizedBox(height: SDSpacing.xxxs),
+            const SizedBox(height: 4), // Réduit de 6 à 4
             Text(
               title,
-              style: SDTypography.labelSmall.copyWith(
-                color: SDColors.neutral900,
+              style: const TextStyle(
+                fontSize: 11, // Réduit de 12 à 11
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
               ),
               textAlign: TextAlign.center,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
-            SizedBox(height: SDSpacing.xxxs),
             Text(
               subtitle,
-              style: SDTypography.bodySmall.copyWith(
-                color: SDColors.neutral500,
+              style: TextStyle(
+                fontSize: 9, // Réduit de 10 à 9
+                color: Colors.grey.shade600,
               ),
               textAlign: TextAlign.center,
               maxLines: 1,
@@ -1163,163 +1154,11 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
         // TODO: Afficher promotions actives
         print('💰 Affichage promotions');
         break;
+      case 'ai':
+        // TODO: Ouvrir assistant IA
+        print('🤖 Ouverture assistant IA');
+        break;
     }
-  }
-
-  // 🎯 Hero Search Bar — réduit pour laisser place à la bannière
-  Widget _buildHeroSearchBar() {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: SDSpacing.md, vertical: SDSpacing.sm),
-      decoration: BoxDecoration(
-        color: SDColors.white,
-        borderRadius: BorderRadius.circular(SDSpacing.lg),
-        border: Border.all(color: SDColors.primary100, width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: SDColors.neutral900.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.search, color: SDColors.primary600, size: 22),
-          SizedBox(width: SDSpacing.sm),
-          Expanded(
-            child: GestureDetector(
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (context) => const SearchPageScreenM()),
-                );
-              },
-              child: Text(
-                'Rechercher un service, prestataire...',
-                style: SDTypography.bodyMedium.copyWith(
-                  color: SDColors.neutral400,
-                ),
-              ),
-            ),
-          ),
-          GestureDetector(
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (context) => const SearchPageScreenM()),
-              );
-            },
-            child: Container(
-              padding: EdgeInsets.all(SDSpacing.xs),
-              decoration: BoxDecoration(
-                color: SDColors.primary600,
-                borderRadius: BorderRadius.circular(SDSpacing.sm),
-              ),
-              child: Icon(Icons.tune, color: SDColors.white, size: 20),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatChip({
-    required IconData icon,
-    required String label,
-    required Color color,
-  }) {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: SDSpacing.sm, vertical: SDSpacing.sm),
-      decoration: BoxDecoration(
-        color: SDColors.primary50,
-        borderRadius: BorderRadius.circular(SDSpacing.sm),
-        border: Border.all(color: SDColors.primary100),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: color),
-          SizedBox(width: 6),
-          Flexible(
-            child: Text(
-              label,
-              style: SDTypography.labelSmall.copyWith(
-                color: color,
-                fontWeight: FontWeight.w600,
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 📦 NOUVEAU : Skeleton Loader
-  Widget _buildSkeletonLoader({required double height, int count = 3}) {
-    return SizedBox(
-      height: height,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: count,
-        separatorBuilder: (_, __) => SizedBox(width: SDSpacing.sm),
-        itemBuilder: (_, __) => Container(
-          width: 160,
-          decoration: BoxDecoration(
-            color: Colors.grey.shade200,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Center(
-            child: CircularProgressIndicator(
-              color: const Color(0xFF2E7D32),
-              strokeWidth: 2,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ⚠️ NOUVEAU : Error Card
-  Widget _buildErrorCard(String error) {
-    return Container(
-      padding: SDSpacing.cardPadding,
-      decoration: BoxDecoration(
-        color: SDColors.error50,
-        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-        border: Border.all(color: SDColors.error200),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.error_outline, color: SDColors.error600),
-          SizedBox(width: SDSpacing.sm),
-          Expanded(
-            child: Text(
-              error,
-              style: SDTypography.bodyMedium.copyWith(color: SDColors.error600),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 🔍 NOUVEAU : Empty State
-  Widget _buildEmptyState(String message) {
-    return Container(
-      padding: EdgeInsets.all(SDSpacing.lg),
-      child: Column(
-        children: [
-          Icon(Icons.inbox_outlined, size: 64, color: SDColors.neutral300),
-          SizedBox(height: SDSpacing.sm),
-          Text(
-            message,
-            style: SDTypography.bodyLarge.copyWith(
-              color: SDColors.neutral500,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
   }
 
   // ✅ NOUVEAU : Afficher la section "Autour de moi"
@@ -1336,40 +1175,32 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Titre de la section
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Icon(Icons.location_on, color: SDColors.primary600, size: 22),
-                    SizedBox(width: SDSpacing.xs),
-                    Text(
-                      'Autour de moi',
-                      style: SDTypography.titleLarge.copyWith(
-                        color: SDColors.neutral900,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
+                const Text(
+                  '📍 Autour de moi',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
+                    color: Colors.black,
+                  ),
                 ),
-                SizedBox(height: SDSpacing.xxs),
-                // Contrôles sur une ligne séparée
                 Row(
                   children: [
-                    // Slider de rayon plus compact
-                    Expanded(
-                      flex: 3,
+                    // Slider de rayon
+                    SizedBox(
+                      width: 120,
                       child: Row(
                         children: [
-                          Icon(Icons.radio_button_unchecked, size: 14, color: SDColors.primary600),
-                          SizedBox(width: SDSpacing.xxxs),
+                          const Icon(Icons.radio_button_unchecked, size: 16),
                           Expanded(
                             child: Slider(
                               value: _searchRadius,
                               min: 1.0,
                               max: 20.0,
                               divisions: 19,
-                              activeColor: SDColors.primary600,
+                              activeColor: Colors.green,
                               onChanged: (value) {
                                 setState(() {
                                   _searchRadius = value;
@@ -1393,15 +1224,13 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                             ),
                           ),
                           Text('${_searchRadius.toInt()}km',
-                              style: SDTypography.labelSmall),
+                              style: const TextStyle(fontSize: 12)),
                         ],
                       ),
                     ),
-                    // Boutons plus compacts
+                    const SizedBox(width: 8),
+                    // Bouton actualiser
                     IconButton(
-                      constraints:
-                          const BoxConstraints(minWidth: 32, minHeight: 32),
-                      padding: EdgeInsets.zero,
                       onPressed: () {
                         if (_userLocation != null) {
                           context.read<JobPageBlocM>().add(LoadNearbyProvidersM(
@@ -1417,19 +1246,12 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                               ));
                         }
                       },
-                      icon: Icon(Icons.refresh,
-                          color: SDColors.primary600, size: 20),
+                      icon: const Icon(Icons.refresh, color: Colors.green),
                     ),
+                    // Bouton zoom vers carte complète
                     IconButton(
-                      constraints:
-                          const BoxConstraints(minWidth: 32, minHeight: 32),
-                      padding: EdgeInsets.zero,
                       onPressed: () {
                         if (_userLocation != null) {
-                          print(
-                              '🗺️ Navigation vers FullMap avec ${state.nearbyProviders.length} prestataires');
-                          print(
-                              '🗺️ Type des nearbyProviders: ${state.nearbyProviders.map((p) => p.runtimeType).toList()}');
                           Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -1444,15 +1266,14 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                           );
                         }
                       },
-                      icon: Icon(Icons.zoom_out_map,
-                          color: SDColors.info500, size: 20),
+                      icon: const Icon(Icons.zoom_out_map, color: Colors.blue),
                       tooltip: 'Voir carte complète',
                     ),
                   ],
                 ),
               ],
             ),
-            SizedBox(height: SDSpacing.sm),
+            const SizedBox(height: 16),
 
             // Carte Google Maps
             Container(
@@ -1476,25 +1297,27 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                           if (kIsWeb) {
                             return Container(
                               decoration: BoxDecoration(
-                                color: SDColors.neutral100,
-                                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
+                                color: Colors.grey.shade100,
+                                borderRadius: BorderRadius.circular(16),
                               ),
-                              child: Center(
+                              child: const Center(
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     Icon(Icons.map,
-                                        size: 48, color: SDColors.primary600),
-                                    SizedBox(height: SDSpacing.xxs),
+                                        size: 48, color: Colors.green),
+                                    SizedBox(height: 8),
                                     Text('Carte disponible sur mobile',
-                                        style: SDTypography.titleSmall.copyWith(
-                                          color: SDColors.primary600,
+                                        style: TextStyle(
+                                          color: Colors.green,
+                                          fontWeight: FontWeight.bold,
                                         )),
-                                    SizedBox(height: SDSpacing.xxxs),
+                                    SizedBox(height: 4),
                                     Text(
                                         'Utilisez l\'application mobile pour voir la carte',
-                                        style: SDTypography.bodySmall.copyWith(
-                                          color: SDColors.neutral500,
+                                        style: TextStyle(
+                                          color: Colors.grey,
+                                          fontSize: 12,
                                         )),
                                   ],
                                 ),
@@ -1510,82 +1333,86 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                               ),
                               markers: _markers,
                               onMapCreated: (GoogleMapController controller) {
-                                // _mapController supprimé car non utilisé
+                                _mapController = controller;
                               },
                               myLocationEnabled: true,
                               myLocationButtonEnabled: true,
                             );
                           } catch (e) {
                             print('Erreur Google Maps: $e');
-                            return Center(
+                            return const Center(
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Icon(Icons.error_outline,
-                                      size: 48, color: SDColors.error500),
+                                      size: 48, color: Colors.red),
                                   SizedBox(height: 8),
                                   Text('Erreur de chargement de la carte',
-                                      style: SDTypography.bodyMedium.copyWith(color: SDColors.error500)),
+                                      style: TextStyle(color: Colors.red)),
                                 ],
                               ),
                             );
                           }
                         },
                       )
-                    : Center(
+                    : const Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(Icons.location_off,
-                                size: 48, color: SDColors.neutral400),
-                            SizedBox(height: SDSpacing.xxs),
+                                size: 48, color: Colors.grey),
+                            SizedBox(height: 8),
                             Text('Position non disponible',
-                                style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral500)),
+                                style: TextStyle(color: Colors.grey)),
                           ],
                         ),
                       ),
               ),
             ),
-            SizedBox(height: SDSpacing.sm),
+            const SizedBox(height: 16),
 
             // Filtres de catégorie et service
             _buildFiltersRow(state),
-            SizedBox(height: SDSpacing.sm),
+            const SizedBox(height: 16),
 
             // Compteur de prestataires trouvés
             if (state.nearbyProviders.isNotEmpty)
               Container(
                 padding:
-                    EdgeInsets.symmetric(horizontal: SDSpacing.sm, vertical: SDSpacing.xxs),
-                margin: EdgeInsets.only(bottom: SDSpacing.xxs),
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                margin: const EdgeInsets.only(bottom: 8),
                 decoration: BoxDecoration(
-                  color: SDColors.success50,
-                  borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
-                  border: Border.all(color: SDColors.success200),
+                  color: Colors.green.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.green.shade200),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.location_on, color: SDColors.primary600, size: 16),
-                    SizedBox(width: SDSpacing.xxs),
+                    Icon(Icons.location_on, color: Colors.green, size: 16),
+                    const SizedBox(width: 8),
                     Text(
                       '${state.nearbyProviders.length} prestataire(s) trouvé(s)',
-                      style: SDTypography.bodyMedium.copyWith(
-                        color: SDColors.success700,
-                        fontWeight: FontWeight.w600,
+                      style: TextStyle(
+                        color: Colors.green.shade700,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
                       ),
                     ),
                     const Spacer(),
                     if (_selectedCategory.isNotEmpty)
                       Container(
-                        padding: SDSpacing.chipPadding,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: SDColors.primary600,
-                          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                          color: Colors.green,
+                          borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
                           _selectedCategory,
-                          style: SDTypography.labelSmall.copyWith(
-                            color: SDColors.white,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
@@ -1595,29 +1422,29 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
 
             // Liste des prestataires à proximité
             if (state.isNearbyLoading)
-              Center(
-                  child: CircularProgressIndicator(color: SDColors.primary600))
+              const Center(
+                  child: CircularProgressIndicator(color: Colors.green))
             else if (state.nearbyError.isNotEmpty)
               Center(
                 child: Column(
                   children: [
-                    Icon(Icons.error_outline,
-                        size: 48, color: SDColors.error500),
-                    SizedBox(height: SDSpacing.xxs),
+                    const Icon(Icons.error_outline,
+                        size: 48, color: Colors.red),
+                    const SizedBox(height: 8),
                     Text('Erreur: ${state.nearbyError}',
-                        style: SDTypography.bodyMedium.copyWith(color: SDColors.error500)),
+                        style: const TextStyle(color: Colors.red)),
                   ],
                 ),
               )
             else if (state.nearbyProviders.isEmpty)
-              Center(
+              const Center(
                 child: Column(
                   children: [
                     Icon(Icons.location_searching,
-                        size: 48, color: SDColors.neutral400),
-                    SizedBox(height: SDSpacing.xxs),
+                        size: 48, color: Colors.grey),
+                    SizedBox(height: 8),
                     Text('Aucun prestataire à proximité',
-                        style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral500)),
+                        style: TextStyle(color: Colors.grey)),
                   ],
                 ),
               )
@@ -1641,10 +1468,11 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
               flex: 1,
               child: DropdownButtonFormField<String>(
                 value: _selectedCategory.isEmpty ? null : _selectedCategory,
-                decoration: InputDecoration(
+                decoration: const InputDecoration(
                   labelText: 'Catégorie',
                   border: OutlineInputBorder(),
-                  contentPadding: SDSpacing.inputPadding,
+                  contentPadding:
+                      EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                   isDense: true,
                 ),
                 isExpanded: true,
@@ -1680,16 +1508,17 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                 },
               ),
             ),
-            SizedBox(width: SDSpacing.xxs),
+            const SizedBox(width: 8),
             // Filtre par service
             Expanded(
               flex: 1,
               child: DropdownButtonFormField<String>(
                 value: _selectedService.isEmpty ? null : _selectedService,
-                decoration: InputDecoration(
+                decoration: const InputDecoration(
                   labelText: 'Service',
                   border: OutlineInputBorder(),
-                  contentPadding: EdgeInsets.symmetric(horizontal: SDSpacing.xxs, vertical: SDSpacing.xxxs),
+                  contentPadding:
+                      EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                   isDense: true,
                 ),
                 isExpanded: true,
@@ -1738,11 +1567,12 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
       children: [
         Text(
           'Prestataires à proximité (${providers.length})',
-          style: SDTypography.titleSmall.copyWith(
-            color: SDColors.neutral900,
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
           ),
         ),
-        SizedBox(height: SDSpacing.sm),
+        const SizedBox(height: 12),
         SizedBox(
           height: 200,
           child: ListView.builder(
@@ -1762,23 +1592,26 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
   Widget _buildNearbyProviderCard(dynamic provider, int index) {
     return Container(
       width: 280,
-      margin: EdgeInsets.only(right: SDSpacing.sm),
+      margin: const EdgeInsets.only(right: 12),
       child: Card(
-        elevation: 4,
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge)),
+        elevation: 3,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: InkWell(
-          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+          borderRadius: BorderRadius.circular(12),
           onTap: () {
-            // ✅ Navigation vers le profil complet du prestataire
-            NavigationHelper.navigateToProviderProfile(
+            // Navigation vers le détail du prestataire
+            Navigator.push(
               context,
-              providerId: provider.idprestataire,
-              providerData: provider.toJson(),
+              MaterialPageRoute(
+                builder: (_) => DetailPage(
+                  title: provider.utilisateur?.fullName ?? 'Prestataire',
+                  image: 'assets/categories/Image${(index % 5) + 1}.png',
+                ),
+              ),
             );
           },
           child: Padding(
-            padding: SDSpacing.cardPadding,
+            padding: const EdgeInsets.all(12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1790,24 +1623,25 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                       backgroundImage: AssetImage(
                           'assets/categories/Image${(index % 5) + 1}.png'),
                     ),
-                    SizedBox(width: SDSpacing.xxs),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             provider.utilisateur?.fullName ?? 'Prestataire',
-                            style: SDTypography.bodyMedium.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: SDColors.neutral900,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                           Text(
                             provider.service?.nomservice ?? 'Service',
-                            style: SDTypography.bodySmall.copyWith(
-                              color: SDColors.neutral500,
+                            style: const TextStyle(
+                              color: Colors.grey,
+                              fontSize: 12,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -1816,54 +1650,40 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                       ),
                     ),
                     if (provider.verifier)
-                      Icon(Icons.verified, color: SDColors.primary600, size: 16),
+                      const Icon(Icons.verified, color: Colors.green, size: 16),
                   ],
                 ),
-                SizedBox(height: SDSpacing.xxs),
+                const SizedBox(height: 8),
 
                 // Note et distance
                 Row(
                   children: [
-                    Icon(Icons.star, color: SDColors.warning500, size: 14),
-                    SizedBox(width: SDSpacing.xxxs),
-                    Flexible(
-                      flex: 2,
-                      child: Text(
-                        provider.note ?? 'N/A',
-                        style: SDTypography.labelSmall.copyWith(
-                          color: SDColors.warning500,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                    const Icon(Icons.star, color: Colors.amber, size: 16),
+                    const SizedBox(width: 4),
+                    Text(
+                      provider.note.toStringAsFixed(1),
+                      style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
-                    SizedBox(width: SDSpacing.xxs),
-                    Icon(Icons.location_on,
-                        color: SDColors.primary600, size: 14),
-                    SizedBox(width: SDSpacing.xxxs),
-                    Flexible(
-                      flex: 3,
-                      child: Text(
-                        '${(index + 1) * 0.5} km',
-                        style: SDTypography.labelSmall.copyWith(
-                          color: SDColors.primary600,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                    const SizedBox(width: 12),
+                    const Icon(Icons.location_on,
+                        color: Colors.green, size: 16),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${(index + 1) * 0.5} km',
+                      style: const TextStyle(color: Colors.green, fontSize: 12),
                     ),
                   ],
                 ),
-                SizedBox(height: SDSpacing.xxs),
+                const SizedBox(height: 8),
 
                 // Description
                 Text(
                   provider.description ?? 'Prestataire professionnel',
-                  style: SDTypography.bodySmall.copyWith(
-                    color: SDColors.neutral500,
-                  ),
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-                SizedBox(height: SDSpacing.xxs),
+                const SizedBox(height: 8),
 
                 // Bouton d'action
                 SizedBox(
@@ -1873,13 +1693,14 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                       // Action contacter
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: SDColors.primary600,
-                      foregroundColor: SDColors.white,
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
+                        borderRadius: BorderRadius.circular(8),
                       ),
                     ),
-                    child: Text('Contacter', style: SDTypography.labelSmall),
+                    child:
+                        const Text('Contacter', style: TextStyle(fontSize: 12)),
                   ),
                 ),
               ],
@@ -1950,20 +1771,18 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                   'À la une cette semaine',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    fontSize: 18, // Standardisé
+                    fontSize: 20,
                     color: Colors.black,
                   ),
                 ),
               ],
             ),
             GestureDetector(
-              onTap: () {
-                // TODO: Navigation vers la page complète des featured
-              },
+              onTap: () {},
               child: const Text(
                 'Voir plus',
                 style: TextStyle(
-                  color: const Color(0xFF2E7D32),
+                  color: Colors.green,
                   fontWeight: FontWeight.w600,
                   fontSize: 15,
                 ),
@@ -1971,11 +1790,11 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
             ),
           ],
         ),
-        SizedBox(height: SDSpacing.sm),
+        const SizedBox(height: 12),
         Container(
           height: 180,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+            borderRadius: BorderRadius.circular(14),
             image: const DecorationImage(
               image: AssetImage('assets/categories/Image3.png'),
               fit: BoxFit.cover,
@@ -1985,45 +1804,51 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
             children: [
               Container(
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                  borderRadius: BorderRadius.circular(14),
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [Colors.transparent, SDColors.neutral900.withOpacity(0.7)],
+                    colors: [Colors.transparent, Colors.black.withOpacity(0.7)],
                   ),
                 ),
               ),
               Padding(
-                padding: SDSpacing.cardPadding,
+                padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     Container(
-                      padding: SDSpacing.chipPadding,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: SDColors.warning500,
-                        borderRadius: BorderRadius.circular(SDSpacing.xxxs),
+                        color: Colors.amber,
+                        borderRadius: BorderRadius.circular(4),
                       ),
-                      child: Text(
+                      child: const Text(
                         'POPULAIRE',
-                        style: SDTypography.labelSmall.copyWith(
-                          color: SDColors.white,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
                         ),
                       ),
                     ),
-                    SizedBox(height: SDSpacing.xxs),
-                    Text(
+                    const SizedBox(height: 8),
+                    const Text(
                       'Amadou K. - Plombier Professionnel',
-                      style: SDTypography.titleMedium.copyWith(
-                        color: SDColors.white,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
                       ),
                     ),
-                    SizedBox(height: SDSpacing.xxxs),
-                    Text(
+                    const SizedBox(height: 4),
+                    const Text(
                       '15 ans d\'expérience - Disponible 24/7',
-                      style: SDTypography.bodyMedium.copyWith(
-                        color: SDColors.white,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
                       ),
                     ),
                   ],
@@ -2041,12 +1866,12 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
       String name, String? imageUrl, IconData fallbackIcon) {
     return Container(
       width: 100,
-      margin: EdgeInsets.symmetric(vertical: SDSpacing.xxxs),
+      margin: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
-        color: SDColors.primary50,
-        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
+        color: Colors.green.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
-          BoxShadow(color: SDColors.neutral900.withOpacity(0.05), blurRadius: 4)
+          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4)
         ],
       ),
       child: Column(
@@ -2054,21 +1879,23 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
         children: [
           if (imageUrl != null && imageUrl.isNotEmpty)
             ClipOval(
-            child: AppImage(
-                imageUrl: imageUrl,
+              child: Image.network(
+                imageUrl,
                 width: 60,
                 height: 60,
                 fit: BoxFit.cover,
-                // Error icon handled by AppImage
+                errorBuilder: (_, __, ___) =>
+                    Icon(fallbackIcon, color: Colors.green, size: 32),
               ),
             )
           else
-            Icon(fallbackIcon, color: SDColors.primary600, size: 40),
-          SizedBox(height: SDSpacing.xxs),
+            Icon(fallbackIcon, color: Colors.green, size: 40),
+          const SizedBox(height: 8),
           Text(
             name,
-            style: SDTypography.labelSmall.copyWith(
-              color: SDColors.neutral900,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
             ),
             textAlign: TextAlign.center,
             maxLines: 1,
@@ -2076,711 +1903,6 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
           ),
         ],
       ),
-    );
-  }
-
-  // 🥇 PRIORITÉ 1 : Section Promotions actives
-  Widget _buildActivePromotionsSection() {
-    // Données simulées des promotions (à remplacer par API)
-    final List<Map<String, dynamic>> activePromotions = [
-      {
-        'title': '🎉 Première commande',
-        'discount': '20%',
-        'description': 'Économisez sur votre premier service',
-        'code': 'FIRST20',
-        'expiry': '31 Dec 2024',
-        'color': Colors.red,
-        'services': ['Ménage', 'Plomberie', 'Électricité']
-      },
-      {
-        'title': '⚡ Service Express',
-        'discount': '15%',
-        'description': 'Réduction sur interventions urgentes',
-        'code': 'EXPRESS15',
-        'expiry': '15 Jan 2025',
-        'color': Colors.orange,
-        'services': ['Urgence', 'Dépannage']
-      },
-      {
-        'title': '🏠 Pack Maison',
-        'discount': '25%',
-        'description': 'Combiné ménage + jardinage',
-        'code': 'PACK25',
-        'expiry': '28 Feb 2025',
-        'color': Colors.green,
-        'services': ['Ménage', 'Jardinage', 'Rénovation']
-      },
-    ];
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            // Supprime spaceBetween
-            Expanded(
-              child: Row(
-                children: [
-                  Icon(Icons.local_offer,
-                      color: SDColors.error500, size: 22),
-                  SizedBox(width: SDSpacing.xxxs),
-                  Flexible(
-                    child: Text(
-                      '🎁 Promotions du moment',
-                      style: SDTypography.titleMedium.copyWith(
-                        color: SDColors.neutral900,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            TextButton(
-              onPressed: () {
-                // TODO: Navigation vers la page complète des promotions
-              },
-              child: Text(
-                'Voir toutes',
-                style: SDTypography.labelMedium.copyWith(
-                  color: SDColors.primary600,
-                ),
-              ),
-            ),
-          ],
-        ),
-        SizedBox(height: SDSpacing.sm),
-        SizedBox(
-          height: 180, // Augmenté de 160 à 180
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            itemCount: activePromotions.length,
-            itemBuilder: (context, index) {
-              final promo = activePromotions[index];
-              return Container(
-                width: 280,
-                margin: EdgeInsets.only(right: SDSpacing.sm),
-                child: Card(
-                  elevation: 4,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
-                  ),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
-                      gradient: LinearGradient(
-                        colors: [
-                          promo['color'].withOpacity(0.1),
-                          promo['color'].withOpacity(0.05),
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                    ),
-                    padding: SDSpacing.cardPadding,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                promo['title'],
-                                style: SDTypography.titleSmall.copyWith(
-                                  color: SDColors.neutral900,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            SizedBox(width: SDSpacing.xxs),
-                            Container(
-                              padding: SDSpacing.chipPadding,
-                              decoration: BoxDecoration(
-                                color: promo['color'],
-                                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-                              ),
-                              child: Text(
-                                promo['discount'],
-                                style: SDTypography.bodyMedium.copyWith(
-                                  color: SDColors.white,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: SDSpacing.xxxs),
-                        Text(
-                          promo['description'],
-                          style: SDTypography.bodySmall.copyWith(
-                            color: SDColors.neutral600,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        SizedBox(height: SDSpacing.xxxs),
-                        Row(
-                          children: [
-                            Icon(Icons.code, size: 14, color: promo['color']),
-                            SizedBox(width: SDSpacing.xxxs),
-                            Text(
-                              promo['code'],
-                              style: SDTypography.labelSmall.copyWith(
-                                color: promo['color'],
-                              ),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: SDSpacing.xxxs),
-                        Row(
-                          children: [
-                            Expanded(
-                              flex: 3,
-                              child: Text(
-                                'Expire le ${promo['expiry']}',
-                                style: SDTypography.bodySmall.copyWith(
-                                  color: SDColors.neutral500,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            SizedBox(width: SDSpacing.xxxs),
-                            Flexible(
-                              flex: 2,
-                              child: ElevatedButton(
-                                onPressed: () {
-                                  // TODO: Appliquer la promotion
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content:
-                                          Text('Code ${promo['code']} copié !'),
-                                      duration: const Duration(seconds: 2),
-                                    ),
-                                  );
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: promo['color'],
-                                  foregroundColor: SDColors.white,
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: SDSpacing.xxxs,
-                                    vertical: SDSpacing.xxxs,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
-                                  ),
-                                  minimumSize: const Size(0, 24),
-                                ),
-                                child: Text(
-                                  'Utiliser',
-                                  style: SDTypography.labelSmall,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
-  // 🥈 PRIORITÉ 2 : Témoignages clients
-  Widget _buildRecentReviewsSection() {
-    // Données simulées des témoignages (à remplacer par API)
-    final List<Map<String, dynamic>> reviews = [
-      {
-        'name': 'Marie K.',
-        'service': 'Ménage à domicile',
-        'rating': 5,
-        'comment':
-            'Service exceptionnel ! Très professionnel et ponctuel. Je recommande vivement.',
-        'date': '3 jours',
-        'avatar':
-            'https://images.unsplash.com/photo-1494790108755-2616b612727a?w=150',
-        'provider': 'Fatou Diallo'
-      },
-      {
-        'name': 'Jean-Claude D.',
-        'service': 'Plomberie',
-        'rating': 5,
-        'comment':
-            'Problème résolu rapidement. Prix honnête et travail de qualité.',
-        'date': '1 semaine',
-        'avatar':
-            'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150',
-        'provider': 'Moussa Traoré'
-      },
-      {
-        'name': 'Aicha B.',
-        'service': 'Coiffure à domicile',
-        'rating': 4,
-        'comment':
-            'Très satisfaite du résultat. Coiffeuse très à l\'écoute de mes souhaits.',
-        'date': '2 semaines',
-        'avatar':
-            'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150',
-        'provider': 'Aminata Keita'
-      },
-    ];
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            // Supprime spaceBetween
-            const Expanded(
-              // Wrap avec Expanded
-              child: Row(
-                children: [
-                  Icon(Icons.star,
-                      color: Colors.amber, size: 22), // Réduit de 24 à 22
-                  SizedBox(width: 6), // Réduit de 8 à 6
-                  Flexible(
-                    // Wrap text avec Flexible
-                    child: Text(
-                      '💬 Ils nous font confiance',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18, // Réduit de 20 à 18
-                        color: Colors.black,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            TextButton(
-              onPressed: () {
-                // TODO: Navigation vers la page complète des témoignages
-              },
-              child: const Text(
-                'Voir tous',
-                style: TextStyle(
-                  color: const Color(0xFF2E7D32),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        ),
-        SizedBox(height: SDSpacing.sm),
-        SizedBox(
-          height: 200,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            itemCount: reviews.length,
-            itemBuilder: (context, index) {
-              final review = reviews[index];
-              return Container(
-                width: 280,
-                margin: EdgeInsets.only(right: SDSpacing.sm),
-                child: Card(
-                  elevation: 4,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
-                  ),
-                  child: Padding(
-                    padding: SDSpacing.cardPadding,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Row(
-                          children: [
-                            CircleAvatar(
-                              radius: 18,
-                              backgroundImage: NetworkImage(review['avatar']),
-                              onBackgroundImageError: (_, __) {},
-                              child: review['avatar'] == null
-                                  ? const Icon(Icons.person, size: 18)
-                                  : null,
-                            ),
-                            SizedBox(width: SDSpacing.xs),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    review['name'],
-                                    style: SDTypography.labelSmall.copyWith(
-                                      color: SDColors.neutral900,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  Text(
-                                    review['service'],
-                                    style: SDTypography.labelSmall.copyWith(
-                                      color: SDColors.neutral500,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: List.generate(5, (starIndex) {
-                                return Icon(
-                                  starIndex < review['rating']
-                                      ? Icons.star
-                                      : Icons.star_border,
-                                  color: SDColors.warning500,
-                                  size: 14,
-                                );
-                              }),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: SDSpacing.xxxs),
-                        Flexible(
-                          child: Text(
-                            review['comment'],
-                            style: SDTypography.labelSmall.copyWith(
-                              color: SDColors.neutral900,
-                              height: 1.3,
-                            ),
-                            maxLines: 3,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        SizedBox(height: SDSpacing.xxxs),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                'Par ${review['provider']}',
-                                style: SDTypography.labelSmall.copyWith(
-                                  color: SDColors.primary600,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            SizedBox(width: SDSpacing.xxxs),
-                            Text(
-                              review['date'],
-                              style: SDTypography.bodySmall.copyWith(
-                                color: SDColors.neutral500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
-  // 🥉 PRIORITÉ 3 : Recommandations personnalisées
-  Widget _buildPersonalizedRecommendationsSection() {
-    return BlocBuilder<JobPageBlocM, JobPageStateM>(
-      builder: (context, state) {
-        // Données simulées des recommandations (à remplacer par vraie IA)
-        final List<Map<String, dynamic>> recommendations = [
-          {
-            'title': 'Ménage hebdomadaire',
-            'reason': 'Basé sur vos recherches récentes',
-            'provider': 'Aminata Services',
-            'rating': 4.8,
-            'price': '15 000 FCFA',
-            'image': null, // Utilise l'icône par défaut au lieu d'URL cassée
-            'category': 'Ménage',
-            'discount': '10%',
-            'urgent': false,
-            'icon': Icons.cleaning_services,
-          },
-          {
-            'title': 'Réparation électrique',
-            'reason': 'Prestataires populaires près de chez vous',
-            'provider': 'Électro Pro',
-            'rating': 4.9,
-            'price': '25 000 FCFA',
-            'image': null, // Utilise l'icône par défaut au lieu d'URL cassée
-            'category': 'Électricité',
-            'discount': null,
-            'urgent': true,
-            'icon': Icons.electrical_services,
-          },
-          {
-            'title': 'Jardinage & Taille',
-            'reason': 'Saison recommandée pour vos plantes',
-            'provider': 'Vert Jardin',
-            'rating': 4.7,
-            'price': '20 000 FCFA',
-            'image': null, // Utilise l'icône par défaut au lieu d'URL cassée
-            'category': 'Jardinage',
-            'discount': '15%',
-            'urgent': false,
-            'icon': Icons.local_florist,
-          },
-        ];
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                // Supprime spaceBetween
-                Expanded(
-                  child: Row(
-                    children: [
-                      Icon(Icons.recommend,
-                          color: SDColors.info500, size: 22),
-                      SizedBox(width: SDSpacing.xxxs),
-                      Flexible(
-                        child: Text(
-                          '🎯 Recommandé pour vous',
-                          style: SDTypography.titleMedium.copyWith(
-                            color: SDColors.neutral900,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                TextButton(
-                  onPressed: () {
-                    // TODO: Navigation vers la page complète des recommandations
-                  },
-                  child: Text(
-                    'Tout voir',
-                    style: SDTypography.labelMedium.copyWith(
-                      color: const Color(0xFF2E7D32),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: SDSpacing.sm),
-            SizedBox(
-              height: 220,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: recommendations.length,
-                itemBuilder: (context, index) {
-                  final rec = recommendations[index];
-                  return Container(
-                    width: 300,
-                    margin: EdgeInsets.only(right: SDSpacing.sm),
-                    child: Card(
-                      elevation: 4,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min, // Évite l'overflow
-                        children: [
-                          // Header avec image et badges
-                          Stack(
-                            children: [
-                              ClipRRect(
-                                borderRadius: BorderRadius.vertical(
-                                  top: Radius.circular(SDSpacing.borderRadiusLarge),
-                                ),
-                                child: Container(
-                                  height: 100,
-                                  width: double.infinity,
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                      colors: [
-                                        SDColors.primary600.withOpacity(0.1),
-                                        SDColors.primary600.withOpacity(0.05),
-                                      ],
-                                    ),
-                                  ),
-                                  child: rec['image'] != null && rec['image'].toString().isNotEmpty
-                                      ? AppImage(
-                                          imageUrl: rec['image'],
-                                          fit: BoxFit.cover,
-                                        )
-                                      : Center(
-                                          child: Icon(
-                                            rec['icon'] ?? Icons.handyman,
-                                            size: 50,
-                                            color: const Color(0xFF2E7D32),
-                                          ),
-                                        ),
-                                ),
-                              ),
-                              // Badges
-                              Positioned(
-                                top: 8,
-                                right: 8,
-                                child: Row(
-                                  children: [
-                                    if (rec['urgent'] == true)
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 6,
-                                          vertical: 2,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: Colors.red,
-                                          borderRadius:
-                                              BorderRadius.circular(8),
-                                        ),
-                                        child: const Text(
-                                          'URGENT',
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                    SizedBox(width: SDSpacing.xxxs),
-                                    if (rec['discount'] != null)
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 6,
-                                          vertical: 2,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: SDColors.primary600,
-                                          borderRadius:
-                                              BorderRadius.circular(SDSpacing.borderRadiusSmall),
-                                        ),
-                                        child: Text(
-                                          '-${rec['discount']}',
-                                          style: SDTypography.labelSmall.copyWith(
-                                            color: SDColors.white,
-                                          ),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          // Contenu
-                          Flexible(
-                            child: Padding(
-                              padding: EdgeInsets.all(SDSpacing.xxxs),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    rec['title'],
-                                    style: SDTypography.bodyMedium.copyWith(
-                                      color: SDColors.neutral900,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  SizedBox(height: SDSpacing.xxxs),
-                                  Text(
-                                    rec['reason'],
-                                    style: SDTypography.labelSmall.copyWith(
-                                      color: SDColors.info500,
-                                      fontStyle: FontStyle.italic,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  SizedBox(height: SDSpacing.xxxs),
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          rec['provider'],
-                                          style: SDTypography.labelSmall.copyWith(
-                                            color: SDColors.neutral900,
-                                          ),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                      SizedBox(width: SDSpacing.xxxs),
-                                      Icon(
-                                        Icons.star,
-                                        color: SDColors.warning500,
-                                        size: 12,
-                                      ),
-                                      SizedBox(width: SDSpacing.xxxs),
-                                      Text(
-                                        rec['rating'].toString(),
-                                        style: SDTypography.labelSmall.copyWith(
-                                          color: SDColors.warning500,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  SizedBox(height: SDSpacing.xxxs),
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        flex: 3,
-                                        child: Text(
-                                          rec['price'],
-                                          style: SDTypography.labelSmall.copyWith(
-                                            color: SDColors.primary600,
-                                          ),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                      SizedBox(width: SDSpacing.xxxs),
-                                      Flexible(
-                                        flex: 2,
-                                        child: ElevatedButton(
-                                          onPressed: () {
-                                            // TODO: Navigation vers les détails du service
-                                          },
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: SDColors.primary600,
-                                            foregroundColor: SDColors.white,
-                                            padding: EdgeInsets.symmetric(
-                                              horizontal: SDSpacing.xxxs,
-                                              vertical: SDSpacing.xxxs,
-                                            ),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(SDSpacing.borderRadiusSmall),
-                                            ),
-                                            minimumSize: const Size(0, 24),
-                                          ),
-                                          child: Text(
-                                            'Voir',
-                                            style: SDTypography.labelSmall,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
-        );
-      },
     );
   }
 }

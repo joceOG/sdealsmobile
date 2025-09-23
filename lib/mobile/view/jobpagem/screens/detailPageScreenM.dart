@@ -9,8 +9,6 @@ import 'package:sdealsmobile/mobile/view/orderpagem/screens/service_request_summ
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../widgets/mini_map_widget.dart';
-// ✅ Design System
-import '../../../../design_system/design_system.dart';
 
 // Page de détails de service (2025) avec header moderne, prestataires réels, et CTA sticky
 class DetailPage extends StatefulWidget {
@@ -34,8 +32,6 @@ class _DetailPageState extends State<DetailPage> {
   bool _filterVerifiedOnly = false;
   bool _isFavorited = false;
   LatLng? _userLocation;
-  String? _serviceId;
-  String? _selectedProviderId;
 
   @override
   void initState() {
@@ -73,10 +69,6 @@ class _DetailPageState extends State<DetailPage> {
       if (!mounted) return;
       setState(() {
         _providers = results;
-        // Récupérer l'ID du service depuis le premier prestataire
-        if (_providers.isNotEmpty && _providers.first['service'] != null) {
-          _serviceId = _providers.first['service']['_id']?.toString();
-        }
       });
     } catch (e) {
       if (!mounted) return;
@@ -96,25 +88,13 @@ class _DetailPageState extends State<DetailPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.title,
-            style: SDTypography.titleMedium.copyWith(fontWeight: FontWeight.bold, color: SDColors.white)),
-        backgroundColor: SDColors.primary700,
-        foregroundColor: SDColors.white,
+            style: const TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.green,
+        foregroundColor: Colors.white,
         elevation: 0,
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                SDColors.primary700,
-                SDColors.primary500,
-              ],
-            ),
-          ),
-        ),
         actions: [
           IconButton(
-            icon: Icon(Icons.ios_share_rounded, color: SDColors.white),
+            icon: const Icon(Icons.ios_share_rounded),
             onPressed: _onShareTap,
           ),
           IconButton(
@@ -122,12 +102,11 @@ class _DetailPageState extends State<DetailPage> {
               _isFavorited
                   ? Icons.favorite_rounded
                   : Icons.favorite_border_rounded,
-              color: SDColors.white,
             ),
             onPressed: _onFavoriteTap,
           ),
           IconButton(
-            icon: Icon(Icons.flag_outlined, color: SDColors.white),
+            icon: const Icon(Icons.flag_outlined),
             onPressed: _onReportTap,
           ),
         ],
@@ -136,73 +115,131 @@ class _DetailPageState extends State<DetailPage> {
         slivers: [
           SliverToBoxAdapter(
             child: Padding(
-              padding: EdgeInsets.all(SDSpacing.md),
+              padding: const EdgeInsets.all(18),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildServiceImage(widget.image),
-                  SizedBox(height: SDSpacing.sm),
+                  const SizedBox(height: 16),
+                  _buildHeaderChips(),
+                  const SizedBox(height: 14),
                   Text(
                     widget.title,
-                    style: SDTypography.titleLarge.copyWith(
+                    style: const TextStyle(
+                      fontSize: 24,
                       fontWeight: FontWeight.bold,
-                      color: SDColors.neutral900,
+                      color: Colors.black87,
                     ),
                   ),
-                  SizedBox(height: SDSpacing.sm),
-                  _buildServiceDescription(),
-                  SizedBox(height: SDSpacing.md),
-                  SizedBox(height: SDSpacing.lg),
+                  const SizedBox(height: 10),
+                  const Text(
+                    "Description du service :\nCe service est assuré par un professionnel qualifié.",
+                    style: TextStyle(fontSize: 15.5, color: Colors.black54),
+                  ),
+                  const SizedBox(height: 18),
+                  Row(
+                    children: const [
+                      Icon(Icons.location_on, color: Colors.green, size: 20),
+                      SizedBox(width: 6),
+                      Text(
+                        "Disponible à : Abobo",
+                        style: TextStyle(fontSize: 14.5, color: Colors.black87),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: const [
+                      Icon(Icons.star, color: Colors.amber, size: 20),
+                      SizedBox(width: 6),
+                      Text(
+                        "Note : 4.8/5",
+                        style: TextStyle(fontSize: 14.5, color: Colors.black87),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 28),
 
                   // Mini carte avec emplacement du prestataire
-                  if (_providers.isNotEmpty && _userLocation != null)
-                    ConstrainedBox(
-                      constraints: BoxConstraints(
-                        minHeight: 100,
-                        maxHeight: 200,
-                      ),
-                      child: MiniMapWidget(
-                        provider: _providers.first,
-                        userLocation: _userLocation,
-                      ),
+                  if (_providers.isNotEmpty)
+                    MiniMapWidget(
+                      provider:
+                          _providers.first, // Premier prestataire comme exemple
+                      userLocation: _userLocation,
                     ),
 
-                  SizedBox(height: SDSpacing.md),
+                  const SizedBox(height: 20),
                   AIProviderMatcherWidget(
                     serviceType: widget.title,
                     location: "Abidjan",
                     preferences: const [],
                   ),
-                  SizedBox(height: SDSpacing.md),
+                  const SizedBox(height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Prestataires disponibles',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 18),
+                      ),
+                      TextButton.icon(
+                        onPressed: () {
+                          setState(() {
+                            _filterVerifiedOnly = !_filterVerifiedOnly;
+                          });
+                          _loadProviders();
+                        },
+                        icon: Icon(
+                          _filterVerifiedOnly
+                              ? Icons.verified_rounded
+                              : Icons.verified_outlined,
+                          color: Colors.green,
+                        ),
+                        label: Text(
+                          _filterVerifiedOnly ? 'Vérifiés seulement' : 'Tous',
+                          style: const TextStyle(color: Colors.green),
+                        ),
+                      )
+                    ],
+                  ),
                 ],
               ),
             ),
           ),
           if (_loading)
-            SliverToBoxAdapter(
+            const SliverToBoxAdapter(
               child: Padding(
-                padding: EdgeInsets.only(top: SDSpacing.xs),
+                padding: EdgeInsets.only(top: 8),
                 child: Center(
-                    child: CircularProgressIndicator(
-                        color: SDColors.primary700)),
+                    child: CircularProgressIndicator(color: Colors.green)),
               ),
             )
           else if (_providers.isEmpty)
-            SliverToBoxAdapter(
+            const SliverToBoxAdapter(
               child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: SDSpacing.md, vertical: SDSpacing.xs),
-                child: Text('Aucun prestataire trouvé pour ce service.',
-                    style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral600)),
+                padding: EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                child: Text('Aucun prestataire trouvé pour ce service.'),
               ),
             )
           else
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: SDSpacing.md),
-                child: _buildProvidersStories(),
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              sliver: SliverList.builder(
+                itemCount: _providers.length,
+                itemBuilder: (context, index) {
+                  final p = _providers[index];
+                  return _buildProviderCard(p);
+                },
               ),
             ),
-          SliverToBoxAdapter(child: SizedBox(height: SDSpacing.xxl)),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: _buildSuggestionsSection(context),
+            ),
+          ),
+          const SliverToBoxAdapter(child: SizedBox(height: 80)),
         ],
       ),
       bottomNavigationBar: _buildStickyCta(context),
@@ -214,8 +251,7 @@ class _DetailPageState extends State<DetailPage> {
     await Clipboard.setData(ClipboardData(text: text));
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Texte copié dans le presse-papiers',
-          style: SDTypography.bodyMedium)),
+      const SnackBar(content: Text('Texte copié dans le presse-papiers')),
     );
   }
 
@@ -223,9 +259,8 @@ class _DetailPageState extends State<DetailPage> {
     final auth = context.read<AuthCubit>().state;
     if (auth is! AuthAuthenticated) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text('Connectez-vous pour ajouter en favoris.',
-                style: SDTypography.bodyMedium)),
+        const SnackBar(
+            content: Text('Connectez-vous pour ajouter en favoris.')),
       );
       Navigator.push(
         context,
@@ -236,9 +271,7 @@ class _DetailPageState extends State<DetailPage> {
 
     setState(() => _isFavorited = !_isFavorited);
     final msg = _isFavorited ? 'Ajouté aux favoris' : 'Retiré des favoris';
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(msg, style: SDTypography.bodyMedium),
-        backgroundColor: SDColors.success500));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
 
     // Appel backend (fire-and-forget)
     if (_isFavorited) {
@@ -259,30 +292,25 @@ class _DetailPageState extends State<DetailPage> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text('Signaler le service', style: SDTypography.titleMedium),
+          title: const Text('Signaler le service'),
           content: TextField(
             controller: controller,
             maxLines: 4,
-            style: SDTypography.bodyMedium,
-            decoration: InputDecoration(
+            decoration: const InputDecoration(
               hintText: 'Décrivez le problème…',
-              hintStyle: SDTypography.bodyMedium.copyWith(color: SDColors.neutral400),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-              ),
+              border: OutlineInputBorder(),
             ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: Text('Annuler', style: SDTypography.labelMedium),
+              child: const Text('Annuler'),
             ),
             ElevatedButton(
               onPressed: () async {
                 if (controller.text.trim().isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Veuillez saisir un motif.',
-                        style: SDTypography.bodyMedium)),
+                    const SnackBar(content: Text('Veuillez saisir un motif.')),
                   );
                   return;
                 }
@@ -303,11 +331,7 @@ class _DetailPageState extends State<DetailPage> {
                 }
                 Navigator.pop(context, true);
               },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: SDColors.error500,
-                foregroundColor: SDColors.white,
-              ),
-              child: Text('Envoyer', style: SDTypography.labelMedium.copyWith(color: SDColors.white)),
+              child: const Text('Envoyer'),
             ),
           ],
         );
@@ -317,9 +341,7 @@ class _DetailPageState extends State<DetailPage> {
     if (result == true) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Signalement envoyé. Merci.',
-            style: SDTypography.bodyMedium),
-            backgroundColor: SDColors.success500),
+        const SnackBar(content: Text('Signalement envoyé. Merci.')),
       );
     }
   }
@@ -327,33 +349,32 @@ class _DetailPageState extends State<DetailPage> {
   Widget _buildStickyCta(BuildContext context) {
     return SafeArea(
       child: Padding(
-        padding: EdgeInsets.fromLTRB(SDSpacing.sm, SDSpacing.xs, SDSpacing.sm, SDSpacing.sm),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
         child: SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
             style: ElevatedButton.styleFrom(
-              backgroundColor: SDColors.primary700,
-              padding: EdgeInsets.symmetric(vertical: SDSpacing.sm),
+              backgroundColor: Colors.green,
+              padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
+                borderRadius: BorderRadius.circular(12),
               ),
-              elevation: 6,
             ),
-            icon: Icon(Icons.shopping_cart_checkout_rounded,
-                color: SDColors.white),
-            label: Text(
+            icon: const Icon(Icons.shopping_cart_checkout_rounded,
+                color: Colors.white),
+            label: const Text(
               "Commander ce service",
-              style: SDTypography.labelMedium.copyWith(
+              style: TextStyle(
+                  fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: SDColors.white),
+                  color: Colors.white),
             ),
             onPressed: () {
               final auth = context.read<AuthCubit>().state;
               if (auth is! AuthAuthenticated) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                      content: Text('Veuillez vous connecter pour commander.',
-                          style: SDTypography.bodyMedium)),
+                  const SnackBar(
+                      content: Text('Veuillez vous connecter pour commander.')),
                 );
                 Navigator.push(
                   context,
@@ -378,504 +399,129 @@ class _DetailPageState extends State<DetailPage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
       builder: (context) {
-        return Container(
-          decoration: BoxDecoration(
-            color: SDColors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(SDSpacing.xxxl)),
-          ),
+        return Padding(
           padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom + SDSpacing.sm,
-            left: SDSpacing.md,
-            right: SDSpacing.md,
-            top: SDSpacing.md,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+            left: 16,
+            right: 16,
+            top: 16,
           ),
           child: StatefulBuilder(
             builder: (context, setSheetState) {
-              return SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // En-tête moderne
-                    Row(
-                      children: [
-                        Container(
-                          padding: EdgeInsets.all(SDSpacing.xs),
-                          decoration: BoxDecoration(
-                            color: SDColors.primary700.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-                          ),
-                          child: Icon(
-                            Icons.shopping_cart_checkout_rounded,
-                            color: SDColors.primary700,
-                            size: 28,
-                          ),
-                        ),
-                        SizedBox(width: SDSpacing.xs),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Commander',
-                                style: SDTypography.titleMedium.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: SDColors.neutral900,
-                                ),
-                              ),
-                              Text(
-                                widget.title,
-                                style: SDTypography.bodySmall.copyWith(
-                                  color: SDColors.neutral600,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: () => Navigator.pop(context),
-                          icon: Icon(Icons.close, color: SDColors.neutral400),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: SDSpacing.md),
-                    
-                    // Sélecteur de prestataire moderne
-                    if (_providers.isNotEmpty) ...[
-                      Row(
-                        children: [
-                          Icon(Icons.person, color: SDColors.neutral700, size: 20),
-                          SizedBox(width: SDSpacing.xs),
-                          Text(
-                            'Choisir un prestataire',
-                            style: SDTypography.titleSmall.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          Text(' *', style: SDTypography.titleSmall.copyWith(color: SDColors.error500)),
-                        ],
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Commander ${widget.title}',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 18)),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: adresseCtrl,
+                    decoration: const InputDecoration(labelText: 'Adresse'),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: villeCtrl,
+                    decoration: const InputDecoration(labelText: 'Ville'),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(selectedDateTime == null
+                            ? 'Date/heure non choisie'
+                            : 'Le ${selectedDateTime!.toLocal()}'),
                       ),
-                      SizedBox(height: SDSpacing.xs),
-                      Container(
-                        decoration: BoxDecoration(
-                          border: Border.all(color: SDColors.neutral300),
-                          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-                        ),
-                        child: DropdownButtonFormField<String>(
-                          value: _selectedProviderId,
-                          style: SDTypography.bodyMedium,
-                          decoration: InputDecoration(
-                            border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(horizontal: SDSpacing.sm, vertical: SDSpacing.xs),
-                            prefixIcon: Icon(Icons.person_pin_circle, color: SDColors.primary700),
-                          ),
-                          hint: Text('Sélectionnez un prestataire', style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral500)),
-                          items: _providers.map((provider) {
-                            final prenom = provider['utilisateur']?['prenom'] ?? '';
-                            final nom = provider['utilisateur']?['nom'] ?? 'Inconnu';
-                            final price = provider['prixprestataire'] ?? 0;
-                            final note = provider['note'] ?? 'N/A';
-                            return DropdownMenuItem<String>(
-                              value: provider['_id']?.toString(),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      '$prenom $nom',
-                                      style: SDTypography.bodyMedium.copyWith(fontWeight: FontWeight.w500),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                  Icon(Icons.star, size: 14, color: SDColors.warning500),
-                                  SizedBox(width: SDSpacing.xxxs),
-                                  Text(
-                                    '$note',
-                                    style: SDTypography.labelSmall.copyWith(color: SDColors.neutral600),
-                                  ),
-                                  SizedBox(width: SDSpacing.xs),
-                                  Text(
-                                    '${price}F',
-                                    style: SDTypography.bodySmall.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                      color: SDColors.primary700,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }).toList(),
-                          onChanged: (value) {
-                            setSheetState(() {
-                              _selectedProviderId = value;
-                            });
-                          },
-                        ),
-                      ),
-                      SizedBox(height: SDSpacing.sm),
-                    ],
-                    
-                    // Adresse
-                    TextField(
-                      controller: adresseCtrl,
-                      style: SDTypography.bodyMedium,
-                      decoration: InputDecoration(
-                        labelText: 'Adresse',
-                        labelStyle: SDTypography.bodyMedium,
-                        hintText: 'Ex: Rue 12, Cocody',
-                        hintStyle: SDTypography.bodyMedium.copyWith(color: SDColors.neutral400),
-                        prefixIcon: Icon(Icons.home, color: SDColors.primary700),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-                          borderSide: BorderSide(color: SDColors.primary700, width: 2),
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: SDSpacing.xs),
-                    
-                    // Ville
-                    TextField(
-                      controller: villeCtrl,
-                      style: SDTypography.bodyMedium,
-                      decoration: InputDecoration(
-                        labelText: 'Ville',
-                        labelStyle: SDTypography.bodyMedium,
-                        hintText: 'Ex: Abidjan',
-                        hintStyle: SDTypography.bodyMedium.copyWith(color: SDColors.neutral400),
-                        prefixIcon: Icon(Icons.location_city, color: SDColors.primary700),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-                          borderSide: BorderSide(color: SDColors.primary700, width: 2),
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: SDSpacing.xs),
-                    
-                    // Date/Heure
-                    Container(
-                      decoration: BoxDecoration(
-                        border: Border.all(color: SDColors.neutral300),
-                        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-                      ),
-                      padding: EdgeInsets.symmetric(horizontal: SDSpacing.sm, vertical: SDSpacing.xs),
-                      child: Row(
-                        children: [
-                          Icon(Icons.calendar_today, color: SDColors.primary700),
-                          SizedBox(width: SDSpacing.xs),
-                          Expanded(
-                            child: Text(
-                              selectedDateTime == null
-                                  ? 'Choisir une date et heure (optionnel)'
-                                  : '${selectedDateTime!.day}/${selectedDateTime!.month}/${selectedDateTime!.year} à ${selectedDateTime!.hour}:${selectedDateTime!.minute.toString().padLeft(2, '0')}',
-                              style: SDTypography.bodyMedium.copyWith(
-                                color: selectedDateTime == null ? SDColors.neutral500 : SDColors.neutral900,
-                              ),
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: () async {
-                              final date = await showDatePicker(
-                                context: context,
-                                firstDate: DateTime.now(),
-                                lastDate: DateTime.now().add(const Duration(days: 90)),
-                                initialDate: DateTime.now().add(const Duration(days: 1)),
-                              );
-                              if (date == null) return;
-                              final time = await showTimePicker(
-                                context: context,
-                                initialTime: TimeOfDay.now(),
-                              );
-                              if (time == null) return;
-                              final dt = DateTime(date.year, date.month, date.day, time.hour, time.minute);
-                              setSheetState(() => selectedDateTime = dt);
-                            },
-                            child: Text('Choisir', style: SDTypography.labelMedium.copyWith(color: SDColors.primary700)),
-                          ),
-                        ],
-                      ),
-                    ),
-                    SizedBox(height: SDSpacing.xs),
-                    
-                    // Notes
-                    TextField(
-                      controller: notesCtrl,
-                      maxLines: 3,
-                      style: SDTypography.bodyMedium,
-                      decoration: InputDecoration(
-                        labelText: 'Notes / Instructions (optionnel)',
-                        labelStyle: SDTypography.bodyMedium,
-                        hintText: 'Ajoutez des détails supplémentaires...',
-                        hintStyle: SDTypography.bodyMedium.copyWith(color: SDColors.neutral400),
-                        prefixIcon: Padding(
-                          padding: EdgeInsets.only(bottom: SDSpacing.lg),
-                          child: Icon(Icons.note_alt, color: SDColors.primary700),
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-                          borderSide: BorderSide(color: SDColors.primary700, width: 2),
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: SDSpacing.md),
-                    
-                    // Message GRATUIT amélioré et plus visible
-                    Container(
-                      padding: EdgeInsets.all(SDSpacing.sm),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [SDColors.success100, SDColors.success50],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-                        border: Border.all(color: SDColors.success200, width: 2),
-                        boxShadow: [
-                          BoxShadow(
-                            color: SDColors.success200.withOpacity(0.3),
-                            blurRadius: 8,
-                            offset: Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: EdgeInsets.all(SDSpacing.xs),
-                            decoration: BoxDecoration(
-                              color: SDColors.success500,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(Icons.check_circle, color: SDColors.white, size: 24),
-                          ),
-                          SizedBox(width: SDSpacing.sm),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Service 100% GRATUIT',
-                                  style: SDTypography.titleSmall.copyWith(
-                                    color: SDColors.success700,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                SizedBox(height: SDSpacing.xxxs),
-                                Text(
-                                  'Aucun paiement requis • Accès immédiat',
-                                  style: SDTypography.bodySmall.copyWith(
-                                    color: SDColors.success600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    SizedBox(height: SDSpacing.md),
-                    
-                    // Bouton de soumission moderne
-                    SizedBox(
-                      width: double.infinity,
-                      height: 56,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: SDColors.primary700,
-                          foregroundColor: SDColors.white,
-                          elevation: 3,
-                          shadowColor: SDColors.primary700.withOpacity(0.4),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
-                          ),
-                        ),
+                      TextButton.icon(
                         onPressed: () async {
-                          final auth = context.read<AuthCubit>().state
-                              as AuthAuthenticated;
-
-                          // Validation simplifiée - seulement les champs essentiels
-                          if (_selectedProviderId == null) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Row(
-                                  children: [
-                                    Icon(Icons.warning_amber_rounded, color: SDColors.white),
-                                    SizedBox(width: SDSpacing.xs),
-                                    Expanded(child: Text('Veuillez sélectionner un prestataire',
-                                        style: SDTypography.bodyMedium.copyWith(color: SDColors.white))),
-                                  ],
-                                ),
-                                backgroundColor: SDColors.warning500,
-                                behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium)),
-                              ),
-                            );
-                            return;
-                          }
-                          
-                          // Validation adresse et ville (requis)
-                          if (adresseCtrl.text.trim().isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Row(
-                                  children: [
-                                    Icon(Icons.location_off, color: SDColors.white),
-                                    SizedBox(width: SDSpacing.xs),
-                                    Expanded(child: Text('Veuillez renseigner votre adresse',
-                                        style: SDTypography.bodyMedium.copyWith(color: SDColors.white))),
-                                  ],
-                                ),
-                                backgroundColor: SDColors.error500,
-                                behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium)),
-                              ),
-                            );
-                            return;
-                          }
-                          
-                          if (villeCtrl.text.trim().isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Row(
-                                  children: [
-                                    Icon(Icons.location_city_outlined, color: SDColors.white),
-                                    SizedBox(width: SDSpacing.xs),
-                                    Expanded(child: Text('Veuillez renseigner votre ville',
-                                        style: SDTypography.bodyMedium.copyWith(color: SDColors.white))),
-                                  ],
-                                ),
-                                backgroundColor: SDColors.error500,
-                                behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium)),
-                              ),
-                            );
-                            return;
-                          }
-                          
-                          // Date/heure optionnels - utiliser valeur par défaut si non renseigné
-                          final dateTimeToUse = selectedDateTime ?? DateTime.now().add(Duration(days: 1));
-
-                          // Montrer un loader
-                          showDialog(
+                          final date = await showDatePicker(
                             context: context,
-                            barrierDismissible: false,
-                            builder: (_) => Center(
-                              child: Card(
-                                child: Padding(
-                                  padding: EdgeInsets.all(SDSpacing.md),
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      CircularProgressIndicator(color: SDColors.primary700),
-                                      SizedBox(height: SDSpacing.sm),
-                                      Text('Envoi en cours...', style: SDTypography.bodyMedium),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
+                            firstDate: DateTime.now(),
+                            lastDate:
+                                DateTime.now().add(const Duration(days: 90)),
+                            initialDate:
+                                DateTime.now().add(const Duration(days: 1)),
                           );
-
-                          try {
-                            final created = await _api.createPrestation(
-                              token: auth.token,
-                              utilisateurId: auth.utilisateur.idutilisateur,
-                              prestataireId: _selectedProviderId,
-                              serviceId: _serviceId,
-                              adresse: adresseCtrl.text.trim(),
-                              ville: villeCtrl.text.trim(),
-                              dateHeure: dateTimeToUse,
-                              notesClient: notesCtrl.text.trim().isEmpty
-                                  ? null
-                                  : notesCtrl.text.trim(),
-                              moyenPaiement: 'GRATUIT',
-                            );
-                            
-                            if (!mounted) return;
-                            Navigator.pop(context); // Fermer le loader
-                            Navigator.pop(context); // Fermer le modal
-                            
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Row(
-                                  children: [
-                                    Icon(Icons.check_circle, color: SDColors.white),
-                                    SizedBox(width: SDSpacing.xs),
-                                    Expanded(child: Text('Commande confirmée ! 🎉',
-                                        style: SDTypography.bodyMedium.copyWith(color: SDColors.white))),
-                                  ],
+                          if (date == null) return;
+                          final time = await showTimePicker(
+                            context: context,
+                            initialTime: TimeOfDay.now(),
+                          );
+                          if (time == null) return;
+                          final dt = DateTime(date.year, date.month, date.day,
+                              time.hour, time.minute);
+                          setSheetState(() => selectedDateTime = dt);
+                        },
+                        icon: const Icon(Icons.calendar_today,
+                            color: Colors.green),
+                        label: const Text('Choisir'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: notesCtrl,
+                    maxLines: 3,
+                    decoration: const InputDecoration(labelText: 'Notes'),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green),
+                      onPressed: () async {
+                        final auth = context.read<AuthCubit>().state
+                            as AuthAuthenticated;
+                        try {
+                          final created = await _api.createPrestation(
+                            token: auth.token,
+                            utilisateurId: auth.utilisateur.idutilisateur,
+                            serviceId: null,
+                            adresse: adresseCtrl.text.trim().isEmpty
+                                ? null
+                                : adresseCtrl.text.trim(),
+                            ville: villeCtrl.text.trim().isEmpty
+                                ? null
+                                : villeCtrl.text.trim(),
+                            dateHeure: selectedDateTime,
+                            notesClient: notesCtrl.text.trim().isEmpty
+                                ? null
+                                : notesCtrl.text.trim(),
+                            moyenPaiement: 'SOUTRAPAY',
+                          );
+                          if (!mounted) return;
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Demande envoyée')));
+                          final id = created['_id']?.toString();
+                          if (id != null) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ServiceRequestSummaryScreen(
+                                  requestId: id,
+                                  token: auth.token,
                                 ),
-                                backgroundColor: SDColors.primary700,
-                                behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium)),
-                                duration: Duration(seconds: 3),
-                              ),
-                            );
-                            
-                            final id = created['_id']?.toString();
-                            if (id != null) {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => ServiceRequestSummaryScreen(
-                                    requestId: id,
-                                    token: auth.token,
-                                  ),
-                                ),
-                              );
-                            }
-                          } catch (e) {
-                            if (!mounted) return;
-                            Navigator.pop(context); // Fermer le loader
-                            Navigator.pop(context); // Fermer le modal
-                            
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Row(
-                                  children: [
-                                    Icon(Icons.error_outline, color: SDColors.white),
-                                    SizedBox(width: SDSpacing.xs),
-                                    Expanded(child: Text('Erreur: ${e.toString()}',
-                                        style: SDTypography.bodyMedium.copyWith(color: SDColors.white))),
-                                  ],
-                                ),
-                                backgroundColor: SDColors.error500,
-                                behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium)),
-                                duration: Duration(seconds: 4),
                               ),
                             );
                           }
-                        },
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.send_rounded, size: 22, color: SDColors.white),
-                            SizedBox(width: SDSpacing.xs),
-                            Text(
-                              'Confirmer la commande',
-                              style: SDTypography.labelMedium.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: SDColors.white,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                        } catch (e) {
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Erreur: $e')));
+                        }
+                      },
+                      child: const Text('Confirmer et payer',
+                          style: TextStyle(color: Colors.white)),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               );
             },
           ),
@@ -887,7 +533,7 @@ class _DetailPageState extends State<DetailPage> {
   Widget _buildServiceImage(String path) {
     final isUrl = path.toLowerCase().startsWith('http');
     return ClipRRect(
-      borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
+      borderRadius: BorderRadius.circular(16),
       child: isUrl
           ? Image.network(
               path,
@@ -900,21 +546,20 @@ class _DetailPageState extends State<DetailPage> {
                   height: 200,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: SDColors.neutral200,
-                    borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
+                    color: Colors.grey.shade200,
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  child:
-                      CircularProgressIndicator(color: SDColors.primary700),
+                  child: const CircularProgressIndicator(color: Colors.green),
                 );
               },
               errorBuilder: (context, error, stackTrace) {
                 return Container(
                   height: 200,
                   width: double.infinity,
-                  color: SDColors.neutral200,
+                  color: Colors.grey.shade200,
                   alignment: Alignment.center,
-                  child: Icon(Icons.image_not_supported,
-                      size: 48, color: SDColors.neutral500),
+                  child: const Icon(Icons.image_not_supported,
+                      size: 48, color: Colors.grey),
                 );
               },
             )
@@ -925,178 +570,180 @@ class _DetailPageState extends State<DetailPage> {
               fit: BoxFit.cover,
               errorBuilder: (context, error, stackTrace) => Container(
                 height: 200,
-                color: SDColors.neutral200,
+                color: Colors.grey.shade200,
                 alignment: Alignment.center,
-                child: Icon(Icons.image_not_supported,
-                    size: 48, color: SDColors.neutral500),
+                child: const Icon(Icons.image_not_supported,
+                    size: 48, color: Colors.grey),
               ),
             ),
     );
   }
 
-  Widget _buildServiceDescription() {
-    // Utiliser la description du premier prestataire si disponible
-    String description = "Ce service est assuré par un professionnel qualifié.";
-    if (_providers.isNotEmpty && _providers.first['description'] != null) {
-      description = _providers.first['description'];
-    }
-
-    return Text(
-      description,
-      style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral600),
+  Widget _buildHeaderChips() {
+    final chips = <String>['Populaire', 'Rapide', 'Garanti', 'Top qualité'];
+    return SizedBox(
+      height: 36,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: chips.length + 1,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          if (index == 0) {
+            return FilterChip(
+              label: const Text('Vérifiés'),
+              selected: _filterVerifiedOnly,
+              onSelected: (v) {
+                setState(() => _filterVerifiedOnly = v);
+                _loadProviders();
+              },
+            );
+          }
+          final label = chips[index - 1];
+          return Chip(
+            label: Text(label),
+            backgroundColor: Colors.green.shade50,
+            side: BorderSide(color: Colors.green.withOpacity(0.25)),
+          );
+        },
+      ),
     );
   }
 
-  Widget _buildProvidersStories() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Prestataires disponibles',
-          style: SDTypography.titleMedium.copyWith(
-            fontWeight: FontWeight.bold,
-            color: SDColors.neutral900,
-          ),
-        ),
-        SizedBox(height: SDSpacing.sm),
-        SizedBox(
-          height: 120, // Hauteur pour les stories
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            itemCount: _providers.length,
-            itemBuilder: (context, index) {
-              final provider = _providers[index];
-              return _buildProviderStory(provider);
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildProviderStory(Map<String, dynamic> provider) {
-    final utilisateur = provider['utilisateur'];
+  Widget _buildProviderCard(Map<String, dynamic> p) {
+    final utilisateur = p['utilisateur'];
     final nom = (utilisateur is Map<String, dynamic>)
         ? '${utilisateur['nom'] ?? ''} ${utilisateur['prenom'] ?? ''}'.trim()
         : 'Prestataire';
+    final service = p['service'];
+    final serviceName = (service is Map<String, dynamic>)
+        ? (service['nomservice'] ?? service['name'] ?? '')
+        : (service?.toString() ?? '');
     final photo = (utilisateur is Map<String, dynamic>)
         ? (utilisateur['photoProfil'] ?? '')
         : '';
     final isUrl = photo.toString().toLowerCase().startsWith('http');
-    final verified =
-        provider['verifier'] == true || provider['verified'] == true;
-    final price = provider['prixprestataire']?.toString() ?? '-';
+    final verified = p['verifier'] == true || p['verified'] == true;
+    final price = p['prixprestataire']?.toString() ?? '-';
 
-    return Container(
-      width: 80,
-      margin: EdgeInsets.only(right: SDSpacing.sm),
-      child: Column(
-        children: [
-          // Story ronde avec photo
-          GestureDetector(
-            onTap: () {
-              // Action pour voir le profil du prestataire
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Profil de $nom',
-                    style: SDTypography.bodyMedium)),
-              );
-            },
-            child: Stack(
-              children: [
-                // Cercle principal
-                Container(
-                  width: 70,
-                  height: 70,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: verified
-                          ? SDColors.primary700
-                          : SDColors.neutral300,
-                      width: 3,
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 1.5,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: isUrl && photo.isNotEmpty
+                  ? Image.network(photo,
+                      height: 56, width: 56, fit: BoxFit.cover)
+                  : Container(
+                      height: 56,
+                      width: 56,
+                      color: Colors.green.shade50,
+                      alignment: Alignment.center,
+                      child: const Icon(Icons.person, color: Colors.green),
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: SDColors.neutral900.withOpacity(0.1),
-                        blurRadius: 8,
-                        offset: Offset(0, 2),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          nom.isEmpty ? 'Prestataire' : nom,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
+                      if (verified)
+                        const Icon(Icons.verified_rounded,
+                            color: Colors.green, size: 18),
                     ],
                   ),
-                  child: ClipOval(
-                    child: isUrl && photo.isNotEmpty
-                        ? Image.network(
-                            photo,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
-                                color: SDColors.primary700.withOpacity(0.1),
-                                child: Icon(
-                                  Icons.person,
-                                  color: SDColors.primary700,
-                                  size: 30,
-                                ),
-                              );
-                            },
-                          )
-                        : Container(
-                            color: SDColors.primary700.withOpacity(0.1),
-                            child: Icon(
-                              Icons.person,
-                              color: SDColors.primary700,
-                              size: 30,
-                            ),
-                          ),
+                  const SizedBox(height: 2),
+                  Text(
+                    serviceName.toString(),
+                    style:
+                        const TextStyle(color: Colors.black54, fontSize: 12.5),
                   ),
-                ),
-                // Badge vérifié
-                if (verified)
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: Container(
-                      width: 20,
-                      height: 20,
-                      decoration: BoxDecoration(
-                        color: SDColors.primary700,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.verified,
-                        color: SDColors.white,
-                        size: 12,
-                      ),
-                    ),
-                  ),
-              ],
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(Icons.star, size: 16, color: Colors.amber),
+                      const SizedBox(width: 4),
+                      const Text('4.8'),
+                      const SizedBox(width: 12),
+                      const Icon(Icons.price_change_rounded,
+                          size: 16, color: Colors.green),
+                      const SizedBox(width: 4),
+                      Text('$price FCFA'),
+                    ],
+                  )
+                ],
+              ),
             ),
-          ),
-          SizedBox(height: SDSpacing.xs),
-          // Nom du prestataire
-          Text(
-            nom.length > 10 ? '${nom.substring(0, 10)}...' : nom,
-            style: SDTypography.labelSmall.copyWith(
-              fontWeight: FontWeight.w600,
-              color: SDColors.neutral900,
-            ),
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          SizedBox(height: SDSpacing.xxxs),
-          // Prix
-          Text(
-            '$price FCFA',
-            style: SDTypography.labelSmall.copyWith(
-              color: SDColors.primary700,
-              fontWeight: FontWeight.w500,
-            ),
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
+            const SizedBox(width: 8),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Demande envoyée')));
+              },
+              child: const Text('Commander',
+                  style: TextStyle(color: Colors.white)),
+            )
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildSuggestionsSection(BuildContext context) {
+    final suggestions = <String>[
+      'Nettoyage ménager',
+      'Collecte d\'encombrants',
+      'Entretien espaces verts'
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Prestations similaires',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 40,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: suggestions.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (context, index) {
+              final label = suggestions[index];
+              return ActionChip(
+                label: Text(label),
+                backgroundColor: Colors.green.shade50,
+                side: BorderSide(color: Colors.green.withOpacity(0.3)),
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Suggestion: $label')),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }

@@ -17,6 +17,9 @@ import '../../loginpagem/screens/loginPageScreenM.dart';
 import '../homepageblocm/homePageBlocM.dart';
 import '../homepageblocm/homePageEventM.dart';
 import '../homepageblocm/homePageStateM.dart';
+import '../../locationpagem/locationpageblocm/locationPageBlocM.dart';
+import '../../locationpagem/locationpageblocm/locationPageEventM.dart';
+import '../../locationpagem/locationpageblocm/locationPageStateM.dart';
 
 // ✅ Design System
 import '../../../../design_system/design_system.dart';
@@ -419,6 +422,7 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
       ),
       child: TabBar(
         controller: _tabController,
+<<<<<<< HEAD
         indicator: BoxDecoration(
           color: SDColors.white,
           borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
@@ -463,6 +467,23 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
             ),
           );
         }).toList(),
+=======
+        isScrollable: true,
+        indicatorColor: Colors.transparent,
+        tabs: _tabsData
+            .map((tab) => Tab(
+                  child: OutlinedButton.icon(
+                    onPressed: () =>
+                        _tabController.animateTo(_tabsData.indexOf(tab)),
+                    icon: Icon(tab["icon"] as IconData,
+                        color: Colors.white, size: 16),
+                    label: Text(tab["label"] as String,
+                        style:
+                            const TextStyle(color: Colors.white, fontSize: 11)),
+                  ),
+                ))
+            .toList(),
+>>>>>>> 9a877c0 (🚀 Optimisation géolocalisation et intégration API Maps)
       ),
     );
   }

@@ -79,8 +79,3 @@ class LocationPageStateM extends Equatable {
       ];
 }
 
-
-
-
-
-

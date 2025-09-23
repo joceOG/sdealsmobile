@@ -2,7 +2,10 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:sdealsmobile/mobile/data/models/commande_model.dart';
 import '../../../../data/services/websocket_service.dart';
 import '../../../../data/services/notification_service.dart';
+<<<<<<< HEAD
 import '../../../../data/services/api_client.dart';
+=======
+>>>>>>> 9a877c0 (🚀 Optimisation géolocalisation et intégration API Maps)
 import 'commande_event.dart';
 import 'commande_state.dart';
 // NOTE: imports non utilisés pour le flux e-commerce actuel; le flux Prestation
@@ -11,7 +14,10 @@ import 'commande_state.dart';
 class CommandeBloc extends Bloc<CommandeEvent, CommandeState> {
   final WebSocketService _webSocketService = WebSocketService();
   final NotificationService _notificationService = NotificationService();
+<<<<<<< HEAD
   final ApiClient _apiClient = ApiClient();
+=======
+>>>>>>> 9a877c0 (🚀 Optimisation géolocalisation et intégration API Maps)
 
   CommandeBloc() : super(CommandeState.initial()) {
     on<ChargerCommandes>(_onChargerCommandes);
@@ -54,8 +60,12 @@ class CommandeBloc extends Bloc<CommandeEvent, CommandeState> {
 
       emit(state.copyWith(
         isLoading: false,
+<<<<<<< HEAD
         commandes: commandes,
         error: null,
+=======
+        commandes: [],
+>>>>>>> 9a877c0 (🚀 Optimisation géolocalisation et intégration API Maps)
       ));
     } catch (error) {
       print('⚠️ Erreur API, utilisation mock data: $error');
@@ -203,6 +213,238 @@ class CommandeBloc extends Bloc<CommandeEvent, CommandeState> {
       print('❌ Erreur annulation: $error');
       emit(state.copyWith(error: 'Impossible d\'annuler'));
     }
+  }
+
+  // 🔌 CONFIGURATION DES CALLBACKS WEBSOCKET
+  void _setupWebSocketCallbacks() {
+    _webSocketService.onOrderStatusUpdated((data) {
+      add(OrderStatusUpdated(data));
+    });
+
+    _webSocketService.onOrderUpdate((data) {
+      print('📦 Mise à jour commande reçue: $data');
+    });
+
+    _webSocketService.onOrderError((error) {
+      print('❌ Erreur commande WebSocket: $error');
+    });
+  }
+
+  // 🔌 CONNEXION WEBSOCKET
+  Future<void> _onConnectWebSocket(
+    ConnectWebSocket event,
+    Emitter<CommandeState> emit,
+  ) async {
+    try {
+      await _webSocketService.connect();
+      emit(state.copyWith(isWebSocketConnected: true));
+    } catch (error) {
+      emit(state.copyWith(
+        isWebSocketConnected: false,
+        error: 'Erreur connexion WebSocket: $error',
+      ));
+    }
+  }
+
+  // 🔌 DÉCONNEXION WEBSOCKET
+  Future<void> _onDisconnectWebSocket(
+    DisconnectWebSocket event,
+    Emitter<CommandeState> emit,
+  ) async {
+    _webSocketService.disconnect();
+    emit(state.copyWith(isWebSocketConnected: false));
+  }
+
+  // 📦 MISE À JOUR STATUT COMMANDE VIA WEBSOCKET
+  Future<void> _onOrderStatusUpdated(
+    OrderStatusUpdated event,
+    Emitter<CommandeState> emit,
+  ) async {
+    try {
+      final orderData = event.orderData;
+      final orderId = orderData['orderId']?.toString() ?? '';
+      final newStatus = orderData['status']?.toString() ?? '';
+
+      // Mettre à jour la commande dans la liste
+      final updatedCommandes = state.commandes.map((commande) {
+        if (commande.id == orderId) {
+          return commande.copyWith(
+            status: _parseCommandeStatus(newStatus),
+          );
+        }
+        return commande;
+      }).toList();
+
+      emit(state.copyWith(
+        commandes: updatedCommandes,
+        lastUpdate: DateTime.now(),
+      ));
+
+      print('📦 Commande $orderId mise à jour: $newStatus');
+    } catch (error) {
+      print('❌ Erreur mise à jour statut commande: $error');
+    }
+  }
+
+  // 🔄 PARSER LE STATUT DE LA COMMANDE
+  CommandeStatus _parseCommandeStatus(String status) {
+    switch (status.toLowerCase()) {
+      case 'en cours':
+        return CommandeStatus.enCours;
+      case 'en attente':
+        return CommandeStatus.enAttente;
+      case 'terminée':
+        return CommandeStatus.terminee;
+      case 'annulée':
+        return CommandeStatus.annulee;
+      default:
+        return CommandeStatus.enCours;
+    }
+  }
+
+  // 🔔 ENVOYER NOTIFICATION PUSH
+  Future<void> _onSendPushNotification(
+    SendPushNotification event,
+    Emitter<CommandeState> emit,
+  ) async {
+    try {
+      final success = await _notificationService.sendPushNotification(
+        userId: event.userId,
+        title: event.title,
+        message: event.message,
+        data: event.data,
+      );
+
+      if (success) {
+        print('✅ Notification envoyée avec succès');
+      } else {
+        print('❌ Échec envoi notification');
+        emit(state.copyWith(
+          error: 'Erreur envoi notification',
+        ));
+      }
+    } catch (error) {
+      print('❌ Erreur envoi notification: $error');
+      emit(state.copyWith(
+        error: 'Erreur envoi notification: $error',
+      ));
+    }
+  }
+
+  // 🔔 NOTIFICATION REÇUE
+  Future<void> _onNotificationReceived(
+    NotificationReceived event,
+    Emitter<CommandeState> emit,
+  ) async {
+    try {
+      final notificationData = event.notificationData;
+      final type = notificationData['type']?.toString() ?? '';
+
+      print('🔔 Notification reçue: $type');
+
+      // Traiter selon le type de notification
+      switch (type) {
+        case 'order_status':
+          _handleOrderStatusNotification(notificationData, emit);
+          break;
+        case 'payment_received':
+          _handlePaymentNotification(notificationData, emit);
+          break;
+        case 'delivery_update':
+          _handleDeliveryNotification(notificationData, emit);
+          break;
+        default:
+          print('📱 Notification générique: $notificationData');
+      }
+    } catch (error) {
+      print('❌ Erreur traitement notification: $error');
+    }
+  }
+
+  // 📦 TRAITER NOTIFICATION STATUT COMMANDE
+  void _handleOrderStatusNotification(
+    Map<String, dynamic> data,
+    Emitter<CommandeState> emit,
+  ) {
+    final orderId = data['orderId']?.toString() ?? '';
+    final status = data['status']?.toString() ?? '';
+
+    // Mettre à jour la commande
+    final updatedCommandes = state.commandes.map((commande) {
+      if (commande.id == orderId) {
+        return commande.copyWith(
+          status: _parseCommandeStatus(status),
+        );
+      }
+      return commande;
+    }).toList();
+
+    emit(state.copyWith(
+      commandes: updatedCommandes,
+      lastUpdate: DateTime.now(),
+    ));
+
+    print('📦 Commande $orderId mise à jour via notification: $status');
+  }
+
+  // 💰 TRAITER NOTIFICATION PAIEMENT
+  void _handlePaymentNotification(
+    Map<String, dynamic> data,
+    Emitter<CommandeState> emit,
+  ) {
+    final orderId = data['orderId']?.toString() ?? '';
+    final amount = data['amount']?.toDouble() ?? 0.0;
+
+    print('💰 Paiement reçu pour commande $orderId: $amount FCFA');
+
+    // Mettre à jour la commande avec le statut payé
+    final updatedCommandes = state.commandes.map((commande) {
+      if (commande.id == orderId) {
+        return commande.copyWith(
+          status: CommandeStatus.terminee,
+        );
+      }
+      return commande;
+    }).toList();
+
+    emit(state.copyWith(
+      commandes: updatedCommandes,
+      lastUpdate: DateTime.now(),
+    ));
+  }
+
+  // 🚚 TRAITER NOTIFICATION LIVRAISON
+  void _handleDeliveryNotification(
+    Map<String, dynamic> data,
+    Emitter<CommandeState> emit,
+  ) {
+    final orderId = data['orderId']?.toString() ?? '';
+    final status = data['status']?.toString() ?? '';
+
+    print('🚚 Mise à jour livraison pour commande $orderId: $status');
+
+    // Mettre à jour la commande
+    final updatedCommandes = state.commandes.map((commande) {
+      if (commande.id == orderId) {
+        return commande.copyWith(
+          status: _parseCommandeStatus(status),
+        );
+      }
+      return commande;
+    }).toList();
+
+    emit(state.copyWith(
+      commandes: updatedCommandes,
+      lastUpdate: DateTime.now(),
+    ));
+  }
+
+  // 🧹 NETTOYAGE
+  @override
+  Future<void> close() {
+    _webSocketService.dispose();
+    _notificationService.dispose();
+    return super.close();
   }
 
   // 🔌 CONFIGURATION DES CALLBACKS WEBSOCKET
