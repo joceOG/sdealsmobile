@@ -303,3 +303,4 @@ class ProviderPopup extends StatelessWidget {
     return (2.5 + (provider.hashCode % 10) * 0.5).toStringAsFixed(1);
   }
 }
+
