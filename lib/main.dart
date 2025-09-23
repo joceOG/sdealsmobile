@@ -6,6 +6,7 @@ import 'package:sdealsmobile/data/models/article.dart';
 import 'data/models/categorie.dart';
 import 'data/models/utilisateur.dart';
 import 'data/services/authCubit.dart';
+import 'mobile/view/locationpagem/locationpageblocm/locationPageBlocM.dart';
 import 'mobile/view/home.dart';
 import 'mobile/view/loginpagem/loginpageblocm/loginPageBlocM.dart';
 import 'mobile/view/loginpagem/screens/loginPageScreenM.dart';
@@ -18,13 +19,12 @@ import 'mobile/view/serviceproviderwelcomepagem/screens/serviceProviderWelcomeSc
 import 'mobile/view/shoppingpagem/screens/productDetailsScreenM.dart';
 import 'mobile/view/shoppingpagem/shoppingpageblocm/shoppingPageBlocM.dart';
 import 'mobile/view/shoppingpagem/shoppingpageblocm/shoppingPageEventM.dart'
-as shoppingPageEventM;
+    as shoppingPageEventM;
 import 'mobile/view/splashcreenm/screens/splashScreenM.dart';
 import 'mobile/view/splashcreenm/splashscreenblocm/splashscreenBlocM.dart';
 import 'mobile/view/splashcreenm/splashscreenblocm/splashscreenEventM.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -35,7 +35,6 @@ void main() async {
 }
 
 class MyApp extends StatelessWidget {
-
   final GoRouter mobileRouter = GoRouter(
     routes: [
       GoRoute(
@@ -102,9 +101,13 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiBlocProvider(
       providers: [
-        // 👇 AuthCubit global pour toute l’application
+        // 👇 AuthCubit global pour toute l'application
         BlocProvider<AuthCubit>(
           create: (_) => AuthCubit(),
+        ),
+        // 👇 LocationPageBlocM pour la géolocalisation
+        BlocProvider<LocationPageBlocM>(
+          create: (_) => LocationPageBlocM(),
         ),
       ],
       child: ResponsiveBuilder(builder: (context, sizingInformation) {
@@ -130,8 +133,8 @@ class MyApp extends StatelessWidget {
                       color: Colors.grey,
                       width: 1.5,
                     )),
-                focusedBorder:
-                OutlineInputBorder(borderSide: BorderSide(color: Colors.grey)),
+                focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.grey)),
                 hintStyle: TextStyle(color: Colors.grey, fontSize: 14)),
           ),
         );

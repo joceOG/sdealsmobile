@@ -10,12 +10,18 @@ class CommandeState extends Equatable {
   final String? searchQuery;
   final CommandeStatus? filtreStatus;
 
+  // 🔌 WebSocket et notifications
+  final bool isWebSocketConnected;
+  final DateTime? lastUpdate;
+
   const CommandeState({
     required this.isLoading,
     required this.commandes,
     this.error,
     this.searchQuery,
     this.filtreStatus,
+    this.isWebSocketConnected = false,
+    this.lastUpdate,
   });
 
   // État initial
@@ -23,6 +29,7 @@ class CommandeState extends Equatable {
     return const CommandeState(
       isLoading: true,
       commandes: [],
+      isWebSocketConnected: false,
     );
   }
 
@@ -77,6 +84,8 @@ class CommandeState extends Equatable {
     String? error,
     String? searchQuery,
     CommandeStatus? filtreStatus,
+    bool? isWebSocketConnected,
+    DateTime? lastUpdate,
   }) {
     return CommandeState(
       isLoading: isLoading ?? this.isLoading,
@@ -84,12 +93,21 @@ class CommandeState extends Equatable {
       error: error,
       searchQuery: searchQuery ?? this.searchQuery,
       filtreStatus: filtreStatus,
+      isWebSocketConnected: isWebSocketConnected ?? this.isWebSocketConnected,
+      lastUpdate: lastUpdate ?? this.lastUpdate,
     );
   }
 
   @override
-  List<Object?> get props =>
-      [isLoading, commandes, error, searchQuery, filtreStatus];
+  List<Object?> get props => [
+        isLoading,
+        commandes,
+        error,
+        searchQuery,
+        filtreStatus,
+        isWebSocketConnected,
+        lastUpdate
+      ];
 }
 
 // États pour le flux Prestation (service request)

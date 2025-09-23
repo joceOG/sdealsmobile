@@ -6,6 +6,9 @@ import 'package:sdealsmobile/data/services/authCubit.dart';
 import 'package:sdealsmobile/mobile/view/common/widgets/ai_provider_matcher_widget.dart';
 import 'package:sdealsmobile/mobile/view/loginpagem/screens/loginPageScreenM.dart';
 import 'package:sdealsmobile/mobile/view/orderpagem/screens/service_request_summary_screen.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import '../widgets/mini_map_widget.dart';
 
 // Page de détails de service (2025) avec header moderne, prestataires réels, et CTA sticky
 class DetailPage extends StatefulWidget {
@@ -28,11 +31,29 @@ class _DetailPageState extends State<DetailPage> {
   List<Map<String, dynamic>> _providers = [];
   bool _filterVerifiedOnly = false;
   bool _isFavorited = false;
+  LatLng? _userLocation;
 
   @override
   void initState() {
     super.initState();
     _loadProviders();
+    _getCurrentLocation();
+  }
+
+  Future<void> _getCurrentLocation() async {
+    try {
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+      setState(() {
+        _userLocation = LatLng(position.latitude, position.longitude);
+      });
+    } catch (e) {
+      // Position par défaut (Abidjan) si géolocalisation échoue
+      setState(() {
+        _userLocation = const LatLng(5.3599, -4.0083);
+      });
+    }
   }
 
   Future<void> _loadProviders() async {
@@ -138,6 +159,16 @@ class _DetailPageState extends State<DetailPage> {
                     ],
                   ),
                   const SizedBox(height: 28),
+
+                  // Mini carte avec emplacement du prestataire
+                  if (_providers.isNotEmpty)
+                    MiniMapWidget(
+                      provider:
+                          _providers.first, // Premier prestataire comme exemple
+                      userLocation: _userLocation,
+                    ),
+
+                  const SizedBox(height: 20),
                   AIProviderMatcherWidget(
                     serviceType: widget.title,
                     location: "Abidjan",

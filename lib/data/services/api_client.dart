@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:sdealsmobile/data/models/categorie.dart';
@@ -448,6 +449,109 @@ class ApiClient {
     } catch (e) {
       print('Erreur dans fetchVendeurs: $e');
       throw Exception('Échec de chargement des vendeurs: $e');
+    }
+  }
+
+  // ✅ NOUVELLE MÉTHODE : Calculer la distance entre deux points
+  Future<double> calculateDistance({
+    required double lat1,
+    required double lng1,
+    required double lat2,
+    required double lng2,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('${dotenv.env['API_URL']}/maps/distance'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'origin': {'lat': lat1, 'lng': lng1},
+          'destination': {'lat': lat2, 'lng': lng2},
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['distance']?.toDouble() ?? 0.0;
+      } else {
+        // Fallback vers calcul local si l'API échoue
+        return _calculateLocalDistance(lat1, lng1, lat2, lng2);
+      }
+    } catch (e) {
+      print('Erreur calcul distance API: $e');
+      // Fallback vers calcul local
+      return _calculateLocalDistance(lat1, lng1, lat2, lng2);
+    }
+  }
+
+  // ✅ MÉTHODE FALLBACK : Calcul de distance local (formule de Haversine)
+  double _calculateLocalDistance(
+      double lat1, double lng1, double lat2, double lng2) {
+    const double earthRadius = 6371; // Rayon de la Terre en km
+
+    final double dLat = _degreesToRadians(lat2 - lat1);
+    final double dLng = _degreesToRadians(lng2 - lng1);
+
+    final double a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(_degreesToRadians(lat1)) *
+            math.cos(_degreesToRadians(lat2)) *
+            math.sin(dLng / 2) *
+            math.sin(dLng / 2);
+
+    final double c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+
+    return earthRadius * c;
+  }
+
+  double _degreesToRadians(double degrees) {
+    return degrees * (math.pi / 180);
+  }
+
+  // ✅ NOUVELLE MÉTHODE : Géocodage d'une adresse
+  Future<Map<String, dynamic>?> geocodeAddress(String address) async {
+    try {
+      final response = await http.post(
+        Uri.parse('${dotenv.env['API_URL']}/maps/geocode'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'address': address}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true) {
+          return data;
+        }
+      }
+      return null;
+    } catch (e) {
+      print('Erreur géocodage API: $e');
+      return null;
+    }
+  }
+
+  // ✅ NOUVELLE MÉTHODE : Rechercher des lieux proches
+  Future<List<Map<String, dynamic>>> searchNearbyPlaces({
+    required double lat,
+    required double lng,
+    double radius = 5000,
+    String type = 'establishment',
+    String keyword = '',
+  }) async {
+    try {
+      final response = await http.get(
+        Uri.parse('${dotenv.env['API_URL']}/maps/nearby'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true) {
+          return List<Map<String, dynamic>>.from(data['places'] ?? []);
+        }
+      }
+      return [];
+    } catch (e) {
+      print('Erreur recherche lieux proches API: $e');
+      return [];
     }
   }
 

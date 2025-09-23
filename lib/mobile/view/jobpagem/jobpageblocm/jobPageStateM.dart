@@ -13,7 +13,6 @@ class JobPageStateM extends Equatable {
   final List<Service> listItems2;
   final String error2;
 
-
   // Estimation de prix IA
   final AIPriceEstimation? priceEstimation;
   final bool isPriceLoading;
@@ -24,6 +23,16 @@ class JobPageStateM extends Equatable {
   final ProviderMatchExplanation? matchExplanation;
   final bool isMatchingLoading;
   final String matchError;
+
+  // ✅ NOUVEAU : Géolocalisation
+  final List<Prestataire> nearbyProviders;
+  final bool isNearbyLoading;
+  final String nearbyError;
+  final double? userLatitude;
+  final double? userLongitude;
+  final double searchRadius;
+  final String selectedCategory;
+  final String selectedService;
 
   const JobPageStateM({
     required this.isLoading,
@@ -39,6 +48,14 @@ class JobPageStateM extends Equatable {
     this.matchExplanation,
     required this.isMatchingLoading,
     required this.matchError,
+    required this.nearbyProviders,
+    required this.isNearbyLoading,
+    required this.nearbyError,
+    this.userLatitude,
+    this.userLongitude,
+    required this.searchRadius,
+    required this.selectedCategory,
+    required this.selectedService,
   });
 
   /// État initial "safe"
@@ -57,6 +74,14 @@ class JobPageStateM extends Equatable {
       matchExplanation: null,
       isMatchingLoading: false,
       matchError: '',
+      nearbyProviders: [],
+      isNearbyLoading: false,
+      nearbyError: '',
+      userLatitude: null,
+      userLongitude: null,
+      searchRadius: 5.0,
+      selectedCategory: '',
+      selectedService: '',
     );
   }
 
@@ -74,6 +99,14 @@ class JobPageStateM extends Equatable {
     ProviderMatchExplanation? matchExplanation,
     bool? isMatchingLoading,
     String? matchError,
+    List<Prestataire>? nearbyProviders,
+    bool? isNearbyLoading,
+    String? nearbyError,
+    double? userLatitude,
+    double? userLongitude,
+    double? searchRadius,
+    String? selectedCategory,
+    String? selectedService,
   }) {
     return JobPageStateM(
       isLoading: isLoading ?? this.isLoading,
@@ -89,23 +122,39 @@ class JobPageStateM extends Equatable {
       matchExplanation: matchExplanation ?? this.matchExplanation,
       isMatchingLoading: isMatchingLoading ?? this.isMatchingLoading,
       matchError: matchError ?? this.matchError,
+      nearbyProviders: nearbyProviders ?? this.nearbyProviders,
+      isNearbyLoading: isNearbyLoading ?? this.isNearbyLoading,
+      nearbyError: nearbyError ?? this.nearbyError,
+      userLatitude: userLatitude ?? this.userLatitude,
+      userLongitude: userLongitude ?? this.userLongitude,
+      searchRadius: searchRadius ?? this.searchRadius,
+      selectedCategory: selectedCategory ?? this.selectedCategory,
+      selectedService: selectedService ?? this.selectedService,
     );
   }
 
   @override
   List<Object?> get props => [
-    isLoading,
-    listItems,
-    error,
-    isLoading2,
-    listItems2,
-    error2,
-    priceEstimation,
-    isPriceLoading,
-    priceError,
-    matchedProviders,
-    matchExplanation,
-    isMatchingLoading,
-    matchError,
-  ];
+        isLoading,
+        listItems,
+        error,
+        isLoading2,
+        listItems2,
+        error2,
+        priceEstimation,
+        isPriceLoading,
+        priceError,
+        matchedProviders,
+        matchExplanation,
+        isMatchingLoading,
+        matchError,
+        nearbyProviders,
+        isNearbyLoading,
+        nearbyError,
+        userLatitude,
+        userLongitude,
+        searchRadius,
+        selectedCategory,
+        selectedService,
+      ];
 }
