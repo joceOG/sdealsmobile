@@ -95,3 +95,48 @@ class AnnulerCommande extends CommandeEvent {
   @override
   List<Object?> get props => [commandeId];
 }
+
+// 🔌 ÉVÉNEMENTS WEBSOCKET POUR COMMANDES
+class ConnectWebSocket extends CommandeEvent {
+  const ConnectWebSocket();
+}
+
+class DisconnectWebSocket extends CommandeEvent {
+  const DisconnectWebSocket();
+}
+
+class OrderStatusUpdated extends CommandeEvent {
+  final Map<String, dynamic> orderData;
+
+  const OrderStatusUpdated(this.orderData);
+
+  @override
+  List<Object> get props => [orderData];
+}
+
+// 🔔 ÉVÉNEMENTS NOTIFICATIONS PUSH
+class SendPushNotification extends CommandeEvent {
+  final String userId;
+  final String title;
+  final String message;
+  final Map<String, dynamic>? data;
+
+  const SendPushNotification({
+    required this.userId,
+    required this.title,
+    required this.message,
+    this.data,
+  });
+
+  @override
+  List<Object?> get props => [userId, title, message, data];
+}
+
+class NotificationReceived extends CommandeEvent {
+  final Map<String, dynamic> notificationData;
+
+  const NotificationReceived(this.notificationData);
+
+  @override
+  List<Object> get props => [notificationData];
+}

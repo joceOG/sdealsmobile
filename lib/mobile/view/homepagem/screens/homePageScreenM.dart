@@ -11,6 +11,9 @@ import '../../loginpagem/screens/loginPageScreenM.dart';
 import '../homepageblocm/homePageBlocM.dart';
 import '../homepageblocm/homePageEventM.dart';
 import '../homepageblocm/homePageStateM.dart';
+import '../../locationpagem/locationpageblocm/locationPageBlocM.dart';
+import '../../locationpagem/locationpageblocm/locationPageEventM.dart';
+import '../../locationpagem/locationpageblocm/locationPageStateM.dart';
 
 class HomePageScreenM extends StatefulWidget {
   const HomePageScreenM({super.key});
@@ -20,11 +23,6 @@ class HomePageScreenM extends StatefulWidget {
 
 class _HomePageScreenStateM extends State<HomePageScreenM>
     with TickerProviderStateMixin {
-  bool isLocationEnabled = false;
-  bool isLoading = false;
-  Map<String, double>? userLocation;
-  String lastFilterLocation = '';
-
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
   bool _isSearchVisible = false;
@@ -83,70 +81,6 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
     _tabController.dispose();
     _searchController.dispose();
     super.dispose();
-  }
-
-  Future<void> toggleLocation() async {
-    if (isLocationEnabled) {
-      setState(() {
-        isLocationEnabled = false;
-        userLocation = null;
-      });
-      return;
-    }
-    setState(() {
-      isLoading = true;
-    });
-    await Future.delayed(const Duration(seconds: 1));
-    bool serviceEnabled = (DateTime.now().millisecond % 10) < 8;
-    if (!serviceEnabled) {
-      setState(() {
-        isLoading = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Services de localisation désactivés')),
-      );
-      return;
-    }
-    await Future.delayed(const Duration(milliseconds: 500));
-    try {
-      final position = {'latitude': 5.3364, 'longitude': -4.0267};
-      setState(() {
-        userLocation = position;
-        isLocationEnabled = true;
-        isLoading = false;
-      });
-      _filterByLocation();
-    } catch (e) {
-      setState(() {
-        isLoading = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur de géolocalisation: ${e.toString()}')),
-      );
-    }
-  }
-
-  void _filterByLocation() async {
-    if (!isLocationEnabled || userLocation == null) {
-      setState(() {});
-      return;
-    }
-    try {
-      setState(() {
-        isLoading = true;
-      });
-      await Future.delayed(const Duration(seconds: 1));
-      setState(() {
-        isLoading = false;
-        userLocation = {'lat': 12.3696, 'lng': -1.5247};
-        lastFilterLocation = 'Ouagadougou, Burkina Faso';
-      });
-    } catch (e) {
-      setState(() {
-        isLoading = false;
-      });
-      print('Erreur lors de la géolocalisation: $e');
-    }
   }
 
   void _toggleSearch() {
@@ -255,8 +189,6 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
               if (_isSearchVisible) _buildSearchField(),
               const SizedBox(height: 8),
               _buildTabBar(),
-              const SizedBox(height: 2),
-              _buildLocationButton(),
             ],
           ),
         ),
@@ -461,33 +393,6 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
                   ),
                 ))
             .toList(),
-      ),
-    );
-  }
-
-  Widget _buildLocationButton() {
-    return Align(
-      alignment: Alignment.centerRight,
-      child: OutlinedButton.icon(
-        style: OutlinedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          minimumSize: const Size(120, 32),
-        ),
-        onPressed: isLoading ? null : toggleLocation,
-        icon: isLoading
-            ? const SizedBox(
-                width: 14,
-                height: 14,
-                child: CircularProgressIndicator(
-                    strokeWidth: 2, color: Colors.white),
-              )
-            : Icon(Icons.location_on,
-                size: 18,
-                color: isLocationEnabled ? Colors.amber : Colors.white),
-        label: Text('Autour de moi',
-            style: TextStyle(
-                color: isLocationEnabled ? Colors.amber : Colors.white,
-                fontSize: 11)),
       ),
     );
   }

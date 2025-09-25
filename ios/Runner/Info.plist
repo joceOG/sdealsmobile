@@ -45,5 +45,10 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!-- Permissions pour la géolocalisation -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Cette app a besoin de votre localisation pour vous proposer des services à proximité</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Cette app a besoin de votre localisation pour vous proposer des services à proximité</string>
 </dict>
 </plist>

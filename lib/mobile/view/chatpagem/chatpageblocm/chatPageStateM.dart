@@ -16,10 +16,13 @@ class ChatPageStateM extends Equatable {
   final Map<String, List<MessageModel>> messagesByConversation;
   final ConversationModel? selectedConversation;
   final String? error;
-  
+
   // Champs utilisés pour la compatibilité avec le code existant
   final bool? isLoading;
   final List<Categorie>? listItems;
+
+  // 🔌 WebSocket et notifications
+  final bool isWebSocketConnected;
 
   const ChatPageStateM({
     this.status = ChatPageStatus.initial,
@@ -29,6 +32,7 @@ class ChatPageStateM extends Equatable {
     this.error,
     this.isLoading,
     this.listItems,
+    this.isWebSocketConnected = false,
   });
 
   factory ChatPageStateM.initial() {
@@ -37,6 +41,7 @@ class ChatPageStateM extends Equatable {
       isLoading: true,
       listItems: null,
       error: '',
+      isWebSocketConnected: false,
     );
   }
 
@@ -48,16 +53,21 @@ class ChatPageStateM extends Equatable {
     String? error,
     bool? isLoading,
     List<Categorie>? listItems,
+    bool? isWebSocketConnected,
     bool clearSelectedConversation = false,
   }) {
     return ChatPageStateM(
       status: status ?? this.status,
       conversations: conversations ?? this.conversations,
-      messagesByConversation: messagesByConversation ?? this.messagesByConversation,
-      selectedConversation: clearSelectedConversation ? null : selectedConversation ?? this.selectedConversation,
+      messagesByConversation:
+          messagesByConversation ?? this.messagesByConversation,
+      selectedConversation: clearSelectedConversation
+          ? null
+          : selectedConversation ?? this.selectedConversation,
       error: error ?? this.error,
       isLoading: isLoading ?? this.isLoading,
       listItems: listItems ?? this.listItems,
+      isWebSocketConnected: isWebSocketConnected ?? this.isWebSocketConnected,
     );
   }
 
@@ -97,5 +107,6 @@ class ChatPageStateM extends Equatable {
         error,
         isLoading,
         listItems,
+        isWebSocketConnected,
       ];
 }
