@@ -23,6 +23,8 @@ import 'mobile/view/shoppingpagem/shoppingpageblocm/shoppingPageEventM.dart'
 import 'mobile/view/splashcreenm/screens/splashScreenM.dart';
 import 'mobile/view/splashcreenm/splashscreenblocm/splashscreenBlocM.dart';
 import 'mobile/view/splashcreenm/splashscreenblocm/splashscreenEventM.dart';
+import 'mobile/view/walletpagem/screens/walletPageScreenM.dart';
+import 'mobile/view/walletpagem/soutrapayblocm/soutra_wallet_bloc.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
@@ -90,6 +92,15 @@ class MyApp extends StatelessWidget {
         builder: (context, state) {
           final utilisateur = state.extra as Utilisateur;
           return ProviderMainScreen(utilisateur: utilisateur);
+        },
+      ),
+      GoRoute(
+        path: '/wallet',
+        builder: (context, state) {
+          return BlocProvider(
+            create: (context) => SoutraWalletBloc(),
+            child: const WalletPageScreenM(),
+          );
         },
       ),
     ],

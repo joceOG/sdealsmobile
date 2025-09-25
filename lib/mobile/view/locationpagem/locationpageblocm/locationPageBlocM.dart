@@ -226,5 +226,3 @@ class LocationPageBlocM extends Bloc<LocationPageEventM, LocationPageStateM> {
     }
   }
 }
-
-
