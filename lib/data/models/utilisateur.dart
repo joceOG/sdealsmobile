@@ -14,6 +14,7 @@ class Utilisateur {
   DateTime? createdAt;
   DateTime? updatedAt;
   String role; // ✅ Champ obligatoire
+  bool verifie; // ✅ Champ pour indiquer si l'utilisateur est vérifié
 
   Utilisateur({
     required this.idutilisateur,
@@ -31,6 +32,7 @@ class Utilisateur {
     this.createdAt,
     this.updatedAt,
     required this.role,
+    this.verifie = false, // ✅ Par défaut non vérifié
   });
 
   /// Convertir JSON → Utilisateur
@@ -48,8 +50,8 @@ class Utilisateur {
       photoProfil: json['photoProfil'],
       tokens: json['tokens'] != null
           ? List<String>.from(
-        (json['tokens'] as List).map((t) => t['token'] as String),
-      )
+              (json['tokens'] as List).map((t) => t['token'] as String),
+            )
           : [],
       token: json['token'], // ✅ pris en compte si présent dans la réponse API
       createdAt: json['createdAt'] != null
@@ -59,6 +61,7 @@ class Utilisateur {
           ? DateTime.tryParse(json['updatedAt'])
           : null,
       role: json['role'] ?? '',
+      verifie: json['verifie'] ?? false, // ✅ Par défaut non vérifié
     );
   }
 
@@ -75,13 +78,12 @@ class Utilisateur {
       'genre': genre,
       'note': note,
       'photoProfil': photoProfil,
-      'tokens': tokens != null
-          ? tokens!.map((t) => {'token': t}).toList()
-          : [],
+      'tokens': tokens != null ? tokens!.map((t) => {'token': t}).toList() : [],
       'token': token, // ✅ exporté aussi
       'createdAt': createdAt?.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
       'role': role,
+      'verifie': verifie, // ✅ Export du statut de vérification
     };
   }
 

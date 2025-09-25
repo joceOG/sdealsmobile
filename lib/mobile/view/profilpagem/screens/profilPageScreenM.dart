@@ -1,8 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../data/services/api_client.dart';
 import '../../loginpagem/screens/loginPageScreenM.dart';
 import '../../orderpagem/screens/service_requests_list_screen.dart';
 import '../profilpageblocm/profilPageBlocM.dart';
+import '../../avispagem/screens/avisPageScreenM.dart';
+import '../../avispagem/avispageblocm/avisPageBlocM.dart';
+import '../../favorispagem/screens/favoritePageScreenM.dart';
+import '../../favorispagem/favorispageblocm/favoritePageBlocM.dart';
+import '../../historypagem/screens/historyPageScreenM.dart';
+import '../../historypagem/historypageblocm/historyPageBlocM.dart';
+import '../../alertpagem/screens/alertPageScreenM.dart';
+import '../../alertpagem/alertpageblocm/alertPageBlocM.dart';
+import '../../preferencespagem/screens/preferencesPageScreenM.dart';
+import '../../preferencespagem/preferencespageblocm/preferencesPageBlocM.dart';
+import '../../securitypagem/screens/securityPageScreenM.dart';
+import '../../securitypagem/securitypageblocm/securityPageBlocM.dart';
+import '../../locationpagem/screens/locationPageScreenM.dart';
+import '../../locationpagem/locationpageblocm/locationPageBlocM.dart';
 
 class ProfilPageScreenM extends StatefulWidget {
   const ProfilPageScreenM({super.key});
@@ -11,9 +26,6 @@ class ProfilPageScreenM extends StatefulWidget {
 }
 
 class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
-  final GlobalKey<ScaffoldState> _scaffoldKey =
-      GlobalKey<ScaffoldState>(); // ignore: unused_field
-
   // Simuler des données utilisateur
   final String userName = "Afisu Yussuf";
   final String userStatus = "Compte vérifié"; // Ou "Client simple", "Premium"
@@ -221,7 +233,14 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
               title: "Mes avis & évaluations",
               subtitle: "Historique des commentaires laissés",
               onTap: () {
-                // Navigation vers les avis
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => BlocProvider(
+                      create: (context) => AvisPageBlocM(),
+                      child: const AvisPageScreenM(),
+                    ),
+                  ),
+                );
               },
             ),
             MenuItem(
@@ -229,15 +248,29 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
               title: "Favoris / Listes enregistrées",
               subtitle: "Articles, prestataires ou annonces sauvegardés",
               onTap: () {
-                // Navigation vers les favoris
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => BlocProvider(
+                      create: (context) => FavoritePageBlocM(),
+                      child: const FavoritePageScreenM(),
+                    ),
+                  ),
+                );
               },
             ),
             MenuItem(
               icon: Icons.history,
               title: "Historique des consultations",
-              subtitle: "Services et produits récemment visités",
+              subtitle: "Voir toutes vos consultations récentes",
               onTap: () {
-                // Navigation vers l'historique
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => BlocProvider(
+                      create: (context) => HistoryPageBlocM(),
+                      child: const HistoryPageScreenM(),
+                    ),
+                  ),
+                );
               },
             ),
             MenuItem(
@@ -245,7 +278,29 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
               title: "Mes alertes",
               subtitle: "Notifs personnalisées : offres, rappels",
               onTap: () {
-                // Navigation vers les alertes
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => BlocProvider(
+                      create: (context) => AlertPageBlocM(),
+                      child: const AlertPageScreenM(),
+                    ),
+                  ),
+                );
+              },
+            ),
+            MenuItem(
+              icon: Icons.language,
+              title: "Langue & Devise",
+              subtitle: "Configurer langue, devise, localisation",
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => BlocProvider(
+                      create: (context) => PreferencesPageBlocM(),
+                      child: const PreferencesPageScreenM(),
+                    ),
+                  ),
+                );
               },
             ),
 
@@ -322,7 +377,14 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
               title: "Localisation",
               subtitle: "Gérer votre adresse, géolocalisation",
               onTap: () {
-                // Navigation vers les paramètres de localisation
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => BlocProvider(
+                      create: (context) => LocationPageBlocM(),
+                      child: const LocationPageScreenM(),
+                    ),
+                  ),
+                );
               },
             ),
             MenuItem(
@@ -330,7 +392,16 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
               title: "Sécurité du compte",
               subtitle: "Mot de passe, double authentification",
               onTap: () {
-                // Navigation vers les paramètres de sécurité
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => BlocProvider(
+                      create: (context) => SecurityPageBlocM(
+                        apiClient: ApiClient(),
+                      ),
+                      child: const SecurityPageScreenM(),
+                    ),
+                  ),
+                );
               },
             ),
             MenuItem(
@@ -338,7 +409,14 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
               title: "Préférences utilisateurs",
               subtitle: "Notifications, catégories favorites",
               onTap: () {
-                // Navigation vers les préférences
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => BlocProvider(
+                      create: (context) => PreferencesPageBlocM(),
+                      child: const PreferencesPageScreenM(),
+                    ),
+                  ),
+                );
               },
             ),
             MenuItem(

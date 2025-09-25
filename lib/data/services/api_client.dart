@@ -17,6 +17,53 @@ class ApiClient {
 
   var apiUrl = dotenv.env['API_URL'];
 
+  // 🔧 MÉTHODES HTTP GÉNÉRIQUES
+  Future<http.Response> get(String endpoint) async {
+    final response = await http.get(
+      Uri.parse('$apiUrl$endpoint'),
+      headers: {'Content-Type': 'application/json'},
+    );
+    return response;
+  }
+
+  Future<http.Response> post(String endpoint,
+      {Map<String, dynamic>? body}) async {
+    final response = await http.post(
+      Uri.parse('$apiUrl$endpoint'),
+      headers: {'Content-Type': 'application/json'},
+      body: body != null ? jsonEncode(body) : null,
+    );
+    return response;
+  }
+
+  Future<http.Response> put(String endpoint,
+      {Map<String, dynamic>? body}) async {
+    final response = await http.put(
+      Uri.parse('$apiUrl$endpoint'),
+      headers: {'Content-Type': 'application/json'},
+      body: body != null ? jsonEncode(body) : null,
+    );
+    return response;
+  }
+
+  Future<http.Response> delete(String endpoint) async {
+    final response = await http.delete(
+      Uri.parse('$apiUrl$endpoint'),
+      headers: {'Content-Type': 'application/json'},
+    );
+    return response;
+  }
+
+  Future<http.Response> patch(String endpoint,
+      {Map<String, dynamic>? body}) async {
+    final response = await http.patch(
+      Uri.parse('$apiUrl$endpoint'),
+      headers: {'Content-Type': 'application/json'},
+      body: body != null ? jsonEncode(body) : null,
+    );
+    return response;
+  }
+
   Future<List<Categorie>> fetchCategorie(String nomGroupe) async {
     print('Récupération des catégories pour le groupe: $nomGroupe');
     try {
