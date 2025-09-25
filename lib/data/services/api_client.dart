@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:sdealsmobile/data/models/categorie.dart';
@@ -6,6 +7,7 @@ import 'package:diacritic/diacritic.dart';
 import '../models/article.dart';
 import '../models/groupe.dart';
 import '../models/service.dart';
+import '../models/utilisateur.dart';
 
 // http://180.149.197.115:3000/
 
@@ -241,47 +243,45 @@ class ApiClient {
     }
   }
 
-  Future<Map<String, dynamic>> registerUser(
-      {required String fullName,
-      required String phone,
-      required String password}) async {
-    final url = Uri.parse("$apiUrl/register");
+  Future<Utilisateur> registerUser(Utilisateur utilisateur) async {
+    final uri = Uri.parse("$apiUrl/register");
+    var request = http.MultipartRequest("POST", uri);
 
-    // Découper le fullName en nom et prénom
-    final parts = fullName.trim().split(" ");
-    final nom = parts.isNotEmpty ? parts.first : "";
-    final prenom = parts.length > 1 ? parts.sublist(1).join(" ") : "";
+    // Champs texte
+    request.fields['nom'] = utilisateur.nom ?? "";
+    request.fields['prenom'] = utilisateur.prenom ?? "";
+    request.fields['email'] = utilisateur.email ?? "";
+    request.fields['password'] = utilisateur.password ?? "";
+    request.fields['telephone'] = utilisateur.telephone ?? "";
+    request.fields['genre'] = utilisateur.genre ?? "";
+    request.fields['note'] = utilisateur.note ?? "";
+    request.fields['dateNaissance'] = utilisateur.dateNaissance ?? "";
+    request.fields['role'] = utilisateur.role ?? "";
 
-    print("🌍 Appel API: $url");
-    print(
-        "📤 Données envoyées: { nom: $nom, prenom: $prenom, telephone: $phone, password: ***** }");
+    // Photo profil
+    if (utilisateur.photoProfil != null && File(utilisateur.photoProfil!).existsSync()) {
+      request.files.add(await http.MultipartFile.fromPath("photoProfil", utilisateur.photoProfil!));
+    }
 
-    final response = await http.post(
-      url,
-      headers: {"Content-Type": "application/json"},
-      body: jsonEncode({
-        "nom": nom,
-        "prenom": prenom,
-        "telephone": phone,
-        "password": password, // 👈 correspond à ton backend
-      }),
-    );
+    print("📤 Champs envoyés utilisateur : ${request.fields}");
+    print("📤 Fichiers envoyés utilisateur : ${request.files.map((f) => f.filename).toList()}");
 
-    print("📥 StatusCode: ${response.statusCode}");
-    print("📥 Réponse brute: ${response.body}");
+    final response = await request.send();
+    final responseBody = await response.stream.bytesToString();
+
+    print("📥 Status: ${response.statusCode}");
+    print("📥 Body: $responseBody");
 
     if (response.statusCode == 200 || response.statusCode == 201) {
-      final data = jsonDecode(response.body);
-      print("✅ Succès Register: $data");
-      return data;
+      final data = jsonDecode(responseBody);
+      return data["utilisateur"] != null
+          ? Utilisateur.fromJson(data["utilisateur"])
+          : Utilisateur.fromJson(data);
     } else {
       try {
-        final error = jsonDecode(response.body);
-        print("❌ Erreur API Register: $error");
-        throw Exception(
-            error["error"] ?? error["message"] ?? "Erreur d'inscription");
-      } catch (e) {
-        print("⚠️ Impossible de parser l'erreur: ${response.body}");
+        final error = jsonDecode(responseBody);
+        throw Exception(error["message"] ?? error["error"] ?? "Erreur lors de l'inscription");
+      } catch (_) {
         throw Exception("Erreur inconnue (${response.statusCode})");
       }
     }
