@@ -61,19 +61,22 @@ class Prestataire {
   // ✅ NOUVELLE FACTORY : Convertir depuis le backend avec nouveau modèle
   factory Prestataire.fromBackend(Map<String, dynamic> json) {
     try {
+      final id = json['_id'] as String? ?? json['idprestataire'] as String? ?? '';
+      final utilisateur = json['utilisateur'] != null
+          ? Utilisateur.fromJson(json['utilisateur'])
+          : Utilisateur(
+              idutilisateur: '',
+              nom: 'Inconnu',
+              prenom: '',
+              genre: 'Homme',
+              email: '',
+              password: '',
+              telephone: '',
+              role: 'PRESTATAIRE');
+
       return Prestataire(
-        idprestataire: json['_id'] as String,
-        utilisateur: json['utilisateur'] != null
-            ? Utilisateur.fromJson(json['utilisateur'])
-            : Utilisateur(
-                idutilisateur: '',
-                nom: 'Inconnu',
-                prenom: '',
-                genre: 'Homme',
-                email: '',
-                password: '',
-                telephone: '',
-                role: 'PRESTATAIRE'),
+        idprestataire: id,
+        utilisateur: utilisateur,
         service: json['service'] != null
             ? Service.fromJson(json['service'])
             : Service(
@@ -81,22 +84,24 @@ class Prestataire {
                 nomservice: 'Service inconnu',
                 imageservice: '',
                 prixmoyen: '0'),
-        prixprestataire: (json['hourlyRate'] as num?)?.toDouble() ??
-            0.0, // Mapping nouveau modèle
-        localisation: json['location'] as String? ?? '',
+        // ✅ CORRIGÉ : Mapping correct du backend
+        prixprestataire: (json['prixprestataire'] as num?)?.toDouble() ?? 0.0,
+        // ✅ CORRIGÉ : Mapping correct du backend
+        localisation: json['localisation'] as String? ?? '',
         localisationMaps: json['localisationmaps'] != null
             ? LocalisationMaps.fromJson(json['localisationmaps'])
             : null,
-        note: json['description'] as String?,
-        verifier:
-            json['verificationDocuments']?['isVerified'] as bool? ?? false,
-        cni1: json['verificationDocuments']?['cni1'] as String?,
-        cni2: json['verificationDocuments']?['cni2'] as String?,
-        selfie: json['verificationDocuments']?['selfie'] as String?,
+        // ✅ CORRIGÉ : Mapping correct du backend
+        note: json['note'] as String?,
+        // ✅ CORRIGÉ : Mapping correct du backend
+        verifier: json['verifier'] as bool? ?? false,
+        cni1: json['cni1'] as String?,
+        cni2: json['cni2'] as String?,
+        selfie: json['selfie'] as String?,
         numeroCNI: json['numeroCNI'] as String?,
-        specialite:
-            json['skills'] != null ? List<String>.from(json['skills']) : null,
-        anneeExperience: json['experienceLevel'] as String?,
+        // ✅ CORRIGÉ : Mapping correct du backend
+        specialite: json['specialite'] != null ? List<String>.from(json['specialite']) : null,
+        anneeExperience: json['anneeExperience'] as String?,
         description: json['description'] as String?,
         rayonIntervention: json['rayonIntervention'] as double?,
         zoneIntervention: json['zoneIntervention'] != null

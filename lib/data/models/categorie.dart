@@ -18,13 +18,13 @@ class Categorie {
     final map = json as Map<String, dynamic>;
     final g = map['groupe'];
     return Categorie(
-      idcategorie: map['_id'] as String,
-      nomcategorie: map['nomcategorie'] as String,
-      imagecategorie: map['imagecategorie'] as String,
+      idcategorie: map['_id'] as String? ?? map['idcategorie'] as String? ?? '',
+      nomcategorie: map['nomcategorie'] as String? ?? '',
+      imagecategorie: map['imagecategorie'] as String? ?? '',
       // Gère populate ou simple ObjectId string
       groupe: g is Map<String, dynamic>
           ? Groupe.fromJson(g)
-          : Groupe(idgroupe: g as String, nomgroupe: ''), // placeholder si pas populate
+          : Groupe(idgroupe: g as String? ?? '', nomgroupe: ''), // placeholder si pas populate
     );
   }
 
