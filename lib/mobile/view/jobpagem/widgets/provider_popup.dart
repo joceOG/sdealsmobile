@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import '../../../../data/models/prestataire.dart';
+import '../screens/detailPageScreenM.dart';
 
 class ProviderPopup extends StatelessWidget {
-  final dynamic provider;
+  final dynamic provider; // Peut être Prestataire ou Map
   final VoidCallback onClose;
 
   const ProviderPopup({
@@ -11,8 +12,56 @@ class ProviderPopup extends StatelessWidget {
     required this.onClose,
   }) : super(key: key);
 
+  // Helper pour extraire les données du prestataire de manière sécurisée
+  Map<String, dynamic> _getProviderData() {
+    if (provider is Prestataire) {
+      final p = provider as Prestataire;
+      return {
+        'fullName': p.utilisateur.fullName,
+        'serviceName': p.service.nomservice,
+        'categoryName': p.service.categorie?.nomcategorie ?? '',
+        'description': p.description,
+        'note': p.note ?? '4.5',
+        'isVerified': p.verifier,
+        'photoProfil': p.utilisateur.photoProfil,
+        'price': '${p.prixprestataire.toStringAsFixed(0)} FCFA/h',
+        'location': p.localisation,
+      };
+    } else if (provider is Map<String, dynamic>) {
+      final utilisateur = provider['utilisateur'] as Map<String, dynamic>?;
+      final service = provider['service'] as Map<String, dynamic>?;
+      return {
+        'fullName': utilisateur != null 
+          ? '${utilisateur['prenom'] ?? ''} ${utilisateur['nom'] ?? ''}'.trim()
+          : 'Prestataire',
+        'serviceName': service?['nomservice'] ?? 'Service',
+        'categoryName': service?['categorie']?['nomcategorie'] ?? '',
+        'description': provider['description'] ?? 'Service professionnel de qualité.',
+        'note': provider['note']?.toString() ?? '4.5',
+        'isVerified': provider['verifier'] == true,
+        'photoProfil': utilisateur?['photoProfil'],
+        'price': '${(provider['prixprestataire'] ?? 0).toString()} FCFA/h',
+        'location': provider['localisation'] ?? 'Localisation',
+      };
+    }
+    // Fallback par défaut
+    return {
+      'fullName': 'Prestataire',
+      'serviceName': 'Service',
+      'categoryName': '',
+      'description': 'Service professionnel de qualité.',
+      'note': '4.5',
+      'isVerified': false,
+      'photoProfil': null,
+      'price': '0 FCFA/h',
+      'location': 'Localisation',
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
+    final data = _getProviderData();
+    
     return Material(
       color: Colors.transparent,
       child: GestureDetector(
@@ -61,9 +110,9 @@ class ProviderPopup extends StatelessWidget {
                             ),
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(30),
-                              child: provider.utilisateur?.photo != null
+                              child: data['photoProfil'] != null
                                   ? Image.network(
-                                      provider.utilisateur!.photo!,
+                                      data['photoProfil'],
                                       fit: BoxFit.cover,
                                       errorBuilder:
                                           (context, error, stackTrace) {
@@ -94,8 +143,7 @@ class ProviderPopup extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  provider.utilisateur?.fullName ??
-                                      'Prestataire',
+                                  data['fullName'],
                                   style: const TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
@@ -104,7 +152,7 @@ class ProviderPopup extends StatelessWidget {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  provider.service?.nomservice ?? 'Service',
+                                  data['serviceName'],
                                   style: TextStyle(
                                     fontSize: 14,
                                     color: Colors.green.shade700,
@@ -121,14 +169,14 @@ class ProviderPopup extends StatelessWidget {
                                     ),
                                     const SizedBox(width: 4),
                                     Text(
-                                      provider.note?.toString() ?? '4.5',
+                                      data['note'],
                                       style: const TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),
                                     const SizedBox(width: 8),
-                                    if (provider.verifier == true)
+                                    if (data['isVerified'] == true)
                                       Container(
                                         padding: const EdgeInsets.symmetric(
                                           horizontal: 8,
@@ -149,6 +197,26 @@ class ProviderPopup extends StatelessWidget {
                                         ),
                                       ),
                                   ],
+                                ),
+                                const SizedBox(height: 8),
+                                // Prix comme dans l'exemple immobilier
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.green,
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: Text(
+                                    data['price'],
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
                                 ),
                               ],
                             ),
@@ -179,8 +247,7 @@ class ProviderPopup extends StatelessWidget {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            provider.description ??
-                                'Service professionnel de qualité. Contactez-moi pour plus d\'informations.',
+                            data['description'],
                             style: const TextStyle(
                               fontSize: 14,
                               color: Colors.black54,
@@ -268,9 +335,16 @@ class ProviderPopup extends StatelessWidget {
                             child: ElevatedButton.icon(
                               onPressed: () {
                                 onClose(); // Fermer le popup
-                                // Naviguer vers l'écran de détail
-                                context.push('/provider-detail',
-                                    extra: provider);
+                                // Naviguer vers la page détail existante
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => DetailPage(
+                                      title: data['fullName'],
+                                      image: 'assets/categories/Image1.png', // Image par défaut
+                                    ),
+                                  ),
+                                );
                               },
                               icon: const Icon(Icons.info_outline, size: 18),
                               label: const Text('Détails'),
