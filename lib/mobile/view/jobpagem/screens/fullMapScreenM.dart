@@ -9,6 +9,7 @@ import '../widgets/provider_popup.dart';
 import '../jobpageblocm/jobPageBlocM.dart';
 import '../jobpageblocm/jobPageStateM.dart';
 import '../jobpageblocm/jobPageEventM.dart';
+import '../../../../data/models/prestataire.dart'; // ✅ Import nécessaire
 
 class FullMapScreenM extends StatefulWidget {
   final LatLng? initialPosition;
@@ -51,6 +52,11 @@ class _FullMapScreenMState extends State<FullMapScreenM> {
   }
 
   void _updateMapMarkers(List<dynamic> providers) async {
+    print('🗺️ FullMap _updateMapMarkers appelé avec ${providers.length} prestataires');
+    print('🗺️ Type des providers: ${providers.map((p) => p.runtimeType).toList()}');
+    if (providers.isNotEmpty) {
+      print('🗺️ Premier provider: ${providers.first}');
+    }
     Set<Marker> markers = {};
 
     // Marqueur de l'utilisateur avec forme humaine
@@ -69,55 +75,136 @@ class _FullMapScreenMState extends State<FullMapScreenM> {
       );
     }
 
-    // Marqueurs des prestataires avec formes humaines personnalisées
-    for (int i = 0; i < providers.length && i < 20; i++) {
+    // Marqueurs des prestataires avec leurs vraies coordonnées
+    for (int i = 0; i < providers.length; i++) {
       final provider = providers[i];
-      // Simulation de position (à remplacer par les vraies coordonnées)
-      double lat = _userLocation != null
-          ? _userLocation!.latitude + (0.01 * (i - 2))
-          : 5.3599; // Abidjan par défaut
-      double lng = _userLocation != null
-          ? _userLocation!.longitude + (0.01 * (i - 2))
-          : -4.0083;
+      
+      // Utiliser les vraies coordonnées du prestataire
+      double? lat;
+      double? lng;
+      
+      // Les prestataires arrivent maintenant comme objets Prestataire convertis
+      if (provider is Prestataire) {
+        // C'est un objet Prestataire
+        if (provider.localisationMaps != null) {
+          lat = provider.localisationMaps!.latitude;
+          lng = provider.localisationMaps!.longitude;
+        }
+      } else if (provider is Map<String, dynamic>) {
+        // Fallback si c'est encore un Map (données du backend)
+        final locMaps = provider['localisationmaps'];
+        if (locMaps != null && locMaps is Map<String, dynamic>) {
+          // Conversion sécurisée int/double
+          final latValue = locMaps['latitude'];
+          final lngValue = locMaps['longitude'];
+          
+          if (latValue is num) lat = latValue.toDouble();
+          if (lngValue is num) lng = lngValue.toDouble();
+        }
+      } else {
+        // Autre type d'objet - tentative d'accès dynamique
+        try {
+          final prestataireData = provider as dynamic;
+          if (prestataireData.localisationMaps != null) {
+            lat = prestataireData.localisationMaps.latitude;
+            lng = prestataireData.localisationMaps.longitude;
+          }
+        } catch (e) {
+          print('Erreur extraction coordonnées prestataire: $e');
+        }
+      }
+      
+      // Ignorer ce prestataire s'il n'a pas de coordonnées
+      if (lat == null || lng == null || lat == 0.0 || lng == 0.0) {
+        final providerId = provider is Prestataire ? provider.idprestataire : (provider is Map ? provider['_id'] ?? i : i);
+        print('❌ Prestataire $providerId ignoré: pas de coordonnées valides (lat: $lat, lng: $lng)');
+        continue;
+      }
+      
+      final providerId = provider is Prestataire ? provider.idprestataire : (provider is Map ? provider['_id'] ?? i : i);
+      print('✅ Prestataire $providerId ajouté à la carte: lat=$lat, lng=$lng');
 
-      // Les icônes sont maintenant gérées dans le service de marqueurs
+      // Extraire les vraies données du prestataire
+      String providerName = 'Prestataire';
+      String serviceName = 'Service';
+      String categoryName = '';
+      String price = '0 FCFA';
+      bool isVerified = false;
+      String note = 'N/A';
+      
+      if (provider is Prestataire) {
+        // C'est un objet Prestataire converti ✅
+        providerName = provider.utilisateur.fullName;
+        if (providerName.isEmpty) providerName = 'Prestataire';
+        serviceName = provider.service.nomservice;
+        categoryName = provider.service.categorie?.nomcategorie ?? '';
+        price = '${provider.prixprestataire.toStringAsFixed(0)} FCFA/h';
+        isVerified = provider.verifier;
+        note = provider.note ?? 'N/A';
+      } else if (provider is Map<String, dynamic>) {
+        // Fallback pour Map (données du backend)
+        final utilisateur = provider['utilisateur'];
+        if (utilisateur is Map<String, dynamic>) {
+          providerName = '${utilisateur['prenom'] ?? ''} ${utilisateur['nom'] ?? ''}'.trim();
+          if (providerName.isEmpty) providerName = 'Prestataire';
+        }
+        
+        final service = provider['service'];
+        if (service is Map<String, dynamic>) {
+          serviceName = service['nomservice'] ?? 'Service';
+          categoryName = service['nomcategorie'] ?? '';
+        }
+        
+        // Prix réel du prestataire (conversion sécurisée)
+        final prixPrestataire = provider['prixprestataire'] ?? provider['hourlyRate'];
+        if (prixPrestataire != null && prixPrestataire is num) {
+          final prixDouble = prixPrestataire.toDouble();
+          price = '${prixDouble.toStringAsFixed(0)} FCFA/h';
+        }
+        
+        isVerified = provider['verifier'] == true || 
+                    (provider['verificationDocuments']?['isVerified'] == true);
+        
+        note = provider['note']?.toString() ?? 'N/A';
+      } else {
+        // Autre type d'objet - tentative d'accès dynamique
+        try {
+          final prestataireData = provider as dynamic;
+          if (prestataireData.utilisateur != null) {
+            providerName = '${prestataireData.utilisateur.prenom ?? ''} ${prestataireData.utilisateur.nom ?? ''}'.trim();
+            if (providerName.isEmpty) providerName = 'Prestataire';
+          }
+          
+          if (prestataireData.service != null) {
+            serviceName = prestataireData.service.nomservice ?? 'Service';
+            categoryName = prestataireData.service.nomcategorie ?? '';
+          }
+          
+          price = '${prestataireData.prixprestataire?.toString() ?? '0'} FCFA/h';
+          isVerified = prestataireData.verifier == true;
+          note = prestataireData.note?.toString() ?? 'N/A';
+        } catch (e) {
+          print('Erreur extraction données prestataire: $e');
+        }
+      }
 
-      // Générer un prix aléatoire pour la démonstration (à remplacer par les vraies données)
-      final List<String> priceRanges = [
-        '5 000 F CFA',
-        '8 000 F CFA',
-        '12 000 F CFA',
-        '15 000 F CFA',
-        '20 000 F CFA',
-        '25 000 F CFA',
-        '30 000 F CFA',
-        '35 000 F CFA',
-        '45 000 F CFA',
-        '50 000 F CFA',
-      ];
-      final String price = priceRanges[i % priceRanges.length];
-
-      // Créer le marqueur avec bulle de prix
-      final providerIcon =
-          await CustomMarkerService.createProviderWithPriceMarker(
-        name: provider.utilisateur?.fullName ?? 'Prestataire',
-        category: provider.categorie?.nomcategorie ?? '',
-        service: provider.service?.nomservice ?? '',
-        price: price,
-        isVerified: provider.verifier == true,
-        isUrgent: provider.disponibilite == 'urgent' ||
-            (provider.note != null && provider.note < 3.0),
+      // Créer le marqueur personnalisé avec couleur intelligente (même style que "Autour de moi")
+      final providerIcon = await CustomMarkerService.createSmartProviderMarker(
+        name: providerName,
+        category: categoryName,
+        service: serviceName,
+        isVerified: isVerified,
+        isUrgent: false,
       );
 
       markers.add(
         Marker(
-          markerId: MarkerId('provider_$i'),
+          markerId: MarkerId('provider_${provider is Prestataire ? provider.idprestataire : i}'),
           position: LatLng(lat, lng),
           icon: providerIcon,
           infoWindow: InfoWindow(
-            title: provider.utilisateur?.fullName ?? 'Prestataire',
-            snippet:
-                'Note: ${provider.note ?? 'N/A'}/5 • ${provider.service?.nomservice ?? 'Service'}',
+            title: providerName,
+            snippet: 'Note: $note/5 • $serviceName • $price',
           ),
           onTap: () {
             setState(() {
@@ -129,6 +216,8 @@ class _FullMapScreenMState extends State<FullMapScreenM> {
       );
     }
 
+    print('🎯 Total markers créés: ${markers.length} (dont 1 utilisateur + ${markers.length - 1} prestataires)');
+    
     setState(() {
       _markers = markers;
     });
@@ -261,29 +350,32 @@ class _FullMapScreenMState extends State<FullMapScreenM> {
                       child: Row(
                         children: [
                           Icon(Icons.attach_money,
-                              color: Colors.white, size: 16),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Prix des services affichés sur la carte',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
+                              color: Colors.white, size: 14),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              'Prix des services affichés sur la carte',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          const Spacer(),
+                          const SizedBox(width: 6),
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
+                                horizontal: 6, vertical: 3),
                             decoration: BoxDecoration(
                               color: Colors.white,
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(10),
                             ),
                             child: Text(
-                              'F CFA',
+                              'FCFA',
                               style: TextStyle(
                                 color: Colors.green.shade800,
-                                fontSize: 12,
+                                fontSize: 10,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),

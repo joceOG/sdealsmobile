@@ -103,6 +103,15 @@ class MyApp extends StatelessWidget {
           );
         },
       ),
+      GoRoute(
+        path: '/wallet/profile',
+        builder: (context, state) {
+          return BlocProvider(
+            create: (context) => SoutraWalletBloc(),
+            child: const WalletPageScreenM(), // Ou créer un ProfileScreen dédié
+          );
+        },
+      ),
     ],
   );
 

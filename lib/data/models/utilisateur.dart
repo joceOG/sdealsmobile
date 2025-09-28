@@ -35,10 +35,13 @@ class Utilisateur {
     this.verifie = false, // ✅ Par défaut non vérifié
   });
 
+  // ✅ GETTER fullName manquant
+  String get fullName => '${prenom ?? ''} $nom'.trim();
+
   /// Convertir JSON → Utilisateur
   factory Utilisateur.fromJson(Map<String, dynamic> json) {
     return Utilisateur(
-      idutilisateur: json['_id'] ?? '',
+      idutilisateur: json['_id'] ?? json['idutilisateur'] ?? '',
       nom: json['nom'] ?? '',
       prenom: json['prenom'],
       dateNaissance: json['datedenaissance'],
@@ -50,7 +53,7 @@ class Utilisateur {
       photoProfil: json['photoProfil'],
       tokens: json['tokens'] != null
           ? List<String>.from(
-              (json['tokens'] as List).map((t) => t['token'] as String),
+              (json['tokens'] as List).map((t) => t is Map ? (t['token'] as String? ?? '') : t.toString()).where((token) => token.isNotEmpty),
             )
           : [],
       token: json['token'], // ✅ pris en compte si présent dans la réponse API

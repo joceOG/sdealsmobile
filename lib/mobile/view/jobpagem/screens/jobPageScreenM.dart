@@ -14,6 +14,7 @@ import 'package:flutter/foundation.dart';
 import '../services/custom_marker_service.dart';
 
 import '../../../../data/models/service.dart';
+import '../../../../data/models/prestataire.dart'; // ✅ Import manquant
 import '../jobpageblocm/jobPageBlocM.dart';
 import '../jobpageblocm/jobPageStateM.dart';
 import '../jobpageblocm/jobPageEventM.dart';
@@ -260,11 +261,10 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
       // Créer le marqueur personnalisé avec couleur intelligente
       final providerIcon = await CustomMarkerService.createSmartProviderMarker(
         name: provider.utilisateur?.fullName ?? 'Prestataire',
-        category: provider.categorie?.nomcategorie ?? '',
+        category: provider.service.categorie?.nomcategorie ?? '',
         service: provider.service?.nomservice ?? '',
         isVerified: provider.verifier == true,
-        isUrgent: provider.disponibilite == 'urgent' ||
-            (provider.note != null && provider.note < 3.0),
+        isUrgent: false, // Simplification - pas de données de disponibilité dans le modèle
       );
 
       markers.add(
@@ -523,29 +523,32 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                                         ),
                                         Padding(
                                           padding: const EdgeInsets.symmetric(
-                                              horizontal: 10, vertical: 6),
+                                              horizontal: 8, vertical: 4),
                                           child: Column(
                                             crossAxisAlignment:
                                                 CrossAxisAlignment.start,
+                                            mainAxisSize: MainAxisSize.min,
                                             children: [
                                               Text(
                                                 item.nomservice,
                                                 style: const TextStyle(
                                                   color: Colors.black87,
                                                   fontWeight: FontWeight.bold,
-                                                  fontSize: 16.0,
+                                                  fontSize: 14.0,
                                                 ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
                                               ),
                                               const SizedBox(height: 2),
                                               Text(
                                                 'À partir de ${item.prixmoyen} FCFA/h',
                                                 style: const TextStyle(
                                                   color: Colors.green,
-                                                  fontSize: 12.0,
+                                                  fontSize: 11.0,
                                                   fontWeight: FontWeight.w500,
                                                 ),
                                               ),
-                                              const SizedBox(height: 2),
+                                              const SizedBox(height: 1),
                                               Text(
                                                 'Catégorie: ${item.categorie?.nomcategorie}',
                                                 style: const TextStyle(
@@ -602,31 +605,80 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                         _buildFeaturedSection(),
                         const SizedBox(height: 24),
 
-                        // Carrousel Top Prestataires (design différent)
-                        CarouselSlider.builder(
-                          itemCount: topPrestataires.length,
-                          options: CarouselOptions(
-                            height: 170.0,
-                            autoPlay: true,
-                            autoPlayInterval: const Duration(seconds: 4),
-                            enlargeCenterPage: true,
-                            viewportFraction: 0.85,
-                          ),
-                          itemBuilder: (context, index, realIndex) {
-                            final item = topPrestataires[index];
-                            return GestureDetector(
-                              onTap: () {
-                                // Redirection vers la page de détails du prestataire
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => DetailPage(
-                                      title: item['title']!,
-                                      image: item['image']!,
-                                    ),
-                                  ),
-                                );
-                              },
+                        // 🥇 PRIORITÉ 1 : Section Promotions actives
+                        _buildActivePromotionsSection(),
+                        const SizedBox(height: 24),
+
+                        // 🥈 PRIORITÉ 2 : Témoignages clients
+                        _buildRecentReviewsSection(),
+                        const SizedBox(height: 24),
+
+                        // 🥉 PRIORITÉ 3 : Recommandations personnalisées
+                        _buildPersonalizedRecommendationsSection(),
+                        const SizedBox(height: 24),
+
+                        // Carrousel Top Prestataires (vraies données)
+                        BlocBuilder<JobPageBlocM, JobPageStateM>(
+                          builder: (context, state) {
+                            // Utiliser les vrais prestataires du state
+                            final topPrestatairesReal = state.nearbyProviders.take(5).toList();
+                            
+                            if (topPrestatairesReal.isEmpty) {
+                              return const SizedBox(
+                                height: 170,
+                                child: Center(
+                                  child: Text('Aucun prestataire trouvé',
+                                      style: TextStyle(color: Colors.grey)),
+                                ),
+                              );
+                            }
+                            
+                            return CarouselSlider.builder(
+                              itemCount: topPrestatairesReal.length,
+                              options: CarouselOptions(
+                                height: 170.0,
+                                autoPlay: true,
+                                autoPlayInterval: const Duration(seconds: 4),
+                                enlargeCenterPage: true,
+                                viewportFraction: 0.85,
+                              ),
+                              itemBuilder: (context, index, realIndex) {
+                                final prestataire = topPrestatairesReal[index];
+                                // Extraire les données du prestataire réel
+                                String providerName = 'Prestataire';
+                                String serviceName = 'Service';
+                                String location = 'Localisation';
+                                String rating = 'N/A';
+                                bool isVerified = false;
+                                String imageUrl = '';
+                                
+                                // Extraction sécurisée des données depuis objet Prestataire
+                                try {
+                                  // Les données viennent maintenant sous forme d'objets Prestataire convertis
+                                  providerName = prestataire.utilisateur.fullName;
+                                  if (providerName.isEmpty) providerName = 'Prestataire';
+                                  imageUrl = prestataire.utilisateur.photoProfil ?? '';
+                                  serviceName = prestataire.service.nomservice;
+                                  location = prestataire.localisation;
+                                  rating = prestataire.note ?? 'N/A';
+                                  isVerified = prestataire.verifier;
+                                } catch (e) {
+                                  print('Erreur extraction données prestataire: $e');
+                                }
+                                
+                                return GestureDetector(
+                                  onTap: () {
+                                    // Redirection vers la page de détails du prestataire
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => DetailPage(
+                                          title: providerName,
+                                          image: imageUrl.isNotEmpty ? imageUrl : 'assets/profil.png',
+                                        ),
+                                      ),
+                                    );
+                                  },
                               child: Card(
                                 elevation: 5,
                                 shape: RoundedRectangleBorder(
@@ -643,31 +695,45 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                                           ClipRRect(
                                             borderRadius:
                                                 BorderRadius.circular(14.0),
-                                            child: Image.asset(
-                                              item['image']!,
-                                              fit: BoxFit.cover,
-                                              width: 90,
-                                              height: 130,
-                                            ),
+                                            child: imageUrl.isNotEmpty
+                                                ? Image.network(
+                                                    imageUrl,
+                                                    fit: BoxFit.cover,
+                                                    width: 90,
+                                                    height: 130,
+                                                    errorBuilder: (context, error, stackTrace) =>
+                                                        Image.asset(
+                                                          'assets/profil.png',
+                                                          fit: BoxFit.cover,
+                                                          width: 90,
+                                                          height: 130,
+                                                        ),
+                                                  )
+                                                : Image.asset(
+                                                    'assets/profil.png',
+                                                    fit: BoxFit.cover,
+                                                    width: 90,
+                                                    height: 130,
+                                                  ),
                                           ),
-                                          // Indicateur en ligne
-                                          Positioned(
-                                            top: 8,
-                                            right: 8,
-                                            child: Container(
-                                              width: 12,
-                                              height: 12,
-                                              decoration: BoxDecoration(
-                                                color: item['online'] == true
-                                                    ? Colors.green
-                                                    : Colors.grey,
-                                                shape: BoxShape.circle,
-                                                border: Border.all(
-                                                    color: Colors.white,
-                                                    width: 2),
+                                          // Indicateur vérification
+                                          if (isVerified)
+                                            Positioned(
+                                              top: 8,
+                                              right: 8,
+                                              child: Container(
+                                                padding: const EdgeInsets.all(2),
+                                                decoration: const BoxDecoration(
+                                                  color: Colors.green,
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: const Icon(
+                                                  Icons.verified,
+                                                  color: Colors.white,
+                                                  size: 12,
+                                                ),
                                               ),
                                             ),
-                                          ),
                                         ],
                                       ),
                                       const SizedBox(width: 16),
@@ -681,81 +747,83 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                                           children: [
                                             Row(
                                               children: [
-                                                Text(
-                                                  item['title'] ?? '',
-                                                  style: const TextStyle(
-                                                    fontWeight: FontWeight.bold,
-                                                    fontSize: 17.0,
-                                                    color: Colors.black87,
+                                                Expanded(
+                                                  child: Text(
+                                                    providerName,
+                                                    style: const TextStyle(
+                                                      fontWeight: FontWeight.bold,
+                                                      fontSize: 15.0,
+                                                      color: Colors.black87,
+                                                    ),
+                                                    overflow: TextOverflow.ellipsis,
                                                   ),
                                                 ),
-                                                if (item['verified'] == true)
-                                                  const Padding(
-                                                    padding: EdgeInsets.only(
-                                                        left: 4),
-                                                    child: Icon(Icons.verified,
-                                                        color: Colors.green,
-                                                        size: 16),
-                                                  ),
                                               ],
                                             ),
-                                            const SizedBox(height: 4),
+                                            const SizedBox(height: 2),
                                             Text(
-                                              item['subtitle'] ?? '',
+                                              serviceName,
                                               style: const TextStyle(
-                                                fontSize: 13.5,
+                                                fontSize: 12.0,
                                                 color: Colors.black54,
                                               ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
                                             ),
                                             const SizedBox(height: 6),
                                             Row(
                                               children: [
                                                 const Icon(Icons.location_on,
-                                                    size: 15,
+                                                    size: 14,
                                                     color: Colors.green),
-                                                const SizedBox(width: 4),
-                                                Text(
-                                                  item['location'] ?? '',
-                                                  style: const TextStyle(
-                                                    fontSize: 13,
-                                                    color: Colors.green,
+                                                const SizedBox(width: 3),
+                                                Expanded(
+                                                  child: Text(
+                                                    location,
+                                                    style: const TextStyle(
+                                                      fontSize: 12,
+                                                      color: Colors.green,
+                                                    ),
+                                                    overflow: TextOverflow.ellipsis,
                                                   ),
                                                 ),
-                                                const Spacer(),
+                                                const SizedBox(width: 4),
                                                 const Icon(Icons.star,
-                                                    size: 15,
+                                                    size: 14,
                                                     color: Colors.amber),
                                                 const SizedBox(width: 2),
                                                 Text(
-                                                  item['rating'] ?? '',
+                                                  rating,
                                                   style: const TextStyle(
-                                                    fontSize: 13,
+                                                    fontSize: 12,
                                                     color: Colors.amber,
                                                     fontWeight: FontWeight.w600,
                                                   ),
                                                 ),
                                               ],
                                             ),
-                                            const SizedBox(height: 8),
-                                            ElevatedButton(
-                                              onPressed: () {
-                                                // Action contacter
-                                              },
-                                              style: ElevatedButton.styleFrom(
-                                                backgroundColor: Colors.green,
-                                                foregroundColor: Colors.white,
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                        horizontal: 12,
-                                                        vertical: 6),
-                                                minimumSize: const Size(
-                                                    double.infinity, 30),
-                                                shape: RoundedRectangleBorder(
-                                                  borderRadius:
-                                                      BorderRadius.circular(20),
+                                            const SizedBox(height: 4),
+                                            SizedBox(
+                                              height: 28,
+                                              child: ElevatedButton(
+                                                onPressed: () {
+                                                  // Action contacter
+                                                },
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: Colors.green,
+                                                  foregroundColor: Colors.white,
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                          horizontal: 8,
+                                                          vertical: 2),
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(14),
+                                                  ),
                                                 ),
+                                                child: const Text('Contacter',
+                                                    style: TextStyle(fontSize: 11)),
                                               ),
-                                              child: const Text('Contacter'),
                                             ),
                                           ],
                                         ),
@@ -766,7 +834,10 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                               ),
                             );
                           },
-                        ),
+                        );
+                      }
+                    ),
+
                       ],
                     ),
                   ),
@@ -1175,8 +1246,8 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Titre de la section
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
                   '📍 Autour de moi',
@@ -1186,14 +1257,17 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                     color: Colors.black,
                   ),
                 ),
+                const SizedBox(height: 8),
+                // Contrôles sur une ligne séparée
                 Row(
                   children: [
-                    // Slider de rayon
-                    SizedBox(
-                      width: 120,
+                    // Slider de rayon plus compact
+                    Expanded(
+                      flex: 3,
                       child: Row(
                         children: [
-                          const Icon(Icons.radio_button_unchecked, size: 16),
+                          const Icon(Icons.radio_button_unchecked, size: 14),
+                          const SizedBox(width: 4),
                           Expanded(
                             child: Slider(
                               value: _searchRadius,
@@ -1224,13 +1298,14 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                             ),
                           ),
                           Text('${_searchRadius.toInt()}km',
-                              style: const TextStyle(fontSize: 12)),
+                              style: const TextStyle(fontSize: 11)),
                         ],
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    // Bouton actualiser
+                    // Boutons plus compacts
                     IconButton(
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                      padding: EdgeInsets.zero,
                       onPressed: () {
                         if (_userLocation != null) {
                           context.read<JobPageBlocM>().add(LoadNearbyProvidersM(
@@ -1246,12 +1321,15 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                               ));
                         }
                       },
-                      icon: const Icon(Icons.refresh, color: Colors.green),
+                      icon: const Icon(Icons.refresh, color: Colors.green, size: 20),
                     ),
-                    // Bouton zoom vers carte complète
                     IconButton(
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                      padding: EdgeInsets.zero,
                       onPressed: () {
                         if (_userLocation != null) {
+                          print('🗺️ Navigation vers FullMap avec ${state.nearbyProviders.length} prestataires');
+                          print('🗺️ Type des nearbyProviders: ${state.nearbyProviders.map((p) => p.runtimeType).toList()}');
                           Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -1266,7 +1344,7 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                           );
                         }
                       },
-                      icon: const Icon(Icons.zoom_out_map, color: Colors.blue),
+                      icon: const Icon(Icons.zoom_out_map, color: Colors.blue, size: 20),
                       tooltip: 'Voir carte complète',
                     ),
                   ],
@@ -1661,7 +1739,7 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                     const Icon(Icons.star, color: Colors.amber, size: 16),
                     const SizedBox(width: 4),
                     Text(
-                      provider.note.toStringAsFixed(1),
+                      provider.note ?? 'N/A',
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(width: 12),
@@ -1903,6 +1981,697 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
           ),
         ],
       ),
+    );
+  }
+
+  // 🥇 PRIORITÉ 1 : Section Promotions actives
+  Widget _buildActivePromotionsSection() {
+    // Données simulées des promotions (à remplacer par API)
+    final List<Map<String, dynamic>> activePromotions = [
+      {
+        'title': '🎉 Première commande',
+        'discount': '20%',
+        'description': 'Économisez sur votre premier service',
+        'code': 'FIRST20',
+        'expiry': '31 Dec 2024',
+        'color': Colors.red,
+        'services': ['Ménage', 'Plomberie', 'Électricité']
+      },
+      {
+        'title': '⚡ Service Express',
+        'discount': '15%',
+        'description': 'Réduction sur interventions urgentes',
+        'code': 'EXPRESS15',
+        'expiry': '15 Jan 2025',
+        'color': Colors.orange,
+        'services': ['Urgence', 'Dépannage']
+      },
+      {
+        'title': '🏠 Pack Maison',
+        'discount': '25%',
+        'description': 'Combiné ménage + jardinage',
+        'code': 'PACK25',
+        'expiry': '28 Feb 2025',
+        'color': Colors.green,
+        'services': ['Ménage', 'Jardinage', 'Rénovation']
+      },
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [ // Supprime spaceBetween
+            const Expanded( // Wrap avec Expanded
+              child: Row(
+                children: [
+                  Icon(Icons.local_offer, color: Colors.red, size: 22), // Réduit de 24 à 22
+                  SizedBox(width: 6), // Réduit de 8 à 6
+                  Flexible( // Wrap text avec Flexible
+                    child: Text(
+                      '🎁 Promotions du moment',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18, // Réduit de 20 à 18
+                        color: Colors.black,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                // TODO: Navigation vers page promotions complète
+              },
+              child: const Text(
+                'Voir toutes',
+                style: TextStyle(
+                  color: Colors.green,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 180, // Augmenté de 160 à 180
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: activePromotions.length,
+            itemBuilder: (context, index) {
+              final promo = activePromotions[index];
+              return Container(
+                width: 280,
+                margin: const EdgeInsets.only(right: 16),
+                child: Card(
+                  elevation: 4,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      gradient: LinearGradient(
+                        colors: [
+                          promo['color'].withOpacity(0.1),
+                          promo['color'].withOpacity(0.05),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                    padding: const EdgeInsets.all(12), // Réduit de 16 à 12
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min, // Évite l'overflow
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                promo['title'],
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: promo['color'],
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                promo['discount'],
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          promo['description'],
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Colors.black54,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(Icons.code, size: 16, color: promo['color']),
+                            const SizedBox(width: 4),
+                            Text(
+                              promo['code'],
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: promo['color'],
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6), // Remplace Spacer par SizedBox fixe
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded( // Wrap text avec Expanded
+                              child: Text(
+                                'Expire le ${promo['expiry']}',
+                                style: const TextStyle(
+                                  fontSize: 10, // Réduit de 11 à 10
+                                  color: Colors.grey,
+                                ),
+                                overflow: TextOverflow.ellipsis, // Gère l'overflow
+                              ),
+                            ),
+                            const SizedBox(width: 8), // Espacement minimal
+                            ElevatedButton(
+                              onPressed: () {
+                                // TODO: Appliquer la promotion
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Code ${promo['code']} copié !'),
+                                    duration: const Duration(seconds: 2),
+                                  ),
+                                );
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: promo['color'],
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, // Réduit de 12 à 8
+                                  vertical: 4, // Réduit de 6 à 4
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              child: const Text(
+                                'Utiliser',
+                                style: TextStyle(fontSize: 11),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  // 🥈 PRIORITÉ 2 : Témoignages clients
+  Widget _buildRecentReviewsSection() {
+    // Données simulées des témoignages (à remplacer par API)
+    final List<Map<String, dynamic>> reviews = [
+      {
+        'name': 'Marie K.',
+        'service': 'Ménage à domicile',
+        'rating': 5,
+        'comment': 'Service exceptionnel ! Très professionnel et ponctuel. Je recommande vivement.',
+        'date': '3 jours',
+        'avatar': 'https://images.unsplash.com/photo-1494790108755-2616b612727a?w=150',
+        'provider': 'Fatou Diallo'
+      },
+      {
+        'name': 'Jean-Claude D.',
+        'service': 'Plomberie',
+        'rating': 5,
+        'comment': 'Problème résolu rapidement. Prix honnête et travail de qualité.',
+        'date': '1 semaine',
+        'avatar': 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150',
+        'provider': 'Moussa Traoré'
+      },
+      {
+        'name': 'Aicha B.',
+        'service': 'Coiffure à domicile',
+        'rating': 4,
+        'comment': 'Très satisfaite du résultat. Coiffeuse très à l\'écoute de mes souhaits.',
+        'date': '2 semaines',
+        'avatar': 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150',
+        'provider': 'Aminata Keita'
+      },
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [ // Supprime spaceBetween
+            const Expanded( // Wrap avec Expanded
+              child: Row(
+                children: [
+                  Icon(Icons.star, color: Colors.amber, size: 22), // Réduit de 24 à 22
+                  SizedBox(width: 6), // Réduit de 8 à 6
+                  Flexible( // Wrap text avec Flexible
+                    child: Text(
+                      '💬 Ils nous font confiance',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18, // Réduit de 20 à 18
+                        color: Colors.black,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                // TODO: Navigation vers page témoignages complète
+              },
+              child: const Text(
+                'Voir tous',
+                style: TextStyle(
+                  color: Colors.green,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 200,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: reviews.length,
+            itemBuilder: (context, index) {
+              final review = reviews[index];
+              return Container(
+                width: 280, // Réduit de 300 à 280
+                margin: const EdgeInsets.only(right: 12), // Réduit de 16 à 12
+                child: Card(
+                  elevation: 3,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12), // Réduit de 16 à 12
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min, // Évite l'overflow
+                      children: [
+                        Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 20,
+                              backgroundImage: NetworkImage(review['avatar']),
+                              onBackgroundImageError: (_, __) {},
+                              child: review['avatar'] == null
+                                  ? const Icon(Icons.person)
+                                  : null,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    review['name'],
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  Text(
+                                    review['service'],
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Row(
+                              children: List.generate(5, (starIndex) {
+                                return Icon(
+                                  starIndex < review['rating']
+                                      ? Icons.star
+                                      : Icons.star_border,
+                                  color: Colors.amber,
+                                  size: 16,
+                                );
+                              }),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8), // Réduit de 12 à 8
+                        Flexible( // Remplace Expanded par Flexible
+                          child: Text(
+                            review['comment'],
+                            style: const TextStyle(
+                              fontSize: 12, // Réduit de 13 à 12
+                              color: Colors.black87,
+                              height: 1.3, // Réduit de 1.4 à 1.3
+                            ),
+                            maxLines: 3, // Réduit de 4 à 3 lignes
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded( // Wrap avec Expanded
+                              child: Text(
+                                'Prestataire: ${review['provider']}',
+                                style: const TextStyle(
+                                  fontSize: 10, // Réduit de 11 à 10
+                                  color: Colors.green,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                overflow: TextOverflow.ellipsis, // Gère l'overflow
+                              ),
+                            ),
+                            const SizedBox(width: 8), // Espacement minimal
+                            Text(
+                              'Il y a ${review['date']}',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  // 🥉 PRIORITÉ 3 : Recommandations personnalisées
+  Widget _buildPersonalizedRecommendationsSection() {
+    return BlocBuilder<JobPageBlocM, JobPageStateM>(
+      builder: (context, state) {
+        // Données simulées des recommandations (à remplacer par vraie IA)
+        final List<Map<String, dynamic>> recommendations = [
+          {
+            'title': 'Ménage hebdomadaire',
+            'reason': 'Basé sur vos recherches récentes',
+            'provider': 'Aminata Services',
+            'rating': 4.8,
+            'price': '15 000 FCFA',
+            'image': 'https://images.unsplash.com/photo-1558618047-b2b7cd7006ec?w=150',
+            'category': 'Ménage',
+            'discount': '10%',
+            'urgent': false
+          },
+          {
+            'title': 'Réparation électrique',
+            'reason': 'Prestataires populaires près de chez vous',
+            'provider': 'Électro Pro',
+            'rating': 4.9,
+            'price': '25 000 FCFA',
+            'image': 'https://images.unsplash.com/photo-1621905251918-48416bd8575a?w=150',
+            'category': 'Électricité',
+            'discount': null,
+            'urgent': true
+          },
+          {
+            'title': 'Jardinage & Taille',
+            'reason': 'Saison recommandée pour vos plantes',
+            'provider': 'Vert Jardin',
+            'rating': 4.7,
+            'price': '20 000 FCFA',
+            'image': 'https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=150',
+            'category': 'Jardinage',
+            'discount': '15%',
+            'urgent': false
+          },
+        ];
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [ // Supprime spaceBetween
+                const Expanded( // Wrap avec Expanded
+                  child: Row(
+                    children: [
+                      Icon(Icons.recommend, color: Colors.blue, size: 22), // Réduit de 24 à 22
+                      SizedBox(width: 6), // Réduit de 8 à 6
+                      Flexible( // Wrap text avec Flexible
+                        child: Text(
+                          '🎯 Recommandé pour vous',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18, // Réduit de 20 à 18
+                            color: Colors.black,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                TextButton(
+                  onPressed: () {
+                    // TODO: Navigation vers page recommandations complète
+                  },
+                  child: const Text(
+                    'Tout voir',
+                    style: TextStyle(
+                      color: Colors.green,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 240, // Augmenté de 220 à 240
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: recommendations.length,
+                itemBuilder: (context, index) {
+                  final rec = recommendations[index];
+                  return Container(
+                    width: 300, // Réduit de 320 à 300
+                    margin: const EdgeInsets.only(right: 12), // Réduit de 16 à 12
+                    child: Card(
+                      elevation: 4,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min, // Évite l'overflow
+                        children: [
+                          // Header avec image et badges
+                          Stack(
+                            children: [
+                              ClipRRect(
+                                borderRadius: const BorderRadius.vertical(
+                                  top: Radius.circular(16),
+                                ),
+                                child: Container(
+                                  height: 100,
+                                  width: double.infinity,
+                                  color: Colors.grey.shade200,
+                                  child: rec['image'] != null
+                                      ? Image.network(
+                                          rec['image'],
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) => const Icon(
+                                            Icons.image_not_supported,
+                                            size: 40,
+                                            color: Colors.grey,
+                                          ),
+                                        )
+                                      : const Icon(
+                                          Icons.handyman,
+                                          size: 40,
+                                          color: Colors.grey,
+                                        ),
+                                ),
+                              ),
+                              // Badges
+                              Positioned(
+                                top: 8,
+                                right: 8,
+                                child: Row(
+                                  children: [
+                                    if (rec['urgent'] == true)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Colors.red,
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: const Text(
+                                          'URGENT',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    const SizedBox(width: 4),
+                                    if (rec['discount'] != null)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Colors.green,
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Text(
+                                          '-${rec['discount']}',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          // Contenu
+                          Flexible( // Remplace Expanded pour éviter overflow
+                            child: Padding(
+                              padding: const EdgeInsets.all(6), // Réduit encore de 8 à 6
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min, // Force taille minimale
+                                children: [
+                                  Text(
+                                    rec['title'],
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2), // Réduit de 4 à 2
+                                  Text(
+                                    rec['reason'],
+                                    style: const TextStyle(
+                                      fontSize: 10, // Réduit de 12 à 10
+                                      color: Colors.blue,
+                                      fontStyle: FontStyle.italic,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4), // Réduit de 8 à 4
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          rec['provider'],
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ),
+                                      Row(
+                                        children: [
+                                          const Icon(
+                                            Icons.star,
+                                            color: Colors.amber,
+                                            size: 14,
+                                          ),
+                                          const SizedBox(width: 2),
+                                          Text(
+                                            rec['rating'].toString(),
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4), // Remplace Spacer par SizedBox fixe
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Expanded( // Wrap prix avec Expanded
+                                        child: Text(
+                                          rec['price'],
+                                          style: const TextStyle(
+                                            fontSize: 13, // Réduit de 14 à 13
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.green,
+                                          ),
+                                          overflow: TextOverflow.ellipsis, // Gère l'overflow
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8), // Espacement minimal
+                                      ElevatedButton(
+                                        onPressed: () {
+                                          // TODO: Navigation vers détails du service
+                                        },
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.green,
+                                          foregroundColor: Colors.white,
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8, // Réduit de 12 à 8
+                                            vertical: 4, // Réduit de 6 à 4
+                                          ),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                        ),
+                                        child: const Text(
+                                          'Réserver',
+                                          style: TextStyle(fontSize: 11),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

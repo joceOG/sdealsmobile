@@ -9,8 +9,8 @@ class Groupe {
 
   factory Groupe.fromJson(Map<String, dynamic> json) {
     return Groupe(
-      idgroupe: json['_id'] as String,
-      nomgroupe: json['nomgroupe'] as String,
+      idgroupe: json['_id'] as String? ?? json['idgroupe'] as String? ?? '',
+      nomgroupe: json['nomgroupe'] as String? ?? '',
     );
   }
 
