@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:io';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:sdealsmobile/data/models/categorie.dart';
@@ -22,27 +23,31 @@ class ApiClient {
     final response = await http.get(
       Uri.parse('$apiUrl$endpoint'),
       headers: {'Content-Type': 'application/json'},
-    );
+    ).timeout(const Duration(seconds: 30));
     return response;
   }
 
   Future<http.Response> post(String endpoint,
       {Map<String, dynamic>? body}) async {
-    final response = await http.post(
-      Uri.parse('$apiUrl$endpoint'),
-      headers: {'Content-Type': 'application/json'},
-      body: body != null ? jsonEncode(body) : null,
-    );
+    final response = await http
+        .post(
+          Uri.parse('$apiUrl$endpoint'),
+          headers: {'Content-Type': 'application/json'},
+          body: body != null ? jsonEncode(body) : null,
+        )
+        .timeout(const Duration(seconds: 30));
     return response;
   }
 
   Future<http.Response> put(String endpoint,
       {Map<String, dynamic>? body}) async {
-    final response = await http.put(
-      Uri.parse('$apiUrl$endpoint'),
-      headers: {'Content-Type': 'application/json'},
-      body: body != null ? jsonEncode(body) : null,
-    );
+    final response = await http
+        .put(
+          Uri.parse('$apiUrl$endpoint'),
+          headers: {'Content-Type': 'application/json'},
+          body: body != null ? jsonEncode(body) : null,
+        )
+        .timeout(const Duration(seconds: 30));
     return response;
   }
 
@@ -50,8 +55,69 @@ class ApiClient {
     final response = await http.delete(
       Uri.parse('$apiUrl$endpoint'),
       headers: {'Content-Type': 'application/json'},
-    );
+    ).timeout(const Duration(seconds: 30));
     return response;
+  }
+
+  // ✅ MÉTHODE POUR METTRE À JOUR LE PROFIL UTILISATEUR
+  Future<Map<String, dynamic>> updateUserProfile({
+    required String userId,
+    required Map<String, dynamic> updateData,
+    File? photoFile,
+    required String token,
+  }) async {
+    try {
+      var request = http.MultipartRequest(
+        'PUT',
+        Uri.parse('$apiUrl/utilisateur/$userId'),
+      );
+
+      // Ajouter le token d'authentification
+      request.headers['Authorization'] = 'Bearer $token';
+
+      // Ajouter les données de mise à jour
+      updateData.forEach((key, value) {
+        if (value != null) {
+          request.fields[key] = value.toString();
+        }
+      });
+
+      // Ajouter la photo si fournie
+      if (photoFile != null) {
+        request.files.add(
+          await http.MultipartFile.fromPath(
+            'photoProfil',
+            photoFile.path,
+          ),
+        );
+      }
+
+      var streamedResponse = await request.send();
+      var response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception(
+            'Erreur lors de la mise à jour: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Erreur API: $e');
+    }
+  }
+
+  // ✅ MÉTHODE POUR RÉCUPÉRER UN UTILISATEUR PAR ID
+  Future<Map<String, dynamic>> getUserById(String userId) async {
+    try {
+      final response = await get('/utilisateur/$userId');
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Erreur lors du chargement: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Erreur API: $e');
+    }
   }
 
   Future<http.Response> patch(String endpoint,
@@ -420,11 +486,11 @@ class ApiClient {
   Future<bool> testConnectivity() async {
     try {
       print("🔍 Test de connectivité vers: ${dotenv.env['API_URL']}");
-      final response = await http.get(
-        Uri.parse('${dotenv.env['API_URL']}/health'),
-        headers: {'Content-Type': 'application/json'}
-      ).timeout(Duration(seconds: 5));
-      
+      final response = await http
+          .get(Uri.parse('${dotenv.env['API_URL']}/health'), headers: {
+        'Content-Type': 'application/json'
+      }).timeout(Duration(seconds: 5));
+
       print("📡 Réponse test connectivité: ${response.statusCode}");
       return response.statusCode == 200;
     } catch (e) {
@@ -446,10 +512,10 @@ class ApiClient {
     }
 
     try {
-      final response = await http.get(
-        Uri.parse('${dotenv.env['API_URL']}/prestataire'),
-        headers: {'Content-Type': 'application/json'}
-      ).timeout(Duration(seconds: 10));
+      final response = await http
+          .get(Uri.parse('${dotenv.env['API_URL']}/prestataire'), headers: {
+        'Content-Type': 'application/json'
+      }).timeout(Duration(seconds: 10));
 
       print('📡 Status Code: ${response.statusCode}');
       print('📋 Response Headers: ${response.headers}');
@@ -493,18 +559,12 @@ class ApiClient {
           'categorie': {
             'idcategorie': 'cat1',
             'nomcategorie': 'Ménage',
-            'groupe': {
-              'idgroupe': 'grp1',
-              'nomgroupe': 'Métiers'
-            }
+            'groupe': {'idgroupe': 'grp1', 'nomgroupe': 'Métiers'}
           }
         },
         'prixprestataire': 15000.0, // ✅ Requis par le modèle
         'localisation': 'Abidjan, Côte d\'Ivoire',
-        'localisationmaps': {
-          'latitude': 5.3600,
-          'longitude': -4.0083
-        },
+        'localisationmaps': {'latitude': 5.3600, 'longitude': -4.0083},
         'description': 'Service de ménage professionnel disponible 24h/7',
         'verifier': true,
         'note': '4.8', // ✅ String comme attendu
@@ -540,19 +600,14 @@ class ApiClient {
           'categorie': {
             'idcategorie': 'cat2',
             'nomcategorie': 'Jardinage',
-            'groupe': {
-              'idgroupe': 'grp1',
-              'nomgroupe': 'Métiers'
-            }
+            'groupe': {'idgroupe': 'grp1', 'nomgroupe': 'Métiers'}
           }
         },
         'prixprestataire': 25000.0, // ✅ Requis par le modèle
         'localisation': 'Abidjan, Côte d\'Ivoire',
-        'localisationmaps': {
-          'latitude': 5.3700,
-          'longitude': -4.0200
-        },
-        'description': 'Spécialiste en aménagement paysager et entretien jardins',
+        'localisationmaps': {'latitude': 5.3700, 'longitude': -4.0200},
+        'description':
+            'Spécialiste en aménagement paysager et entretien jardins',
         'verifier': true,
         'note': '4.5', // ✅ String comme attendu
         'anneeExperience': '8',

@@ -15,7 +15,8 @@ class OrderPageScreenM extends StatefulWidget {
   State<OrderPageScreenM> createState() => _OrderPageScreenMState();
 }
 
-class _OrderPageScreenMState extends State<OrderPageScreenM> with SingleTickerProviderStateMixin {
+class _OrderPageScreenMState extends State<OrderPageScreenM>
+    with SingleTickerProviderStateMixin {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
@@ -34,7 +35,7 @@ class _OrderPageScreenMState extends State<OrderPageScreenM> with SingleTickerPr
   void _handleTabChange() {
     if (!_tabController.indexIsChanging) {
       CommandeStatus? selectedStatus;
-      
+
       switch (_tabController.index) {
         case 0: // Toutes
           selectedStatus = null;
@@ -52,7 +53,7 @@ class _OrderPageScreenMState extends State<OrderPageScreenM> with SingleTickerPr
           selectedStatus = CommandeStatus.annulee;
           break;
       }
-      
+
       context.read<CommandeBloc>().add(FiltrerParStatus(selectedStatus));
     }
   }
@@ -80,7 +81,9 @@ class _OrderPageScreenMState extends State<OrderPageScreenM> with SingleTickerPr
                 _isSearchVisible = !_isSearchVisible;
                 if (!_isSearchVisible) {
                   _searchController.clear();
-                  context.read<CommandeBloc>().add(const RechercherCommandes(''));
+                  context
+                      .read<CommandeBloc>()
+                      .add(const RechercherCommandes(''));
                 }
               });
             },
@@ -111,11 +114,7 @@ class _OrderPageScreenMState extends State<OrderPageScreenM> with SingleTickerPr
         ),
         flexibleSpace: Container(
           decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFF43EA5E), Color(0xFF1CBF3F)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+            color: Colors.green,
             boxShadow: [
               BoxShadow(
                 color: Colors.black26,
@@ -154,11 +153,11 @@ class _OrderPageScreenMState extends State<OrderPageScreenM> with SingleTickerPr
                     ),
                   ),
                 ),
-                
+
                 const SizedBox(height: 20),
-                
+
                 // Champ de recherche si visible
-                if (_isSearchVisible) 
+                if (_isSearchVisible)
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16.0),
                     child: Container(
@@ -170,7 +169,8 @@ class _OrderPageScreenMState extends State<OrderPageScreenM> with SingleTickerPr
                         controller: _searchController,
                         decoration: InputDecoration(
                           hintText: 'Rechercher une commande...',
-                          prefixIcon: const Icon(Icons.search, color: Colors.green),
+                          prefixIcon:
+                              const Icon(Icons.search, color: Colors.green),
                           border: InputBorder.none,
                           contentPadding: const EdgeInsets.symmetric(
                             horizontal: 20,
@@ -178,14 +178,16 @@ class _OrderPageScreenMState extends State<OrderPageScreenM> with SingleTickerPr
                           ),
                         ),
                         onChanged: (value) {
-                          context.read<CommandeBloc>().add(RechercherCommandes(value));
+                          context
+                              .read<CommandeBloc>()
+                              .add(RechercherCommandes(value));
                         },
                       ),
                     ),
                   ),
-                  
+
                 const SizedBox(height: 10),
-                
+
                 // TabBar
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -217,19 +219,23 @@ class _OrderPageScreenMState extends State<OrderPageScreenM> with SingleTickerPr
                         _buildTab('Toutes', state.commandes.length),
                         _buildTab(
                           'En attente',
-                          state.getNombreCommandesParStatus(CommandeStatus.enAttente),
+                          state.getNombreCommandesParStatus(
+                              CommandeStatus.enAttente),
                         ),
                         _buildTab(
                           'En cours',
-                          state.getNombreCommandesParStatus(CommandeStatus.enCours),
+                          state.getNombreCommandesParStatus(
+                              CommandeStatus.enCours),
                         ),
                         _buildTab(
                           'Terminées',
-                          state.getNombreCommandesParStatus(CommandeStatus.terminee),
+                          state.getNombreCommandesParStatus(
+                              CommandeStatus.terminee),
                         ),
                         _buildTab(
                           'Annulées',
-                          state.getNombreCommandesParStatus(CommandeStatus.annulee),
+                          state.getNombreCommandesParStatus(
+                              CommandeStatus.annulee),
                         ),
                       ],
                     ),
@@ -256,7 +262,7 @@ class _OrderPageScreenMState extends State<OrderPageScreenM> with SingleTickerPr
               maxLines: 1,
             ),
           ),
-          if (count > 0) ...[  
+          if (count > 0) ...[
             const SizedBox(width: 2),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
@@ -284,32 +290,42 @@ class _OrderPageScreenMState extends State<OrderPageScreenM> with SingleTickerPr
 
   int _getTabIndexFromLabel(String label) {
     switch (label) {
-      case 'Toutes': return 0;
-      case 'En attente': return 1;
-      case 'En cours': return 2;
-      case 'Terminées': return 3;
-      case 'Annulées': return 4;
-      default: return 0;
+      case 'Toutes':
+        return 0;
+      case 'En attente':
+        return 1;
+      case 'En cours':
+        return 2;
+      case 'Terminées':
+        return 3;
+      case 'Annulées':
+        return 4;
+      default:
+        return 0;
     }
   }
 
   Widget _buildBody(CommandeState state) {
     if (state.isLoading) {
       return const Center(
-        child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.green)),
+        child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(Colors.green)),
       );
     }
-    
+
     if (state.error != null) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.error_outline, size: 60, color: Colors.red.shade300),
+            Icon(Icons.error_outline, size: 60, color: Colors.green.shade300),
             const SizedBox(height: 16),
             const Text(
               'Une erreur s\'est produite',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.green),
             ),
             const SizedBox(height: 8),
             Padding(
@@ -336,17 +352,21 @@ class _OrderPageScreenMState extends State<OrderPageScreenM> with SingleTickerPr
         ),
       );
     }
-    
+
     if (state.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.shopping_bag_outlined, size: 80, color: Colors.grey.shade300),
+            Icon(Icons.shopping_bag_outlined,
+                size: 80, color: Colors.green.shade300),
             const SizedBox(height: 16),
             const Text(
               'Aucune commande trouvée',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.green),
             ),
             const SizedBox(height: 8),
             Text(
@@ -358,7 +378,7 @@ class _OrderPageScreenMState extends State<OrderPageScreenM> with SingleTickerPr
         ),
       );
     }
-    
+
     return TabBarView(
       controller: _tabController,
       children: [
@@ -396,7 +416,7 @@ class _OrderPageScreenMState extends State<OrderPageScreenM> with SingleTickerPr
     if (status == null) {
       return 'Vous n\'avez pas encore passé de commande';
     }
-    
+
     switch (status) {
       case CommandeStatus.enAttente:
         return 'Aucune commande en attente actuellement';
@@ -440,14 +460,15 @@ class _OrderPageScreenMState extends State<OrderPageScreenM> with SingleTickerPr
   Widget _buildRatingDialog(CommandeModel commande) {
     double rating = 0;
     final commentController = TextEditingController();
-    
+
     return AlertDialog(
       title: const Text('Noter cette commande'),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('Comment évaluez-vous votre expérience avec ${commande.prestataireName}?'),
+            Text(
+                'Comment évaluez-vous votre expérience avec ${commande.prestataireName}?'),
             const SizedBox(height: 20),
             StatefulBuilder(
               builder: (context, setState) => Row(
@@ -490,12 +511,12 @@ class _OrderPageScreenMState extends State<OrderPageScreenM> with SingleTickerPr
           onPressed: () {
             if (rating > 0) {
               context.read<CommandeBloc>().add(NoterCommande(
-                commandeId: commande.id,
-                note: rating,
-                commentaire: commentController.text,
-              ));
+                    commandeId: commande.id,
+                    note: rating,
+                    commentaire: commentController.text,
+                  ));
               Navigator.pop(context);
-              
+
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text('Merci pour votre évaluation!'),

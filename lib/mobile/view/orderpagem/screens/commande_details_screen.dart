@@ -25,6 +25,12 @@ class CommandeDetailsScreen extends StatelessWidget {
         title: Text('Commande ${commande.id}'),
         centerTitle: true,
         elevation: 2,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.only(
+            bottomLeft: Radius.circular(44),
+            bottomRight: Radius.circular(44),
+          ),
+        ),
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -129,14 +135,15 @@ class CommandeDetailsScreen extends StatelessWidget {
               [
                 _buildInfoRow('Référence', commande.id),
                 _buildInfoRow('Date', commande.dateFormatee),
-                _buildInfoRow('Montant', formatCurrency.format(commande.montant)),
+                _buildInfoRow(
+                    'Montant', formatCurrency.format(commande.montant)),
                 if (commande.adresseLivraison != null)
                   _buildInfoRow('Adresse', commande.adresseLivraison!),
               ],
             ),
 
             // Évaluation si présente
-            if (commande.estNotee && commande.note != null) 
+            if (commande.estNotee && commande.note != null)
               _buildSection(
                 'Évaluation',
                 [
@@ -147,7 +154,9 @@ class CommandeDetailsScreen extends StatelessWidget {
                         ...List.generate(
                           5,
                           (index) => Icon(
-                            index < (commande.note ?? 0) ? Icons.star : Icons.star_border,
+                            index < (commande.note ?? 0)
+                                ? Icons.star
+                                : Icons.star_border,
                             color: Colors.amber,
                             size: 24,
                           ),
@@ -163,7 +172,8 @@ class CommandeDetailsScreen extends StatelessWidget {
                       ],
                     ),
                   ),
-                  if (commande.commentaire != null && commande.commentaire!.isNotEmpty)
+                  if (commande.commentaire != null &&
+                      commande.commentaire!.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: 8.0),
                       child: Text(
@@ -190,7 +200,8 @@ class CommandeDetailsScreen extends StatelessWidget {
                       Navigator.pop(context);
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text('Chat avec ${commande.prestataireName} ouvert'),
+                          content: Text(
+                              'Chat avec ${commande.prestataireName} ouvert'),
                           backgroundColor: Colors.green,
                         ),
                       );

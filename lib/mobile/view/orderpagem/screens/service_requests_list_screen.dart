@@ -24,6 +24,12 @@ class ServiceRequestsListScreen extends StatelessWidget {
           title: const Text('Mes demandes de services'),
           backgroundColor: Colors.green,
           foregroundColor: Colors.white,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.only(
+              bottomLeft: Radius.circular(44),
+              bottomRight: Radius.circular(44),
+            ),
+          ),
         ),
         body: BlocBuilder<ServiceRequestCubit, ServiceRequestState>(
           builder: (context, state) {

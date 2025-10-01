@@ -4,6 +4,7 @@ import '../../../../data/services/api_client.dart';
 import '../../loginpagem/screens/loginPageScreenM.dart';
 import '../../orderpagem/screens/service_requests_list_screen.dart';
 import '../profilpageblocm/profilPageBlocM.dart';
+import 'edit_profile_screen.dart';
 import '../../avispagem/screens/avisPageScreenM.dart';
 import '../../avispagem/avispageblocm/avisPageBlocM.dart';
 import '../../favorispagem/screens/favoritePageScreenM.dart';
@@ -486,6 +487,21 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
               ),
             ],
           ),
+          const SizedBox(height: 15),
+          // Bouton Modifier le profil
+          ElevatedButton.icon(
+            onPressed: () => _navigateToEditProfile(),
+            icon: const Icon(Icons.edit, size: 18),
+            label: const Text('Modifier le profil'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: Colors.green,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -500,6 +516,35 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
         return const Icon(Icons.lock, color: Colors.white);
       default:
         return const Icon(Icons.person, color: Colors.white);
+    }
+  }
+
+  // Navigation vers l'écran d'édition du profil
+  void _navigateToEditProfile() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EditProfileScreen(
+          initialUserData: {
+            'nom': userName.split(' ').first,
+            'prenom': userName.split(' ').length > 1
+                ? userName.split(' ').skip(1).join(' ')
+                : '',
+            'telephone': '', // À récupérer depuis l'API
+            'email': '', // À récupérer depuis l'API
+            'genre': '',
+            'datedenaissance': '',
+            'photoProfil': 'assets/profile_picture.jpg',
+          },
+        ),
+      ),
+    );
+
+    // Rafraîchir la page si des modifications ont été apportées
+    if (result == true) {
+      setState(() {
+        // Rafraîchir les données du profil
+      });
     }
   }
 
