@@ -44,10 +44,11 @@ class _HomeState extends State<Home> {
       body: Center(child: _pageList[_currentIndex]),
       bottomNavigationBar: Padding(
           padding: const EdgeInsets.all(0),
-          child:  CurvedNavigationBar(
+          child: CurvedNavigationBar(
             backgroundColor: Colors.white, // background behind the nav bar
-            color: Colors.green,           // actual nav bar color
-            buttonBackgroundColor: Colors.green, // optional, color for the active button
+            color: Colors.green, // actual nav bar color
+            buttonBackgroundColor:
+                Colors.green, // optional, color for the active button
             onTap: (index) => setState(() {
               _currentIndex = index;
             }),
@@ -55,61 +56,46 @@ class _HomeState extends State<Home> {
               Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                      Icons.home,
-                      size: 30.0,
-                      color: Colors.white
-                  ),
-                  Text('Accueil', style: TextStyle(color: Colors.white, fontSize: 12)),
+                  Icon(Icons.home, size: 30.0, color: Colors.white),
+                  Text('Accueil',
+                      style: TextStyle(color: Colors.white, fontSize: 12)),
                 ],
               ),
               Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                      Icons.account_balance_wallet,
-                      size: 30.0,
-                      color: Colors.white
-                  ),
-                  Text('Wallet', style: TextStyle(color: Colors.white, fontSize: 12)),
+                  Icon(Icons.account_balance_wallet,
+                      size: 30.0, color: Colors.white),
+                  Text('Wallet',
+                      style: TextStyle(color: Colors.white, fontSize: 12)),
                 ],
               ),
               Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                      Icons.chat,
-                      size: 30.0,
-                      color: Colors.white
-                  ),
-                  Text('Chat', style: TextStyle(color: Colors.white, fontSize: 12)),
+                  Icon(Icons.chat, size: 30.0, color: Colors.white),
+                  Text('Chat',
+                      style: TextStyle(color: Colors.white, fontSize: 12)),
                 ],
               ),
               Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                      Icons.shopping_bag,
-                      size: 30.0,
-                      color: Colors.white
-                  ),
-                  Text('Commandes', style: TextStyle(color: Colors.white, fontSize: 12)),
+                  Icon(Icons.shopping_bag, size: 30.0, color: Colors.white),
+                  Text('Commandes',
+                      style: TextStyle(color: Colors.white, fontSize: 12)),
                 ],
               ),
               Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                      Icons.account_circle,
-                      size: 30.0,
-                      color: Colors.white
-                  ),
-                  Text('Profil', style: TextStyle(color: Colors.white, fontSize: 12)),
+                  Icon(Icons.account_circle, size: 30.0, color: Colors.white),
+                  Text('Profil',
+                      style: TextStyle(color: Colors.white, fontSize: 12)),
                 ],
               ),
             ],
-          )
-      ),
+          )),
     );
   }
 }
