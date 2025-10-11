@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../data/services/authCubit.dart';
 import '../registerpageblocm/registerPageBlocM.dart';
 import '../registerpageblocm/registerPageEventM.dart';
 import '../registerpageblocm/registerPageStateM.dart';
@@ -52,6 +53,11 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
           if (state.isSuccess) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text("Inscription réussie ✅")),
+            );
+
+            context.read<AuthCubit>().setAuthenticated(
+              token: state.token!,
+              utilisateur: state.utilisateur!,
             );
             // Navigation avec GoRouter vers la page d'accueil
             WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -190,6 +196,7 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
                           context
                               .read<RegisterPageBlocM>()
                               .add(RegisterSubmitted());
+
                         }
                             : null,
                         style: ElevatedButton.styleFrom(
