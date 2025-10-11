@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../data/models/utilisateur.dart';
 import '../../../../data/services/api_client.dart';
 import 'package:http/http.dart' as http;
@@ -27,8 +28,7 @@ class RegisterPageBlocM extends Bloc<RegisterPageEventM, RegisterPageStateM> {
 
     on<RegisterSubmitted>((event, emit) async {
       if (state.password != state.confirmPassword) {
-        emit(state.copyWith(
-            errorMessage: "Les mots de passe ne correspondent pas"));
+        emit(state.copyWith(errorMessage: "Les mots de passe ne correspondent pas"));
         return;
       }
 
@@ -47,25 +47,37 @@ class RegisterPageBlocM extends Bloc<RegisterPageEventM, RegisterPageStateM> {
           idutilisateur: "",
           nom: nom,
           prenom: prenom,
-          email: null,
+          email: '',
           password: state.password,
           telephone: state.phone,
-          genre: "", // valeur par défaut
+          genre: "",       // valeur par défaut
           note: null,
           photoProfil: null,
           dateNaissance: null,
           role: "Client",
         );
 
-        // Appel API
-        final newuser = await apiClient.registerUser(
-          fullName: state.fullName,
-          phone: state.phone,
-          password: state.password,
-        );
+        // Appel API inscription
+        final response = await apiClient.registerUser(utilisateur);
 
+        final token = response["token"] ?? "";
+
+        if (token.isEmpty) {
+          emit(state.copyWith(
+            isSubmitting: false,
+            errorMessage: "Token manquant après l'inscription",
+          ));
+          return;
+        }
+
+
+        // ✅ Succès → utilisateur automatiquement connecté
         emit(state.copyWith(
-            isSubmitting: false, isSuccess: true, utilisateur: utilisateur));
+          isSubmitting: false,
+          isSuccess: true,
+          utilisateur: utilisateur,
+          token: token,
+        ));
       } catch (e) {
         emit(state.copyWith(
           isSubmitting: false,
@@ -73,5 +85,7 @@ class RegisterPageBlocM extends Bloc<RegisterPageEventM, RegisterPageStateM> {
         ));
       }
     });
+
   }
+
 }
