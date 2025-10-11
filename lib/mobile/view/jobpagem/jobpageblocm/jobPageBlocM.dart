@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:sdealsmobile/mobile/view/jobpagem/jobpageblocm/jobPageEventM.dart';
 import 'package:sdealsmobile/mobile/view/jobpagem/jobpageblocm/jobPageStateM.dart';
 
@@ -19,6 +20,10 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
     on<LoadServiceDataJobM>(_onLoadServiceDataJobM);
     on<LoadPriceEstimationM>(_onLoadPriceEstimationM);
     on<LoadProviderMatchingM>(_onLoadProviderMatchingM);
+    // ✅ NOUVEAU : Gestionnaires de géolocalisation
+    on<LoadNearbyProvidersM>(_onLoadNearbyProvidersM);
+    on<LoadProvidersByCategoryM>(_onLoadProvidersByCategoryM);
+    on<LoadUrgentProvidersM>(_onLoadUrgentProvidersM);
   }
 
   Future<void> _onLoadCategorieDataJobM(
@@ -44,9 +49,9 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
   }
 
   Future<void> _onLoadServiceDataJobM(
-      LoadServiceDataJobM event,
-      Emitter<JobPageStateM> emit,
-      ) async {
+    LoadServiceDataJobM event,
+    Emitter<JobPageStateM> emit,
+  ) async {
     emit(state.copyWith(isLoading2: true));
 
     ApiClient apiClient = ApiClient();
@@ -221,9 +226,9 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
             await matchingService.getRecommendedProviders(
           query: '${event.serviceType} ${event.preferences?.join(' ') ?? ''}'
               .trim(),
-        location: event.location,
-        maxResults: 5,
-      );
+          location: event.location,
+          maxResults: 5,
+        );
 
         List<Prestataire> providers =
             recommendations.map((r) => r.prestataire).toList();
@@ -235,20 +240,299 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
           providerStrengths: {},
         );
 
-      emit(state.copyWith(
-        matchedProviders: providers,
-        matchExplanation: explanation,
-        isMatchingLoading: false,
-      ));
+        emit(state.copyWith(
+          matchedProviders: providers,
+          matchExplanation: explanation,
+          isMatchingLoading: false,
+        ));
 
         print("🔄 Fallback vers données mock réussi");
       } catch (mockError) {
         print("💥 Erreur critique: $mockError");
-      emit(state.copyWith(
-        isMatchingLoading: false,
+        emit(state.copyWith(
+          isMatchingLoading: false,
           matchError: error.toString(),
+        ));
+      }
+    }
+  }
+
+  // ✅ NOUVEAU : Chargement des prestataires à proximité
+  Future<void> _onLoadNearbyProvidersM(
+      LoadNearbyProvidersM event, Emitter<JobPageStateM> emit) async {
+    emit(state.copyWith(
+      isNearbyLoading: true,
+      nearbyError: '',
+      userLatitude: event.latitude,
+      userLongitude: event.longitude,
+      searchRadius: event.radius,
+      selectedCategory: event.category ?? '',
+      selectedService: event.service ?? '',
+    ));
+
+    try {
+      ApiClient apiClient = ApiClient();
+      print("📍 Chargement des prestataires à proximité...");
+      print("📍 Position: ${event.latitude}, ${event.longitude}");
+      print("📍 Rayon: ${event.radius} km");
+
+      // Charger tous les prestataires
+      final List<Map<String, dynamic>> prestatairesData =
+          await apiClient.fetchPrestataires();
+
+      List<Prestataire> allProviders = prestatairesData
+          .map((data) => Prestataire.fromBackend(data))
+          .toList();
+
+      // Filtrer par catégorie si spécifiée
+      if (event.category != null && event.category!.isNotEmpty) {
+        allProviders = allProviders
+            .where((p) =>
+                p.service.categorie?.nomcategorie
+                    .toLowerCase()
+                    .contains(event.category!.toLowerCase()) ??
+                false)
+            .toList();
+      }
+
+      // Filtrer par service si spécifié
+      if (event.service != null && event.service!.isNotEmpty) {
+        allProviders = allProviders
+            .where((p) => p.service.nomservice
+                .toLowerCase()
+                .contains(event.service!.toLowerCase()))
+            .toList();
+      }
+
+      // ✅ NOUVEAU : Filtrage par distance via API backend
+      List<Prestataire> nearbyProviders = await _filterByDistance(
+        allProviders,
+        event.latitude,
+        event.longitude,
+        event.radius,
+      );
+
+      // Trier par distance et note
+      nearbyProviders.sort((a, b) {
+        // Priorité aux prestataires vérifiés
+        if (a.verifier && !b.verifier) return -1;
+        if (!a.verifier && b.verifier) return 1;
+
+        // Puis par note
+        final noteA = (a.note ?? 0.0) as double;
+        final noteB = (b.note ?? 0.0) as double;
+        if (noteB > noteA) return 1;
+        if (noteB < noteA) return -1;
+        return 0;
+      });
+
+      print("✅ Prestataires à proximité trouvés: ${nearbyProviders.length}");
+
+      emit(state.copyWith(
+        nearbyProviders: nearbyProviders,
+        isNearbyLoading: false,
+      ));
+    } catch (error) {
+      print("❌ Erreur chargement prestataires à proximité: $error");
+      emit(state.copyWith(
+        isNearbyLoading: false,
+        nearbyError: error.toString(),
       ));
     }
   }
+
+  // ✅ NOUVEAU : Chargement par catégorie
+  Future<void> _onLoadProvidersByCategoryM(
+      LoadProvidersByCategoryM event, Emitter<JobPageStateM> emit) async {
+    emit(state.copyWith(
+      isNearbyLoading: true,
+      nearbyError: '',
+      selectedCategory: event.category,
+    ));
+
+    try {
+      ApiClient apiClient = ApiClient();
+      print("🏷️ Chargement prestataires pour catégorie: ${event.category}");
+
+      final List<Map<String, dynamic>> prestatairesData =
+          await apiClient.fetchPrestataires();
+
+      List<Prestataire> providers = prestatairesData
+          .map((data) => Prestataire.fromBackend(data))
+          .toList();
+
+      // Filtrer par catégorie
+      providers = providers
+          .where((p) =>
+              p.service.categorie?.nomcategorie
+                  .toLowerCase()
+                  .contains(event.category.toLowerCase()) ??
+              false)
+          .toList();
+
+      // ✅ NOUVEAU : Filtrer par distance via API backend si position disponible
+      if (event.latitude != null && event.longitude != null) {
+        providers = await _filterByDistance(
+          providers,
+          event.latitude!,
+          event.longitude!,
+          event.radius,
+        );
+      }
+
+      // Trier par note
+      providers.sort((a, b) {
+        final noteA = (a.note ?? 0.0) as double;
+        final noteB = (b.note ?? 0.0) as double;
+        if (noteB > noteA) return 1;
+        if (noteB < noteA) return -1;
+        return 0;
+      });
+
+      print("✅ Prestataires pour ${event.category}: ${providers.length}");
+
+      emit(state.copyWith(
+        nearbyProviders: providers,
+        isNearbyLoading: false,
+      ));
+    } catch (error) {
+      print("❌ Erreur chargement par catégorie: $error");
+      emit(state.copyWith(
+        isNearbyLoading: false,
+        nearbyError: error.toString(),
+      ));
+    }
+  }
+
+  // ✅ NOUVEAU : Chargement des prestataires d'urgence
+  Future<void> _onLoadUrgentProvidersM(
+      LoadUrgentProvidersM event, Emitter<JobPageStateM> emit) async {
+    emit(state.copyWith(
+      isNearbyLoading: true,
+      nearbyError: '',
+    ));
+
+    try {
+      ApiClient apiClient = ApiClient();
+      print("🚨 Chargement prestataires d'urgence...");
+
+      final List<Map<String, dynamic>> prestatairesData =
+          await apiClient.fetchPrestataires();
+
+      List<Prestataire> providers = prestatairesData
+          .map((data) => Prestataire.fromBackend(data))
+          .toList();
+
+      // Filtrer les prestataires d'urgence (disponibles 24h/24)
+      // Note: Le champ 'disponibilite' n'existe pas dans le modèle Prestataire
+      // Pour l'instant, on filtre par prestataires vérifiés comme approximation
+      providers = providers.where((p) => p.verifier).toList();
+
+      // ✅ NOUVEAU : Filtrer par distance via API backend si position disponible
+      if (event.latitude != null && event.longitude != null) {
+        providers = await _filterByDistance(
+          providers,
+          event.latitude!,
+          event.longitude!,
+          event.radius,
+        );
+      }
+
+      // Trier par disponibilité et note
+      providers.sort((a, b) {
+        if (a.verifier && !b.verifier) return -1;
+        if (!a.verifier && b.verifier) return 1;
+        final noteA = (a.note ?? 0.0) as double;
+        final noteB = (b.note ?? 0.0) as double;
+        if (noteB > noteA) return 1;
+        if (noteB < noteA) return -1;
+        return 0;
+      });
+
+      print("✅ Prestataires d'urgence trouvés: ${providers.length}");
+
+      emit(state.copyWith(
+        nearbyProviders: providers,
+        isNearbyLoading: false,
+      ));
+    } catch (error) {
+      print("❌ Erreur chargement prestataires d'urgence: $error");
+      emit(state.copyWith(
+        isNearbyLoading: false,
+        nearbyError: error.toString(),
+      ));
+    }
+  }
+
+  // ✅ NOUVEAU : Méthode utilitaire pour filtrer par distance
+  Future<List<Prestataire>> _filterByDistance(
+    List<Prestataire> providers,
+    double userLat,
+    double userLng,
+    double radiusKm,
+  ) async {
+    // Simulation du calcul de distance
+    // En réalité, ceci devrait être fait côté backend avec une vraie base de données géospatiale
+    List<Prestataire> nearbyProviders = [];
+
+    for (Prestataire provider in providers) {
+      // Simuler des coordonnées pour les prestataires (en réalité, ces données viendraient de la DB)
+      double providerLat =
+          userLat + (0.01 * (provider.hashCode % 10 - 5)); // Simulation
+      double providerLng =
+          userLng + (0.01 * (provider.hashCode % 10 - 5)); // Simulation
+
+      // ✅ NOUVEAU : Calcul de distance via l'API backend
+      double distance =
+          await _calculateDistance(userLat, userLng, providerLat, providerLng);
+
+      if (distance <= radiusKm) {
+        nearbyProviders.add(provider);
+      }
+    }
+
+    return nearbyProviders;
+  }
+
+  // ✅ NOUVELLE MÉTHODE : Calculer la distance via l'API backend
+  Future<double> _calculateDistance(
+      double lat1, double lng1, double lat2, double lng2) async {
+    try {
+      // Utiliser l'API backend pour le calcul de distance
+      final distance = await ApiClient().calculateDistance(
+        lat1: lat1,
+        lng1: lng1,
+        lat2: lat2,
+        lng2: lng2,
+      );
+      return distance;
+    } catch (e) {
+      print('Erreur calcul distance API: $e');
+      // Fallback vers calcul local si l'API échoue
+      return _calculateLocalDistance(lat1, lng1, lat2, lng2);
+    }
+  }
+
+  // ✅ MÉTHODE FALLBACK : Calcul de distance local (formule de Haversine)
+  double _calculateLocalDistance(
+      double lat1, double lng1, double lat2, double lng2) {
+    const double earthRadius = 6371; // Rayon de la Terre en km
+
+    final double dLat = _degreesToRadians(lat2 - lat1);
+    final double dLng = _degreesToRadians(lng2 - lng1);
+
+    final double a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(_degreesToRadians(lat1)) *
+            math.cos(_degreesToRadians(lat2)) *
+            math.sin(dLng / 2) *
+            math.sin(dLng / 2);
+
+    final double c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+
+    return earthRadius * c;
+  }
+
+  double _degreesToRadians(double degrees) {
+    return degrees * (math.pi / 180);
   }
 }

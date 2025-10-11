@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'dart:io';
+import 'dart:math' as math;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:sdealsmobile/data/models/categorie.dart';
@@ -7,7 +7,6 @@ import 'package:diacritic/diacritic.dart';
 import '../models/article.dart';
 import '../models/groupe.dart';
 import '../models/service.dart';
-import '../models/utilisateur.dart';
 
 // http://180.149.197.115:3000/
 
@@ -243,45 +242,47 @@ class ApiClient {
     }
   }
 
-  Future<Utilisateur> registerUser(Utilisateur utilisateur) async {
-    final uri = Uri.parse("$apiUrl/register");
-    var request = http.MultipartRequest("POST", uri);
+  Future<Map<String, dynamic>> registerUser(
+      {required String fullName,
+      required String phone,
+      required String password}) async {
+    final url = Uri.parse("$apiUrl/register");
 
-    // Champs texte
-    request.fields['nom'] = utilisateur.nom ?? "";
-    request.fields['prenom'] = utilisateur.prenom ?? "";
-    request.fields['email'] = utilisateur.email ?? "";
-    request.fields['password'] = utilisateur.password ?? "";
-    request.fields['telephone'] = utilisateur.telephone ?? "";
-    request.fields['genre'] = utilisateur.genre ?? "";
-    request.fields['note'] = utilisateur.note ?? "";
-    request.fields['dateNaissance'] = utilisateur.dateNaissance ?? "";
-    request.fields['role'] = utilisateur.role ?? "";
+    // Découper le fullName en nom et prénom
+    final parts = fullName.trim().split(" ");
+    final nom = parts.isNotEmpty ? parts.first : "";
+    final prenom = parts.length > 1 ? parts.sublist(1).join(" ") : "";
 
-    // Photo profil
-    if (utilisateur.photoProfil != null && File(utilisateur.photoProfil!).existsSync()) {
-      request.files.add(await http.MultipartFile.fromPath("photoProfil", utilisateur.photoProfil!));
-    }
+    print("🌍 Appel API: $url");
+    print(
+        "📤 Données envoyées: { nom: $nom, prenom: $prenom, telephone: $phone, password: ***** }");
 
-    print("📤 Champs envoyés utilisateur : ${request.fields}");
-    print("📤 Fichiers envoyés utilisateur : ${request.files.map((f) => f.filename).toList()}");
+    final response = await http.post(
+      url,
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode({
+        "nom": nom,
+        "prenom": prenom,
+        "telephone": phone,
+        "password": password, // 👈 correspond à ton backend
+      }),
+    );
 
-    final response = await request.send();
-    final responseBody = await response.stream.bytesToString();
-
-    print("📥 Status: ${response.statusCode}");
-    print("📥 Body: $responseBody");
+    print("📥 StatusCode: ${response.statusCode}");
+    print("📥 Réponse brute: ${response.body}");
 
     if (response.statusCode == 200 || response.statusCode == 201) {
-      final data = jsonDecode(responseBody);
-      return data["utilisateur"] != null
-          ? Utilisateur.fromJson(data["utilisateur"])
-          : Utilisateur.fromJson(data);
+      final data = jsonDecode(response.body);
+      print("✅ Succès Register: $data");
+      return data;
     } else {
       try {
-        final error = jsonDecode(responseBody);
-        throw Exception(error["message"] ?? error["error"] ?? "Erreur lors de l'inscription");
-      } catch (_) {
+        final error = jsonDecode(response.body);
+        print("❌ Erreur API Register: $error");
+        throw Exception(
+            error["error"] ?? error["message"] ?? "Erreur d'inscription");
+      } catch (e) {
+        print("⚠️ Impossible de parser l'erreur: ${response.body}");
         throw Exception("Erreur inconnue (${response.statusCode})");
       }
     }
@@ -448,6 +449,109 @@ class ApiClient {
     } catch (e) {
       print('Erreur dans fetchVendeurs: $e');
       throw Exception('Échec de chargement des vendeurs: $e');
+    }
+  }
+
+  // ✅ NOUVELLE MÉTHODE : Calculer la distance entre deux points
+  Future<double> calculateDistance({
+    required double lat1,
+    required double lng1,
+    required double lat2,
+    required double lng2,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('${dotenv.env['API_URL']}/maps/distance'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'origin': {'lat': lat1, 'lng': lng1},
+          'destination': {'lat': lat2, 'lng': lng2},
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['distance']?.toDouble() ?? 0.0;
+      } else {
+        // Fallback vers calcul local si l'API échoue
+        return _calculateLocalDistance(lat1, lng1, lat2, lng2);
+      }
+    } catch (e) {
+      print('Erreur calcul distance API: $e');
+      // Fallback vers calcul local
+      return _calculateLocalDistance(lat1, lng1, lat2, lng2);
+    }
+  }
+
+  // ✅ MÉTHODE FALLBACK : Calcul de distance local (formule de Haversine)
+  double _calculateLocalDistance(
+      double lat1, double lng1, double lat2, double lng2) {
+    const double earthRadius = 6371; // Rayon de la Terre en km
+
+    final double dLat = _degreesToRadians(lat2 - lat1);
+    final double dLng = _degreesToRadians(lng2 - lng1);
+
+    final double a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(_degreesToRadians(lat1)) *
+            math.cos(_degreesToRadians(lat2)) *
+            math.sin(dLng / 2) *
+            math.sin(dLng / 2);
+
+    final double c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+
+    return earthRadius * c;
+  }
+
+  double _degreesToRadians(double degrees) {
+    return degrees * (math.pi / 180);
+  }
+
+  // ✅ NOUVELLE MÉTHODE : Géocodage d'une adresse
+  Future<Map<String, dynamic>?> geocodeAddress(String address) async {
+    try {
+      final response = await http.post(
+        Uri.parse('${dotenv.env['API_URL']}/maps/geocode'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'address': address}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true) {
+          return data;
+        }
+      }
+      return null;
+    } catch (e) {
+      print('Erreur géocodage API: $e');
+      return null;
+    }
+  }
+
+  // ✅ NOUVELLE MÉTHODE : Rechercher des lieux proches
+  Future<List<Map<String, dynamic>>> searchNearbyPlaces({
+    required double lat,
+    required double lng,
+    double radius = 5000,
+    String type = 'establishment',
+    String keyword = '',
+  }) async {
+    try {
+      final response = await http.get(
+        Uri.parse('${dotenv.env['API_URL']}/maps/nearby'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true) {
+          return List<Map<String, dynamic>>.from(data['places'] ?? []);
+        }
+      }
+      return [];
+    } catch (e) {
+      print('Erreur recherche lieux proches API: $e');
+      return [];
     }
   }
 

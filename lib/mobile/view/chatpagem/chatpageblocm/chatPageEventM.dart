@@ -91,7 +91,8 @@ class CreateConversation extends ChatPageEventM {
   });
 
   @override
-  List<Object> get props => [participantId, participantName, participantImage, type];
+  List<Object> get props =>
+      [participantId, participantName, participantImage, type];
 }
 
 // Événement pour la recherche de conversations
@@ -107,3 +108,62 @@ class SearchConversations extends ChatPageEventM {
 // Classe pour la rétrocompatibilité avec le code existant
 class LoadCategorieDataM extends ChatPageEventM {}
 
+// 🔌 ÉVÉNEMENTS WEBSOCKET
+class ConnectWebSocket extends ChatPageEventM {
+  const ConnectWebSocket();
+}
+
+class DisconnectWebSocket extends ChatPageEventM {
+  const DisconnectWebSocket();
+}
+
+class NewMessageReceived extends ChatPageEventM {
+  final Map<String, dynamic> messageData;
+
+  const NewMessageReceived(this.messageData);
+
+  @override
+  List<Object> get props => [messageData];
+}
+
+class MessageStatusUpdated extends ChatPageEventM {
+  final String conversationId;
+  final String messageId;
+  final MessageStatus status;
+
+  const MessageStatusUpdated({
+    required this.conversationId,
+    required this.messageId,
+    required this.status,
+  });
+
+  @override
+  List<Object> get props => [conversationId, messageId, status];
+}
+
+// 🔔 ÉVÉNEMENTS NOTIFICATIONS PUSH POUR CHAT
+class SendChatNotification extends ChatPageEventM {
+  final String userId;
+  final String title;
+  final String message;
+  final Map<String, dynamic>? data;
+
+  const SendChatNotification({
+    required this.userId,
+    required this.title,
+    required this.message,
+    this.data,
+  });
+
+  @override
+  List<Object?> get props => [userId, title, message, data];
+}
+
+class ChatNotificationReceived extends ChatPageEventM {
+  final Map<String, dynamic> notificationData;
+
+  const ChatNotificationReceived(this.notificationData);
+
+  @override
+  List<Object> get props => [notificationData];
+}
