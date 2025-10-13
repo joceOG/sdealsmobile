@@ -63,17 +63,16 @@ class RegisterPageBlocM extends Bloc<RegisterPageEventM, RegisterPageStateM> {
           fullName: state.fullName,
           phone: state.phone,
           password: state.password,
+          role: "Client", // ✅ Spécifier le rôle
         );
 
-        // ✅ CONNEXION AUTOMATIQUE APRÈS INSCRIPTION
-        if (newuser != null &&
-            newuser['utilisateur'] != null &&
-            newuser['token'] != null) {
+        // ✅ Mettre à jour l'AuthCubit après inscription réussie
+        if (newuser['utilisateur'] != null && newuser['token'] != null) {
           final userData = newuser['utilisateur'];
           final token = newuser['token'];
-
-          // Créer l'objet Utilisateur avec les données du backend
-          final utilisateurCree = Utilisateur(
+          
+          // Créer l'objet Utilisateur à partir de la réponse
+          final utilisateur = Utilisateur(
             idutilisateur: userData['_id'] ?? '',
             nom: userData['nom'] ?? '',
             prenom: userData['prenom'] ?? '',
@@ -86,17 +85,21 @@ class RegisterPageBlocM extends Bloc<RegisterPageEventM, RegisterPageStateM> {
             dateNaissance: userData['datedenaissance'],
             role: userData['role'] ?? 'Client',
           );
-
-          // ✅ ÉMISSION D'UN ÉVÉNEMENT POUR CONNECTER L'UTILISATEUR
+          
+          // Émettre un événement pour mettre à jour l'AuthCubit
           emit(state.copyWith(
-            isSubmitting: false,
-            isSuccess: true,
-            utilisateur: utilisateurCree,
-            token: token, // ✅ Ajouter le token pour la connexion
+            isSubmitting: false, 
+            isSuccess: true, 
+            utilisateur: utilisateur,
+            token: token, // ✅ Ajouter le token dans l'état
+            shouldUpdateAuth: true, // ✅ Flag pour indiquer la mise à jour
           ));
         } else {
           emit(state.copyWith(
-              isSubmitting: false, isSuccess: true, utilisateur: utilisateur));
+            isSubmitting: false, 
+            isSuccess: true, 
+            utilisateur: utilisateur
+          ));
         }
       } catch (e) {
         emit(state.copyWith(
