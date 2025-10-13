@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../data/services/authCubit.dart';
 import '../registerpageblocm/registerPageBlocM.dart';
 import '../registerpageblocm/registerPageEventM.dart';
 import '../registerpageblocm/registerPageStateM.dart';
@@ -50,6 +51,17 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
       body: BlocConsumer<RegisterPageBlocM, RegisterPageStateM>(
         listener: (context, state) {
           if (state.isSuccess) {
+            // ✅ Mettre à jour l'AuthCubit si nécessaire
+            if (state.shouldUpdateAuth && state.token != null && state.utilisateur != null) {
+              final authCubit = context.read<AuthCubit>();
+              authCubit.setAuthenticated(
+                token: state.token!,
+                utilisateur: state.utilisateur!,
+                roles: [state.utilisateur!.role],
+                activeRole: state.utilisateur!.role,
+              );
+            }
+            
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text("Inscription réussie ✅")),
             );
@@ -211,7 +223,9 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Text('Vous avez déjà un compte ?'),
+                          const Flexible(
+                            child: Text('Vous avez déjà un compte ?'),
+                          ),
                           TextButton(
                             onPressed: () {
                               context.go("/login"); // si tu as une route login

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../data/models/utilisateur.dart';
 import '../../../../data/services/api_client.dart';
+import '../../../../data/services/authCubit.dart';
 import 'package:http/http.dart' as http;
 import 'registerPageStateM.dart';
 import 'registerPageEventM.dart';
@@ -62,10 +63,44 @@ class RegisterPageBlocM extends Bloc<RegisterPageEventM, RegisterPageStateM> {
           fullName: state.fullName,
           phone: state.phone,
           password: state.password,
+          role: "Client", // ✅ Spécifier le rôle
         );
 
-        emit(state.copyWith(
-            isSubmitting: false, isSuccess: true, utilisateur: utilisateur));
+        // ✅ Mettre à jour l'AuthCubit après inscription réussie
+        if (newuser['utilisateur'] != null && newuser['token'] != null) {
+          final userData = newuser['utilisateur'];
+          final token = newuser['token'];
+          
+          // Créer l'objet Utilisateur à partir de la réponse
+          final utilisateur = Utilisateur(
+            idutilisateur: userData['_id'] ?? '',
+            nom: userData['nom'] ?? '',
+            prenom: userData['prenom'] ?? '',
+            email: userData['email'],
+            password: '', // Ne pas stocker le mot de passe
+            telephone: userData['telephone'] ?? '',
+            genre: userData['genre'] ?? '',
+            note: userData['note'],
+            photoProfil: userData['photoProfil'],
+            dateNaissance: userData['datedenaissance'],
+            role: userData['role'] ?? 'Client',
+          );
+          
+          // Émettre un événement pour mettre à jour l'AuthCubit
+          emit(state.copyWith(
+            isSubmitting: false, 
+            isSuccess: true, 
+            utilisateur: utilisateur,
+            token: token, // ✅ Ajouter le token dans l'état
+            shouldUpdateAuth: true, // ✅ Flag pour indiquer la mise à jour
+          ));
+        } else {
+          emit(state.copyWith(
+            isSubmitting: false, 
+            isSuccess: true, 
+            utilisateur: utilisateur
+          ));
+        }
       } catch (e) {
         emit(state.copyWith(
           isSubmitting: false,

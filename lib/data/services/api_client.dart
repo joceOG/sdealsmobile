@@ -358,7 +358,8 @@ class ApiClient {
   Future<Map<String, dynamic>> registerUser(
       {required String fullName,
       required String phone,
-      required String password}) async {
+      required String password,
+      String role = "Client"}) async {
     final url = Uri.parse("$apiUrl/register");
 
     // Découper le fullName en nom et prénom
@@ -368,7 +369,7 @@ class ApiClient {
 
     print("🌍 Appel API: $url");
     print(
-        "📤 Données envoyées: { nom: $nom, prenom: $prenom, telephone: $phone, password: ***** }");
+        "📤 Données envoyées: { nom: $nom, prenom: $prenom, telephone: $phone, password: *****, role: $role }");
 
     final response = await http.post(
       url,
@@ -378,6 +379,7 @@ class ApiClient {
         "prenom": prenom,
         "telephone": phone,
         "password": password, // 👈 correspond à ton backend
+        "role": role, // ✅ Ajouter le rôle
       }),
     );
 
@@ -426,7 +428,18 @@ class ApiClient {
 
       final data = jsonDecode(response.body);
 
+      print("📥 Réponse login brute: ${response.body}");
+      print("📥 StatusCode: ${response.statusCode}");
+      print("📥 Data parsed: $data");
+      print("📥 Token présent: ${data["token"] != null}");
+      print("📥 Utilisateur présent: ${data["utilisateur"] != null}");
+
       if (response.statusCode == 200) {
+        // Vérifier que le token est présent
+        if (data["token"] == null) {
+          throw Exception("Token manquant dans la réponse");
+        }
+        
         // Sauvegarde du token si rememberMe activé
         if (rememberMe && data["token"] != null) {
           // Exemple: SharedPreferences
@@ -486,8 +499,9 @@ class ApiClient {
   Future<bool> testConnectivity() async {
     try {
       print("🔍 Test de connectivité vers: ${dotenv.env['API_URL']}");
+      // ✅ CORRIGÉ : Tester directement l'endpoint prestataire au lieu de /health
       final response = await http
-          .get(Uri.parse('${dotenv.env['API_URL']}/health'), headers: {
+          .get(Uri.parse('${dotenv.env['API_URL']}/prestataire'), headers: {
         'Content-Type': 'application/json'
       }).timeout(Duration(seconds: 5));
 
@@ -504,12 +518,7 @@ class ApiClient {
     print('🚀 Récupération des prestataires depuis le backend');
     print('🌐 URL complète: ${dotenv.env['API_URL']}/prestataire');
 
-    // Test de connectivité avant l'appel
-    final isConnected = await testConnectivity();
-    if (!isConnected) {
-      print("⚠️ Backend non accessible, utilisation des données de fallback");
-      return _getFallbackPrestataires();
-    }
+    // ✅ SUPPRIMÉ : Test de connectivité inutile qui causait le problème
 
     try {
       final response = await http

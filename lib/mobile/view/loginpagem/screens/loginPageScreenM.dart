@@ -63,10 +63,12 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
           listener: (context, state) {
             if (state is LoginPageSuccessM) {
               final utilisateur = Utilisateur.fromMap(state.utilisateur);
-              // ✅ On met à jour l'état global d'auth
+              // ✅ On met à jour l'état global d'auth avec les rôles
               context.read<AuthCubit>().setAuthenticated(
                 token: state.token,
                 utilisateur: utilisateur,
+                roles: [utilisateur.role],
+                activeRole: utilisateur.role,
               );
 
               // ✅ Redirection selon le rôle
@@ -239,7 +241,9 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Text('Vous n\'avez pas de compte?'),
+                          const Flexible( // ✅ Added Flexible widget
+                            child: Text('Vous n\'avez pas de compte?'),
+                          ),
                           TextButton(
                             onPressed: () {
                               WidgetsBinding.instance
