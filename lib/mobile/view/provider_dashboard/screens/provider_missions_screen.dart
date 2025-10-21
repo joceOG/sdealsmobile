@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:sdealsmobile/mobile/view/provider_dashboard/widgets/mission_list_item.dart';
+import 'package:sdealsmobile/mobile/view/provider_dashboard/bloc/missions_bloc.dart';
+import 'package:sdealsmobile/mobile/view/provider_dashboard/bloc/missions_event.dart';
+import 'package:sdealsmobile/mobile/view/provider_dashboard/bloc/missions_state.dart';
 
 class ProviderMissionsScreen extends StatefulWidget {
   const ProviderMissionsScreen({Key? key}) : super(key: key);
@@ -8,9 +12,18 @@ class ProviderMissionsScreen extends StatefulWidget {
   _ProviderMissionsScreenState createState() => _ProviderMissionsScreenState();
 }
 
-class _ProviderMissionsScreenState extends State<ProviderMissionsScreen> with SingleTickerProviderStateMixin {
+class _ProviderMissionsScreenState extends State<ProviderMissionsScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  
+
+  // 🔍 VARIABLES DE RECHERCHE
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  String _selectedLocation = 'Toutes';
+  String _selectedPriceRange = 'Tous';
+  String _selectedUrgency = 'Toutes';
+  bool _showFilters = false;
+
   // Données simulées pour les missions
   final List<Map<String, dynamic>> _availableMissions = [
     {
@@ -21,7 +34,8 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen> with Si
       'distance': '1.2 km',
       'clientName': 'Marie K.',
       'clientRating': 4.2,
-      'description': 'Fuite importante sous évier cuisine, eau qui s\'accumule...',
+      'description':
+          'Fuite importante sous évier cuisine, eau qui s\'accumule...',
     },
     {
       'title': 'Installation climatisation',
@@ -31,7 +45,8 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen> with Si
       'distance': '3.5 km',
       'clientName': 'Paul M.',
       'clientRating': 4.8,
-      'description': 'Installation de 2 climatiseurs split dans salon et chambre principale...',
+      'description':
+          'Installation de 2 climatiseurs split dans salon et chambre principale...',
     },
     {
       'title': 'Débouchage canalisation',
@@ -41,7 +56,8 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen> with Si
       'distance': '5.1 km',
       'clientName': 'Ahmed T.',
       'clientRating': 3.9,
-      'description': 'Évier bouché depuis 2 jours, l\'eau ne s\'évacue plus du tout...',
+      'description':
+          'Évier bouché depuis 2 jours, l\'eau ne s\'évacue plus du tout...',
     },
     {
       'title': 'Remplacement interrupteur',
@@ -51,10 +67,11 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen> with Si
       'distance': '8.3 km',
       'clientName': 'Sophie D.',
       'clientRating': 4.0,
-      'description': 'Interrupteur cassé dans salon, risque d\'électrocution...',
+      'description':
+          'Interrupteur cassé dans salon, risque d\'électrocution...',
     },
   ];
-  
+
   final List<Map<String, dynamic>> _ongoingMissions = [
     {
       'title': 'Installation plomberie salle de bain',
@@ -75,7 +92,7 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen> with Si
       'dueDate': '15/07/2025',
     },
   ];
-  
+
   final List<Map<String, dynamic>> _completedMissions = [
     {
       'title': 'Installation prise électrique',
@@ -102,7 +119,7 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen> with Si
       'completedDate': '05/07/2025',
     },
   ];
-  
+
   final List<Map<String, dynamic>> _rejectedMissions = [
     {
       'title': 'Réparation chauffe-eau',
@@ -126,122 +143,208 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen> with Si
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
+
+    // 🎯 CHARGER LES MISSIONS AU DÉMARRAGE
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<MissionsBloc>().add(LoadAvailableMissions());
+    });
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Column(
-        children: [
-          // Barre de filtres avec TabBar
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.2),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: TabBar(
-              controller: _tabController,
-              labelColor: Theme.of(context).primaryColor,
-              unselectedLabelColor: Colors.grey,
-              indicatorColor: Theme.of(context).primaryColor,
-              indicatorWeight: 3,
-              tabs: const [
-                Tab(
-                  icon: Icon(Icons.local_fire_department),
-                  text: 'Disponibles',
-                ),
-                Tab(
-                  icon: Icon(Icons.schedule),
-                  text: 'En cours',
-                ),
-                Tab(
-                  icon: Icon(Icons.check_circle_outline),
-                  text: 'Terminées',
-                ),
-                Tab(
-                  icon: Icon(Icons.cancel_outlined),
-                  text: 'Refusées',
-                ),
-              ],
-            ),
-          ),
-          
-          // Zone de recherche et filtres
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    decoration: InputDecoration(
-                      hintText: 'Rechercher une mission...',
-                      prefixIcon: const Icon(Icons.search),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(30),
-                        borderSide: BorderSide.none,
-                      ),
-                      filled: true,
-                      fillColor: Colors.grey[200],
-                      contentPadding: const EdgeInsets.symmetric(vertical: 0),
+    return BlocBuilder<MissionsBloc, MissionsState>(
+      builder: (context, state) {
+        return Scaffold(
+          body: Column(
+            children: [
+              // 🔍 EN-TÊTE DE RECHERCHE
+              _buildSearchHeader(),
+
+              // Barre de filtres avec TabBar
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.2),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
                     ),
-                  ),
+                  ],
                 ),
-                IconButton(
-                  icon: const Icon(Icons.filter_list),
-                  onPressed: () {
-                    _showFilterDialog(context);
+                child: TabBar(
+                  controller: _tabController,
+                  labelColor: Theme.of(context).primaryColor,
+                  unselectedLabelColor: Colors.grey,
+                  indicatorColor: Theme.of(context).primaryColor,
+                  indicatorWeight: 3,
+                  onTap: (index) {
+                    // 🎯 CHARGER LES MISSIONS SELON L'ONGLET
+                    switch (index) {
+                      case 0:
+                        context
+                            .read<MissionsBloc>()
+                            .add(LoadAvailableMissions());
+                        break;
+                      case 1:
+                        context.read<MissionsBloc>().add(LoadOngoingMissions());
+                        break;
+                      case 2:
+                        context
+                            .read<MissionsBloc>()
+                            .add(LoadCompletedMissions());
+                        break;
+                      case 3:
+                        // TODO: Charger les missions refusées
+                        break;
+                    }
                   },
+                  tabs: const [
+                    Tab(
+                      icon: Icon(Icons.local_fire_department),
+                      text: 'Disponibles',
+                    ),
+                    Tab(
+                      icon: Icon(Icons.schedule),
+                      text: 'En cours',
+                    ),
+                    Tab(
+                      icon: Icon(Icons.check_circle_outline),
+                      text: 'Terminées',
+                    ),
+                    Tab(
+                      icon: Icon(Icons.cancel_outlined),
+                      text: 'Refusées',
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+
+              // Zone de recherche et filtres
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        decoration: InputDecoration(
+                          hintText: 'Rechercher une mission...',
+                          prefixIcon: const Icon(Icons.search),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(30),
+                            borderSide: BorderSide.none,
+                          ),
+                          filled: true,
+                          fillColor: Colors.grey[200],
+                          contentPadding:
+                              const EdgeInsets.symmetric(vertical: 0),
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.filter_list),
+                      onPressed: () {
+                        _showFilterDialog(context);
+                      },
+                    ),
+                  ],
+                ),
+              ),
+
+              // 🎯 GESTION DES ÉTATS
+              Expanded(
+                child: _buildContent(state),
+              ),
+            ],
           ),
-          
-          // Contenu des onglets
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                // Onglet Missions disponibles
-                _buildAvailableMissionsTab(),
-                
-                // Onglet Missions en cours
-                _buildOngoingMissionsTab(),
-                
-                // Onglet Missions terminées
-                _buildCompletedMissionsTab(),
-                
-                // Onglet Missions refusées
-                _buildRejectedMissionsTab(),
-              ],
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildAvailableMissionsTab() {
-    if (_availableMissions.isEmpty) {
-      return _buildEmptyState('Aucune mission disponible actuellement', Icons.search_off);
+  // 🎯 GESTION DES ÉTATS DU BLoC
+  Widget _buildContent(MissionsState state) {
+    if (state is MissionsLoading) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
     }
-    
+
+    if (state is MissionsError) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
+            const SizedBox(height: 16),
+            Text(
+              state.message,
+              style: TextStyle(fontSize: 16, color: Colors.red[600]),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () {
+                context.read<MissionsBloc>().add(LoadAvailableMissions());
+              },
+              child: const Text('Réessayer'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (state is MissionsLoaded) {
+      return TabBarView(
+        controller: _tabController,
+        children: [
+          // Onglet Missions disponibles
+          _buildAvailableMissionsTab(state.availableMissions ?? []),
+
+          // Onglet Missions en cours
+          _buildOngoingMissionsTab(),
+
+          // Onglet Missions terminées
+          _buildCompletedMissionsTab(),
+
+          // Onglet Missions refusées
+          _buildRejectedMissionsTab(),
+        ],
+      );
+    }
+
+    // État initial - utiliser les données simulées
+    return TabBarView(
+      controller: _tabController,
+      children: [
+        _buildAvailableMissionsTab(),
+        _buildOngoingMissionsTab(),
+        _buildCompletedMissionsTab(),
+        _buildRejectedMissionsTab(),
+      ],
+    );
+  }
+
+  Widget _buildAvailableMissionsTab([List<dynamic>? missions]) {
+    final missionsList = missions ?? _availableMissions;
+
+    if (missionsList.isEmpty) {
+      return _buildEmptyState(
+          'Aucune mission disponible actuellement', Icons.search_off);
+    }
+
     return ListView.builder(
       padding: const EdgeInsets.all(16),
-      itemCount: _availableMissions.length,
+      itemCount: missionsList.length,
       itemBuilder: (context, index) {
-        final mission = _availableMissions[index];
+        final mission = missionsList[index];
         return MissionListItem(
           title: mission['title'],
           location: mission['location'],
@@ -260,13 +363,13 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen> with Si
     if (_ongoingMissions.isEmpty) {
       return _buildEmptyState('Aucune mission en cours', Icons.pending_actions);
     }
-    
+
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: _ongoingMissions.length,
       itemBuilder: (context, index) {
         final mission = _ongoingMissions[index];
-        
+
         return Card(
           margin: const EdgeInsets.only(bottom: 12),
           shape: RoundedRectangleBorder(
@@ -288,7 +391,8 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen> with Si
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
                         color: Colors.blue.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(12),
@@ -307,7 +411,8 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen> with Si
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    const Icon(Icons.location_on_outlined, size: 16, color: Colors.grey),
+                    const Icon(Icons.location_on_outlined,
+                        size: 16, color: Colors.grey),
                     const SizedBox(width: 4),
                     Text(
                       mission['location'],
@@ -316,7 +421,8 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen> with Si
                       ),
                     ),
                     const SizedBox(width: 16),
-                    const Icon(Icons.person_outline, size: 16, color: Colors.grey),
+                    const Icon(Icons.person_outline,
+                        size: 16, color: Colors.grey),
                     const SizedBox(width: 4),
                     Text(
                       mission['clientName'],
@@ -405,15 +511,16 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen> with Si
 
   Widget _buildCompletedMissionsTab() {
     if (_completedMissions.isEmpty) {
-      return _buildEmptyState('Aucune mission terminée', Icons.check_circle_outline);
+      return _buildEmptyState(
+          'Aucune mission terminée', Icons.check_circle_outline);
     }
-    
+
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: _completedMissions.length,
       itemBuilder: (context, index) {
         final mission = _completedMissions[index];
-        
+
         return Card(
           margin: const EdgeInsets.only(bottom: 12),
           shape: RoundedRectangleBorder(
@@ -438,7 +545,9 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen> with Si
                       children: List.generate(
                         5,
                         (i) => Icon(
-                          i < mission['rating'] ? Icons.star : Icons.star_border,
+                          i < mission['rating']
+                              ? Icons.star
+                              : Icons.star_border,
                           color: Colors.amber,
                           size: 18,
                         ),
@@ -449,7 +558,8 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen> with Si
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    const Icon(Icons.location_on_outlined, size: 16, color: Colors.grey),
+                    const Icon(Icons.location_on_outlined,
+                        size: 16, color: Colors.grey),
                     const SizedBox(width: 4),
                     Text(
                       mission['location'],
@@ -458,7 +568,8 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen> with Si
                       ),
                     ),
                     const SizedBox(width: 16),
-                    const Icon(Icons.person_outline, size: 16, color: Colors.grey),
+                    const Icon(Icons.person_outline,
+                        size: 16, color: Colors.grey),
                     const SizedBox(width: 4),
                     Text(
                       mission['clientName'],
@@ -515,13 +626,13 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen> with Si
     if (_rejectedMissions.isEmpty) {
       return _buildEmptyState('Aucune mission refusée', Icons.cancel_outlined);
     }
-    
+
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: _rejectedMissions.length,
       itemBuilder: (context, index) {
         final mission = _rejectedMissions[index];
-        
+
         return Card(
           margin: const EdgeInsets.only(bottom: 12),
           shape: RoundedRectangleBorder(
@@ -543,7 +654,8 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen> with Si
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
                         color: Colors.grey.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(12),
@@ -562,7 +674,8 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen> with Si
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    const Icon(Icons.location_on_outlined, size: 16, color: Colors.grey),
+                    const Icon(Icons.location_on_outlined,
+                        size: 16, color: Colors.grey),
                     const SizedBox(width: 4),
                     Text(
                       mission['location'],
@@ -571,7 +684,8 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen> with Si
                       ),
                     ),
                     const SizedBox(width: 16),
-                    const Icon(Icons.person_outline, size: 16, color: Colors.grey),
+                    const Icon(Icons.person_outline,
+                        size: 16, color: Colors.grey),
                     const SizedBox(width: 4),
                     Text(
                       mission['clientName'],
@@ -636,7 +750,8 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen> with Si
     );
   }
 
-  void _showMissionDetailsDialog(BuildContext context, Map<String, dynamic> mission) {
+  void _showMissionDetailsDialog(
+      BuildContext context, Map<String, dynamic> mission) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -664,7 +779,8 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen> with Si
                   children: [
                     mission['urgency'] == 'Urgent'
                         ? Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
                               color: Colors.red.withOpacity(0.3),
                               borderRadius: BorderRadius.circular(12),
@@ -672,7 +788,8 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen> with Si
                             child: const Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.priority_high, color: Colors.white, size: 14),
+                                Icon(Icons.priority_high,
+                                    color: Colors.white, size: 14),
                                 SizedBox(width: 4),
                                 Text(
                                   'URGENT',
@@ -698,7 +815,8 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen> with Si
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        const Icon(Icons.location_on, color: Colors.white70, size: 16),
+                        const Icon(Icons.location_on,
+                            color: Colors.white70, size: 16),
                         const SizedBox(width: 4),
                         Text(
                           mission['location'],
@@ -707,7 +825,8 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen> with Si
                           ),
                         ),
                         const SizedBox(width: 12),
-                        const Icon(Icons.directions_walk, color: Colors.white70, size: 16),
+                        const Icon(Icons.directions_walk,
+                            color: Colors.white70, size: 16),
                         const SizedBox(width: 4),
                         Text(
                           mission['distance'],
@@ -766,7 +885,7 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen> with Si
                       ],
                     ),
                     const SizedBox(height: 16),
-                    
+
                     // Description
                     const Text(
                       'Description',
@@ -783,7 +902,7 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen> with Si
                       ),
                     ),
                     const SizedBox(height: 16),
-                    
+
                     // Budget
                     const Text(
                       'Budget',
@@ -794,7 +913,8 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen> with Si
                     ),
                     const SizedBox(height: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
                         color: Colors.green.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(8),
@@ -826,7 +946,8 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen> with Si
               ),
               const Divider(height: 1),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
@@ -850,7 +971,7 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen> with Si
                       label: const Text('Proposer'),
                       onPressed: () {
                         Navigator.pop(context);
-                        // Naviguer vers la création de devis
+                        _showApplyDialog(context, mission);
                       },
                     ),
                   ],
@@ -859,6 +980,71 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen> with Si
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  // 🎯 DIALOGUE POUR POSTULER À UNE MISSION
+  void _showApplyDialog(BuildContext context, Map<String, dynamic> mission) {
+    final TextEditingController messageController = TextEditingController();
+    final TextEditingController priceController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Postuler à "${mission['title']}"'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: messageController,
+              decoration: const InputDecoration(
+                labelText: 'Message de candidature',
+                hintText: 'Expliquez pourquoi vous êtes le bon prestataire...',
+              ),
+              maxLines: 3,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: priceController,
+              decoration: const InputDecoration(
+                labelText: 'Prix proposé (FCFA)',
+                hintText: 'Prix de votre prestation',
+              ),
+              keyboardType: TextInputType.number,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (messageController.text.isNotEmpty) {
+                context.read<MissionsBloc>().add(
+                      ApplyToMission(
+                        missionId:
+                            mission['id'] ?? '1', // TODO: Utiliser l'ID réel
+                        message: messageController.text,
+                        proposedPrice: priceController.text.isNotEmpty
+                            ? double.tryParse(priceController.text)
+                            : null,
+                      ),
+                    );
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Candidature envoyée avec succès !'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              }
+            },
+            child: const Text('Envoyer'),
+          ),
+        ],
       ),
     );
   }
@@ -883,7 +1069,7 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen> with Si
                 // Mettre à jour la distance
               },
             ),
-            
+
             // Budget
             const Text('Budget'),
             RangeSlider(
@@ -896,7 +1082,7 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen> with Si
                 // Mettre à jour le budget
               },
             ),
-            
+
             // Urgence
             const Text('Urgence'),
             Wrap(
@@ -944,5 +1130,276 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen> with Si
         ],
       ),
     );
+  }
+
+  // 🔍 EN-TÊTE DE RECHERCHE MAGNIFIQUE
+  Widget _buildSearchHeader() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Colors.green.shade50,
+            Colors.green.shade100,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.green.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Barre de recherche principale
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(25),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: TextField(
+              controller: _searchController,
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value;
+                });
+                _performSearch();
+              },
+              decoration: InputDecoration(
+                hintText: '🔍 Rechercher une mission...',
+                prefixIcon: Icon(Icons.search, color: Colors.green.shade600),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() {
+                            _searchQuery = '';
+                          });
+                          _performSearch();
+                        },
+                        icon: Icon(Icons.clear, color: Colors.grey[600]),
+                      )
+                    : IconButton(
+                        onPressed: () => _showAdvancedFilters(),
+                        icon: Icon(Icons.filter_list,
+                            color: Colors.green.shade600),
+                      ),
+                border: InputBorder.none,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          // Filtres rapides
+          _buildQuickFilters(),
+
+          // Filtres avancés (si activés)
+          if (_showFilters) _buildAdvancedFilters(),
+        ],
+      ),
+    );
+  }
+
+  // 🏷️ FILTRES RAPIDES
+  Widget _buildQuickFilters() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          _buildFilterChip('📍 Toutes zones', _selectedLocation == 'Toutes',
+              () {
+            setState(() => _selectedLocation = 'Toutes');
+            _performSearch();
+          }),
+          _buildFilterChip('💰 Tous prix', _selectedPriceRange == 'Tous', () {
+            setState(() => _selectedPriceRange = 'Tous');
+            _performSearch();
+          }),
+          _buildFilterChip('⚡ Toutes urgences', _selectedUrgency == 'Toutes',
+              () {
+            setState(() => _selectedUrgency = 'Toutes');
+            _performSearch();
+          }),
+          _buildFilterChip('🗺️ Carte', false, () => _showMapView()),
+        ],
+      ),
+    );
+  }
+
+  // 🏷️ CHIP DE FILTRE
+  Widget _buildFilterChip(String label, bool selected, VoidCallback onTap) {
+    return Container(
+      margin: const EdgeInsets.only(right: 8),
+      child: FilterChip(
+        label: Text(
+          label,
+          style: TextStyle(
+            color: selected ? Colors.white : Colors.green.shade700,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        selected: selected,
+        onSelected: (_) => onTap(),
+        backgroundColor: Colors.white,
+        selectedColor: Colors.green.shade600,
+        checkmarkColor: Colors.white,
+        side: BorderSide(
+          color: selected ? Colors.green.shade600 : Colors.green.shade300,
+          width: 1,
+        ),
+      ),
+    );
+  }
+
+  // 🔧 FILTRES AVANCÉS
+  Widget _buildAdvancedFilters() {
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.green.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.tune, color: Colors.green.shade600, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'Filtres avancés',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.green.shade800,
+                ),
+              ),
+              const Spacer(),
+              IconButton(
+                onPressed: () => setState(() => _showFilters = false),
+                icon: Icon(Icons.close, color: Colors.grey[600], size: 20),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Localisation
+          _buildFilterSection(
+            '📍 Localisation',
+            ['Toutes', 'Cocody', 'Marcory', 'Yopougon', 'Abobo', 'Plateau'],
+            _selectedLocation,
+            (value) {
+              setState(() => _selectedLocation = value);
+              _performSearch();
+            },
+          ),
+
+          const SizedBox(height: 12),
+
+          // Prix
+          _buildFilterSection(
+            '💰 Prix',
+            ['Tous', '0-25K', '25K-50K', '50K-100K', '100K+'],
+            _selectedPriceRange,
+            (value) {
+              setState(() => _selectedPriceRange = value);
+              _performSearch();
+            },
+          ),
+
+          const SizedBox(height: 12),
+
+          // Urgence
+          _buildFilterSection(
+            '⚡ Urgence',
+            ['Toutes', 'Urgent', 'Standard', 'Flexible'],
+            _selectedUrgency,
+            (value) {
+              setState(() => _selectedUrgency = value);
+              _performSearch();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 📋 SECTION DE FILTRE
+  Widget _buildFilterSection(String title, List<String> options,
+      String selected, Function(String) onChanged) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey[700],
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          children: options.map((option) {
+            return ChoiceChip(
+              label: Text(option),
+              selected: selected == option,
+              onSelected: (_) => onChanged(option),
+              selectedColor: Colors.green.shade100,
+              labelStyle: TextStyle(
+                color: selected == option
+                    ? Colors.green.shade800
+                    : Colors.grey[600],
+                fontWeight:
+                    selected == option ? FontWeight.w600 : FontWeight.normal,
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  // 🔍 EFFECTUER LA RECHERCHE
+  void _performSearch() {
+    // TODO: Implémenter la logique de recherche avec le BLoC
+    context.read<MissionsBloc>().add(FilterMissions(
+          searchQuery: _searchQuery,
+          location: _selectedLocation,
+          priceRange: _selectedPriceRange,
+          urgency: _selectedUrgency,
+        ));
+  }
+
+  // 🗺️ AFFICHER LA VUE CARTE
+  void _showMapView() {
+    // TODO: Implémenter la vue carte
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Vue carte - En développement')),
+    );
+  }
+
+  // 🔧 AFFICHER LES FILTRES AVANCÉS
+  void _showAdvancedFilters() {
+    setState(() {
+      _showFilters = !_showFilters;
+    });
   }
 }

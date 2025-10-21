@@ -1,251 +1,185 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../bloc/provider_profile_bloc.dart';
+import '../bloc/provider_profile_event.dart';
+import '../bloc/provider_profile_state.dart';
+import '../../../../data/services/authCubit.dart';
 
+// 🎯 ÉCRAN PROFIL PRESTATAIRE MAGNIFIQUE
 class ProviderProfileScreen extends StatefulWidget {
-  const ProviderProfileScreen({Key? key}) : super(key: key);
+  const ProviderProfileScreen({super.key});
 
   @override
-  _ProviderProfileScreenState createState() => _ProviderProfileScreenState();
+  State<ProviderProfileScreen> createState() => _ProviderProfileScreenState();
 }
 
-class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
-  // Données simulées pour le profil prestataire
-  final Map<String, dynamic> _providerData = {
-    'name': 'Amadou Diallo',
-    'profession': 'Plombier & Électricien',
-    'rating': 4.8,
-    'reviewCount': 24,
-    'memberSince': 'Mai 2025',
-    'location': 'Abidjan, Cocody',
-    'avatar': 'AD',
-    'bio': 'Professionnel avec 15 ans d\'expérience en plomberie et électricité. '
-        'Spécialisé dans les installations domestiques et dépannages urgents. '
-        'Service rapide et travail soigné garanti.',
-    'phone': '+225 07 XX XX XX',
-    'email': 'amadou.diallo@example.com',
-    'completionRate': 98,
-    'responseRate': 95,
-    'skills': [
-      {'name': 'Plomberie', 'level': 0.9},
-      {'name': 'Électricité', 'level': 0.85},
-      {'name': 'Climatisation', 'level': 0.7},
-      {'name': 'Carrelage', 'level': 0.5},
-    ],
-    'certifications': [
-      'Certificat Professionnel de Plomberie - 2015',
-      'Habilitation Électrique B1V - 2018',
-      'Formation Sécurité au Travail - 2023',
-    ],
-    'languages': [
-      {'name': 'Français', 'level': 'Courant'},
-      {'name': 'Anglais', 'level': 'Intermédiaire'},
-      {'name': 'Malinké', 'level': 'Natif'},
-    ],
-    'portfolioItems': [
-      {
-        'title': 'Rénovation salle de bain complète',
-        'image': 'bathroom.jpg',
-        'description': 'Installation complète de la plomberie et électricité',
-      },
-      {
-        'title': 'Installation tableau électrique',
-        'image': 'electrical.jpg',
-        'description': 'Mise aux normes d\'un tableau électrique résidentiel',
-      },
-      {
-        'title': 'Réparation fuite complexe',
-        'image': 'plumbing.jpg',
-        'description': 'Détection et réparation d\'une fuite souterraine',
-      },
-    ],
-    'services': [
-      {'name': 'Plomberie urgence', 'price': '15,000 FCFA/h', 'duration': '1-2h'},
-      {'name': 'Installation sanitaire', 'price': '25,000 FCFA', 'duration': '2-3h'},
-      {'name': 'Dépannage électrique', 'price': '20,000 FCFA', 'duration': '1-3h'},
-      {'name': 'Installation électrique complète', 'price': 'Sur devis', 'duration': 'Variable'},
-    ],
-    'accountSettings': {
-      'notifications': true,
-      'displayPhone': true,
-      'autoAcceptMissions': false,
-      'darkMode': false,
-      'language': 'Français',
-    },
-  };
+class _ProviderProfileScreenState extends State<ProviderProfileScreen>
+    with TickerProviderStateMixin {
+  late TabController _tabController;
+  String? _prestataireId;
 
-  final List<Map<String, dynamic>> _reviews = [
-    {
-      'clientName': 'Sophie K.',
-      'rating': 5,
-      'comment': 'Excellent service, rapide et efficace. Je recommande vivement !',
-      'date': '12/07/2025',
-    },
-    {
-      'clientName': 'Jean M.',
-      'rating': 5,
-      'comment': 'Très professionnel et ponctuel. Travail impeccable.',
-      'date': '05/07/2025',
-    },
-    {
-      'clientName': 'Marie T.',
-      'rating': 4,
-      'comment': 'Bon travail, mais un peu de retard sur l\'horaire prévu.',
-      'date': '28/06/2025',
-    },
-    {
-      'clientName': 'Konan A.',
-      'rating': 5,
-      'comment': 'Intervention rapide et efficace pour une urgence. Merci !',
-      'date': '15/06/2025',
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+
+    // Récupérer l'ID du prestataire depuis AuthCubit
+    final authState = context.read<AuthCubit>().state;
+    if (authState is AuthAuthenticated) {
+      _prestataireId = authState.utilisateur.idutilisateur;
+      // Charger les données du profil
+      context
+          .read<ProviderProfileBloc>()
+          .add(LoadProviderProfile(_prestataireId!));
+    }
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 4,
-      child: Scaffold(
-        body: NestedScrollView(
-          headerSliverBuilder: (context, innerBoxIsScrolled) {
-            return [
-              SliverToBoxAdapter(
-                child: _buildProfileHeader(),
-              ),
-              SliverPersistentHeader(
-                delegate: _SliverAppBarDelegate(
-                  TabBar(
-                    labelColor: Theme.of(context).primaryColor,
-                    unselectedLabelColor: Colors.grey,
-                    indicatorColor: Theme.of(context).primaryColor,
-                    tabs: const [
-                      Tab(text: 'Infos'),
-                      Tab(text: 'Compétences'),
-                      Tab(text: 'Portfolio'),
-                      Tab(text: 'Avis'),
-                    ],
-                  ),
-                ),
-                pinned: true,
-              ),
-            ];
-          },
-          body: TabBarView(
+    return Scaffold(
+      backgroundColor: Colors.grey[50],
+      appBar: _buildProfileAppBar(),
+      body: BlocBuilder<ProviderProfileBloc, ProviderProfileState>(
+        builder: (context, state) {
+          return Column(
             children: [
-              // Onglet Infos
-              _buildInfoTab(),
-              
-              // Onglet Compétences
-              _buildSkillsTab(),
-              
-              // Onglet Portfolio
-              _buildPortfolioTab(),
-              
-              // Onglet Avis
-              _buildReviewsTab(),
+              _buildProfileHeader(state),
+              _buildTabSelector(),
+              Expanded(
+                child: _buildProfileContent(state),
+              ),
             ],
-          ),
-        ),
+          );
+        },
       ),
     );
   }
 
-  Widget _buildProfileHeader() {
+  // 🎨 APP BAR PROFIL
+  PreferredSizeWidget _buildProfileAppBar() {
+    return AppBar(
+      backgroundColor: Colors.green.shade600,
+      elevation: 0,
+      leading: IconButton(
+        onPressed: () => Navigator.pop(context),
+        icon: Icon(Icons.arrow_back, color: Colors.white),
+      ),
+      title: Row(
+        children: [
+          Icon(Icons.person, color: Colors.white),
+          const SizedBox(width: 8),
+          Text(
+            'Mon Profil',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        IconButton(
+          onPressed: () => _showEditProfile(),
+          icon: Icon(Icons.edit, color: Colors.white),
+        ),
+        const SizedBox(width: 8),
+      ],
+    );
+  }
+
+  // 👤 EN-TÊTE DU PROFIL
+  Widget _buildProfileHeader(ProviderProfileState state) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Theme.of(context).primaryColor.withOpacity(0.1),
+        gradient: LinearGradient(
+          colors: [
+            Colors.green.shade400,
+            Colors.green.shade600,
+            Colors.green.shade800,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.green.withOpacity(0.3),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Column(
         children: [
-          Row(
-            children: [
-              // Avatar
-              CircleAvatar(
-                radius: 40,
-                backgroundColor: Theme.of(context).primaryColor,
-                child: Text(
-                  _providerData['avatar'],
-                  style: const TextStyle(
-                    fontSize: 30,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
+          // Photo de profil
+          Container(
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.white, width: 4),
+              shape: BoxShape.circle,
+            ),
+            child: CircleAvatar(
+              radius: 50,
+              backgroundColor: Colors.white,
+              child: Icon(
+                Icons.handyman,
+                color: Colors.green.shade600,
+                size: 50,
               ),
-              const SizedBox(width: 16),
-              
-              // Informations de base
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _providerData['name'],
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _providerData['profession'],
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.grey[700],
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.star,
-                          color: Colors.amber[700],
-                          size: 18,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${_providerData['rating']} (${_providerData['reviewCount']} avis)',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              
-              // Bouton d'édition
-              IconButton(
-                icon: const Icon(Icons.edit),
-                onPressed: () {
-                  // Ouvrir l'écran d'édition du profil
-                  _showEditProfileDialog();
-                },
-              ),
-            ],
+            ),
           ),
           const SizedBox(height: 16),
-          
-          // Stats
+
+          // Nom et statut
+          Text(
+            'Expert Prestataire',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          // Statut avec badge
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.verified, color: Colors.white, size: 16),
+                const SizedBox(width: 8),
+                Text(
+                  'Profil Vérifié',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Statistiques rapides
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildStatItem(
-                'Depuis',
-                _providerData['memberSince'],
-                Icons.calendar_today,
-              ),
-              _buildStatItem(
-                'Complétion',
-                '${_providerData['completionRate']}%',
-                Icons.task_alt,
-              ),
-              _buildStatItem(
-                'Réponse',
-                '${_providerData['responseRate']}%',
-                Icons.reply_all,
-              ),
+              _buildHeaderStat('Missions', '24', Icons.assignment),
+              _buildHeaderStat('Note', '4.8/5', Icons.star),
+              _buildHeaderStat('Clients', '18', Icons.people),
             ],
           ),
         ],
@@ -253,22 +187,24 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
     );
   }
 
-  Widget _buildStatItem(String label, String value, IconData icon) {
+  // 📊 STATISTIQUE EN-TÊTE
+  Widget _buildHeaderStat(String label, String value, IconData icon) {
     return Column(
       children: [
-        Icon(icon, color: Theme.of(context).primaryColor),
+        Icon(icon, color: Colors.white, size: 20),
         const SizedBox(height: 4),
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 18,
             fontWeight: FontWeight.bold,
-            fontSize: 16,
           ),
         ),
         Text(
           label,
           style: TextStyle(
-            color: Colors.grey[600],
+            color: Colors.white.withOpacity(0.9),
             fontSize: 12,
           ),
         ),
@@ -276,665 +212,981 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
     );
   }
 
-  Widget _buildInfoTab() {
+  // 📊 SÉLECTEUR D'ONGlets
+  Widget _buildTabSelector() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(25),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: TabBar(
+        controller: _tabController,
+        indicator: BoxDecoration(
+          color: Colors.green.shade600,
+          borderRadius: BorderRadius.circular(25),
+        ),
+        labelColor: Colors.white,
+        unselectedLabelColor: Colors.grey[600],
+        labelStyle: const TextStyle(fontWeight: FontWeight.w600),
+        tabs: const [
+          Tab(text: 'Informations', icon: Icon(Icons.info)),
+          Tab(text: 'Performance', icon: Icon(Icons.analytics)),
+          Tab(text: 'Paramètres', icon: Icon(Icons.settings)),
+        ],
+      ),
+    );
+  }
+
+  // 📊 CONTENU DU PROFIL
+  Widget _buildProfileContent(ProviderProfileState state) {
+    if (state is ProviderProfileLoading) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
+
+    if (state is ProviderProfileError) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
+            const SizedBox(height: 16),
+            Text(
+              'Erreur',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              state.message,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey[600]),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => _refreshProfile(),
+              child: const Text('Réessayer'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return TabBarView(
+      controller: _tabController,
+      children: [
+        _buildInformationTab(state),
+        _buildPerformanceTab(state),
+        _buildSettingsTab(state),
+      ],
+    );
+  }
+
+  // 📋 ONGLET INFORMATIONS
+  Widget _buildInformationTab(ProviderProfileState state) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
+        children: [
+          _buildInfoSection(),
+          const SizedBox(height: 20),
+          _buildServicesSection(),
+          const SizedBox(height: 20),
+          _buildContactSection(),
+        ],
+      ),
+    );
+  }
+
+  // 📈 ONGLET PERFORMANCE
+  Widget _buildPerformanceTab(ProviderProfileState state) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          _buildStatsCards(),
+          const SizedBox(height: 20),
+          _buildRecentActivity(),
+          const SizedBox(height: 20),
+          _buildAchievements(),
+        ],
+      ),
+    );
+  }
+
+  // ⚙️ ONGLET PARAMÈTRES
+  Widget _buildSettingsTab(ProviderProfileState state) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          _buildAccountSettings(),
+          const SizedBox(height: 20),
+          _buildNotificationSettings(),
+          const SizedBox(height: 20),
+          _buildPrivacySettings(),
+          const SizedBox(height: 20),
+          _buildDangerZone(),
+        ],
+      ),
+    );
+  }
+
+  // 📋 SECTION INFORMATIONS
+  Widget _buildInfoSection() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // À propos
-          const Text(
-            'À propos',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
+          Row(
+            children: [
+              Icon(Icons.info, color: Colors.green.shade600, size: 24),
+              const SizedBox(width: 8),
+              Text(
+                'Informations personnelles',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[800],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _buildInfoItem('Nom complet', 'Jean Dupont'),
+          _buildInfoItem('Email', 'jean.dupont@email.com'),
+          _buildInfoItem('Téléphone', '+225 07 12 34 56 78'),
+          _buildInfoItem('Date d\'inscription', '15 Janvier 2024'),
+          _buildInfoItem('Statut', 'Actif'),
+        ],
+      ),
+    );
+  }
+
+  // 🔧 ÉLÉMENT D'INFORMATION
+  Widget _buildInfoItem(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 2,
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[600],
+                fontWeight: FontWeight.w500,
+              ),
             ),
+          ),
+          Expanded(
+            flex: 3,
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[800],
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 💼 SECTION SERVICES
+  Widget _buildServicesSection() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.work, color: Colors.green.shade600, size: 24),
+              const SizedBox(width: 8),
+              Text(
+                'Services proposés',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[800],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _buildServiceChip('Plomberie', Colors.blue),
+          _buildServiceChip('Électricité', Colors.orange),
+          _buildServiceChip('Peinture', Colors.purple),
+          _buildServiceChip('Menuiserie', Colors.brown),
+        ],
+      ),
+    );
+  }
+
+  // 🏷️ CHIP DE SERVICE
+  Widget _buildServiceChip(String service, Color color) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8, right: 8),
+      child: Chip(
+        label: Text(
+          service,
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        backgroundColor: color,
+        avatar: Icon(Icons.check, color: Colors.white, size: 16),
+      ),
+    );
+  }
+
+  // 📞 SECTION CONTACT
+  Widget _buildContactSection() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.location_on, color: Colors.green.shade600, size: 24),
+              const SizedBox(width: 8),
+              Text(
+                'Zone de service',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[800],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _buildInfoItem('Adresse', 'Abidjan, Côte d\'Ivoire'),
+          _buildInfoItem('Rayon de service', '15 km'),
+          _buildInfoItem('Disponibilité', '7j/7, 24h/24'),
+        ],
+      ),
+    );
+  }
+
+  // 📊 CARTES DE STATISTIQUES
+  Widget _buildStatsCards() {
+    return GridView.count(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisCount: 2,
+      childAspectRatio: 1.3,
+      crossAxisSpacing: 12,
+      mainAxisSpacing: 12,
+      children: [
+        _buildStatCard(
+          'Missions terminées',
+          '24',
+          '+3 cette semaine',
+          Icons.check_circle,
+          Colors.green,
+        ),
+        _buildStatCard(
+          'Note moyenne',
+          '4.8/5',
+          'Basé sur 18 avis',
+          Icons.star,
+          Colors.amber,
+        ),
+        _buildStatCard(
+          'Revenus du mois',
+          '125K FCFA',
+          '+15% vs mois dernier',
+          Icons.monetization_on,
+          Colors.blue,
+        ),
+        _buildStatCard(
+          'Taux de réussite',
+          '96%',
+          '+2% cette semaine',
+          Icons.trending_up,
+          Colors.purple,
+        ),
+      ],
+    );
+  }
+
+  // 📊 CARTE DE STATISTIQUE
+  Widget _buildStatCard(
+    String title,
+    String value,
+    String subtitle,
+    IconData icon,
+    Color color,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: color, size: 20),
+              ),
+              const Spacer(),
+              Icon(Icons.more_vert, color: Colors.grey[400], size: 20),
+            ],
           ),
           const SizedBox(height: 8),
           Text(
-            _providerData['bio'],
-            style: const TextStyle(
-              height: 1.4,
-            ),
-          ),
-          const SizedBox(height: 16),
-          
-          // Contact
-          const Text(
-            'Contact',
+            value,
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
+              color: Colors.grey[800],
             ),
           ),
-          const SizedBox(height: 8),
-          _buildContactItem(
-            Icons.phone,
-            'Téléphone',
-            _providerData['phone'],
-          ),
-          _buildContactItem(
-            Icons.email,
-            'Email',
-            _providerData['email'],
-          ),
-          _buildContactItem(
-            Icons.location_on,
-            'Localisation',
-            _providerData['location'],
-          ),
-          const SizedBox(height: 16),
-          
-          // Services et tarifs
-          const Text(
-            'Services et tarifs',
+          const SizedBox(height: 2),
+          Text(
+            title,
             style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 8),
-          ...(_providerData['services'] as List).map((service) {
-            return Card(
-              margin: const EdgeInsets.only(bottom: 8),
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            service['name'],
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              Icon(Icons.schedule, size: 14, color: Colors.grey[600]),
-                              const SizedBox(width: 4),
-                              Text(
-                                service['duration'],
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.green.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: Colors.green.withOpacity(0.3),
-                        ),
-                      ),
-                      child: Text(
-                        service['price'],
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.green,
-                        ),
-                      ),
-                    ),
-                  ],
+          const SizedBox(height: 2),
+          Text(
+            subtitle,
+            style: TextStyle(
+              fontSize: 11,
+              color: color,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 📈 ACTIVITÉ RÉCENTE
+  Widget _buildRecentActivity() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.timeline, color: Colors.green.shade600, size: 24),
+              const SizedBox(width: 8),
+              Text(
+                'Activité récente',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[800],
                 ),
               ),
-            );
-          }).toList(),
-          const SizedBox(height: 16),
-          
-          // Langues
-          const Text(
-            'Langues',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 8),
-          ...(_providerData['languages'] as List).map((language) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                children: [
-                  const Icon(Icons.language),
-                  const SizedBox(width: 12),
-                  Text(
-                    language['name'],
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    language['level'],
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }).toList(),
-          const SizedBox(height: 32),
-          
-          // Paramètres du compte
-          const Text(
-            'Paramètres du compte',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+            ],
           ),
           const SizedBox(height: 16),
-          _buildSettingSwitch(
-            'Recevoir des notifications',
-            _providerData['accountSettings']['notifications'],
-            (value) {
-              // Mise à jour de la valeur
-            },
+          _buildActivityItem(
+            'Mission terminée',
+            'Réparation plomberie - Client Marie',
+            'Il y a 2 heures',
+            Icons.check_circle,
+            Colors.green,
           ),
-          _buildSettingSwitch(
-            'Afficher mon numéro de téléphone',
-            _providerData['accountSettings']['displayPhone'],
-            (value) {
-              // Mise à jour de la valeur
-            },
+          _buildActivityItem(
+            'Nouvelle mission',
+            'Installation électrique - Client Paul',
+            'Il y a 4 heures',
+            Icons.assignment,
+            Colors.blue,
           ),
-          _buildSettingSwitch(
-            'Acceptation automatique des missions',
-            _providerData['accountSettings']['autoAcceptMissions'],
-            (value) {
-              // Mise à jour de la valeur
-            },
+          _buildActivityItem(
+            'Avis reçu',
+            '5 étoiles - Excellent travail !',
+            'Il y a 1 jour',
+            Icons.star,
+            Colors.amber,
           ),
-          const SizedBox(height: 8),
-          ListTile(
-            title: const Text('Langue de l\'application'),
-            subtitle: Text(_providerData['accountSettings']['language']),
-            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-            onTap: () {
-              // Ouvrir sélection de la langue
-            },
+        ],
+      ),
+    );
+  }
+
+  // 📋 ÉLÉMENT D'ACTIVITÉ
+  Widget _buildActivityItem(
+    String title,
+    String description,
+    String time,
+    IconData icon,
+    Color color,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Icon(icon, color: color, size: 20),
           ),
-          const SizedBox(height: 24),
-          
-          // Boutons d'action
-          Center(
+          const SizedBox(width: 12),
+          Expanded(
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.logout),
-                  label: const Text('Déconnexion'),
-                  onPressed: () {
-                    // Déconnexion
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size(200, 45),
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey[800],
                   ),
                 ),
-                const SizedBox(height: 8),
-                TextButton(
-                  onPressed: () {
-                    // Désactiver le compte
-                  },
-                  child: const Text('Désactiver temporairement mon compte'),
+                Text(
+                  description,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                Text(
+                  time,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey[500],
+                  ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 32),
         ],
       ),
     );
   }
 
-  Widget _buildContactItem(IconData icon, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          Icon(icon, color: Theme.of(context).primaryColor),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[600],
-                ),
-              ),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 16,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSettingSwitch(String title, bool value, ValueChanged<bool> onChanged) {
-    return SwitchListTile(
-      title: Text(title),
-      value: value,
-      onChanged: onChanged,
-      activeColor: Theme.of(context).primaryColor,
-    );
-  }
-
-  Widget _buildSkillsTab() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Compétences
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Compétences',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              TextButton.icon(
-                icon: const Icon(Icons.add, size: 16),
-                label: const Text('Ajouter'),
-                onPressed: () {
-                  // Ajouter une compétence
-                },
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          ...(_providerData['skills'] as List).map((skill) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        skill['name'],
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        '${(skill['level'] * 100).toInt()}%',
-                        style: TextStyle(
-                          color: Theme.of(context).primaryColor,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: LinearProgressIndicator(
-                      value: skill['level'],
-                      minHeight: 8,
-                      backgroundColor: Colors.grey[300],
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        Theme.of(context).primaryColor,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }).toList(),
-          const SizedBox(height: 24),
-          
-          // Certifications
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Certifications',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              TextButton.icon(
-                icon: const Icon(Icons.add, size: 16),
-                label: const Text('Ajouter'),
-                onPressed: () {
-                  // Ajouter une certification
-                },
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          ...(_providerData['certifications'] as List).map((certification) {
-            return Card(
-              margin: const EdgeInsets.only(bottom: 8),
-              child: ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.amber.withOpacity(0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.verified,
-                    color: Colors.amber[700],
-                  ),
-                ),
-                title: Text(certification),
-                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                onTap: () {
-                  // Voir détails de la certification
-                },
-              ),
-            );
-          }).toList(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPortfolioTab() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Portfolio',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              ElevatedButton.icon(
-                icon: const Icon(Icons.add_photo_alternate, size: 16),
-                label: const Text('Ajouter'),
-                onPressed: () {
-                  // Ajouter une réalisation au portfolio
-                },
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-              childAspectRatio: 0.75,
-            ),
-            itemCount: (_providerData['portfolioItems'] as List).length,
-            itemBuilder: (context, index) {
-              final item = (_providerData['portfolioItems'] as List)[index];
-              
-              return Card(
-                clipBehavior: Clip.antiAlias,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                elevation: 3,
-                child: InkWell(
-                  onTap: () {
-                    // Afficher le détail du projet
-                  },
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Image placeholder
-                      Container(
-                        height: 120,
-                        color: Colors.grey[300],
-                        child: Center(
-                          child: Icon(
-                            Icons.image,
-                            color: Colors.grey[600],
-                            size: 48,
-                          ),
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              item['title'],
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              item['description'],
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[600],
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildReviewsTab() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Text(
-                'Avis clients',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.amber.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.star, size: 16, color: Colors.amber),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${_providerData['rating']}',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Text(
-                ' (${_providerData['reviewCount']} avis)',
-                style: TextStyle(
-                  color: Colors.grey[600],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          
-          // Liste des avis
-          ..._reviews.map((review) {
-            return Card(
-              margin: const EdgeInsets.only(bottom: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        CircleAvatar(
-                          backgroundColor: Colors.grey[200],
-                          child: Text(
-                            review['clientName'].split(' ')[0][0] + review['clientName'].split(' ')[1][0],
-                            style: TextStyle(
-                              color: Colors.grey[700],
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              review['clientName'],
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            Text(
-                              review['date'],
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const Spacer(),
-                        Row(
-                          children: List.generate(
-                            5,
-                            (index) => Icon(
-                              index < review['rating'] ? Icons.star : Icons.star_border,
-                              color: Colors.amber,
-                              size: 16,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      review['comment'],
-                      style: const TextStyle(
-                        height: 1.4,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }).toList(),
-          
-          // Bouton "voir plus"
-          if (_reviews.length >= 4) Center(
-            child: TextButton(
-              onPressed: () {
-                // Voir plus d'avis
-              },
-              child: const Text('Voir tous les avis →'),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showEditProfileDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Modifier le profil'),
-        content: const SingleChildScrollView(
-          child: Text('Ici apparaîtrait un formulaire complet d\'édition du profil'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-            },
-            child: const Text('Annuler'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              // Sauvegarder les modifications
-            },
-            child: const Text('Enregistrer'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
-  final TabBar tabBar;
-
-  _SliverAppBarDelegate(this.tabBar);
-
-  @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+  // 🏆 RÉCOMPENSES
+  Widget _buildAchievements() {
     return Container(
-      color: Colors.white,
-      child: tabBar,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.emoji_events, color: Colors.green.shade600, size: 24),
+              const SizedBox(width: 8),
+              Text(
+                'Récompenses',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[800],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              _buildAchievementBadge('Expert', Icons.star, Colors.amber),
+              _buildAchievementBadge('Fiable', Icons.verified, Colors.green),
+              _buildAchievementBadge('Rapide', Icons.speed, Colors.blue),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
-  @override
-  double get maxExtent => tabBar.preferredSize.height;
+  // 🏅 BADGE DE RÉCOMPENSE
+  Widget _buildAchievementBadge(String title, IconData icon, Color color) {
+    return Container(
+      margin: const EdgeInsets.only(right: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: color, size: 24),
+          const SizedBox(height: 4),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-  @override
-  double get minExtent => tabBar.preferredSize.height;
+  // ⚙️ PARAMÈTRES DU COMPTE
+  Widget _buildAccountSettings() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.account_circle,
+                  color: Colors.green.shade600, size: 24),
+              const SizedBox(width: 8),
+              Text(
+                'Compte',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[800],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _buildSettingItem(
+            'Modifier le profil',
+            'Informations personnelles',
+            Icons.edit,
+            () => _showEditProfile(),
+          ),
+          _buildSettingItem(
+            'Changer le mot de passe',
+            'Sécurité du compte',
+            Icons.lock,
+            () => _showChangePassword(),
+          ),
+          _buildSettingItem(
+            'Vérification d\'identité',
+            'Documents et pièces',
+            Icons.verified_user,
+            () => _showIdentityVerification(),
+          ),
+        ],
+      ),
+    );
+  }
 
-  @override
-  bool shouldRebuild(covariant SliverPersistentHeaderDelegate oldDelegate) {
-    return false;
+  // 🔔 PARAMÈTRES DE NOTIFICATION
+  Widget _buildNotificationSettings() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.notifications, color: Colors.green.shade600, size: 24),
+              const SizedBox(width: 8),
+              Text(
+                'Notifications',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[800],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _buildSwitchItem(
+            'Nouvelles missions',
+            'Recevoir les notifications de nouvelles missions',
+            true,
+            (value) => _toggleNotification('missions', value),
+          ),
+          _buildSwitchItem(
+            'Messages clients',
+            'Notifications des messages clients',
+            true,
+            (value) => _toggleNotification('messages', value),
+          ),
+          _buildSwitchItem(
+            'Paiements',
+            'Notifications de paiements reçus',
+            true,
+            (value) => _toggleNotification('payments', value),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 🔒 PARAMÈTRES DE CONFIDENTIALITÉ
+  Widget _buildPrivacySettings() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.privacy_tip, color: Colors.green.shade600, size: 24),
+              const SizedBox(width: 8),
+              Text(
+                'Confidentialité',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[800],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _buildSettingItem(
+            'Gérer les données',
+            'Télécharger ou supprimer vos données',
+            Icons.data_usage,
+            () => _showDataManagement(),
+          ),
+          _buildSettingItem(
+            'Politique de confidentialité',
+            'Lire notre politique',
+            Icons.policy,
+            () => _showPrivacyPolicy(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 🗑️ ZONE DANGEREUSE
+  Widget _buildDangerZone() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.red.shade50,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.red.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.warning, color: Colors.red.shade600, size: 24),
+              const SizedBox(width: 8),
+              Text(
+                'Zone dangereuse',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.red.shade800,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _buildDangerItem(
+            'Désactiver le compte',
+            'Suspendre temporairement votre compte',
+            Icons.pause_circle,
+            Colors.orange,
+            () => _showDeactivateAccount(),
+          ),
+          _buildDangerItem(
+            'Supprimer le compte',
+            'Supprimer définitivement votre compte',
+            Icons.delete_forever,
+            Colors.red,
+            () => _showDeleteAccount(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ⚙️ ÉLÉMENT DE PARAMÈTRE
+  Widget _buildSettingItem(
+    String title,
+    String subtitle,
+    IconData icon,
+    VoidCallback onTap,
+  ) {
+    return ListTile(
+      leading: Icon(icon, color: Colors.green.shade600),
+      title: Text(
+        title,
+        style: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+          color: Colors.grey[800],
+        ),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: TextStyle(
+          fontSize: 14,
+          color: Colors.grey[600],
+        ),
+      ),
+      trailing:
+          Icon(Icons.arrow_forward_ios, color: Colors.grey[400], size: 16),
+      onTap: onTap,
+    );
+  }
+
+  // 🔄 ÉLÉMENT AVEC SWITCH
+  Widget _buildSwitchItem(
+    String title,
+    String subtitle,
+    bool value,
+    Function(bool) onChanged,
+  ) {
+    return ListTile(
+      title: Text(
+        title,
+        style: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+          color: Colors.grey[800],
+        ),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: TextStyle(
+          fontSize: 14,
+          color: Colors.grey[600],
+        ),
+      ),
+      trailing: Switch(
+        value: value,
+        onChanged: onChanged,
+        activeColor: Colors.green.shade600,
+      ),
+    );
+  }
+
+  // 🚨 ÉLÉMENT DANGEREUX
+  Widget _buildDangerItem(
+    String title,
+    String subtitle,
+    IconData icon,
+    Color color,
+    VoidCallback onTap,
+  ) {
+    return ListTile(
+      leading: Icon(icon, color: color),
+      title: Text(
+        title,
+        style: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: TextStyle(
+          fontSize: 14,
+          color: Colors.grey[600],
+        ),
+      ),
+      trailing: Icon(Icons.arrow_forward_ios,
+          color: color.withOpacity(0.7), size: 16),
+      onTap: onTap,
+    );
+  }
+
+  // 🔧 MÉTHODES UTILITAIRES
+
+  void _refreshProfile() {
+    if (_prestataireId != null) {
+      context
+          .read<ProviderProfileBloc>()
+          .add(LoadProviderProfile(_prestataireId!));
+    }
+  }
+
+  void _showEditProfile() {
+    // TODO: Naviguer vers l'écran d'édition
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Édition du profil - En développement')),
+    );
+  }
+
+  void _showChangePassword() {
+    // TODO: Naviguer vers le changement de mot de passe
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+          content: Text('Changement de mot de passe - En développement')),
+    );
+  }
+
+  void _showIdentityVerification() {
+    // TODO: Naviguer vers la vérification d'identité
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+          content: Text('Vérification d\'identité - En développement')),
+    );
+  }
+
+  void _showDataManagement() {
+    // TODO: Naviguer vers la gestion des données
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Gestion des données - En développement')),
+    );
+  }
+
+  void _showPrivacyPolicy() {
+    // TODO: Naviguer vers la politique de confidentialité
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+          content: Text('Politique de confidentialité - En développement')),
+    );
+  }
+
+  void _showDeactivateAccount() {
+    // TODO: Afficher le dialogue de désactivation
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+          content: Text('Désactivation du compte - En développement')),
+    );
+  }
+
+  void _showDeleteAccount() {
+    // TODO: Afficher le dialogue de suppression
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Suppression du compte - En développement')),
+    );
+  }
+
+  void _toggleNotification(String type, bool value) {
+    // TODO: Mettre à jour les paramètres de notification
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+          content:
+              Text('Notification $type: ${value ? 'activée' : 'désactivée'}')),
+    );
   }
 }

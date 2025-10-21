@@ -6,7 +6,6 @@ import 'package:sdealsmobile/mobile/view/serviceproviderregistrationpagem/screen
 import 'package:sdealsmobile/mobile/view/serviceproviderregistrationpagem/screens/steps/providerprofessionalinfo/providerprofessionalinfobloc/providerProfessionalInfoEvent.dart';
 import 'package:sdealsmobile/mobile/view/serviceproviderregistrationpagem/screens/steps/providerprofessionalinfo/providerprofessionalinfobloc/providerProfessionalInfoState.dart';
 
-
 class ProviderProfessionalInfoStep extends StatefulWidget {
   final Map<String, dynamic> formData;
   final Function(Map<String, dynamic>) onDataChanged;
@@ -27,11 +26,11 @@ class _ProviderProfessionalInfoStepState
   late final ProviderProfessionalInfoBloc _bloc;
   final TextEditingController _serviceController = TextEditingController();
   final TextEditingController _anneeExperienceController =
-  TextEditingController();
+      TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _businessController = TextEditingController();
   final TextEditingController _rayonInterventionController =
-  TextEditingController();
+      TextEditingController();
   final TextEditingController _localisationController = TextEditingController();
 
   String? _selectedCategorie;
@@ -42,7 +41,11 @@ class _ProviderProfessionalInfoStepState
 
   // Spécialités statiques
   final Map<String, List<String>> _metierSpecialites = {
-    'Plombier': ['Installation sanitaire', 'Réparation de fuites', 'Débouchage'],
+    'Plombier': [
+      'Installation sanitaire',
+      'Réparation de fuites',
+      'Débouchage'
+    ],
     'Électricien': ['Installation électrique', 'Dépannage', 'Câblage'],
     'Menuisier': ['Meubles sur mesure', 'Pose de parquet', 'Réparation'],
     'Peintre': ['Intérieur', 'Extérieur', 'Décoration'],
@@ -50,12 +53,19 @@ class _ProviderProfessionalInfoStepState
   };
 
   final List<String> _availableAreas = [
-    'Abidjan', 'Abobo', 'Adjamé', 'Cocody', 'Koumassi',
-    'Marcory', 'Plateau', 'Port-Bouët', 'Treichville', 'Yopougon'
+    'Abidjan',
+    'Abobo',
+    'Adjamé',
+    'Cocody',
+    'Koumassi',
+    'Marcory',
+    'Plateau',
+    'Port-Bouët',
+    'Treichville',
+    'Yopougon'
   ];
 
   List<String> _currentSpecialties = [];
-
 
   @override
   void initState() {
@@ -82,9 +92,9 @@ class _ProviderProfessionalInfoStepState
     _selectedCategorie = widget.formData['categorie'];
     _selectedService = widget.formData['service'];
     _selectedSpecialite =
-    List<String>.from(widget.formData['specialite'] ?? []);
+        List<String>.from(widget.formData['specialite'] ?? []);
     _selectedZoneIntervention =
-    List<String>.from(widget.formData['zoneIntervention'] ?? []);
+        List<String>.from(widget.formData['zoneIntervention'] ?? []);
 
     if (_selectedService != null) {
       _updateSpecialties(_selectedService!);
@@ -114,13 +124,13 @@ class _ProviderProfessionalInfoStepState
       'description': _descriptionController.text,
       'zoneIntervention': _selectedZoneIntervention,
       'rayonIntervention':
-      double.tryParse(_rayonInterventionController.text) ?? 0.0,
+          double.tryParse(_rayonInterventionController.text) ?? 0.0,
       'localisation': _localisationController.text,
       'localisationMaps': _selectedLocalisationMaps != null
           ? {
-        'latitude': _selectedLocalisationMaps!.latitude,
-        'longitude': _selectedLocalisationMaps!.longitude,
-      }
+              'latitude': _selectedLocalisationMaps!.latitude,
+              'longitude': _selectedLocalisationMaps!.longitude,
+            }
           : null,
     };
     widget.onDataChanged(updatedData);
@@ -157,7 +167,7 @@ class _ProviderProfessionalInfoStepState
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 20),
-      
+
                 // Nom entreprise
                 TextFormField(
                   controller: _businessController,
@@ -169,7 +179,7 @@ class _ProviderProfessionalInfoStepState
                   onChanged: (value) => _updateFormData(),
                 ),
                 const SizedBox(height: 16),
-      
+
                 // Catégorie générale (vient du Bloc)
                 DropdownButtonFormField<String>(
                   decoration: const InputDecoration(
@@ -200,7 +210,7 @@ class _ProviderProfessionalInfoStepState
                   },
                 ),
                 const SizedBox(height: 16),
-      
+
                 // Métier (services selon la catégorie)
                 DropdownButtonFormField<String>(
                   decoration: const InputDecoration(
@@ -225,9 +235,10 @@ class _ProviderProfessionalInfoStepState
                   },
                 ),
                 const SizedBox(height: 16),
-      
+
                 // Spécialités
-                if (_selectedService != null && _currentSpecialties.isNotEmpty) ...[
+                if (_selectedService != null &&
+                    _currentSpecialties.isNotEmpty) ...[
                   const Text(
                     'Spécialités',
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
@@ -236,7 +247,8 @@ class _ProviderProfessionalInfoStepState
                     spacing: 8.0,
                     runSpacing: 8.0,
                     children: _currentSpecialties.map((specialty) {
-                      final isSelected = _selectedSpecialite.contains(specialty);
+                      final isSelected =
+                          _selectedSpecialite.contains(specialty);
                       return FilterChip(
                         label: Text(specialty),
                         selected: isSelected,
@@ -255,7 +267,7 @@ class _ProviderProfessionalInfoStepState
                   ),
                 ],
                 const SizedBox(height: 16),
-      
+
                 // Années expérience
                 TextFormField(
                   controller: _anneeExperienceController,
@@ -268,7 +280,7 @@ class _ProviderProfessionalInfoStepState
                   onChanged: (value) => _updateFormData(),
                 ),
                 const SizedBox(height: 16),
-      
+
                 // Description
                 TextFormField(
                   controller: _descriptionController,
@@ -281,7 +293,7 @@ class _ProviderProfessionalInfoStepState
                   onChanged: (value) => _updateFormData(),
                 ),
                 const SizedBox(height: 16),
-      
+
                 // Zones d'intervention
                 const Text('Zones d\'intervention'),
                 Wrap(
@@ -306,7 +318,7 @@ class _ProviderProfessionalInfoStepState
                   }).toList(),
                 ),
                 const SizedBox(height: 16),
-      
+
                 // Rayon
                 TextFormField(
                   controller: _rayonInterventionController,
@@ -319,7 +331,7 @@ class _ProviderProfessionalInfoStepState
                   onChanged: (value) => _updateFormData(),
                 ),
                 const SizedBox(height: 16),
-      
+
                 // Localisation texte
                 TextFormField(
                   controller: _localisationController,
@@ -331,12 +343,12 @@ class _ProviderProfessionalInfoStepState
                   onChanged: (value) => _updateFormData(),
                 ),
                 const SizedBox(height: 16),
-      
+
                 // Maps
                 ElevatedButton.icon(
                   onPressed: _showMapSelector,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.orange,
+                    backgroundColor: Colors.green.shade700,
                   ),
                   icon: const Icon(Icons.location_on, color: Colors.white),
                   label: Text(

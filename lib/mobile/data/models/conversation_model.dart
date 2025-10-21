@@ -16,7 +16,8 @@ class ConversationModel {
   final DateTime lastUpdated; // Date de la dernière mise à jour
   final bool unread; // S'il y a des messages non lus
   final int unreadCount; // Nombre de messages non lus
-  final ConversationType type; // Type de conversation (prestataire, vendeur, freelance)
+  final ConversationType
+      type; // Type de conversation (prestataire, vendeur, freelance)
   final bool isOnline; // Si le participant est en ligne
 
   ConversationModel({
@@ -51,6 +52,72 @@ class ConversationModel {
         orElse: () => ConversationType.prestataire,
       ),
       isOnline: json['isOnline'] ?? false,
+    );
+  }
+
+  // 🔄 Convertir depuis le format backend
+  factory ConversationModel.fromBackend(
+      Map<String, dynamic> json, String currentUserId) {
+    // Extraire les participants
+    final List<dynamic> participants = json['participants'] ?? [];
+
+    // Trouver l'autre participant (pas l'utilisateur actuel)
+    Map<String, dynamic>? otherParticipant;
+    for (var p in participants) {
+      if (p is Map<String, dynamic>) {
+        final participantId = p['_id']?.toString() ?? p['id']?.toString() ?? '';
+        if (participantId != currentUserId) {
+          otherParticipant = p;
+          break;
+        }
+      }
+    }
+
+    // Déterminer le type de conversation
+    ConversationType determineType(Map<String, dynamic>? participant) {
+      if (participant == null) return ConversationType.prestataire;
+
+      final role = participant['role']?.toString().toLowerCase() ?? '';
+      if (role.contains('vendeur') || role == 'vendeur') {
+        return ConversationType.vendeur;
+      } else if (role.contains('freelance') || role == 'freelance') {
+        return ConversationType.freelance;
+      } else if (role.contains('prestataire') || role == 'prestataire') {
+        return ConversationType.prestataire;
+      }
+
+      return ConversationType.prestataire;
+    }
+
+    // Extraire le dernier message
+    MessageModel? lastMessage;
+    if (json['dernierMessage'] != null) {
+      try {
+        lastMessage = MessageModel.fromBackend(json['dernierMessage']);
+      } catch (e) {
+        print('⚠️ Erreur parsing dernierMessage: $e');
+      }
+    }
+
+    return ConversationModel(
+      id: json['_id']?.toString() ?? json['conversationId']?.toString() ?? '',
+      userId: currentUserId,
+      participantId: otherParticipant?['_id']?.toString() ??
+          otherParticipant?['id']?.toString() ??
+          '',
+      participantName: otherParticipant?['nom']?.toString() ??
+          otherParticipant?['prenom']?.toString() ??
+          'Utilisateur',
+      participantImage:
+          otherParticipant?['photoProfil']?.toString() ?? 'assets/profil.png',
+      lastMessage: lastMessage,
+      lastUpdated: json['updatedAt'] != null
+          ? DateTime.parse(json['updatedAt'])
+          : DateTime.now(),
+      unread: json['messagesNonLus'] != null && json['messagesNonLus'] > 0,
+      unreadCount: json['messagesNonLus'] ?? 0,
+      type: determineType(otherParticipant),
+      isOnline: false, // À implémenter avec WebSocket
     );
   }
 
@@ -133,7 +200,8 @@ List<ConversationModel> mockConversations = [
     participantId: 'V001',
     participantName: 'Tech Store',
     participantImage: 'assets/profil.png',
-    lastMessage: mockVendeurMessages.isNotEmpty ? mockVendeurMessages.last : null,
+    lastMessage:
+        mockVendeurMessages.isNotEmpty ? mockVendeurMessages.last : null,
     lastUpdated: DateTime.now().subtract(const Duration(days: 2)),
     unread: true,
     unreadCount: 3,
@@ -146,7 +214,8 @@ List<ConversationModel> mockConversations = [
     participantId: 'F001',
     participantName: 'Web Developer Pro',
     participantImage: 'assets/profil.png',
-    lastMessage: mockFreelanceMessages.isNotEmpty ? mockFreelanceMessages.last : null,
+    lastMessage:
+        mockFreelanceMessages.isNotEmpty ? mockFreelanceMessages.last : null,
     lastUpdated: DateTime.now().subtract(const Duration(days: 4, hours: 21)),
     unread: false,
     unreadCount: 0,

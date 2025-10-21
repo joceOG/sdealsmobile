@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../data/services/authCubit.dart';
 import '../registerpageblocm/registerPageBlocM.dart';
 import '../registerpageblocm/registerPageEventM.dart';
 import '../registerpageblocm/registerPageStateM.dart';
@@ -50,18 +51,38 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
       body: BlocConsumer<RegisterPageBlocM, RegisterPageStateM>(
         listener: (context, state) {
           if (state.isSuccess) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text("Inscription réussie ✅")),
-            );
+            // ✅ CONNEXION AUTOMATIQUE APRÈS INSCRIPTION
+            if (state.utilisateur != null && state.token != null) {
+              // Connecter l'utilisateur automatiquement
+              context.read<AuthCubit>().setAuthenticated(
+                token: state.token!,
+                utilisateur: state.utilisateur!,
+                roles: [state.utilisateur!.role],
+                activeRole: state.utilisateur!.role,
+              );
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    "Inscription réussie ✅ Vous êtes maintenant connecté !",
+                  ),
+                ),
+              );
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text("Inscription réussie ✅")),
+              );
+            }
+
             // Navigation avec GoRouter vers la page d'accueil
             WidgetsBinding.instance.addPostFrameCallback((_) {
               context.push("/homepage");
             });
           }
           if (state.errorMessage != null) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(state.errorMessage!)),
-            );
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text(state.errorMessage!)));
           }
         },
         builder: (context, state) {
@@ -74,25 +95,21 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
                     animation: _animationController,
                     builder: (context, child) {
                       return ScaleTransition(
-                        scale: Tween<double>(begin: 1.0, end: 1.2)
-                            .animate(_animationController),
+                        scale: Tween<double>(
+                          begin: 1.0,
+                          end: 1.2,
+                        ).animate(_animationController),
                         child: child,
                       );
                     },
-                    child: Image.asset(
-                      'assets/logo1.png',
-                      height: 100,
-                    ),
+                    child: Image.asset('assets/logo1.png', height: 100),
                   ),
                 ),
                 const SizedBox(height: 20),
                 const Text(
                   "Bienvenue sur Soutrali Deals,\ncréez un compte pour commencer",
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.white,
-                  ),
+                  style: TextStyle(fontSize: 16, color: Colors.white),
                 ),
                 const SizedBox(height: 30),
 
@@ -107,9 +124,10 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
                   child: Column(
                     children: [
                       TextField(
-                        onChanged: (v) => context
-                            .read<RegisterPageBlocM>()
-                            .add(RegisterFullNameChanged(v)),
+                        onChanged:
+                            (v) => context.read<RegisterPageBlocM>().add(
+                              RegisterFullNameChanged(v),
+                            ),
                         decoration: const InputDecoration(
                           labelText: "Nom complet",
                           hintText: "Entrez votre nom complet",
@@ -118,9 +136,10 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
                       ),
                       const SizedBox(height: 20),
                       TextField(
-                        onChanged: (v) => context
-                            .read<RegisterPageBlocM>()
-                            .add(RegisterPhoneChanged(v)),
+                        onChanged:
+                            (v) => context.read<RegisterPageBlocM>().add(
+                              RegisterPhoneChanged(v),
+                            ),
                         decoration: const InputDecoration(
                           labelText: "Numéro de Téléphone",
                           hintText: "Entrez votre Numéro de Téléphone",
@@ -130,9 +149,10 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
                       const SizedBox(height: 20),
                       TextField(
                         obscureText: obscurePassword,
-                        onChanged: (v) => context
-                            .read<RegisterPageBlocM>()
-                            .add(RegisterPasswordChanged(v)),
+                        onChanged:
+                            (v) => context.read<RegisterPageBlocM>().add(
+                              RegisterPasswordChanged(v),
+                            ),
                         decoration: InputDecoration(
                           labelText: "Mot de passe",
                           hintText: "Entrez votre mot de passe",
@@ -154,9 +174,10 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
                       const SizedBox(height: 20),
                       TextField(
                         obscureText: true,
-                        onChanged: (v) => context
-                            .read<RegisterPageBlocM>()
-                            .add(RegisterConfirmPasswordChanged(v)),
+                        onChanged:
+                            (v) => context.read<RegisterPageBlocM>().add(
+                              RegisterConfirmPasswordChanged(v),
+                            ),
                         decoration: const InputDecoration(
                           labelText: "Confirmez le mot de passe",
                           hintText: "Confirmez votre mot de passe",
@@ -185,13 +206,14 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
                       ),
                       const SizedBox(height: 10),
                       ElevatedButton(
-                        onPressed: agreeToTerms && !state.isSubmitting
-                            ? () {
-                          context
-                              .read<RegisterPageBlocM>()
-                              .add(RegisterSubmitted());
-                        }
-                            : null,
+                        onPressed:
+                            agreeToTerms && !state.isSubmitting
+                                ? () {
+                                  context.read<RegisterPageBlocM>().add(
+                                    RegisterSubmitted(),
+                                  );
+                                }
+                                : null,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.green.shade700,
                           minimumSize: const Size(double.infinity, 50),
@@ -199,13 +221,18 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
                             borderRadius: BorderRadius.circular(25),
                           ),
                         ),
-                        child: state.isSubmitting
-                            ? const CircularProgressIndicator(color: Colors.white)
-                            : const Text(
-                          "JE M'INSCRIS",
-                          style: TextStyle(
-                              fontSize: 16, color: Colors.white),
-                        ),
+                        child:
+                            state.isSubmitting
+                                ? const CircularProgressIndicator(
+                                  color: Colors.white,
+                                )
+                                : const Text(
+                                  "JE M'INSCRIS",
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.white,
+                                  ),
+                                ),
                       ),
                       const SizedBox(height: 10),
                       Row(
@@ -216,10 +243,10 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
                             onPressed: () {
                               context.go("/login"); // si tu as une route login
                             },
-                            child: const Text('Connectez-vous',
-                                style: TextStyle(
-                                  color: Colors.green,
-                                )),
+                            child: const Text(
+                              'Connectez-vous',
+                              style: TextStyle(color: Colors.green),
+                            ),
                           ),
                         ],
                       ),
@@ -227,10 +254,7 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
                       const Text(
                         "En vous inscrivant, vous acceptez nos conditions d'utilisation et notre politique de confidentialité.",
                         textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
-                        ),
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
                       ),
                     ],
                   ),

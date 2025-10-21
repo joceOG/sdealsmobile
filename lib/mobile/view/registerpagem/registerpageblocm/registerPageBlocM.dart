@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../data/models/utilisateur.dart';
 import '../../../../data/services/api_client.dart';
+import '../../../../data/services/authCubit.dart';
 import 'package:http/http.dart' as http;
 import 'registerPageStateM.dart';
 import 'registerPageEventM.dart';
@@ -64,8 +65,39 @@ class RegisterPageBlocM extends Bloc<RegisterPageEventM, RegisterPageStateM> {
           password: state.password,
         );
 
-        emit(state.copyWith(
-            isSubmitting: false, isSuccess: true, utilisateur: utilisateur));
+        // ✅ CONNEXION AUTOMATIQUE APRÈS INSCRIPTION
+        if (newuser != null &&
+            newuser['utilisateur'] != null &&
+            newuser['token'] != null) {
+          final userData = newuser['utilisateur'];
+          final token = newuser['token'];
+
+          // Créer l'objet Utilisateur avec les données du backend
+          final utilisateurCree = Utilisateur(
+            idutilisateur: userData['_id'] ?? '',
+            nom: userData['nom'] ?? '',
+            prenom: userData['prenom'] ?? '',
+            email: userData['email'],
+            password: '', // Ne pas stocker le mot de passe
+            telephone: userData['telephone'] ?? '',
+            genre: userData['genre'] ?? '',
+            note: userData['note'],
+            photoProfil: userData['photoProfil'],
+            dateNaissance: userData['datedenaissance'],
+            role: userData['role'] ?? 'Client',
+          );
+
+          // ✅ ÉMISSION D'UN ÉVÉNEMENT POUR CONNECTER L'UTILISATEUR
+          emit(state.copyWith(
+            isSubmitting: false,
+            isSuccess: true,
+            utilisateur: utilisateurCree,
+            token: token, // ✅ Ajouter le token pour la connexion
+          ));
+        } else {
+          emit(state.copyWith(
+              isSubmitting: false, isSuccess: true, utilisateur: utilisateur));
+        }
       } catch (e) {
         emit(state.copyWith(
           isSubmitting: false,

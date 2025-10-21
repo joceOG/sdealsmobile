@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 // ✅ import de ton AuthCubit
 import '../../../../data/models/utilisateur.dart';
 import '../../../../data/services/authCubit.dart';
-import '../../registerpagem/screens/registerPageScreenM.dart';
 import '../loginpageblocm/loginPageBlocM.dart';
 import '../loginpageblocm/loginPageEventM.dart';
 import '../loginpageblocm/loginPageStateM.dart';
@@ -63,22 +62,25 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
           listener: (context, state) {
             if (state is LoginPageSuccessM) {
               final utilisateur = Utilisateur.fromMap(state.utilisateur);
-              // ✅ On met à jour l'état global d'auth
+              // ✅ ARCHITECTURE MULTI-RÔLES : Utiliser le rôle de l'utilisateur comme rôle actif
+              final userRole =
+                  utilisateur.role.toUpperCase(); // Normaliser le rôle
+              final roles = [
+                userRole
+              ]; // Liste des rôles (pour l'instant un seul)
+              final activeRole = userRole; // Rôle actif
+
               context.read<AuthCubit>().setAuthenticated(
-                token: state.token,
-                utilisateur: utilisateur,
-              );
+                    token: state.token,
+                    utilisateur: utilisateur,
+                    roles: roles,
+                    activeRole: activeRole,
+                  );
 
-              // ✅ Redirection selon le rôle
-              if (utilisateur.role.toLowerCase() == "client") {
-                context.push('/homepage');
-              } else if (utilisateur.role.toLowerCase() == "prestataire") {
-                context.push('/providermain');
-              }
-              print('🔐 Connecté en tant que ${utilisateur.role}');
+              // ✅ REDIRECTION SIMPLIFIÉE : Toujours aller à homepage, la redirection automatique se fera
+              context.push('/homepage');
 
-              // ✅ Puis on redirige vers la Home
-              print('go to homepage') ;
+              print('🔐 Connecté en tant que $activeRole avec rôles: $roles');
             } else if (state is LoginPageFailureM) {
               ScaffoldMessenger.of(context)
                   .showSnackBar(SnackBar(content: Text(state.error)));
@@ -171,29 +173,29 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
                             onPressed: state is LoginPageLoadingM
                                 ? null
                                 : () {
-                              final identifiant =
-                              identifiantController.text.trim();
-                              final password =
-                              passwordController.text.trim();
-                              if (identifiant.isEmpty ||
-                                  password.isEmpty) {
-                                ScaffoldMessenger.of(context)
-                                    .showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                        "Mot de passe ou identifiant requis"),
-                                  ),
-                                );
-                                return;
-                              }
-                              context.read<LoginPageBlocM>().add(
-                                LoginSubmittedM(
-                                  identifiant: identifiant,
-                                  password: password,
-                                  rememberMe: rememberMe,
-                                ),
-                              );
-                            },
+                                    final identifiant =
+                                        identifiantController.text.trim();
+                                    final password =
+                                        passwordController.text.trim();
+                                    if (identifiant.isEmpty ||
+                                        password.isEmpty) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                              "Mot de passe ou identifiant requis"),
+                                        ),
+                                      );
+                                      return;
+                                    }
+                                    context.read<LoginPageBlocM>().add(
+                                          LoginSubmittedM(
+                                            identifiant: identifiant,
+                                            password: password,
+                                            rememberMe: rememberMe,
+                                          ),
+                                        );
+                                  },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green.shade700,
                               minimumSize: const Size(double.infinity, 50),
@@ -203,13 +205,13 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
                             ),
                             child: state is LoginPageLoadingM
                                 ? const CircularProgressIndicator(
-                              color: Colors.white,
-                            )
+                                    color: Colors.white,
+                                  )
                                 : const Text(
-                              "JE ME CONNECTE",
-                              style: TextStyle(
-                                  fontSize: 16, color: Colors.white),
-                            ),
+                                    "JE ME CONNECTE",
+                                    style: TextStyle(
+                                        fontSize: 16, color: Colors.white),
+                                  ),
                           );
                         },
                       ),
@@ -242,8 +244,7 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
                           const Text('Vous n\'avez pas de compte?'),
                           TextButton(
                             onPressed: () {
-                              WidgetsBinding.instance
-                                  .addPostFrameCallback((_) {
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
                                 context.push("/register");
                               });
                             },

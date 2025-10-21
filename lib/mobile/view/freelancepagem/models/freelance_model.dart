@@ -1,5 +1,77 @@
 import 'package:equatable/equatable.dart';
 
+/// 📁 Modèle pour un élément de portfolio
+class PortfolioItem extends Equatable {
+  final String title;
+  final String description;
+  final String imageUrl;
+  final String projectUrl;
+
+  const PortfolioItem({
+    required this.title,
+    required this.description,
+    this.imageUrl = '',
+    this.projectUrl = '',
+  });
+
+  factory PortfolioItem.fromJson(Map<String, dynamic> json) {
+    return PortfolioItem(
+      title: json['title'] as String? ?? '',
+      description: json['description'] as String? ?? '',
+      imageUrl: json['imageUrl'] as String? ?? '',
+      projectUrl: json['projectUrl'] as String? ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'title': title,
+      'description': description,
+      'imageUrl': imageUrl,
+      'projectUrl': projectUrl,
+    };
+  }
+
+  @override
+  List<Object?> get props => [title, description, imageUrl, projectUrl];
+}
+
+/// 🔒 Modèle pour les documents de vérification
+class VerificationDocuments extends Equatable {
+  final String? cni1;
+  final String? cni2;
+  final String? selfie;
+  final bool isVerified;
+
+  const VerificationDocuments({
+    this.cni1,
+    this.cni2,
+    this.selfie,
+    this.isVerified = false,
+  });
+
+  factory VerificationDocuments.fromJson(Map<String, dynamic> json) {
+    return VerificationDocuments(
+      cni1: json['cni1'] as String?,
+      cni2: json['cni2'] as String?,
+      selfie: json['selfie'] as String?,
+      isVerified: json['isVerified'] as bool? ?? false,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      if (cni1 != null) 'cni1': cni1,
+      if (cni2 != null) 'cni2': cni2,
+      if (selfie != null) 'selfie': selfie,
+      'isVerified': isVerified,
+    };
+  }
+
+  @override
+  List<Object?> get props => [cni1, cni2, selfie, isVerified];
+}
+
 class FreelanceModel extends Equatable {
   final String id;
   final String name;
@@ -16,6 +88,20 @@ class FreelanceModel extends Equatable {
   final String description;
   final int responseTime; // temps de réponse en heures
 
+  // ✅ NOUVEAUX CHAMPS
+  final String experienceLevel; // Débutant, Intermédiaire, Expert
+  final String availabilityStatus; // Disponible, Occupé, En pause
+  final String workingHours; // Temps plein, Temps partiel, Ponctuel
+  final String location;
+  final String? phoneNumber;
+  final List<PortfolioItem> portfolioItems;
+  final VerificationDocuments? verificationDocuments;
+  final double totalEarnings;
+  final int currentProjects;
+  final double clientSatisfaction; // 0-100%
+  final List<String> preferredCategories;
+  final String accountStatus; // Active, Suspended, Pending
+
   const FreelanceModel({
     required this.id,
     required this.name,
@@ -31,10 +117,23 @@ class FreelanceModel extends Equatable {
     this.hourlyRate = 0.0,
     this.description = '',
     this.responseTime = 24,
+    // Nouveaux champs
+    this.experienceLevel = 'Débutant',
+    this.availabilityStatus = 'Disponible',
+    this.workingHours = 'Temps partiel',
+    this.location = '',
+    this.phoneNumber,
+    this.portfolioItems = const [],
+    this.verificationDocuments,
+    this.totalEarnings = 0.0,
+    this.currentProjects = 0,
+    this.clientSatisfaction = 0.0,
+    this.preferredCategories = const [],
+    this.accountStatus = 'Active',
   });
 
   @override
-  List<Object> get props => [
+  List<Object?> get props => [
         id,
         name,
         job,
@@ -49,25 +148,93 @@ class FreelanceModel extends Equatable {
         hourlyRate,
         description,
         responseTime,
+        experienceLevel,
+        availabilityStatus,
+        workingHours,
+        location,
+        phoneNumber,
+        portfolioItems,
+        verificationDocuments,
+        totalEarnings,
+        currentProjects,
+        clientSatisfaction,
+        preferredCategories,
+        accountStatus,
       ];
 
-  // ✅ NOUVELLE FACTORY : Convertir depuis le backend
+  // ✅ NOUVELLE FACTORY : Convertir depuis le backend (avec gestion robuste des nulls)
   factory FreelanceModel.fromBackend(Map<String, dynamic> json) {
+    // 🛡️ Helper pour extraire string avec fallback
+    String safeString(String key, String defaultValue) {
+      final value = json[key];
+      if (value == null) return defaultValue;
+      if (value is String) return value;
+      return value.toString();
+    }
+
+    // 🛡️ Helper pour extraire liste de strings
+    List<String> safeStringList(String key) {
+      final value = json[key];
+      if (value == null) return [];
+      if (value is List) {
+        return value
+            .map((e) => e?.toString() ?? '')
+            .where((s) => s.isNotEmpty)
+            .toList();
+      }
+      return [];
+    }
+
     return FreelanceModel(
-      id: json['_id'] as String,
-      name: json['name'] as String,
-      job: json['job'] as String,
-      category: json['category'] as String,
-      imagePath: json['imagePath'] as String? ?? '',
+      id: safeString('_id', ''),
+      name: safeString('name', 'Freelance'),
+      job: safeString('job', 'Non spécifié'),
+      category: safeString('category', 'Autre'),
+      imagePath: safeString('imagePath', ''),
       rating: (json['rating'] as num?)?.toDouble() ?? 0.0,
       completedJobs: json['completedJobs'] as int? ?? 0,
       isTopRated: json['isTopRated'] as bool? ?? false,
       isFeatured: json['isFeatured'] as bool? ?? false,
       isNew: json['isNew'] as bool? ?? true,
-      skills: json['skills'] != null ? List<String>.from(json['skills']) : [],
+      skills: safeStringList('skills'),
       hourlyRate: (json['hourlyRate'] as num?)?.toDouble() ?? 0.0,
-      description: json['description'] as String? ?? '',
+      description: safeString('description', 'Aucune description disponible'),
       responseTime: json['responseTime'] as int? ?? 24,
+      // Nouveaux champs avec gestion robuste des nulls
+      experienceLevel: safeString('experienceLevel', 'Débutant'),
+      availabilityStatus: safeString('availabilityStatus', 'Disponible'),
+      workingHours: safeString('workingHours', 'Temps partiel'),
+      location: safeString('location', ''),
+      phoneNumber: json['phoneNumber'] as String?,
+      portfolioItems:
+          json['portfolioItems'] != null && json['portfolioItems'] is List
+              ? (json['portfolioItems'] as List)
+                  .map((item) {
+                    try {
+                      if (item is Map<String, dynamic>) {
+                        return PortfolioItem.fromJson(item);
+                      }
+                      return null;
+                    } catch (e) {
+                      print('⚠️ Erreur parsing portfolio item: $e');
+                      return null;
+                    }
+                  })
+                  .where((item) => item != null)
+                  .cast<PortfolioItem>()
+                  .toList()
+              : [],
+      verificationDocuments: json['verificationDocuments'] != null &&
+              json['verificationDocuments'] is Map
+          ? VerificationDocuments.fromJson(
+              json['verificationDocuments'] as Map<String, dynamic>)
+          : null,
+      totalEarnings: (json['totalEarnings'] as num?)?.toDouble() ?? 0.0,
+      currentProjects: json['currentProjects'] as int? ?? 0,
+      clientSatisfaction:
+          (json['clientSatisfaction'] as num?)?.toDouble() ?? 0.0,
+      preferredCategories: safeStringList('preferredCategories'),
+      accountStatus: safeString('accountStatus', 'Active'),
     );
   }
 
@@ -111,6 +278,19 @@ class FreelanceModel extends Equatable {
       'hourlyRate': hourlyRate,
       'description': description,
       'responseTime': responseTime,
+      'experienceLevel': experienceLevel,
+      'availabilityStatus': availabilityStatus,
+      'workingHours': workingHours,
+      'location': location,
+      if (phoneNumber != null) 'phoneNumber': phoneNumber,
+      'portfolioItems': portfolioItems.map((item) => item.toJson()).toList(),
+      if (verificationDocuments != null)
+        'verificationDocuments': verificationDocuments!.toJson(),
+      'totalEarnings': totalEarnings,
+      'currentProjects': currentProjects,
+      'clientSatisfaction': clientSatisfaction,
+      'preferredCategories': preferredCategories,
+      'accountStatus': accountStatus,
     };
   }
 
@@ -130,6 +310,18 @@ class FreelanceModel extends Equatable {
     double? hourlyRate,
     String? description,
     int? responseTime,
+    String? experienceLevel,
+    String? availabilityStatus,
+    String? workingHours,
+    String? location,
+    String? phoneNumber,
+    List<PortfolioItem>? portfolioItems,
+    VerificationDocuments? verificationDocuments,
+    double? totalEarnings,
+    int? currentProjects,
+    double? clientSatisfaction,
+    List<String>? preferredCategories,
+    String? accountStatus,
   }) {
     return FreelanceModel(
       id: id ?? this.id,
@@ -146,6 +338,19 @@ class FreelanceModel extends Equatable {
       hourlyRate: hourlyRate ?? this.hourlyRate,
       description: description ?? this.description,
       responseTime: responseTime ?? this.responseTime,
+      experienceLevel: experienceLevel ?? this.experienceLevel,
+      availabilityStatus: availabilityStatus ?? this.availabilityStatus,
+      workingHours: workingHours ?? this.workingHours,
+      location: location ?? this.location,
+      phoneNumber: phoneNumber ?? this.phoneNumber,
+      portfolioItems: portfolioItems ?? this.portfolioItems,
+      verificationDocuments:
+          verificationDocuments ?? this.verificationDocuments,
+      totalEarnings: totalEarnings ?? this.totalEarnings,
+      currentProjects: currentProjects ?? this.currentProjects,
+      clientSatisfaction: clientSatisfaction ?? this.clientSatisfaction,
+      preferredCategories: preferredCategories ?? this.preferredCategories,
+      accountStatus: accountStatus ?? this.accountStatus,
     );
   }
 }

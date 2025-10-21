@@ -57,24 +57,59 @@ class FreelancePageBlocM
       ApiClient apiClient = ApiClient();
       print("🚀 Chargement des freelances depuis le backend...");
 
+      final Map<String, dynamic> response = await apiClient.fetchFreelances(
+        page: 1,
+        limit: 50,
+        sortBy: 'rating',
+      );
+
       final List<Map<String, dynamic>> freelancesData =
-          await apiClient.fetchFreelances();
+          (response['freelances'] as List<dynamic>)
+              .cast<Map<String, dynamic>>();
+      final pagination = response['pagination'];
 
-      // Convertir les données backend en FreelanceModel
-      final List<FreelanceModel> freelancers = freelancesData
-          .map((data) => FreelanceModel.fromBackend(data))
-          .toList();
+      print("📦 Données brutes reçues: ${freelancesData.length} freelances");
+      if (pagination != null) {
+        print(
+            "📄 Pagination: page ${pagination['currentPage']}/${pagination['totalPages']} (${pagination['totalItems']} total)");
+      }
 
-      print("✅ Freelances chargés depuis le backend: ${freelancers.length}");
+      // Debug: Afficher le premier freelance brut
+      if (freelancesData.isNotEmpty && kDebugMode) {
+        print("🔍 Exemple de données brutes: ${freelancesData.first}");
+      }
+
+      // Convertir les données backend en FreelanceModel avec gestion d'erreur par item
+      final List<FreelanceModel> freelancers = [];
+      for (var data in freelancesData) {
+        try {
+          final freelance = FreelanceModel.fromBackend(data);
+          freelancers.add(freelance);
+        } catch (e) {
+          print("⚠️ Erreur conversion freelance (ID: ${data['_id']}): $e");
+          if (kDebugMode) {
+            print("   Données problématiques: $data");
+          }
+        }
+      }
+
+      print(
+          "✅ Freelances chargés depuis le backend: ${freelancers.length}/${freelancesData.length}");
+
+      if (freelancers.isEmpty && freelancesData.isNotEmpty) {
+        throw Exception(
+            "Aucun freelance n'a pu être converti - problème de format des données");
+      }
 
       emit(state.copyWith(
         freelancers: freelancers,
         filteredFreelancers: freelancers,
       ));
-    } catch (error) {
+    } catch (error, stackTrace) {
       // ⚠️ Fallback vers les données mock en cas d'erreur
       if (kDebugMode) {
         print("❌ Erreur backend, utilisation des données mock: $error");
+        print("Stack trace: $stackTrace");
       }
 
       try {
@@ -83,7 +118,8 @@ class FreelancePageBlocM
           freelancers: mockFreelancers,
           filteredFreelancers: mockFreelancers,
         ));
-        print("🔄 Fallback vers données mock réussi");
+        print(
+            "🔄 Fallback vers données mock réussi (${mockFreelancers.length} freelances)");
       } catch (mockError) {
         if (kDebugMode) {
           print("💥 Erreur critique: $mockError");
@@ -255,6 +291,7 @@ class FreelancePageBlocM
       "password":
           formData['password'] ?? 'freelance123', // Mot de passe par défaut
       "genre": formData['gender'] ?? 'Homme',
+      "role": "freelance", // ✅ Ajouter le rôle freelance
     };
   }
 

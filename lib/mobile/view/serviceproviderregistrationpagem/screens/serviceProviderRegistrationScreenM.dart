@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:sdealsmobile/data/services/authCubit.dart';
-import 'package:sdealsmobile/mobile/view/provider_dashboard/screens/provider_main_screen.dart';
 import 'package:sdealsmobile/mobile/view/serviceproviderregistrationpagem/screens/steps/provider_personal_info_step.dart';
-import 'package:sdealsmobile/mobile/view/serviceproviderregistrationpagem/screens/steps/provider_professional_info_step.dart';
 import 'package:sdealsmobile/mobile/view/serviceproviderregistrationpagem/screens/steps/provider_pricing_step.dart';
-import 'package:sdealsmobile/mobile/view/serviceproviderregistrationpagem/screens/steps/provider_verification_step.dart';
-import 'package:sdealsmobile/mobile/view/serviceproviderregistrationpagem/screens/steps/provider_qualifications_step.dart';
 
 import '../serviceproviderregistrationoageblocm/serviceProviderRegistrationPageBlocM.dart';
 import '../serviceproviderregistrationoageblocm/serviceProviderRegistrationPageEventM.dart';
@@ -25,20 +22,36 @@ class _ServiceProviderRegistrationScreenMState
   int _currentStep = 0;
   final _formKey = GlobalKey<FormState>();
 
+  // ✅ FORMULAIRE SIMPLIFIÉ - Compatible avec le backend
   final Map<String, dynamic> formData = {
+    // ÉTAPE 1 : Infos de base (6 champs)
     'fullName': '',
     'phone': '',
-    'email': '',
-    'password': '',
-    'profileImage': null,
+    'email': '', // OPTIONNEL maintenant
+    'category': 'Plombier',
+    'service': '', // Service spécifique
+    'serviceAreas': <String>[],
+
+    // ÉTAPE 2 : Tarification (3 champs)
+    'dailyRate': 0.0, // Tarif par jour (plus simple que horaire)
+    'profileImage': null, // Photo optionnelle
+    'description': '', // Description optionnelle
+
+    // CHAMPS REQUIS POUR LE BACKEND (ajoutés automatiquement)
+    'localisation': '', // Sera rempli avec la première zone
+    'localisationmaps': {'latitude': 0.0, 'longitude': 0.0}, // GPS par défaut
+    'prixprestataire': 0.0, // Sera rempli avec dailyRate
+    'position': null, // Position exacte de l'utilisateur
+    'address': '', // Adresse de la position
+
+    // CHAMPS OBLIGATOIRES SUPPRIMÉS (seront optionnels plus tard)
+    'password': '', // Gardé pour compatibilité
     'birthDate': null,
     'gender': 'Homme',
     'businessName': '',
-    'category': 'Plombier',
     'specialties': <String>[],
     'yearsOfExperience': 0,
     'serviceDescription': '',
-    'serviceAreas': <String>[],
     'serviceRadius': 0.0,
     'location': null,
     'minimumHourlyRate': 0.0,
@@ -63,9 +76,10 @@ class _ServiceProviderRegistrationScreenMState
   }
 
   void _initializeSteps() {
+    // ✅ SIMPLIFIÉ : 2 étapes seulement au lieu de 5
     _steps = [
       Step(
-        title: const Text('Informations personnelles'),
+        title: const Text('Informations de base'),
         content: ProviderPersonalInfoStep(
           formData: formData,
           onDataChanged: _updateFormData,
@@ -73,36 +87,12 @@ class _ServiceProviderRegistrationScreenMState
         isActive: _currentStep >= 0,
       ),
       Step(
-        title: const Text('Informations professionnelles'),
-        content: ProviderProfessionalInfoStep(
-          formData: formData,
-          onDataChanged: _updateFormData,
-        ),
-        isActive: _currentStep >= 1,
-      ),
-      Step(
         title: const Text('Tarification'),
         content: ProviderPricingStep(
           formData: formData,
           onDataChanged: _updateFormData,
         ),
-        isActive: _currentStep >= 2,
-      ),
-      Step(
-        title: const Text('Vérification'),
-        content: ProviderVerificationStep(
-          formData: formData,
-          onDataChanged: _updateFormData,
-        ),
-        isActive: _currentStep >= 3,
-      ),
-      Step(
-        title: const Text('Qualifications'),
-        content: ProviderQualificationsStep(
-          formData: formData,
-          onDataChanged: _updateFormData,
-        ),
-        isActive: _currentStep >= 4,
+        isActive: _currentStep >= 1,
       ),
     ];
   }
@@ -115,23 +105,77 @@ class _ServiceProviderRegistrationScreenMState
 
   void _submitForm() {
     if (_formKey.currentState!.validate()) {
+      // ✅ Préparer les données pour le backend
+      final backendData = _prepareBackendData();
+
       // ✅ Injecter l'userId existant s'il est connecté
       final auth = context.read<AuthCubit>().state;
       if (auth is AuthAuthenticated) {
-        formData['existingUserId'] = auth.utilisateur.idutilisateur;
+        backendData['existingUserId'] = auth.utilisateur.idutilisateur;
       }
+
       context.read<ServiceProviderRegistrationBlocM>().add(
-        SubmitServiceProviderRegistrationEvent(formData: formData),
-      );
+            SubmitServiceProviderRegistrationEvent(formData: backendData),
+          );
     }
+  }
+
+  // ✅ Mapper les données simplifiées vers le format backend
+  Map<String, dynamic> _prepareBackendData() {
+    // Note: Le service sera récupéré côté backend en fonction de la catégorie
+    // Pour l'instant, on utilise un service par défaut qui sera géré par le backend
+
+    return {
+      // Champs utilisateur (inchangés)
+      'fullName': formData['fullName'],
+      'phone': formData['phone'],
+      'email': formData['email'],
+      'password': formData['password'],
+
+      // Champs prestataire (mappés pour le backend)
+      'service':
+          formData['service'] ?? '', // Service sélectionné par l'utilisateur
+      'category': formData['category'] ?? '', // Catégorie sélectionnée
+      'prixprestataire': formData['dailyRate'],
+      'localisation': formData['serviceAreas'].isNotEmpty
+          ? formData['serviceAreas'][0]
+          : 'Abidjan',
+      'localisationmaps': formData['position'] != null
+          ? {
+              'latitude': formData['position'].latitude,
+              'longitude': formData['position'].longitude,
+            }
+          : formData['localisationmaps'],
+      'description': formData['description'],
+      'zoneIntervention': formData['serviceAreas'],
+
+      // Champs optionnels avec valeurs par défaut
+      'note': 'Profil créé via inscription simplifiée',
+      'verifier': false,
+      'specialite': [formData['category']],
+      'anneeExperience': '0',
+      'rayonIntervention': 10, // 10 km par défaut
+      'tarifHoraireMin': formData['dailyRate'] / 8, // Estimation horaire
+      'tarifHoraireMax': formData['dailyRate'] / 6, // Estimation horaire
+
+      // Champs optionnels vides
+      'numeroCNI': '',
+      'numeroRCCM': '',
+      'numeroAssurance': '',
+      'nbMission': 0,
+      'revenus': 0,
+      'clients': [],
+
+      // Source pour traçabilité
+      'source': 'sdealsmobile',
+      'status': 'pending',
+    };
   }
 
   @override
   Widget build(BuildContext context) {
-    return BlocListener<
-      ServiceProviderRegistrationBlocM,
-      ServiceProviderRegistrationStateM
-    >(
+    return BlocListener<ServiceProviderRegistrationBlocM,
+        ServiceProviderRegistrationStateM>(
       listener: (context, state) {
         if (state is ServiceProviderRegistrationLoading) {
           ScaffoldMessenger.of(
@@ -141,16 +185,32 @@ class _ServiceProviderRegistrationScreenMState
           ScaffoldMessenger.of(
             context,
           ).showSnackBar(SnackBar(content: Text(state.message)));
+
+          // ✅ NOUVEAU : Mettre à jour les rôles de l'utilisateur connecté
+          final auth = context.read<AuthCubit>().state;
+          if (auth is AuthAuthenticated) {
+            final currentRoles = List<String>.from(auth.roles);
+
+            // Ajouter le rôle PRESTATAIRE s'il n'existe pas déjà
+            if (!currentRoles.contains('PRESTATAIRE')) {
+              currentRoles.add('PRESTATAIRE');
+
+              // Mettre à jour AuthCubit avec les nouveaux rôles
+              context.read<AuthCubit>().setRoles(
+                    roles: currentRoles,
+                    activeRole:
+                        'PRESTATAIRE', // Basculer automatiquement vers le rôle prestataire
+                  );
+
+              print("✅ Rôle PRESTATAIRE ajouté à l'utilisateur: $currentRoles");
+            }
+          }
+
           Future.delayed(const Duration(seconds: 2), () {
             final auth = context.read<AuthCubit>().state;
             if (auth is AuthAuthenticated) {
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(
-                  builder:
-                      (context) =>
-                          ProviderMainScreen(utilisateur: auth.utilisateur),
-                ),
-              );
+              // Utiliser GoRouter pour la navigation
+              context.push('/providermain', extra: auth.utilisateur);
             }
           });
         } else if (state is ServiceProviderRegistrationFailure) {
@@ -162,7 +222,7 @@ class _ServiceProviderRegistrationScreenMState
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Devenir prestataire'),
-          backgroundColor: Colors.orange,
+          backgroundColor: Colors.green.shade700,
         ),
         body: Form(
           key: _formKey,
@@ -195,7 +255,7 @@ class _ServiceProviderRegistrationScreenMState
                       child: ElevatedButton(
                         onPressed: details.onStepContinue,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.orange,
+                          backgroundColor: Colors.green.shade700,
                           padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
                         child: Text(

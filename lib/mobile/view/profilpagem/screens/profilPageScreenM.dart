@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../data/services/api_client.dart';
+import '../../../../data/services/authCubit.dart'; // ✅ Import AuthCubit
+import 'package:go_router/go_router.dart';
 import '../../loginpagem/screens/loginPageScreenM.dart';
 import '../../orderpagem/screens/service_requests_list_screen.dart';
 import '../profilpageblocm/profilPageBlocM.dart';
@@ -27,10 +29,6 @@ class ProfilPageScreenM extends StatefulWidget {
 }
 
 class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
-  // Simuler des données utilisateur
-  final String userName = "Afisu Yussuf";
-  final String userStatus = "Compte vérifié"; // Ou "Client simple", "Premium"
-
   @override
   void initState() {
     BlocProvider.of<ProfilPageBlocM>(context);
@@ -212,7 +210,7 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             // En-tête du profil
-            _buildProfileHeader(),
+            _buildProfileHeader(context),
             const SizedBox(height: 20),
 
             // Section "Mon activité"
@@ -363,6 +361,9 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
               },
             ),
 
+            // 🎯 SECTION MODE PRESTATAIRE
+            _buildPrestataireModeSection(),
+
             // Section "Paramètres"
             const SectionTitle(title: '⚙️ Paramètres'),
             MenuItem(
@@ -437,7 +438,21 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
   }
 
   // En-tête du profil avec photo, nom et statut
-  Widget _buildProfileHeader() {
+  Widget _buildProfileHeader(BuildContext context) {
+    // ✅ Récupérer l'utilisateur connecté
+    final authState = context.read<AuthCubit>().state;
+    final String userName = authState is AuthAuthenticated
+        ? authState.utilisateur.fullName
+        : "Utilisateur";
+    final String userStatus = authState is AuthAuthenticated
+        ? (authState.utilisateur.verifie
+            ? "Compte vérifié"
+            : "Compte non vérifié")
+        : "Non connecté";
+    final String? userPhoto = authState is AuthAuthenticated
+        ? authState.utilisateur.photoProfil
+        : null;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -456,9 +471,17 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
               border: Border.all(color: Colors.white, width: 3),
               shape: BoxShape.circle,
             ),
-            child: const CircleAvatar(
+            child: CircleAvatar(
               radius: 50,
-              backgroundImage: AssetImage('assets/profile_picture.jpg'),
+              backgroundImage: userPhoto != null && userPhoto.startsWith('http')
+                  ? NetworkImage(userPhoto) as ImageProvider
+                  : const AssetImage('assets/profile_picture.jpg'),
+              child: userPhoto == null || userPhoto.isEmpty
+                  ? Text(
+                      userName.isNotEmpty ? userName[0].toUpperCase() : 'U',
+                      style: const TextStyle(fontSize: 40, color: Colors.white),
+                    )
+                  : null,
             ),
           ),
           const SizedBox(height: 10),
@@ -476,7 +499,7 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _getStatusIcon(),
+              _getStatusIcon(userStatus),
               const SizedBox(width: 5),
               Text(
                 userStatus,
@@ -508,7 +531,7 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
   }
 
   // Retourne l'icône correspondant au statut de l'utilisateur
-  Widget _getStatusIcon() {
+  Widget _getStatusIcon(String userStatus) {
     switch (userStatus) {
       case "Compte vérifié":
         return const Icon(Icons.verified, color: Colors.white);
@@ -521,20 +544,29 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
 
   // Navigation vers l'écran d'édition du profil
   void _navigateToEditProfile() async {
+    // ✅ Récupérer les données utilisateur depuis AuthCubit
+    final authState = context.read<AuthCubit>().state;
+    if (authState is! AuthAuthenticated) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Veuillez vous connecter')),
+      );
+      return;
+    }
+
+    final utilisateur = authState.utilisateur;
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => EditProfileScreen(
           initialUserData: {
-            'nom': userName.split(' ').first,
-            'prenom': userName.split(' ').length > 1
-                ? userName.split(' ').skip(1).join(' ')
-                : '',
-            'telephone': '', // À récupérer depuis l'API
-            'email': '', // À récupérer depuis l'API
-            'genre': '',
-            'datedenaissance': '',
-            'photoProfil': 'assets/profile_picture.jpg',
+            'nom': utilisateur.nom,
+            'prenom': utilisateur.prenom ?? '',
+            'telephone': utilisateur.telephone,
+            'email': utilisateur.email ?? '',
+            'genre': utilisateur.genre ?? '',
+            'datedenaissance': utilisateur.dateNaissance ?? '',
+            'photoProfil':
+                utilisateur.photoProfil ?? 'assets/profile_picture.jpg',
           },
         ),
       ),
@@ -578,6 +610,178 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
         );
       },
     );
+  }
+
+  // 🎯 SECTION MODE PRESTATAIRE
+  Widget _buildPrestataireModeSection() {
+    return BlocBuilder<AuthCubit, AuthState>(
+      builder: (context, state) {
+        // 🔍 DEBUG : Toujours afficher pour test
+        print('🔍 DEBUG - AuthState: $state');
+        if (state is AuthAuthenticated) {
+          print('🔍 DEBUG - Roles: ${state.roles}');
+          print(
+              '🔍 DEBUG - Contains PRESTATAIRE: ${state.roles.contains('PRESTATAIRE')}');
+        }
+
+        // Vérifier si l'utilisateur a le rôle PRESTATAIRE
+        if (state is AuthAuthenticated && state.roles.contains('PRESTATAIRE')) {
+          return Column(
+            children: [
+              const SectionTitle(title: '🔧 Mode Prestataire'),
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF4CAF50), Color(0xFF2E7D32)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.green.withOpacity(0.3),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.handyman,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
+                  title: const Text(
+                    'Mode Prestataire',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  subtitle: const Text(
+                    'Accéder à votre interface prestataire',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 14,
+                    ),
+                  ),
+                  trailing: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Text(
+                      'Disponible',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  onTap: () => _switchToPrestataireMode(context),
+                ),
+              ),
+            ],
+          );
+        }
+
+        // 🔍 DEBUG : Afficher une version de test
+        return Column(
+          children: [
+            const SectionTitle(title: '🔧 Mode Prestataire (DEBUG)'),
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF4CAF50), Color(0xFF2E7D32)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.green.withOpacity(0.3),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.handyman,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+                title: const Text(
+                  'Mode Prestataire (DEBUG)',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                subtitle: const Text(
+                  'Version de test - toujours visible',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 14,
+                  ),
+                ),
+                trailing: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Text(
+                    'DEBUG',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                onTap: () => _switchToPrestataireMode(context),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // 🔄 SWITCH VERS MODE PRESTATAIRE
+  void _switchToPrestataireMode(BuildContext context) {
+    try {
+      context.read<AuthCubit>().switchActiveRole('PRESTATAIRE');
+      Future.delayed(const Duration(milliseconds: 100), () {
+        context.push('/providermain');
+      });
+    } catch (e) {
+      print('Erreur lors du switch vers prestataire: $e');
+      context.push('/providermain');
+    }
   }
 }
 

@@ -24,12 +24,12 @@ class _PortfolioStepState extends State<PortfolioStep> {
   @override
   void initState() {
     super.initState();
-    
+
     // Initialiser avec les données existantes si disponibles
     _linkedInController.text = widget.formData['linkedIn'] ?? '';
     _githubController.text = widget.formData['github'] ?? '';
     _behanceController.text = widget.formData['behance'] ?? '';
-    
+
     if (widget.formData['portfolioItems'] != null) {
       // Convertir les données de portfolio existantes
       final List<dynamic> items = widget.formData['portfolioItems'];
@@ -92,7 +92,7 @@ class _PortfolioStepState extends State<PortfolioStep> {
             ),
           ),
           const SizedBox(height: 16),
-          
+
           // Explication
           Container(
             padding: const EdgeInsets.all(16),
@@ -130,7 +130,7 @@ class _PortfolioStepState extends State<PortfolioStep> {
             ),
           ),
           const SizedBox(height: 24),
-          
+
           // Projets de portfolio
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -145,7 +145,7 @@ class _PortfolioStepState extends State<PortfolioStep> {
               ElevatedButton.icon(
                 onPressed: _addProject,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green.shade700,
+                  backgroundColor: Colors.orange,
                   foregroundColor: Colors.white,
                 ),
                 icon: const Icon(Icons.add),
@@ -154,7 +154,7 @@ class _PortfolioStepState extends State<PortfolioStep> {
             ],
           ),
           const SizedBox(height: 16),
-          
+
           // Liste des projets
           if (_portfolioItems.isEmpty)
             Container(
@@ -191,7 +191,7 @@ class _PortfolioStepState extends State<PortfolioStep> {
                 ],
               ),
             ),
-          
+
           // Affichage des projets
           ...List.generate(_portfolioItems.length, (index) {
             final item = _portfolioItems[index];
@@ -218,7 +218,8 @@ class _PortfolioStepState extends State<PortfolioStep> {
                           ),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.delete_outline, color: Colors.red),
+                          icon: const Icon(Icons.delete_outline,
+                              color: Colors.red),
                           onPressed: () => _removeProject(index),
                           tooltip: 'Supprimer ce projet',
                         ),
@@ -254,11 +255,11 @@ class _PortfolioStepState extends State<PortfolioStep> {
               ),
             );
           }),
-          
+
           const SizedBox(height: 24),
           const Divider(),
           const SizedBox(height: 16),
-          
+
           // Réseaux sociaux et profils
           const Text(
             'Réseaux sociaux professionnels',
@@ -268,7 +269,7 @@ class _PortfolioStepState extends State<PortfolioStep> {
             ),
           ),
           const SizedBox(height: 16),
-          
+
           // LinkedIn
           TextFormField(
             controller: _linkedInController,
@@ -284,7 +285,7 @@ class _PortfolioStepState extends State<PortfolioStep> {
             },
           ),
           const SizedBox(height: 16),
-          
+
           // GitHub
           TextFormField(
             controller: _githubController,
@@ -301,7 +302,7 @@ class _PortfolioStepState extends State<PortfolioStep> {
             },
           ),
           const SizedBox(height: 16),
-          
+
           // Behance/Dribbble
           TextFormField(
             controller: _behanceController,
@@ -343,7 +344,7 @@ class _ProjectDialogState extends State<ProjectDialog> {
       maxHeight: 1000,
       imageQuality: 85,
     );
-    
+
     if (pickedFile != null) {
       setState(() {
         _projectImage = pickedFile;
@@ -401,7 +402,7 @@ class _ProjectDialogState extends State<ProjectDialog> {
               ),
             ),
             const SizedBox(height: 16),
-            
+
             // Titre du projet
             TextField(
               controller: _titleController,
@@ -411,7 +412,7 @@ class _ProjectDialogState extends State<ProjectDialog> {
               ),
             ),
             const SizedBox(height: 16),
-            
+
             // Description du projet
             TextField(
               controller: _descriptionController,
@@ -422,7 +423,7 @@ class _ProjectDialogState extends State<ProjectDialog> {
               maxLines: 3,
             ),
             const SizedBox(height: 16),
-            
+
             // Rôle dans le projet
             TextField(
               controller: _roleController,
@@ -432,7 +433,7 @@ class _ProjectDialogState extends State<ProjectDialog> {
               ),
             ),
             const SizedBox(height: 16),
-            
+
             // URL du projet
             TextField(
               controller: _urlController,
@@ -458,13 +459,14 @@ class _ProjectDialogState extends State<ProjectDialog> {
                 _descriptionController.text.isEmpty) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Veuillez remplir tous les champs obligatoires'),
+                  content:
+                      Text('Veuillez remplir tous les champs obligatoires'),
                   backgroundColor: Colors.red,
                 ),
               );
               return;
             }
-            
+
             // Retourner les données du projet
             Navigator.pop(
               context,
@@ -478,7 +480,7 @@ class _ProjectDialogState extends State<ProjectDialog> {
             );
           },
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.green.shade700,
+            backgroundColor: Colors.orange,
           ),
           child: const Text('AJOUTER'),
         ),

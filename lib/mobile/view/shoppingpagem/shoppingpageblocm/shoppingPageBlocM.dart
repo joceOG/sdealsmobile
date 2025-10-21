@@ -5,6 +5,7 @@ import 'package:bloc/bloc.dart';
 
 import 'package:sdealsmobile/data/models/categorie.dart';
 import 'package:sdealsmobile/data/models/vendeur.dart';
+import 'package:sdealsmobile/data/models/cart_model.dart';
 import 'package:sdealsmobile/data/services/api_client.dart';
 
 class ShoppingPageBlocM extends Bloc<ShoppingPageEventM, ShoppingPageStateM> {
@@ -38,6 +39,16 @@ class ShoppingPageBlocM extends Bloc<ShoppingPageEventM, ShoppingPageStateM> {
     on<ToggleViewEvent>(_onToggleViewEvent);
     on<FilterVendeursEvent>(_onFilterVendeursEvent);
     on<ToggleVendeurFavoriteEvent>(_onToggleVendeurFavoriteEvent);
+
+    // 🛒 NOUVEAUX EVENTS POUR LE PANIER
+    on<LoadCartEvent>(_onLoadCart);
+    on<AddToCartEvent>(_onAddToCart);
+    on<UpdateCartItemQuantityEvent>(_onUpdateCartItemQuantity);
+    on<RemoveFromCartEvent>(_onRemoveFromCart);
+    on<ClearCartEvent>(_onClearCart);
+    on<ApplyPromoCodeEvent>(_onApplyPromoCode);
+    on<UpdateDeliveryAddressEvent>(_onUpdateDeliveryAddress);
+    on<CheckoutEvent>(_onCheckout);
   }
 
   // Event handler pour charger les catégories spécifiquement du groupe E-marché
@@ -149,7 +160,11 @@ class ShoppingPageBlocM extends Bloc<ShoppingPageEventM, ShoppingPageStateM> {
 
           print('Produits convertis: ${products.length}');
 
-          emit(state.copyWith(products: products, isLoading: false));
+          emit(state.copyWith(
+            products: products,
+            filteredProducts: products, // ✅ Initialiser filteredProducts
+            isLoading: false,
+          ));
           return;
         } else {
           print("Aucun article trouvé dans l'API ou erreur de récupération");
@@ -662,11 +677,291 @@ class ShoppingPageBlocM extends Bloc<ShoppingPageEventM, ShoppingPageStateM> {
           .replaceAll(RegExp(r'[\uFFFD\uFEFF]'), '')
           .trim();
 
-      // Si le string devient vide après nettoyage, retourner une valeur par défaut
+      // Si le string devient devient vide après nettoyage, retourner une valeur par défaut
       return cleaned.isEmpty ? 'Non spécifié' : cleaned;
     } catch (e) {
       print('Erreur nettoyage string: $e pour input: $input');
       return 'Non spécifié';
+    }
+  }
+
+  // 🛒 ==================== HANDLERS DU PANIER ====================
+
+  // ✅ CHARGER LE PANIER
+  Future<void> _onLoadCart(
+    LoadCartEvent event,
+    Emitter<ShoppingPageStateM> emit,
+  ) async {
+    emit(state.copyWith(isCartLoading: true, cartError: null));
+
+    try {
+      print('📦 Chargement du panier pour l\'utilisateur: ${event.userId}');
+
+      final response = await _apiClient.getCart(event.userId);
+      final cart = Cart.fromJson(response);
+
+      print(
+          '✅ Panier chargé: ${cart.articles.length} articles, total: ${cart.montantTotal} FCFA');
+
+      emit(state.copyWith(
+        cart: cart,
+        isCartLoading: false,
+      ));
+    } catch (error) {
+      print('❌ Erreur chargement panier: $error');
+      emit(state.copyWith(
+        cartError: 'Impossible de charger le panier: ${error.toString()}',
+        isCartLoading: false,
+      ));
+    }
+  }
+
+  // ✅ AJOUTER UN ARTICLE AU PANIER
+  Future<void> _onAddToCart(
+    AddToCartEvent event,
+    Emitter<ShoppingPageStateM> emit,
+  ) async {
+    emit(state.copyWith(isAddingToCart: true, cartError: null));
+
+    try {
+      print(
+          '🛒 Ajout au panier: Article ${event.articleId}, Quantité: ${event.quantite}');
+
+      final response = await _apiClient.addToCart(
+        userId: event.userId,
+        articleId: event.articleId,
+        vendeurId: event.vendeurId,
+        quantite: event.quantite,
+        variantes: event.variantes,
+      );
+
+      final cart = Cart.fromJson(response['cart']);
+
+      print('✅ Article ajouté au panier. Total: ${cart.montantTotal} FCFA');
+
+      emit(state.copyWith(
+        cart: cart,
+        isAddingToCart: false,
+      ));
+    } catch (error) {
+      print('❌ Erreur ajout au panier: $error');
+      emit(state.copyWith(
+        cartError: 'Impossible d\'ajouter l\'article: ${error.toString()}',
+        isAddingToCart: false,
+      ));
+    }
+  }
+
+  // ✅ MODIFIER LA QUANTITÉ D'UN ARTICLE
+  Future<void> _onUpdateCartItemQuantity(
+    UpdateCartItemQuantityEvent event,
+    Emitter<ShoppingPageStateM> emit,
+  ) async {
+    emit(state.copyWith(isCartLoading: true, cartError: null));
+
+    try {
+      print(
+          '🔢 Mise à jour quantité: Item ${event.itemId}, Nouvelle quantité: ${event.quantite}');
+
+      final response = await _apiClient.updateCartItemQuantity(
+        userId: event.userId,
+        itemId: event.itemId,
+        quantite: event.quantite,
+      );
+
+      final cart = Cart.fromJson(response['cart']);
+
+      print('✅ Quantité mise à jour. Total: ${cart.montantTotal} FCFA');
+
+      emit(state.copyWith(
+        cart: cart,
+        isCartLoading: false,
+      ));
+    } catch (error) {
+      print('❌ Erreur mise à jour quantité: $error');
+      emit(state.copyWith(
+        cartError: 'Impossible de modifier la quantité: ${error.toString()}',
+        isCartLoading: false,
+      ));
+    }
+  }
+
+  // ✅ RETIRER UN ARTICLE DU PANIER
+  Future<void> _onRemoveFromCart(
+    RemoveFromCartEvent event,
+    Emitter<ShoppingPageStateM> emit,
+  ) async {
+    emit(state.copyWith(isCartLoading: true, cartError: null));
+
+    try {
+      print('🗑️ Retrait de l\'article: ${event.itemId}');
+
+      final response = await _apiClient.removeFromCart(
+        userId: event.userId,
+        itemId: event.itemId,
+      );
+
+      final cart = Cart.fromJson(response['cart']);
+
+      print('✅ Article retiré. Reste ${cart.articles.length} articles');
+
+      emit(state.copyWith(
+        cart: cart,
+        isCartLoading: false,
+      ));
+    } catch (error) {
+      print('❌ Erreur retrait article: $error');
+      emit(state.copyWith(
+        cartError: 'Impossible de retirer l\'article: ${error.toString()}',
+        isCartLoading: false,
+      ));
+    }
+  }
+
+  // ✅ VIDER LE PANIER
+  Future<void> _onClearCart(
+    ClearCartEvent event,
+    Emitter<ShoppingPageStateM> emit,
+  ) async {
+    emit(state.copyWith(isCartLoading: true, cartError: null));
+
+    try {
+      print('🧹 Vidage du panier');
+
+      final response = await _apiClient.clearCart(event.userId);
+      final cart = Cart.fromJson(response['cart']);
+
+      print('✅ Panier vidé');
+
+      emit(state.copyWith(
+        cart: cart,
+        isCartLoading: false,
+      ));
+    } catch (error) {
+      print('❌ Erreur vidage panier: $error');
+      emit(state.copyWith(
+        cartError: 'Impossible de vider le panier: ${error.toString()}',
+        isCartLoading: false,
+      ));
+    }
+  }
+
+  // ✅ APPLIQUER UN CODE PROMO
+  Future<void> _onApplyPromoCode(
+    ApplyPromoCodeEvent event,
+    Emitter<ShoppingPageStateM> emit,
+  ) async {
+    emit(state.copyWith(isCartLoading: true, cartError: null));
+
+    try {
+      print('🎁 Application du code promo: ${event.code}');
+
+      final response = await _apiClient.applyPromoCode(
+        userId: event.userId,
+        code: event.code,
+        reduction: event.reduction,
+        typeReduction: event.typeReduction,
+      );
+
+      final cart = Cart.fromJson(response['cart']);
+
+      print('✅ Code promo appliqué. Nouveau total: ${cart.montantTotal} FCFA');
+
+      emit(state.copyWith(
+        cart: cart,
+        isCartLoading: false,
+      ));
+    } catch (error) {
+      print('❌ Erreur application code promo: $error');
+      emit(state.copyWith(
+        cartError: 'Code promo invalide: ${error.toString()}',
+        isCartLoading: false,
+      ));
+    }
+  }
+
+  // ✅ METTRE À JOUR L'ADRESSE DE LIVRAISON
+  Future<void> _onUpdateDeliveryAddress(
+    UpdateDeliveryAddressEvent event,
+    Emitter<ShoppingPageStateM> emit,
+  ) async {
+    emit(state.copyWith(isCartLoading: true, cartError: null));
+
+    try {
+      print('📍 Mise à jour adresse de livraison: ${event.ville}');
+
+      final response = await _apiClient.updateDeliveryAddress(
+        userId: event.userId,
+        nom: event.nom,
+        telephone: event.telephone,
+        adresse: event.adresse,
+        ville: event.ville,
+        codePostal: event.codePostal,
+        pays: event.pays,
+        instructions: event.instructions,
+      );
+
+      final cart = Cart.fromJson(response['cart']);
+
+      print('✅ Adresse de livraison mise à jour');
+
+      emit(state.copyWith(
+        cart: cart,
+        isCartLoading: false,
+      ));
+    } catch (error) {
+      print('❌ Erreur mise à jour adresse: $error');
+      emit(state.copyWith(
+        cartError:
+            'Impossible de mettre à jour l\'adresse: ${error.toString()}',
+        isCartLoading: false,
+      ));
+    }
+  }
+
+  // ✅ CHECKOUT - FINALISER LA COMMANDE
+  Future<void> _onCheckout(
+    CheckoutEvent event,
+    Emitter<ShoppingPageStateM> emit,
+  ) async {
+    emit(state.copyWith(isCartLoading: true, cartError: null));
+
+    try {
+      print('💳 Finalisation de la commande');
+
+      // Vérifications avant checkout
+      if (state.cart == null || state.cart!.isEmpty) {
+        throw Exception('Le panier est vide');
+      }
+
+      if (!state.cart!.hasDeliveryAddress) {
+        throw Exception('Veuillez ajouter une adresse de livraison');
+      }
+
+      final response = await _apiClient.checkout(
+        userId: event.userId,
+        moyenPaiement: event.moyenPaiement,
+        notesClient: event.notesClient,
+      );
+
+      final commande = response['commande'];
+      final cart = Cart.fromJson(response['cart']);
+
+      print('✅ Commande créée avec succès! ID: ${commande['_id']}');
+
+      emit(state.copyWith(
+        cart: cart,
+        isCartLoading: false,
+      ));
+
+      // TODO: Navigation vers la page de confirmation
+      // ou émission d'un event de succès pour afficher un message
+    } catch (error) {
+      print('❌ Erreur checkout: $error');
+      emit(state.copyWith(
+        cartError: 'Impossible de finaliser la commande: ${error.toString()}',
+        isCartLoading: false,
+      ));
     }
   }
 }

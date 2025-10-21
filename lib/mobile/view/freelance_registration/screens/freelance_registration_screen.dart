@@ -319,9 +319,9 @@ class _FreelanceRegistrationContentState extends State<_FreelanceRegistrationCon
       margin: const EdgeInsets.all(24),
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.orange.shade50,
+        color: Colors.green.shade50,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.orange.shade200),
+        border: Border.all(color: Colors.green.shade200),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

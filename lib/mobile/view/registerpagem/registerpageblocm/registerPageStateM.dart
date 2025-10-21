@@ -10,6 +10,7 @@ class RegisterPageStateM extends Equatable {
   final bool isSuccess;
   final String? errorMessage;
   final Utilisateur? utilisateur;
+  final String? token; // ✅ Ajouter le token
 
   const RegisterPageStateM({
     this.fullName = '',
@@ -20,6 +21,7 @@ class RegisterPageStateM extends Equatable {
     this.isSuccess = false,
     this.errorMessage,
     this.utilisateur,
+    this.token, // ✅ Ajouter le token
   });
 
   RegisterPageStateM copyWith({
@@ -30,7 +32,8 @@ class RegisterPageStateM extends Equatable {
     bool? isSubmitting,
     bool? isSuccess,
     String? errorMessage,
-    Utilisateur? utilisateur
+    Utilisateur? utilisateur,
+    String? token, // ✅ Ajouter le token
   }) {
     return RegisterPageStateM(
       fullName: fullName ?? this.fullName,
@@ -40,11 +43,21 @@ class RegisterPageStateM extends Equatable {
       isSubmitting: isSubmitting ?? this.isSubmitting,
       isSuccess: isSuccess ?? this.isSuccess,
       errorMessage: errorMessage,
-      utilisateur: utilisateur
+      utilisateur: utilisateur,
+      token: token ?? this.token, // ✅ Ajouter le token
     );
   }
 
   @override
-  List<Object?> get props =>
-      [fullName, phone, password, confirmPassword, isSubmitting, isSuccess, errorMessage, utilisateur];
+  List<Object?> get props => [
+        fullName,
+        phone,
+        password,
+        confirmPassword,
+        isSubmitting,
+        isSuccess,
+        errorMessage,
+        utilisateur,
+        token
+      ];
 }
