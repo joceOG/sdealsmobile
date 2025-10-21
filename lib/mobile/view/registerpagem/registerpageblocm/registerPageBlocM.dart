@@ -1,10 +1,6 @@
-import 'dart:convert';
-
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../data/models/utilisateur.dart';
 import '../../../../data/services/api_client.dart';
-import '../../../../data/services/authCubit.dart';
-import 'package:http/http.dart' as http;
 import 'registerPageStateM.dart';
 import 'registerPageEventM.dart';
 
@@ -38,37 +34,18 @@ class RegisterPageBlocM extends Bloc<RegisterPageEventM, RegisterPageStateM> {
 
       try {
         // Découper nom et prénom
-        final fullName = (state.fullName).trim();
-        final parts = fullName.split(" ");
-        final nom = parts.isNotEmpty ? parts.first : "";
-        final prenom = parts.length > 1 ? parts.sublist(1).join(" ") : "";
-
-        // Construire l’utilisateur (minimum requis)
-        final utilisateur = Utilisateur(
-          idutilisateur: "",
-          nom: nom,
-          prenom: prenom,
-          email: null,
-          password: state.password,
-          telephone: state.phone,
-          genre: "", // valeur par défaut
-          note: null,
-          photoProfil: null,
-          dateNaissance: null,
-          role: "Client",
-        );
+        // Préparation des données pour l'inscription
 
         // Appel API
         final newuser = await apiClient.registerUser(
           fullName: state.fullName,
           phone: state.phone,
           password: state.password,
+          role: "Client", // ✅ Spécifier le rôle
         );
 
         // ✅ CONNEXION AUTOMATIQUE APRÈS INSCRIPTION
-        if (newuser != null &&
-            newuser['utilisateur'] != null &&
-            newuser['token'] != null) {
+        if (newuser['utilisateur'] != null && newuser['token'] != null) {
           final userData = newuser['utilisateur'];
           final token = newuser['token'];
 
@@ -95,8 +72,27 @@ class RegisterPageBlocM extends Bloc<RegisterPageEventM, RegisterPageStateM> {
             token: token, // ✅ Ajouter le token pour la connexion
           ));
         } else {
+          // Créer un utilisateur par défaut en cas d'échec de récupération des données
+          final utilisateurDefaut = Utilisateur(
+            idutilisateur: '',
+            nom: state.fullName.split(' ').first,
+            prenom: state.fullName.split(' ').length > 1
+                ? state.fullName.split(' ').last
+                : '',
+            email: '',
+            password: '',
+            telephone: state.phone,
+            genre: '',
+            note: '0',
+            photoProfil: '',
+            dateNaissance: '',
+            role: 'Client',
+          );
+
           emit(state.copyWith(
-              isSubmitting: false, isSuccess: true, utilisateur: utilisateur));
+              isSubmitting: false,
+              isSuccess: true,
+              utilisateur: utilisateurDefaut));
         }
       } catch (e) {
         emit(state.copyWith(

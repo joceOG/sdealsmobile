@@ -241,7 +241,10 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Text('Vous n\'avez pas de compte?'),
+                          const Flexible(
+                            // ✅ Added Flexible widget
+                            child: Text('Vous n\'avez pas de compte?'),
+                          ),
                           TextButton(
                             onPressed: () {
                               WidgetsBinding.instance.addPostFrameCallback((_) {

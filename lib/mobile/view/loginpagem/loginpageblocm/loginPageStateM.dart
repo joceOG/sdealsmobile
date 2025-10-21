@@ -12,8 +12,16 @@ class LoginPageLoadingM extends LoginPageStateM {}
 class LoginPageSuccessM extends LoginPageStateM {
   final String token;
   final Map<String, dynamic> utilisateur;
+  final bool shouldUpdateAuth;
 
-  LoginPageSuccessM({required this.token, required this.utilisateur});
+  LoginPageSuccessM({
+    required this.token, 
+    required this.utilisateur,
+    this.shouldUpdateAuth = false,
+  });
+  
+  @override
+  List<Object?> get props => [token, utilisateur, shouldUpdateAuth];
 }
 
 

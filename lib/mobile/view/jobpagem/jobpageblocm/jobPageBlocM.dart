@@ -285,16 +285,20 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
       print("✅ API Response: ${prestatairesData.length} prestataires reçus");
       if (prestatairesData.isNotEmpty) {
         print("📋 Premier prestataire sample: ${prestatairesData[0].keys}");
+        print("📋 Premier prestataire data: ${prestatairesData[0]}");
       }
 
       print("🔄 Conversion vers modèle Prestataire...");
       List<Prestataire> allProviders = [];
       for (int i = 0; i < prestatairesData.length; i++) {
         try {
+          print("🔄 Conversion prestataire $i...");
           final provider = Prestataire.fromBackend(prestatairesData[i]);
           allProviders.add(provider);
+          print("✅ Prestataire $i converti: ${provider.utilisateur.nom} ${provider.utilisateur.prenom}");
         } catch (e) {
           print("⚠️ Erreur conversion prestataire $i: $e");
+          print("⚠️ Données problématiques: ${prestatairesData[i]}");
           // Continue avec les autres
         }
       }
@@ -321,6 +325,11 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
             .toList();
       }
 
+      print("🔍 Filtrage par distance...");
+      print("📍 Position utilisateur: ${event.latitude}, ${event.longitude}");
+      print("📍 Rayon de recherche: ${event.radius} km");
+      print("📍 Prestataires avant filtrage: ${allProviders.length}");
+      
       // ✅ NOUVEAU : Filtrage par distance via API backend
       List<Prestataire> nearbyProviders = await _filterByDistance(
         allProviders,
@@ -328,6 +337,8 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
         event.longitude,
         event.radius,
       );
+
+      print("📍 Prestataires après filtrage distance: ${nearbyProviders.length}");
 
       // Trier par distance et note
       nearbyProviders.sort((a, b) {
@@ -342,6 +353,8 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
         if (noteB < noteA) return -1;
         return 0;
       });
+      
+      print("✅ Prestataires finaux après tri: ${nearbyProviders.length}");
 
       print("✅ Prestataires à proximité trouvés: ${nearbyProviders.length}");
 

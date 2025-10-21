@@ -55,11 +55,11 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
             if (state.utilisateur != null && state.token != null) {
               // Connecter l'utilisateur automatiquement
               context.read<AuthCubit>().setAuthenticated(
-                token: state.token!,
-                utilisateur: state.utilisateur!,
-                roles: [state.utilisateur!.role],
-                activeRole: state.utilisateur!.role,
-              );
+                    token: state.token!,
+                    utilisateur: state.utilisateur!,
+                    roles: [state.utilisateur!.role],
+                    activeRole: state.utilisateur!.role,
+                  );
 
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
@@ -73,7 +73,6 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
                 const SnackBar(content: Text("Inscription réussie ✅")),
               );
             }
-
             // Navigation avec GoRouter vers la page d'accueil
             WidgetsBinding.instance.addPostFrameCallback((_) {
               context.push("/homepage");
@@ -124,8 +123,7 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
                   child: Column(
                     children: [
                       TextField(
-                        onChanged:
-                            (v) => context.read<RegisterPageBlocM>().add(
+                        onChanged: (v) => context.read<RegisterPageBlocM>().add(
                               RegisterFullNameChanged(v),
                             ),
                         decoration: const InputDecoration(
@@ -136,8 +134,7 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
                       ),
                       const SizedBox(height: 20),
                       TextField(
-                        onChanged:
-                            (v) => context.read<RegisterPageBlocM>().add(
+                        onChanged: (v) => context.read<RegisterPageBlocM>().add(
                               RegisterPhoneChanged(v),
                             ),
                         decoration: const InputDecoration(
@@ -149,8 +146,7 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
                       const SizedBox(height: 20),
                       TextField(
                         obscureText: obscurePassword,
-                        onChanged:
-                            (v) => context.read<RegisterPageBlocM>().add(
+                        onChanged: (v) => context.read<RegisterPageBlocM>().add(
                               RegisterPasswordChanged(v),
                             ),
                         decoration: InputDecoration(
@@ -174,8 +170,7 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
                       const SizedBox(height: 20),
                       TextField(
                         obscureText: true,
-                        onChanged:
-                            (v) => context.read<RegisterPageBlocM>().add(
+                        onChanged: (v) => context.read<RegisterPageBlocM>().add(
                               RegisterConfirmPasswordChanged(v),
                             ),
                         decoration: const InputDecoration(
@@ -206,14 +201,13 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
                       ),
                       const SizedBox(height: 10),
                       ElevatedButton(
-                        onPressed:
-                            agreeToTerms && !state.isSubmitting
-                                ? () {
-                                  context.read<RegisterPageBlocM>().add(
-                                    RegisterSubmitted(),
-                                  );
-                                }
-                                : null,
+                        onPressed: agreeToTerms && !state.isSubmitting
+                            ? () {
+                                context.read<RegisterPageBlocM>().add(
+                                      RegisterSubmitted(),
+                                    );
+                              }
+                            : null,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.green.shade700,
                           minimumSize: const Size(double.infinity, 50),
@@ -221,24 +215,25 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
                             borderRadius: BorderRadius.circular(25),
                           ),
                         ),
-                        child:
-                            state.isSubmitting
-                                ? const CircularProgressIndicator(
+                        child: state.isSubmitting
+                            ? const CircularProgressIndicator(
+                                color: Colors.white,
+                              )
+                            : const Text(
+                                "JE M'INSCRIS",
+                                style: TextStyle(
+                                  fontSize: 16,
                                   color: Colors.white,
-                                )
-                                : const Text(
-                                  "JE M'INSCRIS",
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    color: Colors.white,
-                                  ),
                                 ),
+                              ),
                       ),
                       const SizedBox(height: 10),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Text('Vous avez déjà un compte ?'),
+                          const Flexible(
+                            child: Text('Vous avez déjà un compte ?'),
+                          ),
                           TextButton(
                             onPressed: () {
                               context.go("/login"); // si tu as une route login
