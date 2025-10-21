@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../morepageblocm/morePageBlocM.dart';
+import '../../../../data/services/authCubit.dart';
+import 'package:go_router/go_router.dart';
 
 class MorePageScreenM extends StatefulWidget {
   const MorePageScreenM({super.key});
@@ -204,6 +206,9 @@ class _MorePagePageScreenStateM extends State<MorePageScreenM> {
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
+                    onTap: () {
+                      // TODO: Naviguer vers Soutra News
+                    },
                   ),
                 ),
                 const SizedBox(width: 18),
@@ -217,15 +222,57 @@ class _MorePagePageScreenStateM extends State<MorePageScreenM> {
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
+                    onTap: () {
+                      // TODO: Naviguer vers Soutra Pay
+                    },
                   ),
                 ),
               ],
             ),
+            const SizedBox(height: 20),
+            // 🎯 CARTE MODE PRESTATAIRE
+            _buildPrestataireModeCard(),
             const SizedBox(height: 30),
           ],
         ),
       ),
     );
+  }
+
+  // 🎯 CARTE MODE PRESTATAIRE
+  Widget _buildPrestataireModeCard() {
+    return BlocBuilder<AuthCubit, AuthState>(
+      builder: (context, state) {
+        // Vérifier si l'utilisateur a le rôle PRESTATAIRE
+        if (state is AuthAuthenticated && state.roles.contains('PRESTATAIRE')) {
+          return _AnimatedCardWithBadge(
+            icon: Icons.handyman,
+            label: 'Mode Prestataire',
+            badge: 'Disponible',
+            gradient: const LinearGradient(
+              colors: [Color(0xFF4CAF50), Color(0xFF2E7D32)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            onTap: () => _switchToPrestataireMode(context),
+          );
+        }
+        return const SizedBox.shrink(); // Masquer si pas prestataire
+      },
+    );
+  }
+
+  // 🔄 SWITCH VERS MODE PRESTATAIRE
+  void _switchToPrestataireMode(BuildContext context) {
+    try {
+      context.read<AuthCubit>().switchActiveRole('PRESTATAIRE');
+      Future.delayed(const Duration(milliseconds: 100), () {
+        context.push('/providermain');
+      });
+    } catch (e) {
+      print('Erreur lors du switch vers prestataire: $e');
+      context.push('/providermain');
+    }
   }
 }
 
@@ -234,11 +281,13 @@ class _AnimatedCardWithBadge extends StatefulWidget {
   final String label;
   final String? badge;
   final Gradient gradient;
+  final VoidCallback? onTap;
   const _AnimatedCardWithBadge({
     required this.icon,
     required this.label,
     this.badge,
     required this.gradient,
+    this.onTap,
     Key? key,
   }) : super(key: key);
 
@@ -255,7 +304,7 @@ class _AnimatedCardWithBadgeState extends State<_AnimatedCardWithBadge> {
       onTapDown: (_) => setState(() => _pressed = true),
       onTapUp: (_) => setState(() => _pressed = false),
       onTapCancel: () => setState(() => _pressed = false),
-      onTap: () {},
+      onTap: widget.onTap,
       child: AnimatedScale(
         scale: _pressed ? 0.96 : 1.0,
         duration: const Duration(milliseconds: 120),

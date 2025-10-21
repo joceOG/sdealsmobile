@@ -1,9 +1,9 @@
 import 'dart:convert';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../data/models/utilisateur.dart';
 import '../../../../data/services/api_client.dart';
+import '../../../../data/services/authCubit.dart';
 import 'package:http/http.dart' as http;
 import 'registerPageStateM.dart';
 import 'registerPageEventM.dart';
@@ -28,7 +28,8 @@ class RegisterPageBlocM extends Bloc<RegisterPageEventM, RegisterPageStateM> {
 
     on<RegisterSubmitted>((event, emit) async {
       if (state.password != state.confirmPassword) {
-        emit(state.copyWith(errorMessage: "Les mots de passe ne correspondent pas"));
+        emit(state.copyWith(
+            errorMessage: "Les mots de passe ne correspondent pas"));
         return;
       }
 
@@ -47,37 +48,56 @@ class RegisterPageBlocM extends Bloc<RegisterPageEventM, RegisterPageStateM> {
           idutilisateur: "",
           nom: nom,
           prenom: prenom,
-          email: '',
+          email: null,
           password: state.password,
           telephone: state.phone,
-          genre: "",       // valeur par défaut
+          genre: "", // valeur par défaut
           note: null,
           photoProfil: null,
           dateNaissance: null,
           role: "Client",
         );
 
-        // Appel API inscription
-        final response = await apiClient.registerUser(utilisateur);
+        // Appel API
+        final newuser = await apiClient.registerUser(
+          fullName: state.fullName,
+          phone: state.phone,
+          password: state.password,
+        );
 
-        final token = response["token"] ?? "";
+        // ✅ CONNEXION AUTOMATIQUE APRÈS INSCRIPTION
+        if (newuser != null &&
+            newuser['utilisateur'] != null &&
+            newuser['token'] != null) {
+          final userData = newuser['utilisateur'];
+          final token = newuser['token'];
 
-        if (token.isEmpty) {
+          // Créer l'objet Utilisateur avec les données du backend
+          final utilisateurCree = Utilisateur(
+            idutilisateur: userData['_id'] ?? '',
+            nom: userData['nom'] ?? '',
+            prenom: userData['prenom'] ?? '',
+            email: userData['email'],
+            password: '', // Ne pas stocker le mot de passe
+            telephone: userData['telephone'] ?? '',
+            genre: userData['genre'] ?? '',
+            note: userData['note'],
+            photoProfil: userData['photoProfil'],
+            dateNaissance: userData['datedenaissance'],
+            role: userData['role'] ?? 'Client',
+          );
+
+          // ✅ ÉMISSION D'UN ÉVÉNEMENT POUR CONNECTER L'UTILISATEUR
           emit(state.copyWith(
             isSubmitting: false,
-            errorMessage: "Token manquant après l'inscription",
+            isSuccess: true,
+            utilisateur: utilisateurCree,
+            token: token, // ✅ Ajouter le token pour la connexion
           ));
-          return;
+        } else {
+          emit(state.copyWith(
+              isSubmitting: false, isSuccess: true, utilisateur: utilisateur));
         }
-
-
-        // ✅ Succès → utilisateur automatiquement connecté
-        emit(state.copyWith(
-          isSubmitting: false,
-          isSuccess: true,
-          utilisateur: utilisateur,
-          token: token,
-        ));
       } catch (e) {
         emit(state.copyWith(
           isSubmitting: false,
@@ -85,7 +105,5 @@ class RegisterPageBlocM extends Bloc<RegisterPageEventM, RegisterPageStateM> {
         ));
       }
     });
-
   }
-
 }

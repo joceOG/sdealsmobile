@@ -5,6 +5,7 @@ import 'package:sdealsmobile/mobile/view/freelance_registration/screens/freelanc
 import '../freelancepageblocm/freelancePageBlocM.dart';
 import '../freelancepageblocm/freelancePageEventM.dart';
 import '../models/freelance_model.dart';
+import 'freelance_details_screen.dart';
 
 // Widget wrapper qui fournit le BLoC à toute la page
 class FreelancePageScreen extends StatelessWidget {
@@ -362,8 +363,12 @@ class _FreelancePageScreenContentState
         borderRadius: BorderRadius.circular(16),
         onTap: () {
           // Navigation vers le détail du freelancer
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Voir le profil de ${freelancer.name}...')),
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) =>
+                  FreelanceDetailsScreen(freelance: freelancer),
+            ),
           );
         },
         child: Padding(
@@ -553,25 +558,29 @@ class _FreelancePageScreenContentState
                       const SizedBox(height: 14),
                       SizedBox(
                         height: 200,
-                        child: ListView(
+                        child: ListView.builder(
                           scrollDirection: Axis.horizontal,
-                          children: [
-                            _buildSimpleFreelanceCard(
-                                'Aminata',
-                                'Développeuse mobile & web',
-                                'assets/profile_picture.jpg',
-                                isTop: true,
-                                avatarSize: 48),
-                            _buildSimpleFreelanceCard(
-                                'Yao', 'Designer UI/UX', 'assets/esty.jpg',
-                                avatarSize: 48),
-                            _buildSimpleFreelanceCard('Fatou', 'Rédactrice SEO',
-                                'assets/coiffuer2.jpeg',
-                                avatarSize: 48),
-                            _buildSimpleFreelanceCard('Marc', 'Photographe',
-                                'assets/profile_picture.jpg',
-                                avatarSize: 48),
-                          ],
+                          itemCount: state.freelancers
+                              .where((f) => f.isTopRated)
+                              .take(5)
+                              .length,
+                          itemBuilder: (context, index) {
+                            final topFreelancers = state.freelancers
+                                .where((f) => f.isTopRated)
+                                .toList();
+                            if (index >= topFreelancers.length) {
+                              return const SizedBox.shrink();
+                            }
+                            final freelancer = topFreelancers[index];
+                            return _buildSimpleFreelanceCard(
+                              freelancer.name,
+                              freelancer.job,
+                              freelancer.imagePath,
+                              freelancer: freelancer,
+                              isTop: true,
+                              avatarSize: 48,
+                            );
+                          },
                         ),
                       ),
                       const SizedBox(height: 30),
@@ -585,7 +594,7 @@ class _FreelancePageScreenContentState
                         ),
                       ),
                       const SizedBox(height: 14),
-                      _buildFeaturedCard(),
+                      _buildFeaturedCard(state),
                       const SizedBox(height: 30),
                       // Nouveaux freelances
                       const Text(
@@ -599,19 +608,28 @@ class _FreelancePageScreenContentState
                       const SizedBox(height: 14),
                       SizedBox(
                         height: 180,
-                        child: ListView(
+                        child: ListView.builder(
                           scrollDirection: Axis.horizontal,
-                          children: [
-                            _buildSimpleFreelanceCard(
-                                'Sali', 'Traductrice', 'assets/esty.jpg',
-                                avatarSize: 40),
-                            _buildSimpleFreelanceCard('Oumar', 'Développeur',
-                                'assets/profile_picture.jpg',
-                                avatarSize: 40),
-                            _buildSimpleFreelanceCard('Léa',
-                                'Community Manager', 'assets/coiffuer2.jpeg',
-                                avatarSize: 40),
-                          ],
+                          itemCount: state.freelancers
+                              .where((f) => f.isNew)
+                              .take(5)
+                              .length,
+                          itemBuilder: (context, index) {
+                            final newFreelancers = state.freelancers
+                                .where((f) => f.isNew)
+                                .toList();
+                            if (index >= newFreelancers.length) {
+                              return const SizedBox.shrink();
+                            }
+                            final freelancer = newFreelancers[index];
+                            return _buildSimpleFreelanceCard(
+                              freelancer.name,
+                              freelancer.job,
+                              freelancer.imagePath,
+                              freelancer: freelancer,
+                              avatarSize: 40,
+                            );
+                          },
                         ),
                       ),
                       const SizedBox(height: 30),
@@ -766,11 +784,23 @@ class _FreelancePageScreenContentState
   }
 
   Widget _buildSimpleFreelanceCard(String name, String job, String imagePath,
-      {bool isTop = false, double avatarSize = 40}) {
+      {bool isTop = false,
+      double avatarSize = 40,
+      FreelanceModel? freelancer}) {
     return Padding(
       padding: const EdgeInsets.only(right: 14.0),
       child: GestureDetector(
-        onTap: () {},
+        onTap: () {
+          if (freelancer != null) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) =>
+                    FreelanceDetailsScreen(freelance: freelancer),
+              ),
+            );
+          }
+        },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           width: 130,
@@ -848,61 +878,93 @@ class _FreelancePageScreenContentState
     );
   }
 
-  Widget _buildFeaturedCard() {
-    return Container(
-      width: double.infinity,
-      height: 120,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF43EA5E), Color(0xFF1CBF3F)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.green.withOpacity(0.13),
-            blurRadius: 18,
-            offset: const Offset(0, 6),
+  Widget _buildFeaturedCard(FreelancePageStateM state) {
+    // Récupérer le premier freelance "featured" ou le mieux noté
+    final featuredFreelancer = state.freelancers.isNotEmpty
+        ? (state.freelancers.where((f) => f.isFeatured).isNotEmpty
+            ? state.freelancers.firstWhere((f) => f.isFeatured)
+            : state.freelancers.reduce((a, b) => a.rating > b.rating ? a : b))
+        : null;
+
+    if (featuredFreelancer == null) {
+      return const SizedBox.shrink();
+    }
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) =>
+                FreelanceDetailsScreen(freelance: featuredFreelancer),
           ),
-        ],
-      ),
-      child: Row(
-        children: [
-          const SizedBox(width: 18),
-          CircleAvatar(
-            radius: 38,
-            backgroundImage: AssetImage('assets/profile_picture.jpg'),
+        );
+      },
+      child: Container(
+        width: double.infinity,
+        height: 120,
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF43EA5E), Color(0xFF1CBF3F)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
-          const SizedBox(width: 18),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text(
-                  'Aminata - Développeuse',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 17,
-                  ),
-                ),
-                SizedBox(height: 6),
-                Text(
-                  'Spécialiste Flutter & mobile, 5 ans d\'expérience. Disponible pour vos projets !',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
+          borderRadius: BorderRadius.circular(22),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.green.withOpacity(0.13),
+              blurRadius: 18,
+              offset: const Offset(0, 6),
             ),
-          ),
-          const SizedBox(width: 18),
-        ],
+          ],
+        ),
+        child: Row(
+          children: [
+            const SizedBox(width: 18),
+            CircleAvatar(
+              radius: 38,
+              backgroundImage: featuredFreelancer.imagePath.startsWith('http')
+                  ? NetworkImage(featuredFreelancer.imagePath) as ImageProvider
+                  : AssetImage(
+                      featuredFreelancer.imagePath.isNotEmpty
+                          ? featuredFreelancer.imagePath
+                          : 'assets/profile_picture.jpg',
+                    ),
+            ),
+            const SizedBox(width: 18),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${featuredFreelancer.name} - ${featuredFreelancer.job}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 17,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    featuredFreelancer.description.isNotEmpty
+                        ? featuredFreelancer.description
+                        : '${featuredFreelancer.skills.take(3).join(', ')} • ${featuredFreelancer.completedJobs} projets',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 18),
+          ],
+        ),
       ),
     );
   }

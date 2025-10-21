@@ -11,6 +11,7 @@ import 'mobile/view/home.dart';
 import 'mobile/view/loginpagem/loginpageblocm/loginPageBlocM.dart';
 import 'mobile/view/loginpagem/screens/loginPageScreenM.dart';
 import 'mobile/view/provider_dashboard/screens/provider_main_screen.dart';
+import 'mobile/view/provider_dashboard/screens/prestataire_finalization_screen.dart';
 import 'mobile/view/registerpagem/registerpageblocm/registerPageBlocM.dart';
 import 'mobile/view/registerpagem/screens/registerPageScreenM.dart';
 import 'mobile/view/serviceproviderregistrationpagem/screens/serviceProviderRegistrationScreenM.dart';
@@ -90,8 +91,15 @@ class MyApp extends StatelessWidget {
         path: '/providermain',
         name: 'providermain',
         builder: (context, state) {
-          final utilisateur = state.extra as Utilisateur;
+          final utilisateur = state.extra as Utilisateur?;
           return ProviderMainScreen(utilisateur: utilisateur);
+        },
+      ),
+      GoRoute(
+        path: '/prestataire-finalization',
+        name: 'prestataire-finalization',
+        builder: (context, state) {
+          return PrestataireFinalizationScreen();
         },
       ),
       GoRoute(

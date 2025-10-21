@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geolocator/geolocator.dart';
 import 'dart:io';
+import '../../../../../data/services/api_client.dart';
+import '../../../../../data/models/categorie.dart';
+import '../../../../../data/models/service.dart';
 
 class ProviderPersonalInfoStep extends StatefulWidget {
   final Map<String, dynamic> formData;
@@ -13,36 +18,124 @@ class ProviderPersonalInfoStep extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  State<ProviderPersonalInfoStep> createState() => _ProviderPersonalInfoStepState();
+  State<ProviderPersonalInfoStep> createState() =>
+      _ProviderPersonalInfoStepState();
 }
 
 class _ProviderPersonalInfoStepState extends State<ProviderPersonalInfoStep> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _confirmPasswordController = TextEditingController();
 
-  DateTime? _selectedDate;
-  String? _selectedGender;
   File? _profileImage;
-  bool _obscurePassword = true;
-  bool _obscureConfirmPassword = true;
+  String? _selectedCategory;
+  String? _selectedService;
+  List<String> _selectedAreas = [];
+
+  // Position exacte
+  LatLng? _selectedPosition;
+  String? _selectedAddress;
+  bool _isLoadingLocation = false;
+
+  // Données réelles chargées depuis le backend
+  List<Categorie> _categories = [];
+  List<Service> _services = [];
+  bool _isLoadingCategories = false;
+  bool _isLoadingServices = false;
+  final ApiClient _apiClient = ApiClient();
+
+  // Zones disponibles
+  final List<String> _availableAreas = [
+    'Abidjan',
+    'Abobo',
+    'Adjamé',
+    'Attécoubé',
+    'Cocody',
+    'Koumassi',
+    'Marcory',
+    'Plateau',
+    'Port-Bouët',
+    'Treichville',
+    'Yopougon',
+    'Bingerville',
+    'Yamoussoukro',
+    'Bouaké',
+    'Daloa',
+    'San Pedro',
+    'Korhogo',
+    'Anyama',
+    'Divo'
+  ];
 
   @override
   void initState() {
     super.initState();
     _initializeFormValues();
+    _loadCategories();
+  }
+
+  // ✅ CHARGER LES VRAIES CATÉGORIES DEPUIS LE BACKEND
+  Future<void> _loadCategories() async {
+    setState(() {
+      _isLoadingCategories = true;
+    });
+
+    try {
+      print('🔄 Chargement des catégories pour le groupe "Métiers"...');
+      final categories = await _apiClient.fetchCategorie("Métiers");
+
+      setState(() {
+        _categories = categories;
+        _isLoadingCategories = false;
+      });
+
+      print('✅ ${categories.length} catégories chargées depuis le backend');
+    } catch (e) {
+      print('❌ Erreur chargement catégories: $e');
+      setState(() {
+        _isLoadingCategories = false;
+      });
+    }
+  }
+
+  // ✅ CHARGER LES SERVICES POUR UNE CATÉGORIE SPÉCIFIQUE
+  Future<void> _loadServicesForCategory(String categoryId) async {
+    setState(() {
+      _isLoadingServices = true;
+    });
+
+    try {
+      print('🔄 Chargement des services pour la catégorie: $categoryId');
+      final services = await _apiClient.fetchServices("Métiers");
+
+      // Filtrer les services par catégorie
+      final filteredServices = services.where((service) {
+        return service.categorie?.idcategorie == categoryId;
+      }).toList();
+
+      setState(() {
+        _services = filteredServices;
+        _isLoadingServices = false;
+      });
+
+      print('✅ ${filteredServices.length} services chargés pour la catégorie');
+    } catch (e) {
+      print('❌ Erreur chargement services: $e');
+      setState(() {
+        _isLoadingServices = false;
+      });
+    }
   }
 
   void _initializeFormValues() {
     _nameController.text = widget.formData['fullName'] ?? '';
     _phoneController.text = widget.formData['phone'] ?? '';
     _emailController.text = widget.formData['email'] ?? '';
-    _passwordController.text = widget.formData['password'] ?? '';
-    _selectedDate = widget.formData['birthDate'];
-    _selectedGender = widget.formData['gender'] ?? 'Homme'; // Valeur par défaut
-    
+    // Ne pas initialiser avec des valeurs mockées - attendre les vraies données
+    _selectedCategory = null; // Sera défini après chargement des catégories
+    _selectedService = null; // Sera défini après chargement des services
+    _selectedAreas = List<String>.from(widget.formData['serviceAreas'] ?? []);
+
     if (widget.formData['profileImage'] != null) {
       _profileImage = File(widget.formData['profileImage']);
     }
@@ -53,53 +146,108 @@ class _ProviderPersonalInfoStepState extends State<ProviderPersonalInfoStep> {
     _nameController.dispose();
     _phoneController.dispose();
     _emailController.dispose();
-    _passwordController.dispose();
-    _confirmPasswordController.dispose();
     super.dispose();
-  }
-
-  Future<void> _selectDate(BuildContext context) async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedDate ?? DateTime(2000, 1, 1),
-      firstDate: DateTime(1950),
-      lastDate: DateTime.now().subtract(const Duration(days: 365 * 18)), // Minimum 18 ans
-    );
-
-    if (picked != null && picked != _selectedDate) {
-      setState(() {
-        _selectedDate = picked;
-      });
-      
-      _updateFormData();
-    }
   }
 
   Future<void> _pickImage() async {
     final ImagePicker picker = ImagePicker();
-    final XFile? pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
 
-    if (pickedFile != null) {
+    if (image != null) {
       setState(() {
-        _profileImage = File(pickedFile.path);
+        _profileImage = File(image.path);
       });
-      
       _updateFormData();
     }
   }
 
   void _updateFormData() {
+    // Vérifier que les valeurs sélectionnées sont valides
+    String? validCategory = _selectedCategory;
+    String? validService = _selectedService;
+
+    // Vérifier que la catégorie sélectionnée existe dans les catégories chargées
+    if (_selectedCategory != null && _categories.isNotEmpty) {
+      final categoryExists =
+          _categories.any((c) => c.idcategorie == _selectedCategory);
+      if (!categoryExists) {
+        validCategory = null;
+      }
+    }
+
+    // Vérifier que le service sélectionné existe dans les services chargés
+    if (_selectedService != null && _services.isNotEmpty) {
+      final serviceExists =
+          _services.any((s) => s.idservice == _selectedService);
+      if (!serviceExists) {
+        validService = null;
+      }
+    }
+
     Map<String, dynamic> updatedData = {
       'fullName': _nameController.text,
       'phone': _phoneController.text,
       'email': _emailController.text,
-      'password': _passwordController.text,
-      'birthDate': _selectedDate,
-      'gender': _selectedGender,
+      'category': validCategory,
+      'service': validService,
+      'serviceAreas': _selectedAreas,
       'profileImage': _profileImage?.path,
+      'position': _selectedPosition,
+      'address': _selectedAddress,
     };
-    
+
     widget.onDataChanged(updatedData);
+  }
+
+  // Obtenir la position actuelle
+  Future<void> _getCurrentLocation() async {
+    setState(() {
+      _isLoadingLocation = true;
+    });
+
+    try {
+      // Vérifier les permissions
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Permission de localisation refusée')),
+          );
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content:
+                  Text('Permission de localisation refusée définitivement')),
+        );
+        return;
+      }
+
+      // Obtenir la position actuelle
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      setState(() {
+        _selectedPosition = LatLng(position.latitude, position.longitude);
+        _selectedAddress = 'Position actuelle';
+        _isLoadingLocation = false;
+      });
+
+      _updateFormData();
+    } catch (e) {
+      setState(() {
+        _isLoadingLocation = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text('Erreur lors de la récupération de la position: $e')),
+      );
+    }
   }
 
   @override
@@ -109,29 +257,37 @@ class _ProviderPersonalInfoStepState extends State<ProviderPersonalInfoStep> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Informations personnelles',
+            'Informations de base',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'Remplissez ces informations essentielles pour commencer',
+            style: TextStyle(fontSize: 14, color: Colors.grey),
           ),
           const SizedBox(height: 20),
 
-          // Photo de profil
+          // Photo de profil (optionnelle)
           Center(
             child: Column(
               children: [
                 GestureDetector(
                   onTap: _pickImage,
                   child: CircleAvatar(
-                    radius: 60,
+                    radius: 50,
                     backgroundColor: Colors.grey[300],
-                    backgroundImage: _profileImage != null ? FileImage(_profileImage!) : null,
+                    backgroundImage: _profileImage != null
+                        ? FileImage(_profileImage!)
+                        : null,
                     child: _profileImage == null
-                        ? const Icon(Icons.add_a_photo, size: 40, color: Colors.grey)
+                        ? const Icon(Icons.add_a_photo,
+                            size: 30, color: Colors.grey)
                         : null,
                   ),
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'Photo de profil *',
+                  'Photo de profil (optionnelle)',
                   style: TextStyle(fontSize: 14, color: Colors.grey),
                 ),
               ],
@@ -177,147 +333,252 @@ class _ProviderPersonalInfoStepState extends State<ProviderPersonalInfoStep> {
           ),
           const SizedBox(height: 16),
 
-          // Email
+          // Email (OPTIONNEL)
           TextFormField(
             controller: _emailController,
             decoration: const InputDecoration(
-              labelText: 'Email *',
+              labelText: 'Email (optionnel)',
               border: OutlineInputBorder(),
               prefixIcon: Icon(Icons.email),
+              hintText: 'Si vous avez un email',
             ),
             keyboardType: TextInputType.emailAddress,
             validator: (value) {
-              if (value == null || value.isEmpty) {
-                return 'Veuillez entrer votre email';
-              }
-              if (!value.contains('@') || !value.contains('.')) {
-                return 'Veuillez entrer un email valide';
-              }
-              return null;
-            },
-            onChanged: (value) => _updateFormData(),
-          ),
-          const SizedBox(height: 16),
-
-          // Mot de passe
-          TextFormField(
-            controller: _passwordController,
-            decoration: InputDecoration(
-              labelText: 'Mot de passe *',
-              border: const OutlineInputBorder(),
-              prefixIcon: const Icon(Icons.lock),
-              suffixIcon: IconButton(
-                icon: Icon(
-                  _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                ),
-                onPressed: () {
-                  setState(() {
-                    _obscurePassword = !_obscurePassword;
-                  });
-                },
-              ),
-            ),
-            obscureText: _obscurePassword,
-            validator: (value) {
-              if (value == null || value.isEmpty) {
-                return 'Veuillez entrer un mot de passe';
-              }
-              if (value.length < 6) {
-                return 'Le mot de passe doit contenir au moins 6 caractères';
+              if (value != null && value.isNotEmpty) {
+                if (!value.contains('@') || !value.contains('.')) {
+                  return 'Veuillez entrer un email valide';
+                }
               }
               return null;
             },
             onChanged: (value) => _updateFormData(),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
 
-          // Confirmation du mot de passe
-          TextFormField(
-            controller: _confirmPasswordController,
-            decoration: InputDecoration(
-              labelText: 'Confirmer le mot de passe *',
-              border: const OutlineInputBorder(),
-              prefixIcon: const Icon(Icons.lock),
-              suffixIcon: IconButton(
-                icon: Icon(
-                  _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
-                ),
-                onPressed: () {
-                  setState(() {
-                    _obscureConfirmPassword = !_obscureConfirmPassword;
-                  });
-                },
-              ),
-            ),
-            obscureText: _obscureConfirmPassword,
-            validator: (value) {
-              if (value != _passwordController.text) {
-                return 'Les mots de passe ne correspondent pas';
-              }
-              return null;
-            },
-          ),
-          const SizedBox(height: 16),
-
-          // Date de naissance
-          InkWell(
-            onTap: () => _selectDate(context),
-            child: InputDecorator(
-              decoration: const InputDecoration(
-                labelText: 'Date de naissance',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.calendar_today),
-              ),
-              child: Text(
-                _selectedDate == null
-                    ? 'Sélectionner une date'
-                    : '${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}',
-                style: TextStyle(
-                  color: _selectedDate == null ? Colors.grey : Colors.black,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Genre
+          // Catégorie de service
           DropdownButtonFormField<String>(
             decoration: const InputDecoration(
-              labelText: 'Genre',
+              labelText: 'Votre catégorie *',
               border: OutlineInputBorder(),
-              prefixIcon: Icon(Icons.people),
+              prefixIcon: Icon(Icons.category),
             ),
-            value: _selectedGender ?? 'Homme', // Assure une valeur valide
-            items: const [
-              DropdownMenuItem(value: 'Homme', child: Text('Homme')),
-              DropdownMenuItem(value: 'Femme', child: Text('Femme')),
-              DropdownMenuItem(value: 'Autre', child: Text('Autre')),
-            ],
-            onChanged: (value) {
-              setState(() {
-                _selectedGender = value;
-              });
-              _updateFormData();
-            },
-            validator: (value) => value == null ? 'Veuillez sélectionner votre genre' : null,
+            value: _selectedCategory,
+            items: _isLoadingCategories
+                ? [
+                    const DropdownMenuItem(
+                        value: null, child: Text('Chargement...'))
+                  ]
+                : _categories.map((categorie) {
+                    return DropdownMenuItem(
+                      value: categorie.idcategorie,
+                      child: Text(categorie.nomcategorie),
+                    );
+                  }).toList(),
+            onChanged: _isLoadingCategories
+                ? null
+                : (value) {
+                    setState(() {
+                      _selectedCategory = value;
+                      _selectedService =
+                          null; // Réinitialiser le service quand la catégorie change
+                    });
+                    if (value != null) {
+                      _loadServicesForCategory(value);
+                    }
+                    _updateFormData();
+                  },
+            validator: (value) =>
+                value == null ? 'Veuillez sélectionner votre catégorie' : null,
           ),
-          const SizedBox(height: 30),
+          const SizedBox(height: 16),
 
-          // Note sur la vérification
+          // Service spécifique
+          DropdownButtonFormField<String>(
+            decoration: const InputDecoration(
+              labelText: 'Votre service *',
+              border: OutlineInputBorder(),
+              prefixIcon: Icon(Icons.build_circle),
+            ),
+            value: _selectedService != null &&
+                    _services.any((s) => s.idservice == _selectedService)
+                ? _selectedService
+                : null,
+            items: _isLoadingServices
+                ? [
+                    const DropdownMenuItem(
+                        value: null, child: Text('Chargement...'))
+                  ]
+                : _services.map((service) {
+                    return DropdownMenuItem(
+                      value: service.idservice,
+                      child: Text(service.nomservice),
+                    );
+                  }).toList(),
+            onChanged: _isLoadingServices
+                ? null
+                : (value) {
+                    setState(() {
+                      _selectedService = value;
+                    });
+                    _updateFormData();
+                  },
+            validator: (value) =>
+                value == null ? 'Veuillez sélectionner votre service' : null,
+          ),
+          const SizedBox(height: 16),
+
+          // Zones de service
+          const Text(
+            'Où travaillez-vous ? *',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _availableAreas.map((zone) {
+              final isSelected = _selectedAreas.contains(zone);
+              return FilterChip(
+                label: Text(zone),
+                selected: isSelected,
+                onSelected: (selected) {
+                  setState(() {
+                    if (selected) {
+                      _selectedAreas.add(zone);
+                    } else {
+                      _selectedAreas.remove(zone);
+                    }
+                  });
+                  _updateFormData();
+                },
+                selectedColor: Colors.green.shade700.withOpacity(0.3),
+                checkmarkColor: Colors.green.shade700,
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 20),
+
+          // Position exacte
+          const Text(
+            'Votre position exacte *',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey.shade300),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              children: [
+                if (_selectedPosition != null) ...[
+                  Row(
+                    children: [
+                      const Icon(Icons.location_on, color: Colors.red),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _selectedAddress ?? 'Position sélectionnée',
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () {
+                          setState(() {
+                            _selectedPosition = null;
+                            _selectedAddress = null;
+                          });
+                          _updateFormData();
+                        },
+                        icon: const Icon(Icons.close, color: Colors.red),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Lat: ${_selectedPosition!.latitude.toStringAsFixed(6)}, Lng: ${_selectedPosition!.longitude.toStringAsFixed(6)}',
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+                ] else ...[
+                  Row(
+                    children: [
+                      const Icon(Icons.location_off, color: Colors.grey),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Text(
+                          'Aucune position sélectionnée',
+                          style: TextStyle(fontSize: 14, color: Colors.grey),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _isLoadingLocation ? null : _getCurrentLocation,
+                    icon: _isLoadingLocation
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.my_location),
+                    label: Text(_isLoadingLocation
+                        ? 'Récupération...'
+                        : 'Utiliser ma position actuelle'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Validation de la position
+          if (_selectedPosition == null)
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.red.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.red.shade200),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.warning, color: Colors.red),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Veuillez sélectionner votre position exacte pour continuer',
+                      style: TextStyle(fontSize: 13, color: Colors.red),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          const SizedBox(height: 20),
+
+          // Note simplifiée
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.orange.withOpacity(0.1),
+              color: Colors.green.withOpacity(0.1),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.orange.shade200),
+              border: Border.all(color: Colors.green.shade200),
             ),
             child: const Row(
               children: [
-                Icon(Icons.info, color: Colors.orange),
+                Icon(Icons.check_circle, color: Colors.green),
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Un code de vérification sera envoyé à votre numéro de téléphone et à votre email.',
+                    'Profil de base créé ! Vous pourrez le compléter plus tard pour être vérifié.',
                     style: TextStyle(fontSize: 13, color: Colors.black87),
                   ),
                 ),

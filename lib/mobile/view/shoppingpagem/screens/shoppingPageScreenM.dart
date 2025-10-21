@@ -30,10 +30,17 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
       context.read<ShoppingPageBlocM>().add(LoadCategorieDataM());
       // Charger aussi les produits
       context.read<ShoppingPageBlocM>().add(LoadProductsEvent());
+
+      // 🛒 NOUVEAU : Charger le panier de l'utilisateur
+      final authState = context.read<AuthCubit>().state;
+      if (authState is AuthAuthenticated) {
+        context.read<ShoppingPageBlocM>().add(
+              LoadCartEvent(userId: authState.utilisateur.idutilisateur),
+            );
+      }
     });
   }
 
-  int cartItemCount = 2; // Nombre d'articles dans le panier
   bool hasSoutraPayBalance = true; // Solde disponible sur SoutraPay
   bool isCompareDialogOpen = false; // Dialog de comparaison ouvert ou fermé
   // Note: selectedFilter sera maintenant géré par le BLoC
@@ -1026,28 +1033,104 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                                   ),
                                 ),
                               ),
-                              // Bouton ajouter au panier
+                              // 🛒 Bouton ajouter au panier CONNECTÉ AU BLOC
                               InkWell(
                                 onTap: () {
-                                  setState(() {
-                                    cartItemCount++;
-                                  });
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                          '${product.name} ajouté au panier!'),
-                                      duration: const Duration(seconds: 1),
-                                    ),
-                                  );
+                                  // Récupérer l'utilisateur connecté
+                                  final authState =
+                                      context.read<AuthCubit>().state;
+                                  if (authState is AuthAuthenticated) {
+                                    // TODO: Récupérer le vendeurId depuis l'article
+                                    // Pour l'instant, on utilise un vendeurId fictif
+                                    final vendeurId =
+                                        product.vendeurId ?? 'unknown';
+
+                                    // Dispatch l'événement au BLoC
+                                    context.read<ShoppingPageBlocM>().add(
+                                          AddToCartEvent(
+                                            userId: authState
+                                                .utilisateur.idutilisateur,
+                                            articleId: product.id,
+                                            vendeurId: vendeurId,
+                                            quantite: 1,
+                                          ),
+                                        );
+
+                                    // Animation + Feedback
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Row(
+                                          children: [
+                                            const Icon(Icons.check_circle,
+                                                color: Colors.white),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Text(
+                                                  '${product.name} ajouté au panier!'),
+                                            ),
+                                          ],
+                                        ),
+                                        backgroundColor: Colors.green,
+                                        duration: const Duration(seconds: 2),
+                                        action: SnackBarAction(
+                                          label: 'Voir',
+                                          textColor: Colors.white,
+                                          onPressed: () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) =>
+                                                    BlocProvider.value(
+                                                  value: context.read<
+                                                      ShoppingPageBlocM>(),
+                                                  child:
+                                                      const PanierProductScreenM(),
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                    );
+                                  } else {
+                                    // Rediriger vers la connexion
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                            'Veuillez vous connecter pour ajouter au panier'),
+                                        backgroundColor: Colors.orange,
+                                      ),
+                                    );
+                                    context.push('/login');
+                                  }
                                 },
-                                child: Container(
-                                  padding: const EdgeInsets.all(4),
-                                  decoration: BoxDecoration(
-                                    color: Colors.green,
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: const Icon(Icons.add_shopping_cart,
-                                      color: Colors.white, size: 16),
+                                child: BlocBuilder<ShoppingPageBlocM,
+                                    bloc_model.ShoppingPageStateM>(
+                                  builder: (context, state) {
+                                    final isAdding = state.isAddingToCart;
+                                    return Container(
+                                      padding: const EdgeInsets.all(4),
+                                      decoration: BoxDecoration(
+                                        color: isAdding
+                                            ? Colors.grey
+                                            : Colors.green,
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: isAdding
+                                          ? const SizedBox(
+                                              width: 16,
+                                              height: 16,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                valueColor:
+                                                    AlwaysStoppedAnimation<
+                                                        Color>(Colors.white),
+                                              ),
+                                            )
+                                          : const Icon(Icons.add_shopping_cart,
+                                              color: Colors.white, size: 16),
+                                    );
+                                  },
                                 ),
                               ),
                             ],
@@ -1078,9 +1161,12 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
     // Liste des tailles disponibles (exemple statique)
     final sizes = ['S', 'M', 'L', 'XL', 'XXL'];
 
+    // ✅ Capturer le BLoC avant d'ouvrir le dialog
+    final bloc = context.read<ShoppingPageBlocM>();
+
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
+      builder: (dialogContext) => StatefulBuilder(
         builder: (context, setStateDialog) => AlertDialog(
           title: const Text('Filtres avancés'),
           content: SizedBox(
@@ -1179,15 +1265,15 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
               child: const Text('Appliquer'),
               onPressed: () {
                 // Appliquer les filtres via le BLoC
-                context.read<ShoppingPageBlocM>().add(
-                      ApplyAdvancedFiltersEvent(
-                        minPrice: _priceRange.start,
-                        maxPrice: _priceRange.end,
-                        brand: _selectedBrand.isEmpty ? null : _selectedBrand,
-                        size: _selectedSize.isEmpty ? null : _selectedSize,
-                        onlyInStock: _onlyInStock,
-                      ),
-                    );
+                bloc.add(
+                  ApplyAdvancedFiltersEvent(
+                    minPrice: _priceRange.start,
+                    maxPrice: _priceRange.end,
+                    brand: _selectedBrand.isEmpty ? null : _selectedBrand,
+                    size: _selectedSize.isEmpty ? null : _selectedSize,
+                    onlyInStock: _onlyInStock,
+                  ),
+                );
                 Navigator.of(context).pop();
               },
             ),
@@ -1232,33 +1318,61 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                   ),
                   Row(
                     children: [
-                      // Icône panier avec badge
-                      Stack(
-                        alignment: Alignment.topRight,
-                        children: [
-                          Icon(Icons.shopping_cart,
-                              color: Colors.white, size: 20),
-                          if (cartItemCount > 0)
-                            Positioned(
-                              top: -2,
-                              right: -2,
-                              child: Container(
-                                padding: const EdgeInsets.all(2),
-                                decoration: const BoxDecoration(
-                                  color: Colors.red,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Text(
-                                  cartItemCount.toString(),
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 8,
-                                    fontWeight: FontWeight.bold,
+                      // 🛒 Icône panier avec badge CLIQUABLE
+                      BlocBuilder<ShoppingPageBlocM,
+                          bloc_model.ShoppingPageStateM>(
+                        builder: (context, state) {
+                          final cartCount = state.cart?.totalItems ?? 0;
+                          return InkWell(
+                            onTap: () {
+                              // Navigation vers l'écran panier
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => BlocProvider.value(
+                                    value: context.read<ShoppingPageBlocM>(),
+                                    child: const PanierProductScreenM(),
                                   ),
                                 ),
-                              ),
+                              );
+                            },
+                            child: Stack(
+                              alignment: Alignment.topRight,
+                              children: [
+                                const Icon(Icons.shopping_cart,
+                                    color: Colors.white, size: 20),
+                                if (cartCount > 0)
+                                  Positioned(
+                                    top: -2,
+                                    right: -2,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(4),
+                                      constraints: const BoxConstraints(
+                                        minWidth: 16,
+                                        minHeight: 16,
+                                      ),
+                                      decoration: const BoxDecoration(
+                                        color: Colors.red,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Center(
+                                        child: Text(
+                                          cartCount > 99
+                                              ? '99+'
+                                              : cartCount.toString(),
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 8,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
-                        ],
+                          );
+                        },
                       ),
                       const SizedBox(width: 12),
                       const Icon(Icons.notifications_outlined,
@@ -1429,79 +1543,94 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                // Chip Panier avec badge
-                InkWell(
-                  onTap: () {
-                    Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) =>
-                                const PanierProductScreenM()));
-                  },
-                  borderRadius: BorderRadius.circular(20),
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Colors.green.withOpacity(0.1),
-                          Colors.green.withOpacity(0.15)
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
+                // 🛒 Chip Panier avec badge connecté au BLoC
+                BlocBuilder<ShoppingPageBlocM, bloc_model.ShoppingPageStateM>(
+                  builder: (context, state) {
+                    final cartCount = state.cart?.totalItems ?? 0;
+                    return InkWell(
+                      onTap: () {
+                        Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) => BlocProvider.value(
+                                      value: context.read<ShoppingPageBlocM>(),
+                                      child: const PanierProductScreenM(),
+                                    )));
+                      },
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                          color: Colors.green.withOpacity(0.4), width: 1.2),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.green.withOpacity(0.15),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Stack(
-                          children: [
-                            Icon(Icons.shopping_cart,
-                                color: Colors.green, size: 16),
-                            if (cartItemCount > 0)
-                              Positioned(
-                                top: -2,
-                                right: -2,
-                                child: Container(
-                                  padding: const EdgeInsets.all(2),
-                                  decoration: const BoxDecoration(
-                                    color: Colors.red,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Text(
-                                    cartItemCount.toString(),
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 6,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Colors.green.withOpacity(0.1),
+                              Colors.green.withOpacity(0.15)
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                              color: Colors.green.withOpacity(0.4), width: 1.2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.green.withOpacity(0.15),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
                           ],
                         ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '🛒 Panier',
-                          style: TextStyle(
-                              color: Colors.green,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 12),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Stack(
+                              children: [
+                                Icon(Icons.shopping_cart,
+                                    color: Colors.green, size: 16),
+                                if (cartCount > 0)
+                                  Positioned(
+                                    top: -2,
+                                    right: -2,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(2),
+                                      constraints: const BoxConstraints(
+                                        minWidth: 12,
+                                        minHeight: 12,
+                                      ),
+                                      decoration: const BoxDecoration(
+                                        color: Colors.red,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Center(
+                                        child: Text(
+                                          cartCount > 9
+                                              ? '9+'
+                                              : cartCount.toString(),
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 6,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(width: 4),
+                            const Text(
+                              '🛒 Panier',
+                              style: TextStyle(
+                                  color: Colors.green,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 12),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                  ),
+                      ),
+                    );
+                  },
                 ),
               ],
             );

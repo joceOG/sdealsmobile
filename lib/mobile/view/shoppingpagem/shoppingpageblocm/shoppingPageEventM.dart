@@ -187,3 +187,145 @@ class ToggleVendeurFavoriteEvent extends ShoppingPageEventM {
   @override
   List<Object> get props => [vendeurId];
 }
+
+// 🛒 NOUVEAUX ÉVÉNEMENTS POUR LE PANIER
+
+// Événement pour charger le panier
+class LoadCartEvent extends ShoppingPageEventM {
+  final String userId;
+
+  const LoadCartEvent({required this.userId});
+
+  @override
+  List<Object> get props => [userId];
+}
+
+// Événement pour ajouter un article au panier
+class AddToCartEvent extends ShoppingPageEventM {
+  final String userId;
+  final String articleId;
+  final String vendeurId;
+  final int quantite;
+  final Map<String, String>? variantes;
+
+  const AddToCartEvent({
+    required this.userId,
+    required this.articleId,
+    required this.vendeurId,
+    this.quantite = 1,
+    this.variantes,
+  });
+
+  @override
+  List<Object> get props =>
+      [userId, articleId, vendeurId, quantite, variantes ?? {}];
+}
+
+// Événement pour modifier la quantité d'un article
+class UpdateCartItemQuantityEvent extends ShoppingPageEventM {
+  final String userId;
+  final String itemId;
+  final int quantite;
+
+  const UpdateCartItemQuantityEvent({
+    required this.userId,
+    required this.itemId,
+    required this.quantite,
+  });
+
+  @override
+  List<Object> get props => [userId, itemId, quantite];
+}
+
+// Événement pour retirer un article du panier
+class RemoveFromCartEvent extends ShoppingPageEventM {
+  final String userId;
+  final String itemId;
+
+  const RemoveFromCartEvent({
+    required this.userId,
+    required this.itemId,
+  });
+
+  @override
+  List<Object> get props => [userId, itemId];
+}
+
+// Événement pour vider le panier
+class ClearCartEvent extends ShoppingPageEventM {
+  final String userId;
+
+  const ClearCartEvent({required this.userId});
+
+  @override
+  List<Object> get props => [userId];
+}
+
+// Événement pour appliquer un code promo
+class ApplyPromoCodeEvent extends ShoppingPageEventM {
+  final String userId;
+  final String code;
+  final double reduction;
+  final String typeReduction;
+
+  const ApplyPromoCodeEvent({
+    required this.userId,
+    required this.code,
+    required this.reduction,
+    this.typeReduction = 'MONTANT_FIXE',
+  });
+
+  @override
+  List<Object> get props => [userId, code, reduction, typeReduction];
+}
+
+// Événement pour mettre à jour l'adresse de livraison
+class UpdateDeliveryAddressEvent extends ShoppingPageEventM {
+  final String userId;
+  final String nom;
+  final String telephone;
+  final String adresse;
+  final String ville;
+  final String codePostal;
+  final String pays;
+  final String? instructions;
+
+  const UpdateDeliveryAddressEvent({
+    required this.userId,
+    required this.nom,
+    required this.telephone,
+    required this.adresse,
+    required this.ville,
+    required this.codePostal,
+    this.pays = 'Côte d\'Ivoire',
+    this.instructions,
+  });
+
+  @override
+  List<Object> get props => [
+        userId,
+        nom,
+        telephone,
+        adresse,
+        ville,
+        codePostal,
+        pays,
+        instructions ?? ''
+      ];
+}
+
+// Événement pour finaliser la commande (checkout)
+class CheckoutEvent extends ShoppingPageEventM {
+  final String userId;
+  final String? moyenPaiement;
+  final String? notesClient;
+
+  const CheckoutEvent({
+    required this.userId,
+    this.moyenPaiement,
+    this.notesClient,
+  });
+
+  @override
+  List<Object> get props => [userId, moyenPaiement ?? '', notesClient ?? ''];
+}

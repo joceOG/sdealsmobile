@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import '../../../../data/services/authCubit.dart'; // ✅ Import AuthCubit
 
 import '../soutrapayblocm/soutra_wallet_bloc.dart';
 import '../soutrapayblocm/soutra_wallet_event.dart';
@@ -23,7 +24,13 @@ class _WalletPageScreenMState extends State<WalletPageScreenM> {
   @override
   void initState() {
     super.initState();
-    _soutraWalletBloc = SoutraWalletBloc();
+    // ✅ Récupérer l'userId depuis AuthCubit
+    final authState = context.read<AuthCubit>().state;
+    final String? userId = authState is AuthAuthenticated
+        ? authState.utilisateur.idutilisateur
+        : null;
+
+    _soutraWalletBloc = SoutraWalletBloc(userId: userId);
     _soutraWalletBloc.add(LoadSoutraWallet());
   }
 
@@ -131,7 +138,8 @@ class _WalletPageScreenMState extends State<WalletPageScreenM> {
                   child: CircleAvatar(
                     radius: 22,
                     backgroundColor: Colors.green.withOpacity(0.13),
-                    backgroundImage: const AssetImage('assets/profile_picture.jpg'),
+                    backgroundImage:
+                        const AssetImage('assets/profile_picture.jpg'),
                     child: Align(
                       alignment: Alignment.bottomRight,
                       child: Container(
@@ -141,7 +149,8 @@ class _WalletPageScreenMState extends State<WalletPageScreenM> {
                           border: Border.all(color: Colors.white, width: 1.5),
                         ),
                         padding: const EdgeInsets.all(2),
-                        child: const Icon(Icons.verified, size: 14, color: Colors.white),
+                        child: const Icon(Icons.verified,
+                            size: 14, color: Colors.white),
                       ),
                     ),
                   ),
@@ -174,7 +183,8 @@ class _WalletPageScreenMState extends State<WalletPageScreenM> {
                         ],
                       ),
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 22),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 24, vertical: 22),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -227,7 +237,9 @@ class _WalletPageScreenMState extends State<WalletPageScreenM> {
                             const SizedBox(height: 16),
                             // Affichage du solde avec séparateurs ou caché
                             Text(
-                              _showBalance ? "$formattedBalance FCFA" : "••••••••",
+                              _showBalance
+                                  ? "$formattedBalance FCFA"
+                                  : "••••••••",
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 32,
@@ -248,8 +260,11 @@ class _WalletPageScreenMState extends State<WalletPageScreenM> {
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(
-                                        builder: (context) => BlocProvider.value(
-                                          value: BlocProvider.of<SoutraWalletBloc>(context),
+                                        builder: (context) =>
+                                            BlocProvider.value(
+                                          value:
+                                              BlocProvider.of<SoutraWalletBloc>(
+                                                  context),
                                           child: const SoutraRechargeScreen(),
                                         ),
                                       ),
@@ -266,8 +281,11 @@ class _WalletPageScreenMState extends State<WalletPageScreenM> {
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(
-                                        builder: (context) => BlocProvider.value(
-                                          value: BlocProvider.of<SoutraWalletBloc>(context),
+                                        builder: (context) =>
+                                            BlocProvider.value(
+                                          value:
+                                              BlocProvider.of<SoutraWalletBloc>(
+                                                  context),
                                           child: const SoutraTransferScreen(),
                                         ),
                                       ),
@@ -283,7 +301,8 @@ class _WalletPageScreenMState extends State<WalletPageScreenM> {
                                     // Afficher un dialogue ou un modal bottom sheet avec l'historique des transactions
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
-                                        content: Text('Historique des transactions (à implémenter)'),
+                                        content: Text(
+                                            'Historique des transactions (à implémenter)'),
                                         duration: Duration(seconds: 2),
                                       ),
                                     );
@@ -319,7 +338,8 @@ class _WalletPageScreenMState extends State<WalletPageScreenM> {
                       final tx = transactions[index];
                       return ListTile(
                         leading: CircleAvatar(
-                          backgroundColor: (tx['color'] as Color).withOpacity(0.13),
+                          backgroundColor:
+                              (tx['color'] as Color).withOpacity(0.13),
                           child: Icon(tx['icon'], color: tx['color']),
                         ),
                         title: Text(
