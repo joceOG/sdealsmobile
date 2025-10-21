@@ -1,13 +1,9 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:sdealsmobile/data/models/utilisateur.dart';
+import 'package:sdealsmobile/mobile/view/common/screens/ai_assistant_chat_screen.dart';
 import 'package:sdealsmobile/data/services/authCubit.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:sdealsmobile/data/services/api_client.dart';
-import 'package:intl/intl.dart';
-// ✅ Design System
-import '../../../../design_system/design_system.dart';
 import 'package:sdealsmobile/mobile/view/provider_dashboard/bloc/missions_bloc.dart';
 import 'package:sdealsmobile/mobile/view/provider_dashboard/bloc/planning_bloc.dart';
 import 'package:sdealsmobile/mobile/view/provider_dashboard/bloc/messages_bloc.dart';
@@ -35,14 +31,6 @@ class ProviderMainScreen extends StatefulWidget {
 
 class _ProviderMainScreenState extends State<ProviderMainScreen> {
   int _currentIndex = 0;
-  final ApiClient _apiClient = ApiClient();
-  
-  // 📊 Données réelles du dashboard
-  int _pendingMissionsCount = 0;
-  int _ongoingMissionsCount = 0;
-  double _monthlyRevenue = 0.0;
-  double _acceptanceRate = 0.0;
-  bool _isLoadingStats = true;
 
   // Titres des écrans pour l'AppBar
   final List<String> _titles = [
@@ -53,78 +41,8 @@ class _ProviderMainScreenState extends State<ProviderMainScreen> {
     'Profil'
   ];
 
-  @override
-  void initState() {
-    super.initState();
-    _loadDashboardStats();
-  }
-
-  // 🚀 Charger les statistiques du dashboard
-  Future<void> _loadDashboardStats() async {
-    setState(() => _isLoadingStats = true);
-    
-    try {
-      final auth = context.read<AuthCubit>().state;
-      if (auth is AuthAuthenticated) {
-        final token = auth.token;
-        final utilisateurId = auth.utilisateur.idutilisateur;
-        
-        // Charger les missions en attente
-        final pendingMissions = await _apiClient.getPrestationsByStatus(
-          token: token,
-          status: 'EN_ATTENTE',
-        );
-        
-        // Charger les missions en cours
-        final ongoingMissions = await _apiClient.getPrestationsByStatus(
-          token: token,
-          status: 'EN_COURS',
-        );
-        
-        // Filtrer par prestataire
-        final filteredPending = pendingMissions.where((m) =>
-          m['prestataire']?['utilisateur']?.toString() == utilisateurId ||
-          m['prestataire']?.toString() == utilisateurId
-        ).toList();
-        
-        final filteredOngoing = ongoingMissions.where((m) =>
-          m['prestataire']?['utilisateur']?.toString() == utilisateurId ||
-          m['prestataire']?.toString() == utilisateurId
-        ).toList();
-        
-        // Charger les statistiques
-        final statsResponse = await _apiClient.get('/prestation/stats?prestataireId=$utilisateurId');
-        final stats = jsonDecode(statsResponse.body) as Map<String, dynamic>;
-        
-        setState(() {
-          _pendingMissionsCount = filteredPending.length;
-          _ongoingMissionsCount = filteredOngoing.length;
-          _monthlyRevenue = stats['revenueTotal']?.toDouble() ?? 0.0;
-          _acceptanceRate = _calculateAcceptanceRate(stats);
-          _isLoadingStats = false;
-        });
-      }
-    } catch (e) {
-      print('Erreur chargement stats dashboard: $e');
-      setState(() => _isLoadingStats = false);
-    }
-  }
-  
-  double _calculateAcceptanceRate(Map<String, dynamic> stats) {
-    final statsParStatut = stats['statsParStatut'] as List<dynamic>? ?? [];
-    int total = 0;
-    int accepted = 0;
-    
-    for (var stat in statsParStatut) {
-      final count = stat['count'] as int? ?? 0;
-      total += count;
-      if (stat['_id'] == 'ACCEPTEE' || stat['_id'] == 'TERMINEE') {
-        accepted += count;
-      }
-    }
-    
-    return total > 0 ? (accepted / total) * 100 : 0.0;
-  }
+  // Solde SoutraPay (simulé)
+  final String _balance = '125,000 FCFA';
 
   // ✅ DASHBOARD AVEC VÉRIFICATION DU STATUT
   Widget _buildSimpleDashboard() {
@@ -355,55 +273,64 @@ class _ProviderMainScreenState extends State<ProviderMainScreen> {
     );
   }
 
-  // ✅ DASHBOARD ACTIF MAGNIFIQUE (FONCTIONNEL) - AMÉLIORÉ
+  // ✅ DASHBOARD ACTIF MAGNIFIQUE (FONCTIONNEL)
   Widget _buildActiveDashboard() {
     return Scaffold(
-      backgroundColor: SDColors.neutral50,
-      body: RefreshIndicator(
-        onRefresh: _loadDashboardStats,
-        color: SDColors.primary600,
-        child: SingleChildScrollView(
-          padding: EdgeInsets.all(SDSpacing.md),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 🎨 EN-TÊTE DE BIENVENUE MAGNIFIQUE
-              _buildMagnificentWelcomeHeader(),
+      backgroundColor: Colors.grey[50],
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 🎨 EN-TÊTE DE BIENVENUE MAGNIFIQUE
+            _buildMagnificentWelcomeHeader(),
 
-              SizedBox(height: SDSpacing.md),
+            const SizedBox(height: 24),
 
-              // 📊 CARDS PRINCIPALES (Données réelles)
-              _buildMainStatsCards(),
+            // 📊 STATISTIQUES AVANCÉES
+            _buildAdvancedStatsSection(),
 
-              SizedBox(height: SDSpacing.md),
+            const SizedBox(height: 24),
 
-              // ⚡ ACTIONS RAPIDES INTELLIGENTES
-              _buildSmartActionsSection(),
+            // 📈 GRAPHIQUES MINIATURES
+            _buildMiniChartsSection(),
 
-              SizedBox(height: SDSpacing.md),
+            const SizedBox(height: 24),
 
-              // 🎯 RÉCAPITULATIF QUOTIDIEN
-              _buildDailySummarySection(),
-            ],
-          ),
+            // ⚡ ACTIONS RAPIDES INTELLIGENTES
+            _buildSmartActionsSection(),
+
+            const SizedBox(height: 24),
+
+            // 🎯 RÉCAPITULATIF QUOTIDIEN
+            _buildDailySummarySection(),
+          ],
         ),
       ),
     );
   }
 
-  // 🎨 EN-TÊTE DE BIENVENUE MAGNIFIQUE - AMÉLIORÉ AVEC DESIGN SYSTEM
+  // 🎨 EN-TÊTE DE BIENVENUE MAGNIFIQUE
   Widget _buildMagnificentWelcomeHeader() {
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(SDSpacing.lg),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        gradient: SDGradients.primaryGradient,
-        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
+        gradient: LinearGradient(
+          colors: [
+            Colors.green.shade400,
+            Colors.green.shade600,
+            Colors.green.shade800,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: SDColors.primary600.withOpacity(0.3),
+            color: Colors.green.withOpacity(0.3),
             blurRadius: 20,
-            offset: Offset(0, 8),
+            offset: const Offset(0, 8),
           ),
         ],
       ),
@@ -413,34 +340,59 @@ class _ProviderMainScreenState extends State<ProviderMainScreen> {
           Row(
             children: [
               Container(
-                padding: EdgeInsets.all(SDSpacing.sm),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: SDColors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(16),
                 ),
                 child: Icon(
                   Icons.handyman,
-                  color: SDColors.white,
+                  color: Colors.white,
                   size: 28,
                 ),
               ),
-              SizedBox(width: SDSpacing.md),
+              const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'Bonjour ${widget.utilisateur?.prenom ?? 'Prestataire'} !',
-                      style: SDTypography.titleLarge.copyWith(
-                        color: SDColors.white,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    SizedBox(height: SDSpacing.xxxs),
+                    const SizedBox(height: 4),
                     Text(
-                      'Expert Prestataire • ${DateFormat('dd/MM/yyyy').format(DateTime.now())}',
-                      style: SDTypography.bodySmall.copyWith(
-                        color: SDColors.white.withOpacity(0.9),
+                      'Expert Prestataire • ${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.9),
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.trending_up, color: Colors.white, size: 16),
+                    const SizedBox(width: 4),
+                    Text(
+                      '+12%',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ],
@@ -448,195 +400,12 @@ class _ProviderMainScreenState extends State<ProviderMainScreen> {
               ),
             ],
           ),
-          SizedBox(height: SDSpacing.sm),
+          const SizedBox(height: 16),
           Text(
-            'Gérez vos missions efficacement',
-            style: SDTypography.bodyMedium.copyWith(
-              color: SDColors.white.withOpacity(0.9),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-  
-  // 📊 CARDS PRINCIPALES AVEC DONNÉES RÉELLES
-  Widget _buildMainStatsCards() {
-    if (_isLoadingStats) {
-      return GridView.count(
-        shrinkWrap: true,
-        physics: NeverScrollableScrollPhysics(),
-        crossAxisCount: 2,
-        childAspectRatio: 1.2,
-        crossAxisSpacing: SDSpacing.sm,
-        mainAxisSpacing: SDSpacing.sm,
-        children: List.generate(4, (index) => _buildStatCardSkeleton()),
-      );
-    }
-    
-    return GridView.count(
-      shrinkWrap: true,
-      physics: NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
-      childAspectRatio: 1.2,
-      crossAxisSpacing: SDSpacing.sm,
-      mainAxisSpacing: SDSpacing.sm,
-      children: [
-        _buildMainStatCard(
-          'Missions en attente',
-          '$_pendingMissionsCount',
-          'Nouvelles demandes',
-          Icons.assignment_outlined,
-          SDColors.warning500,
-          SDColors.warning50,
-        ),
-        _buildMainStatCard(
-          'Missions en cours',
-          '$_ongoingMissionsCount',
-          'Actuellement',
-          Icons.play_circle_outline,
-          SDColors.info500,
-          SDColors.info50,
-        ),
-        _buildMainStatCard(
-          'Revenus du mois',
-          '${NumberFormat('#,###').format(_monthlyRevenue)} FCFA',
-          'Total cumulé',
-          Icons.monetization_on_outlined,
-          SDColors.success500,
-          SDColors.success50,
-        ),
-        _buildMainStatCard(
-          'Taux d\'acceptation',
-          '${_acceptanceRate.toStringAsFixed(0)}%',
-          'Performance',
-          Icons.check_circle_outline,
-          SDColors.primary600,
-          SDColors.primary50,
-        ),
-      ],
-    );
-  }
-  
-  Widget _buildMainStatCard(
-    String title,
-    String value,
-    String subtitle,
-    IconData icon,
-    Color color,
-    Color backgroundColor,
-  ) {
-    return Container(
-      padding: EdgeInsets.all(SDSpacing.md),
-      decoration: BoxDecoration(
-        color: SDColors.white,
-        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
-        boxShadow: [
-          BoxShadow(
-            color: SDColors.neutral200.withOpacity(0.5),
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: EdgeInsets.all(SDSpacing.xs),
-                decoration: BoxDecoration(
-                  color: backgroundColor,
-                  borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
-                ),
-                child: Icon(icon, color: color, size: 24),
-              ),
-              if (value == '$_pendingMissionsCount' && _pendingMissionsCount > 0)
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: SDSpacing.xs, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: SDColors.error500,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    '$_pendingMissionsCount',
-                    style: SDTypography.labelSmall.copyWith(
-                      color: SDColors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                value,
-                style: SDTypography.titleMedium.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: SDColors.neutral900,
-                ),
-              ),
-              SizedBox(height: SDSpacing.xxxs),
-              Text(
-                title,
-                style: SDTypography.bodySmall.copyWith(
-                  color: SDColors.neutral600,
-                ),
-              ),
-              SizedBox(height: SDSpacing.xxxs),
-              Text(
-                subtitle,
-                style: SDTypography.bodySmall.copyWith(
-                  color: color,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-  
-  Widget _buildStatCardSkeleton() {
-    return Container(
-      padding: EdgeInsets.all(SDSpacing.md),
-      decoration: BoxDecoration(
-        color: SDColors.white,
-        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: SDColors.neutral200,
-              borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
-            ),
-          ),
-          SizedBox(height: SDSpacing.md),
-          Container(
-            width: 60,
-            height: 20,
-            decoration: BoxDecoration(
-              color: SDColors.neutral200,
-              borderRadius: BorderRadius.circular(4),
-            ),
-          ),
-          SizedBox(height: SDSpacing.xs),
-          Container(
-            width: 100,
-            height: 16,
-            decoration: BoxDecoration(
-              color: SDColors.neutral100,
-              borderRadius: BorderRadius.circular(4),
+            'Gérez vos missions et maximisez vos revenus',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.9),
+              fontSize: 16,
             ),
           ),
         ],
@@ -834,68 +603,72 @@ class _ProviderMainScreenState extends State<ProviderMainScreen> {
     );
   }
 
-  // ⚡ ACTIONS RAPIDES INTELLIGENTES - AMÉLIORÉES
+  // ⚡ ACTIONS RAPIDES INTELLIGENTES
   Widget _buildSmartActionsSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Icon(Icons.flash_on, color: SDColors.primary600, size: 24),
-            SizedBox(width: SDSpacing.xs),
+            Icon(Icons.flash_on, color: Colors.green.shade600, size: 24),
+            const SizedBox(width: 8),
             Text(
               'Actions rapides',
-              style: SDTypography.titleSmall.copyWith(
+              style: TextStyle(
+                fontSize: 20,
                 fontWeight: FontWeight.bold,
-                color: SDColors.neutral900,
+                color: Colors.grey[800],
               ),
             ),
           ],
         ),
-        SizedBox(height: SDSpacing.md),
+        const SizedBox(height: 16),
         Row(
           children: [
             Expanded(
               child: _buildSmartActionButton(
                 'Nouvelles missions',
-                _pendingMissionsCount > 0 ? '$_pendingMissionsCount disponibles' : 'Aucune',
-                Icons.assignment_outlined,
-                SDColors.warning500,
-                () => setState(() => _currentIndex = 1),
+                '3 disponibles',
+                Icons.add_circle,
+                Colors.blue,
+                () =>
+                    setState(() => _currentIndex = 1), // Naviguer vers Missions
               ),
             ),
-            SizedBox(width: SDSpacing.sm),
+            const SizedBox(width: 12),
             Expanded(
               child: _buildSmartActionButton(
                 'Mon planning',
-                'Voir calendrier',
-                Icons.calendar_today_outlined,
-                SDColors.info500,
-                () => setState(() => _currentIndex = 2),
+                '2 rendez-vous',
+                Icons.calendar_today,
+                Colors.green,
+                () =>
+                    setState(() => _currentIndex = 2), // Naviguer vers Planning
               ),
             ),
           ],
         ),
-        SizedBox(height: SDSpacing.sm),
+        const SizedBox(height: 12),
         Row(
           children: [
             Expanded(
               child: _buildSmartActionButton(
                 'Messages',
-                'Conversations',
-                Icons.message_outlined,
-                SDColors.primary600,
-                () => setState(() => _currentIndex = 3),
+                '2 non lus',
+                Icons.message,
+                Colors.orange,
+                () =>
+                    setState(() => _currentIndex = 3), // Naviguer vers Messages
               ),
             ),
-            SizedBox(width: SDSpacing.sm),
+            const SizedBox(width: 12),
             Expanded(
               child: _buildSmartActionButton(
-                'Statistiques',
-                'Voir détails',
-                Icons.analytics_outlined,
-                SDColors.success500,
-                () => _showProviderStatistics(),
+                'SoutraPay',
+                '125K FCFA',
+                Icons.account_balance_wallet,
+                Colors.purple,
+                () => _showSoutraPayScreen(),
               ),
             ),
           ],
@@ -904,28 +677,21 @@ class _ProviderMainScreenState extends State<ProviderMainScreen> {
     );
   }
 
-  // 🎯 RÉCAPITULATIF QUOTIDIEN - AMÉLIORÉ AVEC DESIGN SYSTEM
+  // 🎯 RÉCAPITULATIF QUOTIDIEN
   Widget _buildDailySummarySection() {
     return Container(
-      padding: EdgeInsets.all(SDSpacing.md),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            SDColors.info50,
-            SDColors.success50,
+            Colors.blue.shade50,
+            Colors.green.shade50,
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
-        border: Border.all(color: SDColors.primary200, width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: SDColors.neutral200.withOpacity(0.3),
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.green.withOpacity(0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1062,7 +828,7 @@ class _ProviderMainScreenState extends State<ProviderMainScreen> {
     );
   }
 
-  // ⚡ BOUTON D'ACTION INTELLIGENT - AMÉLIORÉ AVEC DESIGN SYSTEM
+  // ⚡ BOUTON D'ACTION INTELLIGENT
   Widget _buildSmartActionButton(
     String title,
     String subtitle,
@@ -1073,16 +839,15 @@ class _ProviderMainScreenState extends State<ProviderMainScreen> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: EdgeInsets.all(SDSpacing.md),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: SDColors.white,
-          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
-          border: Border.all(color: color.withOpacity(0.2), width: 1),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: SDColors.neutral200.withOpacity(0.5),
-              blurRadius: 8,
-              offset: Offset(0, 2),
+              color: Colors.grey.withOpacity(0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
@@ -1310,6 +1075,7 @@ class _ProviderMainScreenState extends State<ProviderMainScreen> {
                     const SizedBox(width: 6),
 
                     // Solde SoutraPay élégant
+                    _buildSoldeButton(context),
                     const SizedBox(width: 6),
 
                     // Menu expert
@@ -1380,11 +1146,46 @@ class _ProviderMainScreenState extends State<ProviderMainScreen> {
     );
   }
 
+  // 💰 BOUTON SOLDE SOUTRAPAY
+  Widget _buildSoldeButton(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.3)),
+      ),
+      child: InkWell(
+        onTap: () => _showSoutraPayScreen(),
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.account_balance_wallet,
+                color: Colors.white,
+                size: 16,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                _balance,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   // 🎯 MENU EXPERT
   Widget _buildExpertMenu(BuildContext context) {
     return PopupMenuButton<String>(
-      offset: const Offset(0, 50), // Afficher le menu EN DESSOUS
       icon: Container(
         width: 40,
         height: 40,
@@ -1405,6 +1206,17 @@ class _ProviderMainScreenState extends State<ProviderMainScreen> {
             break;
           case 'statistiques':
             _showProviderStatistics();
+            break;
+          case 'assistant':
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const AIAssistantChatScreen(),
+              ),
+            );
+            break;
+          case 'soutrapay':
+            _showSoutraPayScreen();
             break;
           case 'retour_client':
             _switchToClientMode(context);
@@ -1442,6 +1254,26 @@ class _ProviderMainScreenState extends State<ProviderMainScreen> {
               Icon(Icons.analytics, color: Colors.green.shade600),
               const SizedBox(width: 12),
               const Text('Statistiques'),
+            ],
+          ),
+        ),
+        PopupMenuItem<String>(
+          value: 'assistant',
+          child: Row(
+            children: [
+              Icon(Icons.smart_toy, color: Colors.green.shade600),
+              const SizedBox(width: 12),
+              const Text('Assistant IA'),
+            ],
+          ),
+        ),
+        PopupMenuItem<String>(
+          value: 'soutrapay',
+          child: Row(
+            children: [
+              Icon(Icons.account_balance_wallet, color: Colors.green.shade600),
+              const SizedBox(width: 12),
+              const Text('SoutraPay'),
             ],
           ),
         ),
@@ -1582,7 +1414,7 @@ class _ProviderMainScreenState extends State<ProviderMainScreen> {
         });
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           color: isActive ? Colors.white.withOpacity(0.2) : Colors.transparent,
           borderRadius: BorderRadius.circular(12),

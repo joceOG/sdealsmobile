@@ -4,9 +4,6 @@ import '../morepageblocm/morePageBlocM.dart';
 import '../../../../data/services/authCubit.dart';
 import 'package:go_router/go_router.dart';
 
-// ✅ Design System
-import '../../../../design_system/design_system.dart';
-
 class MorePageScreenM extends StatefulWidget {
   const MorePageScreenM({super.key});
   @override
@@ -24,19 +21,20 @@ class _MorePagePageScreenStateM extends State<MorePageScreenM> {
   Widget build(BuildContext context) {
     return Scaffold(
       key: _scaffoldKey,
-      backgroundColor: SDColors.white,
+      backgroundColor: Colors.white,
       drawer: Drawer(
         child: ListView(
           padding: EdgeInsets.zero,
-          children: <Widget>[
+          children: const <Widget>[
             DrawerHeader(
               decoration: BoxDecoration(
-                color: SDColors.primary600,
+                color: Colors.green,
               ),
               child: Text(
                 'Menu',
-                style: SDTypography.titleLarge.copyWith(
-                  color: SDColors.white,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
                 ),
               ),
             ),
@@ -51,25 +49,29 @@ class _MorePagePageScreenStateM extends State<MorePageScreenM> {
           surfaceTintColor: Colors.transparent,
           elevation: 0,
           automaticallyImplyLeading: false,
-          shape: RoundedRectangleBorder(
+          shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.only(
-              bottomLeft: Radius.circular(SDSpacing.xxxl),
-              bottomRight: Radius.circular(SDSpacing.xxxl),
+              bottomLeft: Radius.circular(44),
+              bottomRight: Radius.circular(44),
             ),
           ),
           flexibleSpace: Container(
-            decoration: BoxDecoration(
-              gradient: SDGradients.primaryGradient,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF43EA5E), Color(0xFF1CBF3F)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
               boxShadow: [
                 BoxShadow(
-                  color: SDColors.neutral900.withOpacity(0.26),
+                  color: Colors.black26,
                   blurRadius: 18,
                   offset: Offset(0, 8),
                 ),
               ],
               borderRadius: BorderRadius.only(
-                bottomLeft: Radius.circular(SDSpacing.xxxl),
-                bottomRight: Radius.circular(SDSpacing.xxxl),
+                bottomLeft: Radius.circular(44),
+                bottomRight: Radius.circular(44),
               ),
             ),
             child: SafeArea(
@@ -78,8 +80,8 @@ class _MorePagePageScreenStateM extends State<MorePageScreenM> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Padding(
-                    padding: EdgeInsets.symmetric(
-                        horizontal: SDSpacing.sm, vertical: SDSpacing.xxxs),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10.0, vertical: 6),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -87,18 +89,18 @@ class _MorePagePageScreenStateM extends State<MorePageScreenM> {
                           onTap: () {
                             _scaffoldKey.currentState?.openDrawer();
                           },
-                          child: Icon(Icons.menu,
-                              color: SDColors.white, size: 32),
+                          child: const Icon(Icons.menu,
+                              color: Colors.white, size: 32),
                         ),
                         IconButton(
-                          icon: Icon(Icons.notifications,
-                              color: SDColors.white, size: 32),
+                          icon: const Icon(Icons.notifications,
+                              color: Colors.white, size: 32),
                           onPressed: () {},
                         ),
                       ],
                     ),
                   ),
-                  SizedBox(height: SDSpacing.xxxs),
+                  const SizedBox(height: 4),
                   TweenAnimationBuilder<double>(
                     tween: Tween(begin: 0, end: 1),
                     duration: Duration(milliseconds: 700),
@@ -106,19 +108,20 @@ class _MorePagePageScreenStateM extends State<MorePageScreenM> {
                       opacity: value,
                       child: child,
                     ),
-                    child: Center(
+                    child: const Center(
                       child: Text(
-                          'SOUTRALI DEALS',
-                          style: SDTypography.titleLarge.copyWith(
-                            color: SDColors.primary600,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.5,
-                          ),
+                        'SOUTRALI DEALS',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.2,
                         ),
+                      ),
                     ),
                   ),
                   Padding(
-                    padding: EdgeInsets.symmetric(vertical: SDSpacing.xs),
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
                     child: Align(
                       alignment: Alignment.center,
                       child: FractionallySizedBox(
@@ -126,51 +129,52 @@ class _MorePagePageScreenStateM extends State<MorePageScreenM> {
                         child: Container(
                           height: 52,
                           decoration: BoxDecoration(
-                            color: SDColors.white,
-                            borderRadius: BorderRadius.circular(SDSpacing.xxxl),
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(32),
                             border: Border.all(
-                                color: SDColors.primary200, width: 1.4),
+                                color: Colors.green.shade200, width: 1.4),
                             boxShadow: [
                               BoxShadow(
-                                color: SDColors.primary600.withOpacity(0.07),
+                                color: Colors.green.withOpacity(0.07),
                                 blurRadius: 10,
-                                offset: Offset(0, 4),
+                                offset: const Offset(0, 4),
                               ),
                             ],
                           ),
                           child: Row(
                             children: [
-                              SizedBox(width: SDSpacing.sm),
+                              const SizedBox(width: 10),
                               Material(
-                                color: SDColors.primary600,
-                                shape: CircleBorder(),
+                                color: Colors.green,
+                                shape: const CircleBorder(),
                                 elevation: 2,
                                 child: Padding(
-                                  padding: EdgeInsets.all(SDSpacing.xxs),
+                                  padding: const EdgeInsets.all(7.0),
                                   child: Icon(Icons.search_rounded,
-                                      color: SDColors.white, size: 22),
+                                      color: Colors.white, size: 22),
                                 ),
                               ),
-                              SizedBox(width: SDSpacing.xs),
-                              Expanded(
+                              const SizedBox(width: 12),
+                              const Expanded(
                                 child: TextField(
-                                  style: SDTypography.bodyMedium,
-                                  cursorColor: SDColors.primary600,
+                                  style: TextStyle(fontSize: 16),
+                                  cursorColor: Colors.green,
                                   decoration: InputDecoration(
                                     hintText: 'Rechercher sur soutralideals',
-                                    hintStyle: SDTypography.bodyMedium.copyWith(
-                                      color: SDColors.primary600,
-                                    ),
+                                    hintStyle: TextStyle(
+                                        color: Colors.green,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w500),
                                     border: InputBorder.none,
                                     enabledBorder: InputBorder.none,
                                     focusedBorder: InputBorder.none,
                                     isDense: true,
                                     contentPadding:
-                                        EdgeInsets.symmetric(vertical: SDSpacing.sm),
+                                        EdgeInsets.symmetric(vertical: 14),
                                   ),
                                 ),
                               ),
-                              SizedBox(width: SDSpacing.sm),
+                              const SizedBox(width: 10),
                             ],
                           ),
                         ),
@@ -184,11 +188,11 @@ class _MorePagePageScreenStateM extends State<MorePageScreenM> {
         ),
       ),
       body: Padding(
-        padding: EdgeInsets.symmetric(horizontal: SDSpacing.lg, vertical: SDSpacing.xs),
+        padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SizedBox(height: SDSpacing.lg),
+            const SizedBox(height: 30),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
@@ -197,8 +201,8 @@ class _MorePagePageScreenStateM extends State<MorePageScreenM> {
                     icon: Icons.article_rounded,
                     label: 'Soutra News',
                     badge: 'Nouveau',
-                    gradient: LinearGradient(
-                      colors: [SDColors.success500, SDColors.success600],
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF43EA5E), Color(0xFF1CBF3F)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
@@ -207,14 +211,14 @@ class _MorePagePageScreenStateM extends State<MorePageScreenM> {
                     },
                   ),
                 ),
-                SizedBox(width: SDSpacing.md),
+                const SizedBox(width: 18),
                 Expanded(
                   child: _AnimatedCardWithBadge(
                     icon: Icons.account_balance_wallet_rounded,
                     label: 'Soutra Pay',
                     badge: 'Nouveau',
-                    gradient: LinearGradient(
-                      colors: [SDColors.success500, SDColors.success600],
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF43EA5E), Color(0xFF1CBF3F)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
@@ -225,10 +229,10 @@ class _MorePagePageScreenStateM extends State<MorePageScreenM> {
                 ),
               ],
             ),
-            SizedBox(height: SDSpacing.md),
+            const SizedBox(height: 20),
             // 🎯 CARTE MODE PRESTATAIRE
             _buildPrestataireModeCard(),
-            SizedBox(height: SDSpacing.lg),
+            const SizedBox(height: 30),
           ],
         ),
       ),
@@ -245,15 +249,15 @@ class _MorePagePageScreenStateM extends State<MorePageScreenM> {
             icon: Icons.handyman,
             label: 'Mode Prestataire',
             badge: 'Disponible',
-            gradient: LinearGradient(
-              colors: [SDColors.primary500, SDColors.primary700],
+            gradient: const LinearGradient(
+              colors: [Color(0xFF4CAF50), Color(0xFF2E7D32)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
             onTap: () => _switchToPrestataireMode(context),
           );
         }
-        return SizedBox.shrink(); // Masquer si pas prestataire
+        return const SizedBox.shrink(); // Masquer si pas prestataire
       },
     );
   }
@@ -309,35 +313,37 @@ class _AnimatedCardWithBadgeState extends State<_AnimatedCardWithBadge> {
           clipBehavior: Clip.none,
           children: [
             AnimatedContainer(
-              duration: Duration(milliseconds: 120),
+              duration: const Duration(milliseconds: 120),
               height: 100,
               decoration: BoxDecoration(
                 gradient: widget.gradient,
-                borderRadius: BorderRadius.circular(SDSpacing.xxxl),
-                border: Border.all(color: SDColors.white, width: 2),
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(color: Colors.white, width: 2),
                 boxShadow: [
                   BoxShadow(
                     color: _pressed
-                        ? SDColors.success500.withOpacity(0.25)
-                        : SDColors.neutral900.withOpacity(0.10),
+                        ? Colors.greenAccent.withOpacity(0.25)
+                        : Colors.black.withOpacity(0.10),
                     blurRadius: _pressed ? 24 : 16,
-                    offset: Offset(0, 6),
+                    offset: const Offset(0, 6),
                   ),
                 ],
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(widget.icon, color: SDColors.white, size: 32),
-                  SizedBox(width: SDSpacing.sm),
+                  Icon(widget.icon, color: Colors.white, size: 32),
+                  const SizedBox(width: 10),
                   Flexible(
                     child: Text(
                       widget.label,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: SDTypography.titleMedium.copyWith(
-                        color: SDColors.white,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
                         fontWeight: FontWeight.w700,
+                        fontFamily: 'Montserrat',
                         letterSpacing: 1.2,
                       ),
                     ),
@@ -351,23 +357,24 @@ class _AnimatedCardWithBadgeState extends State<_AnimatedCardWithBadge> {
                 right: 18,
                 child: Container(
                   padding:
-                      EdgeInsets.symmetric(horizontal: SDSpacing.sm, vertical: SDSpacing.xxxs),
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: SDColors.error500,
-                    borderRadius: BorderRadius.circular(SDSpacing.sm),
+                    color: Colors.redAccent,
+                    borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: SDColors.error500.withOpacity(0.18),
+                        color: Colors.redAccent.withOpacity(0.18),
                         blurRadius: 8,
-                        offset: Offset(0, 2),
+                        offset: const Offset(0, 2),
                       ),
                     ],
                   ),
                   child: Text(
                     widget.badge!,
-                    style: SDTypography.labelSmall.copyWith(
-                      color: SDColors.white,
+                    style: const TextStyle(
+                      color: Colors.white,
                       fontWeight: FontWeight.bold,
+                      fontSize: 12,
                     ),
                   ),
                 ),

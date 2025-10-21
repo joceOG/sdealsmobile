@@ -8,9 +8,7 @@ import '../../../../data/services/authCubit.dart';
 import '../loginpageblocm/loginPageBlocM.dart';
 import '../loginpageblocm/loginPageEventM.dart';
 import '../loginpageblocm/loginPageStateM.dart';
-
-// ✅ Design System
-import '../../../../design_system/design_system.dart';
+// ✅ import du modèle utilisateur
 
 class LoginPageScreenM extends StatefulWidget {
   const LoginPageScreenM({super.key});
@@ -49,20 +47,28 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
     return BlocProvider(
       create: (_) => LoginPageBlocM(),
       child: Scaffold(
-        backgroundColor: SDColors.white,
-        appBar: SDAppBar(
-          title: '', // Empty title for minimal look
-          useGradient: false,
-          backgroundColor: SDColors.white,
-          centerTitle: false,
+        backgroundColor: Colors.green.shade700,
+        appBar: AppBar(
+          backgroundColor: Colors.green.shade700,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            onPressed: () {
+              Navigator.pop(context);
+            },
+          ),
         ),
         body: BlocListener<LoginPageBlocM, LoginPageStateM>(
           listener: (context, state) {
             if (state is LoginPageSuccessM) {
               final utilisateur = Utilisateur.fromMap(state.utilisateur);
-              final userRole = utilisateur.role.toUpperCase();
-              final roles = [userRole];
-              final activeRole = userRole;
+              // ✅ ARCHITECTURE MULTI-RÔLES : Utiliser le rôle de l'utilisateur comme rôle actif
+              final userRole =
+                  utilisateur.role.toUpperCase(); // Normaliser le rôle
+              final roles = [
+                userRole
+              ]; // Liste des rôles (pour l'instant un seul)
+              final activeRole = userRole; // Rôle actif
 
               context.read<AuthCubit>().setAuthenticated(
                     token: state.token,
@@ -71,7 +77,9 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
                     activeRole: activeRole,
                   );
 
+              // ✅ REDIRECTION SIMPLIFIÉE : Toujours aller à homepage, la redirection automatique se fera
               context.push('/homepage');
+
               print('🔐 Connecté en tant que $activeRole avec rôles: $roles');
             } else if (state is LoginPageFailureM) {
               ScaffoldMessenger.of(context)
@@ -79,201 +87,178 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
             }
           },
           child: SingleChildScrollView(
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: SDSpacing.md),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  SDSpacing.verticalMediumGap,
-                  Center(
-                    child: AnimatedBuilder(
-                      animation: _animationController,
-                      builder: (context, child) {
-                        return ScaleTransition(
-                          scale: Tween<double>(begin: 1.0, end: 1.1)
-                              .animate(_animationController),
-                          child: child,
-                        );
-                      },
-                      child: Image.asset(
-                        'assets/logo1.png',
-                        height: 120,
-                      ),
-                    ),
-                  ),
-                  SDSpacing.verticalLargeGap,
-                  Text(
-                    "Bienvenue !",
-                    textAlign: TextAlign.center,
-                    style: SDTypography.displayMedium.copyWith(
-                      color: SDColors.neutral900,
-                    ),
-                  ),
-                  SDSpacing.verticalTinyGap,
-                  Text(
-                    "Connectez-vous pour continuer",
-                    textAlign: TextAlign.center,
-                    style: SDTypography.bodyLarge.copyWith(
-                      color: SDColors.neutral600,
-                    ),
-                  ),
-                  SDSpacing.verticalLargeGap,
-                  
-                  // Design System Inputs
-                  SDInput(
-                    label: "Mon identifiant",
-                    hint: "Email ou téléphone",
-                    controller: identifiantController,
-                    prefixIcon: Icons.person_outline,
-                    keyboardType: TextInputType.emailAddress,
-                  ),
-                  SDSpacing.verticalMediumGap,
-                  SDInput(
-                    label: "Mot de passe",
-                    hint: "Entrez votre mot de passe",
-                    controller: passwordController,
-                    obscureText: true,
-                    prefixIcon: Icons.lock_outline,
-                  ),
-                  
-                  SDSpacing.verticalSmallGap,
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Flexible(
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Checkbox(
-                              value: rememberMe,
-                              activeColor: SDColors.primary600,
-                              onChanged: (value) {
-                                setState(() {
-                                  rememberMe = value ?? false;
-                                });
-                              },
-                            ),
-                            Flexible(
-                              child: Text(
-                                "Se souvenir de moi",
-                                style: SDTypography.bodyMedium,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () {},
-                        style: TextButton.styleFrom(
-                          padding: EdgeInsets.symmetric(horizontal: SDSpacing.xs, vertical: SDSpacing.xxxs),
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        child: Text(
-                          "Mot de passe oublié ?",
-                          style: SDTypography.labelMedium.copyWith(
-                            color: SDColors.primary700,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  
-                  SDSpacing.verticalMediumGap,
-                  
-                  BlocBuilder<LoginPageBlocM, LoginPageStateM>(
-                    builder: (context, state) {
-                      return SDButton(
-                        text: "SE CONNECTER",
-                        fullWidth: true,
-                        isLoading: state is LoginPageLoadingM,
-                        onPressed: state is LoginPageLoadingM
-                            ? null
-                            : () {
-                                final identifiant =
-                                    identifiantController.text.trim();
-                                final password =
-                                    passwordController.text.trim();
-                                if (identifiant.isEmpty ||
-                                    password.isEmpty) {
-                                  ScaffoldMessenger.of(context)
-                                      .showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        "Mot de passe ou identifiant requis",
-                                        style: SDTypography.bodyMedium.copyWith(
-                                          color: SDColors.white,
-                                        ),
-                                      ),
-                                      backgroundColor: SDColors.error500,
-                                    ),
-                                  );
-                                  return;
-                                }
-                                context.read<LoginPageBlocM>().add(
-                                      LoginSubmittedM(
-                                        identifiant: identifiant,
-                                        password: password,
-                                        rememberMe: rememberMe,
-                                      ),
-                                    );
-                              },
+            child: Column(
+              children: [
+                const SizedBox(height: 40),
+                Center(
+                  child: AnimatedBuilder(
+                    animation: _animationController,
+                    builder: (context, child) {
+                      return ScaleTransition(
+                        scale: Tween<double>(begin: 1.0, end: 1.2)
+                            .animate(_animationController),
+                        child: child,
                       );
                     },
+                    child: Image.asset(
+                      'assets/logo1.png',
+                      height: 100,
+                    ),
                   ),
-                  
-                  SDSpacing.verticalLargeGap,
-                  Row(
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  "Bienvenue sur Soutrali Deals,\nconnectez-vous pour consulter vos services",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 16, color: Colors.white),
+                ),
+                const SizedBox(height: 30),
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  margin: const EdgeInsets.symmetric(horizontal: 20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Column(
                     children: [
-                      Expanded(child: Divider(color: SDColors.neutral300)),
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: SDSpacing.sm),
-                        child: Text(
-                          "OU",
-                          style: SDTypography.bodySmall.copyWith(
-                            color: SDColors.neutral500,
+                      TextField(
+                        controller: identifiantController,
+                        decoration: const InputDecoration(
+                          labelText: "Mon identifiant",
+                          hintText: "Entrez votre identifiant",
+                          border: UnderlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      TextField(
+                        controller: passwordController,
+                        obscureText: !isPasswordVisible,
+                        decoration: InputDecoration(
+                          labelText: "Mot de passe",
+                          hintText: "Entrez votre mot de passe",
+                          border: const UnderlineInputBorder(),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              isPasswordVisible
+                                  ? Icons.visibility
+                                  : Icons.visibility_off,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                isPasswordVisible = !isPasswordVisible;
+                              });
+                            },
                           ),
                         ),
                       ),
-                      Expanded(child: Divider(color: SDColors.neutral300)),
-                    ],
-                  ),
-                  SDSpacing.verticalMediumGap,
-                  
-                  Wrap(
-                    alignment: WrapAlignment.center,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      Text(
-                        'Vous n\'avez pas de compte ?',
-                        style: SDTypography.bodyMedium.copyWith(
-                          color: SDColors.neutral800,
-                        ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Checkbox(
+                            value: rememberMe,
+                            onChanged: (value) {
+                              setState(() {
+                                rememberMe = value ?? false;
+                              });
+                            },
+                          ),
+                          const Text("Se souvenir de moi"),
+                        ],
                       ),
-                      TextButton(
-                        onPressed: () {
-                          WidgetsBinding.instance.addPostFrameCallback((_) {
-                            context.push("/register");
-                          });
+                      const SizedBox(height: 10),
+                      BlocBuilder<LoginPageBlocM, LoginPageStateM>(
+                        builder: (context, state) {
+                          return ElevatedButton(
+                            onPressed: state is LoginPageLoadingM
+                                ? null
+                                : () {
+                                    final identifiant =
+                                        identifiantController.text.trim();
+                                    final password =
+                                        passwordController.text.trim();
+                                    if (identifiant.isEmpty ||
+                                        password.isEmpty) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                              "Mot de passe ou identifiant requis"),
+                                        ),
+                                      );
+                                      return;
+                                    }
+                                    context.read<LoginPageBlocM>().add(
+                                          LoginSubmittedM(
+                                            identifiant: identifiant,
+                                            password: password,
+                                            rememberMe: rememberMe,
+                                          ),
+                                        );
+                                  },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green.shade700,
+                              minimumSize: const Size(double.infinity, 50),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(25),
+                              ),
+                            ),
+                            child: state is LoginPageLoadingM
+                                ? const CircularProgressIndicator(
+                                    color: Colors.white,
+                                  )
+                                : const Text(
+                                    "JE ME CONNECTE",
+                                    style: TextStyle(
+                                        fontSize: 16, color: Colors.white),
+                                  ),
+                          );
                         },
-                        style: TextButton.styleFrom(
-                          padding: EdgeInsets.symmetric(horizontal: SDSpacing.xs, vertical: SDSpacing.xxxs),
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      TextButton(
+                        onPressed: () {},
                         child: Text(
-                          'S\'inscrire',
-                          style: SDTypography.labelLarge.copyWith(
-                            color: SDColors.primary600,
-                          ),
+                          "Mot de passe oublié ?",
+                          style: TextStyle(color: Colors.green.shade700),
                         ),
+                      ),
+                      const SizedBox(height: 10),
+                      const Row(
+                        children: [
+                          Expanded(child: Divider(color: Colors.grey)),
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 10),
+                            child: Text(
+                              "OU",
+                              style: TextStyle(color: Colors.grey),
+                            ),
+                          ),
+                          Expanded(child: Divider(color: Colors.grey)),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Text('Vous n\'avez pas de compte?'),
+                          TextButton(
+                            onPressed: () {
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                context.push("/register");
+                              });
+                            },
+                            child: const Text(
+                              'Créer un compte',
+                              style: TextStyle(color: Colors.green),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                  SDSpacing.verticalMediumGap,
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),

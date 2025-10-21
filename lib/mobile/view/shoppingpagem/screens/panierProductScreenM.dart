@@ -6,11 +6,6 @@ import '../shoppingpageblocm/shoppingPageStateM.dart';
 import 'package:sdealsmobile/data/services/authCubit.dart';
 import 'confirmationCommandeScreenM.dart';
 import 'delivery_address_screen.dart';
-import 'package:sdealsmobile/mobile/view/common/utils/app_snackbar.dart';
-import '../../common/widgets/empty_state_widget.dart';
-import '../../common/widgets/app_image.dart';
-// ✅ Design System
-import '../../../../design_system/design_system.dart';
 
 class PanierProductScreenM extends StatefulWidget {
   const PanierProductScreenM({super.key});
@@ -38,30 +33,29 @@ class _PanierProductScreenMState extends State<PanierProductScreenM> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
+        title: const Text(
           "Votre panier",
-          style: SDTypography.titleMedium.copyWith(fontWeight: FontWeight.bold, color: SDColors.white),
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
         ),
-        backgroundColor: SDColors.primary600,
+        backgroundColor: Colors.green,
         actions: [
           // Bouton vider le panier
           BlocBuilder<ShoppingPageBlocM, ShoppingPageStateM>(
             builder: (context, state) {
               if (state.cart != null && state.cart!.isNotEmpty) {
                 return IconButton(
-                  icon: Icon(Icons.delete_outline, color: SDColors.white),
+                  icon: const Icon(Icons.delete_outline),
                   onPressed: () {
                     showDialog(
                       context: context,
                       builder: (dialogContext) => AlertDialog(
-                        title: Text('Vider le panier', style: SDTypography.titleMedium),
-                        content: Text(
-                            'Êtes-vous sûr de vouloir vider votre panier ?',
-                            style: SDTypography.bodyMedium),
+                        title: const Text('Vider le panier'),
+                        content: const Text(
+                            'Êtes-vous sûr de vouloir vider votre panier ?'),
                         actions: [
                           TextButton(
                             onPressed: () => Navigator.pop(dialogContext),
-                            child: Text('Annuler', style: SDTypography.labelMedium),
+                            child: const Text('Annuler'),
                           ),
                           TextButton(
                             onPressed: () {
@@ -75,8 +69,8 @@ class _PanierProductScreenMState extends State<PanierProductScreenM> {
                               }
                               Navigator.pop(dialogContext);
                             },
-                            child: Text('Vider',
-                                style: SDTypography.labelMedium.copyWith(color: SDColors.error500)),
+                            child: const Text('Vider',
+                                style: TextStyle(color: Colors.red)),
                           ),
                         ],
                       ),
@@ -84,7 +78,7 @@ class _PanierProductScreenMState extends State<PanierProductScreenM> {
                   },
                 );
               }
-              return SizedBox.shrink();
+              return const SizedBox.shrink();
             },
           ),
         ],
@@ -93,19 +87,25 @@ class _PanierProductScreenMState extends State<PanierProductScreenM> {
         listener: (context, state) {
           // Afficher les erreurs
           if (state.cartError != null && state.cartError!.isNotEmpty) {
-            AppSnackBar.error(context, state.cartError!);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.cartError!),
+                backgroundColor: Colors.red,
+                duration: const Duration(seconds: 3),
+              ),
+            );
           }
         },
         builder: (context, state) {
           // Afficher le loader
           if (state.isCartLoading && state.cart == null) {
-            return Center(
+            return const Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  CircularProgressIndicator(color: SDColors.primary600),
-                  SizedBox(height: SDSpacing.sm),
-                  Text('Chargement du panier...', style: SDTypography.bodyMedium),
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('Chargement du panier...'),
                 ],
               ),
             );
@@ -113,22 +113,48 @@ class _PanierProductScreenMState extends State<PanierProductScreenM> {
 
           // Panier vide
           if (state.cart == null || state.cart!.isEmpty) {
-            return EmptyStateWidget(
-              imagePath: 'assets/panier_vide.png',
-              title: 'Votre panier est vide',
-              message: 'Ajoutez des produits pour commencer vos achats et profitez de nos offres !',
-              action: ElevatedButton.icon(
-                onPressed: () => Navigator.pop(context),
-                icon: Icon(Icons.shopping_bag, color: SDColors.white),
-                label: Text('Continuer mes achats', style: SDTypography.labelMedium.copyWith(color: SDColors.white)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: SDColors.primary700,
-                  foregroundColor: SDColors.white,
-                  padding: EdgeInsets.symmetric(horizontal: SDSpacing.lg, vertical: SDSpacing.md),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.shopping_cart_outlined,
+                    size: 100,
+                    color: Colors.grey[400],
                   ),
-                ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Votre panier est vide',
+                    style: TextStyle(
+                      fontSize: 18,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Ajoutez des articles pour commencer',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[500],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 32,
+                        vertical: 12,
+                      ),
+                    ),
+                    child: const Text(
+                      'Continuer mes achats',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ],
               ),
             );
           }
@@ -143,17 +169,18 @@ class _PanierProductScreenMState extends State<PanierProductScreenM> {
             children: [
               // Badge avec nombre d'articles
               Container(
-                padding: EdgeInsets.all(SDSpacing.xs),
-                color: SDColors.success50,
+                padding: const EdgeInsets.all(12),
+                color: Colors.green[50],
                 child: Row(
                   children: [
-                    Icon(Icons.shopping_bag, color: SDColors.success700),
-                    SizedBox(width: SDSpacing.xs),
+                    Icon(Icons.shopping_bag, color: Colors.green[700]),
+                    const SizedBox(width: 8),
                     Text(
                       '${cart.totalItems} article${cart.totalItems > 1 ? 's' : ''} dans votre panier',
-                      style: SDTypography.titleSmall.copyWith(
+                      style: TextStyle(
+                        fontSize: 16,
                         fontWeight: FontWeight.w600,
-                        color: SDColors.success700,
+                        color: Colors.green[700],
                       ),
                     ),
                   ],
@@ -165,33 +192,43 @@ class _PanierProductScreenMState extends State<PanierProductScreenM> {
                 child: Stack(
                   children: [
                     ListView.builder(
-                      padding: EdgeInsets.only(bottom: SDSpacing.sm),
+                      padding: const EdgeInsets.only(bottom: 16),
                       itemCount: cart.articles.length,
                       itemBuilder: (context, index) {
                         final item = cart.articles[index];
 
                         return Card(
-                          margin: EdgeInsets.symmetric(
-                            horizontal: SDSpacing.xs,
-                            vertical: SDSpacing.xxxs,
+                          margin: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
                           ),
                           elevation: 2,
                           child: Padding(
-                            padding: EdgeInsets.all(SDSpacing.xs),
+                            padding: const EdgeInsets.all(12),
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 // Image du produit
                                 ClipRRect(
-                                  borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
-                                  child: AppImage(
-                                    imageUrl: item.imageArticle,
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Image.network(
+                                    item.imageArticle,
                                     width: 80,
                                     height: 80,
                                     fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => Container(
+                                      width: 80,
+                                      height: 80,
+                                      color: Colors.grey[200],
+                                      child: const Icon(
+                                        Icons.image,
+                                        size: 40,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
                                   ),
                                 ),
-                                SizedBox(width: SDSpacing.xs),
+                                const SizedBox(width: 12),
 
                                 // Détails du produit
                                 Expanded(
@@ -201,21 +238,23 @@ class _PanierProductScreenMState extends State<PanierProductScreenM> {
                                     children: [
                                       Text(
                                         item.nomArticle,
-                                        style: SDTypography.bodyMedium.copyWith(
+                                        style: const TextStyle(
                                           fontWeight: FontWeight.bold,
+                                          fontSize: 15,
                                         ),
                                         maxLines: 2,
                                         overflow: TextOverflow.ellipsis,
                                       ),
-                                      SizedBox(height: SDSpacing.xxxs),
+                                      const SizedBox(height: 4),
                                       Text(
                                         "${item.prixUnitaire.toStringAsFixed(0)} FCFA",
-                                        style: SDTypography.titleSmall.copyWith(
+                                        style: TextStyle(
+                                          fontSize: 16,
                                           fontWeight: FontWeight.bold,
-                                          color: SDColors.success700,
+                                          color: Colors.green[700],
                                         ),
                                       ),
-                                      SizedBox(height: SDSpacing.xs),
+                                      const SizedBox(height: 8),
 
                                       // Contrôles de quantité
                                       Row(
@@ -223,9 +262,9 @@ class _PanierProductScreenMState extends State<PanierProductScreenM> {
                                           Container(
                                             decoration: BoxDecoration(
                                               border: Border.all(
-                                                  color: SDColors.neutral300),
+                                                  color: Colors.grey[300]!),
                                               borderRadius:
-                                                  BorderRadius.circular(SDSpacing.borderRadiusSmall),
+                                                  BorderRadius.circular(8),
                                             ),
                                             child: Row(
                                               children: [
@@ -237,12 +276,12 @@ class _PanierProductScreenMState extends State<PanierProductScreenM> {
                                                     size: 20,
                                                   ),
                                                   color: item.quantite > 1
-                                                      ? SDColors.warning500
-                                                      : SDColors.error500,
+                                                      ? Colors.orange
+                                                      : Colors.red,
                                                   padding:
-                                                      EdgeInsets.all(SDSpacing.xxxs),
+                                                      const EdgeInsets.all(4),
                                                   constraints:
-                                                      BoxConstraints(
+                                                      const BoxConstraints(
                                                     minWidth: 32,
                                                     minHeight: 32,
                                                   ),
@@ -272,20 +311,17 @@ class _PanierProductScreenMState extends State<PanierProductScreenM> {
                                                               builder:
                                                                   (dialogContext) =>
                                                                       AlertDialog(
-                                                                title: Text(
-                                                                    'Retirer l\'article',
-                                                                    style: SDTypography.titleMedium),
-                                                                content: Text(
-                                                                    'Voulez-vous retirer cet article du panier ?',
-                                                                    style: SDTypography.bodyMedium),
+                                                                title: const Text(
+                                                                    'Retirer l\'article'),
+                                                                content: const Text(
+                                                                    'Voulez-vous retirer cet article du panier ?'),
                                                                 actions: [
                                                                   TextButton(
                                                                     onPressed: () =>
                                                                         Navigator.pop(
                                                                             dialogContext),
-                                                                    child: Text(
-                                                                        'Annuler',
-                                                                        style: SDTypography.labelMedium),
+                                                                    child: const Text(
+                                                                        'Annuler'),
                                                                   ),
                                                                   TextButton(
                                                                     onPressed:
@@ -302,11 +338,11 @@ class _PanierProductScreenMState extends State<PanierProductScreenM> {
                                                                       Navigator.pop(
                                                                           dialogContext);
                                                                     },
-                                                                    child: Text(
+                                                                    child: const Text(
                                                                         'Retirer',
-                                                                        style: SDTypography.labelMedium.copyWith(
+                                                                        style: TextStyle(
                                                                             color:
-                                                                                SDColors.error500)),
+                                                                                Colors.red)),
                                                                   ),
                                                                 ],
                                                               ),
@@ -315,25 +351,26 @@ class _PanierProductScreenMState extends State<PanierProductScreenM> {
                                                         },
                                                 ),
                                                 Container(
-                                                  padding: EdgeInsets
+                                                  padding: const EdgeInsets
                                                       .symmetric(
-                                                      horizontal: SDSpacing.xs),
+                                                      horizontal: 12),
                                                   child: Text(
                                                     "${item.quantite}",
-                                                    style: SDTypography.titleSmall.copyWith(
+                                                    style: const TextStyle(
+                                                      fontSize: 16,
                                                       fontWeight:
                                                           FontWeight.bold,
                                                     ),
                                                   ),
                                                 ),
                                                 IconButton(
-                                                  icon: Icon(Icons.add,
+                                                  icon: const Icon(Icons.add,
                                                       size: 20),
-                                                  color: SDColors.success500,
+                                                  color: Colors.green,
                                                   padding:
-                                                      EdgeInsets.all(SDSpacing.xxxs),
+                                                      const EdgeInsets.all(4),
                                                   constraints:
-                                                      BoxConstraints(
+                                                      const BoxConstraints(
                                                     minWidth: 32,
                                                     minHeight: 32,
                                                   ),
@@ -359,10 +396,11 @@ class _PanierProductScreenMState extends State<PanierProductScreenM> {
                                               ],
                                             ),
                                           ),
-                                          Spacer(),
+                                          const Spacer(),
                                           Text(
                                             "${item.prixTotal.toStringAsFixed(0)} FCFA",
-                                            style: SDTypography.bodyMedium.copyWith(
+                                            style: const TextStyle(
+                                              fontSize: 15,
                                               fontWeight: FontWeight.bold,
                                             ),
                                           ),
@@ -381,9 +419,9 @@ class _PanierProductScreenMState extends State<PanierProductScreenM> {
                     // Overlay de chargement
                     if (state.isCartLoading)
                       Container(
-                        color: SDColors.neutral900.withOpacity(0.1),
-                        child: Center(
-                          child: CircularProgressIndicator(color: SDColors.primary600),
+                        color: Colors.black.withOpacity(0.1),
+                        child: const Center(
+                          child: CircularProgressIndicator(),
                         ),
                       ),
                   ],
@@ -392,15 +430,15 @@ class _PanierProductScreenMState extends State<PanierProductScreenM> {
 
               // Résumé et bouton commander
               Container(
-                padding: EdgeInsets.all(SDSpacing.sm),
+                padding: const EdgeInsets.all(16.0),
                 decoration: BoxDecoration(
-                  color: SDColors.white,
+                  color: Colors.white,
                   boxShadow: [
                     BoxShadow(
-                      color: SDColors.neutral500.withOpacity(0.3),
+                      color: Colors.grey.withOpacity(0.3),
                       spreadRadius: 1,
                       blurRadius: 5,
-                      offset: Offset(0, -3),
+                      offset: const Offset(0, -3),
                     ),
                   ],
                 ),
@@ -410,42 +448,43 @@ class _PanierProductScreenMState extends State<PanierProductScreenM> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
+                        const Text(
                           "Sous-total:",
-                          style: SDTypography.bodyMedium,
+                          style: TextStyle(fontSize: 15),
                         ),
                         Text(
                           "${cart.montantArticles.toStringAsFixed(0)} FCFA",
-                          style: SDTypography.bodyMedium,
+                          style: const TextStyle(fontSize: 15),
                         ),
                       ],
                     ),
-                    SizedBox(height: SDSpacing.xs),
+                    const SizedBox(height: 8),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Row(
                           children: [
-                            Text(
+                            const Text(
                               "Livraison:",
-                              style: SDTypography.bodyMedium,
+                              style: TextStyle(fontSize: 15),
                             ),
                             if (cart.fraisLivraison == 0)
                               Container(
-                                margin: EdgeInsets.only(left: SDSpacing.xs),
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: SDSpacing.xs,
-                                  vertical: SDSpacing.xxxs,
+                                margin: const EdgeInsets.only(left: 8),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: SDColors.success100,
-                                  borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
+                                  color: Colors.green[100],
+                                  borderRadius: BorderRadius.circular(4),
                                 ),
                                 child: Text(
                                   "GRATUITE",
-                                  style: SDTypography.labelSmall.copyWith(
+                                  style: TextStyle(
+                                    fontSize: 11,
                                     fontWeight: FontWeight.bold,
-                                    color: SDColors.success700,
+                                    color: Colors.green[700],
                                   ),
                                 ),
                               ),
@@ -455,10 +494,11 @@ class _PanierProductScreenMState extends State<PanierProductScreenM> {
                           cart.fraisLivraison == 0
                               ? "Gratuite"
                               : "${cart.fraisLivraison.toStringAsFixed(0)} FCFA",
-                          style: SDTypography.bodyMedium.copyWith(
+                          style: TextStyle(
+                            fontSize: 15,
                             color: cart.fraisLivraison == 0
-                                ? SDColors.success700
-                                : SDColors.neutral900,
+                                ? Colors.green[700]
+                                : Colors.black,
                             fontWeight: cart.fraisLivraison == 0
                                 ? FontWeight.bold
                                 : FontWeight.normal,
@@ -469,68 +509,71 @@ class _PanierProductScreenMState extends State<PanierProductScreenM> {
 
                     // Code promo si appliqué
                     if (cart.hasPromoCode) ...[
-                      SizedBox(height: SDSpacing.xs),
+                      const SizedBox(height: 8),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Row(
                             children: [
                               Icon(Icons.local_offer,
-                                  size: 16, color: SDColors.warning700),
-                              SizedBox(width: SDSpacing.xxxs),
+                                  size: 16, color: Colors.orange[700]),
+                              const SizedBox(width: 4),
                               Text(
                                 "Code promo:",
-                                style: SDTypography.bodyMedium.copyWith(
-                                    color: SDColors.warning700),
+                                style: TextStyle(
+                                    fontSize: 15, color: Colors.orange[700]),
                               ),
                             ],
                           ),
                           Text(
                             cart.codePromo!.descriptionReduction,
-                            style: SDTypography.bodyMedium.copyWith(
+                            style: TextStyle(
+                              fontSize: 15,
                               fontWeight: FontWeight.bold,
-                              color: SDColors.warning700,
+                              color: Colors.orange[700],
                             ),
                           ),
                         ],
                       ),
                     ],
 
-                    Divider(height: SDSpacing.md, thickness: 2, color: SDColors.neutral300),
+                    const Divider(height: 24, thickness: 2),
 
                     // Total
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
+                        const Text(
                           "Total:",
-                          style: SDTypography.titleLarge.copyWith(
+                          style: TextStyle(
+                            fontSize: 20,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         Text(
                           "${cart.montantTotal.toStringAsFixed(0)} FCFA",
-                          style: SDTypography.titleLarge.copyWith(
+                          style: const TextStyle(
+                            fontSize: 20,
                             fontWeight: FontWeight.bold,
-                            color: SDColors.success500,
+                            color: Colors.green,
                           ),
                         ),
                       ],
                     ),
-                    SizedBox(height: SDSpacing.sm),
+                    const SizedBox(height: 16),
 
                     // 📍 Section Adresse de livraison
                     Container(
-                      padding: EdgeInsets.all(SDSpacing.xs),
+                      padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: cart.hasDeliveryAddress
-                            ? SDColors.success50
-                            : SDColors.warning50,
-                        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                            ? Colors.green.shade50
+                            : Colors.orange.shade50,
+                        borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: cart.hasDeliveryAddress
-                              ? SDColors.success200
-                              : SDColors.warning200,
+                              ? Colors.green.shade200
+                              : Colors.orange.shade200,
                         ),
                       ),
                       child: Column(
@@ -543,20 +586,21 @@ class _PanierProductScreenMState extends State<PanierProductScreenM> {
                                     ? Icons.location_on
                                     : Icons.add_location,
                                 color: cart.hasDeliveryAddress
-                                    ? SDColors.success500
-                                    : SDColors.warning500,
+                                    ? Colors.green
+                                    : Colors.orange,
                               ),
-                              SizedBox(width: SDSpacing.xs),
+                              const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
                                   cart.hasDeliveryAddress
                                       ? "Adresse de livraison"
                                       : "Aucune adresse de livraison",
-                                  style: SDTypography.titleSmall.copyWith(
+                                  style: TextStyle(
+                                    fontSize: 16,
                                     fontWeight: FontWeight.bold,
                                     color: cart.hasDeliveryAddress
-                                        ? SDColors.success700
-                                        : SDColors.warning700,
+                                        ? Colors.green.shade900
+                                        : Colors.orange.shade900,
                                   ),
                                 ),
                               ),
@@ -579,10 +623,10 @@ class _PanierProductScreenMState extends State<PanierProductScreenM> {
                                   cart.hasDeliveryAddress
                                       ? "Modifier"
                                       : "Ajouter",
-                                  style: SDTypography.labelMedium.copyWith(
+                                  style: TextStyle(
                                     color: cart.hasDeliveryAddress
-                                        ? SDColors.success700
-                                        : SDColors.warning700,
+                                        ? Colors.green.shade700
+                                        : Colors.orange.shade700,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
@@ -591,53 +635,56 @@ class _PanierProductScreenMState extends State<PanierProductScreenM> {
                           ),
                           if (cart.hasDeliveryAddress &&
                               cart.adresseLivraison != null) ...[
-                            SizedBox(height: SDSpacing.xs),
+                            const SizedBox(height: 8),
                             Text(
                               cart.adresseLivraison!.nom,
-                              style: SDTypography.bodyMedium.copyWith(
+                              style: const TextStyle(
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
-                            SizedBox(height: SDSpacing.xxxs),
+                            const SizedBox(height: 4),
                             Text(
                               "${cart.adresseLivraison!.adresse}\n${cart.adresseLivraison!.ville}, ${cart.adresseLivraison!.pays}",
-                              style: SDTypography.bodySmall.copyWith(
-                                color: SDColors.neutral700,
+                              style: TextStyle(
+                                color: Colors.grey.shade700,
+                                fontSize: 14,
                               ),
                             ),
-                            SizedBox(height: SDSpacing.xxxs),
+                            const SizedBox(height: 4),
                             Text(
                               cart.adresseLivraison!.telephone,
-                              style: SDTypography.bodySmall.copyWith(
-                                color: SDColors.neutral700,
+                              style: TextStyle(
+                                color: Colors.grey.shade700,
+                                fontSize: 14,
                               ),
                             ),
                           ] else ...[
-                            SizedBox(height: SDSpacing.xxxs),
+                            const SizedBox(height: 4),
                             Text(
                               "Veuillez ajouter une adresse pour continuer",
-                              style: SDTypography.bodySmall.copyWith(
-                                color: SDColors.warning700,
+                              style: TextStyle(
+                                color: Colors.orange.shade700,
+                                fontSize: 14,
                               ),
                             ),
                           ],
                         ],
                       ),
                     ),
-                    SizedBox(height: SDSpacing.sm),
+                    const SizedBox(height: 16),
 
                     // Bouton commander
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: SDColors.success500,
-                          padding: EdgeInsets.symmetric(vertical: SDSpacing.sm),
+                          backgroundColor: Colors.green,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                            borderRadius: BorderRadius.circular(12),
                           ),
                           elevation: 2,
-                          disabledBackgroundColor: SDColors.neutral300,
+                          disabledBackgroundColor: Colors.grey.shade300,
                         ),
                         onPressed: cart.canCheckout && !state.isCartLoading
                             ? () {
@@ -653,28 +700,29 @@ class _PanierProductScreenMState extends State<PanierProductScreenM> {
                               }
                             : null,
                         child: state.isCartLoading
-                            ? SizedBox(
+                            ? const SizedBox(
                                 height: 24,
                                 width: 24,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
                                   valueColor: AlwaysStoppedAnimation<Color>(
-                                      SDColors.white),
+                                      Colors.white),
                                 ),
                               )
                             : Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Text(
+                                  const Text(
                                     "Passer commande",
-                                    style: SDTypography.titleMedium.copyWith(
+                                    style: TextStyle(
+                                      fontSize: 18,
                                       fontWeight: FontWeight.bold,
-                                      color: SDColors.white,
+                                      color: Colors.white,
                                     ),
                                   ),
-                                  const SizedBox(width: SDSpacing.xs),
-                                  Icon(Icons.arrow_forward,
-                                      color: SDColors.white),
+                                  const SizedBox(width: 8),
+                                  const Icon(Icons.arrow_forward,
+                                      color: Colors.white),
                                 ],
                               ),
                       ),
@@ -682,12 +730,12 @@ class _PanierProductScreenMState extends State<PanierProductScreenM> {
 
                     // Message si panier non valide
                     if (!cart.canCheckout) ...[
-                      SizedBox(height: SDSpacing.xs),
+                      const SizedBox(height: 8),
                       Row(
                         children: [
                           Icon(Icons.info_outline,
-                              size: 14, color: SDColors.warning700),
-                          SizedBox(width: SDSpacing.xxxs),
+                              size: 14, color: Colors.orange[700]),
+                          const SizedBox(width: 4),
                           Expanded(
                             child: Text(
                               !cart.hasDeliveryAddress
@@ -695,8 +743,9 @@ class _PanierProductScreenMState extends State<PanierProductScreenM> {
                                   : cart.isEmpty
                                       ? "Votre panier est vide"
                                       : "Impossible de passer commande",
-                              style: SDTypography.labelSmall.copyWith(
-                                color: SDColors.warning700,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.orange[700],
                               ),
                             ),
                           ),

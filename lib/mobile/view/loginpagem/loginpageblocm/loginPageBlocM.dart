@@ -14,13 +14,13 @@ class LoginPageBlocM extends Bloc<LoginPageEventM, LoginPageStateM> {
   }
 
   Future<void> _onLoginSubmitted(
-      LoginSubmittedM event,
-      Emitter<LoginPageStateM> emit,
-      ) async {
+    LoginSubmittedM event,
+    Emitter<LoginPageStateM> emit,
+  ) async {
     emit(LoginPageLoadingM());
 
     final apiClient = ApiClient();
-    print('Api COnnexion') ;
+    print('Api COnnexion');
     try {
       final response = await apiClient.loginUser(
         identifiant: event.identifiant,
@@ -28,10 +28,17 @@ class LoginPageBlocM extends Bloc<LoginPageEventM, LoginPageStateM> {
         rememberMe: event.rememberMe,
       );
 
+      // ✅ DEBUG : Afficher la réponse complète
+      print("🔍 Réponse API login: $response");
+
       final token = response["token"] ?? "";
       final utilisateurData = response["utilisateur"] ?? {};
 
+      print("🔍 Token extrait: '$token'");
+      print("🔍 Utilisateur extrait: $utilisateurData");
+
       if (token.isEmpty) {
+        print("❌ Token manquant dans la réponse");
         emit(LoginPageFailureM(error: "Token manquant dans la réponse"));
         return;
       }
@@ -46,18 +53,11 @@ class LoginPageBlocM extends Bloc<LoginPageEventM, LoginPageStateM> {
         await prefs.setString("utilisateur", jsonEncode(utilisateur.toMap()));
       }
 
-
-
-      // ✅ Mettre à jour l'AuthCubit après connexion réussie
-      // Note: L'AuthCubit sera mis à jour dans l'écran de connexion
-      
-      // ✅ Émettre l'état succès avec flag pour mise à jour AuthCubit
+      // ✅ Émettre l'état succès
       emit(LoginPageSuccessM(
         token: token,
         utilisateur: utilisateur.toMap(),
-        shouldUpdateAuth: true, // ✅ Flag pour mise à jour AuthCubit
       ));
-
     } catch (error) {
       final errorMessage = (error is Exception)
           ? error.toString().replaceAll('Exception: ', '')

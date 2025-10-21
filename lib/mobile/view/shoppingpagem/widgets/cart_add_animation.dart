@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../../../design_system/colors.dart';
 
 /// 🎬 Widget d'animation "Ajout au panier" avec effet de vol
 ///
@@ -196,12 +195,12 @@ void showAddToCartAnimation({
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                      color: SDColors.primary600.withOpacity(0.8),
+                      color: Colors.green.withOpacity(0.8),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(
                       Icons.shopping_cart,
-                      color: SDColors.white,
+                      color: Colors.white,
                       size: 24,
                     ),
                   ),

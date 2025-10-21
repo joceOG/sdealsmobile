@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
-import '../../../../../design_system/colors.dart';
-import '../../../../../design_system/typography.dart';
 
 class PortfolioStep extends StatefulWidget {
   final Map<String, dynamic> formData;
@@ -54,7 +52,7 @@ class _PortfolioStepState extends State<PortfolioStep> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Maximum 5 projets peuvent être ajoutés'),
-          backgroundColor: SDColors.warning500,
+          backgroundColor: Colors.orange,
         ),
       );
       return;
@@ -88,7 +86,10 @@ class _PortfolioStepState extends State<PortfolioStep> {
         children: [
           const Text(
             '🎓 Portfolio & Références',
-            style: SDTypography.titleLarge,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 16),
 
@@ -96,33 +97,35 @@ class _PortfolioStepState extends State<PortfolioStep> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: SDColors.success50,
+              color: Colors.green.shade50,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: SDColors.success100),
+              border: Border.all(color: Colors.green.shade100),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.star, color: SDColors.success700),
+                    Icon(Icons.star, color: Colors.green.shade700),
                     const SizedBox(width: 8),
                     const Text(
                       'Pourquoi ajouter un portfolio ?',
-                      style: SDTypography.titleMedium,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 8),
-                Text(
+                const Text(
                   'Les freelances avec un portfolio complet reçoivent 75% plus de propositions de projets que ceux sans portfolio.',
-                  style: SDTypography.bodyMedium,
                 ),
                 const SizedBox(height: 8),
-                Text('• Ajoutez vos meilleurs travaux', style: SDTypography.bodySmall),
-                Text('• Décrivez vos réalisations et votre rôle', style: SDTypography.bodySmall),
-                Text('• Incluez des images si pertinent', style: SDTypography.bodySmall),
-                Text('• Mettez en avant les résultats obtenus', style: SDTypography.bodySmall),
+                const Text('• Ajoutez vos meilleurs travaux'),
+                const Text('• Décrivez vos réalisations et votre rôle'),
+                const Text('• Incluez des images si pertinent'),
+                const Text('• Mettez en avant les résultats obtenus'),
               ],
             ),
           ),
@@ -134,13 +137,16 @@ class _PortfolioStepState extends State<PortfolioStep> {
             children: [
               const Text(
                 'Échantillons de travail (3-5 max)',
-                style: SDTypography.titleMedium,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
               ElevatedButton.icon(
                 onPressed: _addProject,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: SDColors.secondary500,
-                  foregroundColor: SDColors.white,
+                  backgroundColor: Colors.orange,
+                  foregroundColor: Colors.white,
                 ),
                 icon: const Icon(Icons.add),
                 label: const Text('Ajouter un projet'),
@@ -155,30 +161,31 @@ class _PortfolioStepState extends State<PortfolioStep> {
               padding: const EdgeInsets.all(24),
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: SDColors.neutral100,
+                color: Colors.grey.shade100,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: SDColors.neutral300),
+                border: Border.all(color: Colors.grey.shade300),
               ),
               child: Column(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.work_outline,
                     size: 40,
-                    color: SDColors.neutral400,
+                    color: Colors.grey.shade400,
                   ),
                   const SizedBox(height: 12),
                   Text(
                     'Aucun projet ajouté',
-                    style: SDTypography.bodyLarge.copyWith(
-                      color: SDColors.neutral600,
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontSize: 16,
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Text(
+                  const Text(
                     'Ajoutez vos meilleurs travaux pour attirer plus de clients',
                     textAlign: TextAlign.center,
-                    style: SDTypography.bodySmall.copyWith(
-                      color: SDColors.neutral600,
+                    style: TextStyle(
+                      color: Colors.grey,
                     ),
                   ),
                 ],
@@ -204,12 +211,15 @@ class _PortfolioStepState extends State<PortfolioStep> {
                         Expanded(
                           child: Text(
                             item['title'] ?? 'Projet sans titre',
-                            style: SDTypography.titleMedium,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
                           ),
                         ),
                         IconButton(
                           icon: const Icon(Icons.delete_outline,
-                              color: SDColors.error500),
+                              color: Colors.red),
                           onPressed: () => _removeProject(index),
                           tooltip: 'Supprimer ce projet',
                         ),
@@ -253,7 +263,10 @@ class _PortfolioStepState extends State<PortfolioStep> {
           // Réseaux sociaux et profils
           const Text(
             'Réseaux sociaux professionnels',
-            style: SDTypography.titleMedium,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+            ),
           ),
           const SizedBox(height: 16),
 
@@ -363,7 +376,7 @@ class _ProjectDialogState extends State<ProjectDialog> {
                 height: 150,
                 width: double.infinity,
                 decoration: BoxDecoration(
-                  color: SDColors.neutral200,
+                  color: Colors.grey.shade200,
                   borderRadius: BorderRadius.circular(8),
                   image: _projectImage != null
                       ? DecorationImage(
@@ -376,10 +389,10 @@ class _ProjectDialogState extends State<ProjectDialog> {
                     ? Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.add_a_photo,
                             size: 40,
-                            color: SDColors.neutral600,
+                            color: Colors.grey.shade600,
                           ),
                           const SizedBox(height: 8),
                           const Text('Ajouter une image'),
@@ -448,7 +461,7 @@ class _ProjectDialogState extends State<ProjectDialog> {
                 const SnackBar(
                   content:
                       Text('Veuillez remplir tous les champs obligatoires'),
-                  backgroundColor: SDColors.error500,
+                  backgroundColor: Colors.red,
                 ),
               );
               return;
@@ -467,7 +480,7 @@ class _ProjectDialogState extends State<ProjectDialog> {
             );
           },
           style: ElevatedButton.styleFrom(
-            backgroundColor: SDColors.secondary500,
+            backgroundColor: Colors.orange,
           ),
           child: const Text('AJOUTER'),
         ),

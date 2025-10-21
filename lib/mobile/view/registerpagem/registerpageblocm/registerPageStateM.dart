@@ -50,14 +50,14 @@ class RegisterPageStateM extends Equatable {
 
   @override
   List<Object?> get props => [
-    fullName,
-    phone,
-    password,
-    confirmPassword,
-    isSubmitting,
-    isSuccess,
-    errorMessage,
-    utilisateur,
-    token
-  ];
+        fullName,
+        phone,
+        password,
+        confirmPassword,
+        isSubmitting,
+        isSuccess,
+        errorMessage,
+        utilisateur,
+        token
+      ];
 }

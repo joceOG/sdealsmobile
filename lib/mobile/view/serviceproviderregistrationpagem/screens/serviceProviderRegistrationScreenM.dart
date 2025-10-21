@@ -8,8 +8,6 @@ import 'package:sdealsmobile/mobile/view/serviceproviderregistrationpagem/screen
 import '../serviceproviderregistrationoageblocm/serviceProviderRegistrationPageBlocM.dart';
 import '../serviceproviderregistrationoageblocm/serviceProviderRegistrationPageEventM.dart';
 import '../serviceproviderregistrationoageblocm/serviceProviderRegistrationPageStateM.dart';
-import '../../../../../design_system/colors.dart';
-import '../../../../../design_system/typography.dart';
 
 class ServiceProviderRegistrationScreenM extends StatefulWidget {
   const ServiceProviderRegistrationScreenM({Key? key}) : super(key: key);
@@ -223,9 +221,8 @@ class _ServiceProviderRegistrationScreenMState
       },
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Devenir prestataire', style: SDTypography.titleLarge),
-          backgroundColor: SDColors.success700,
-          foregroundColor: SDColors.white,
+          title: const Text('Devenir prestataire'),
+          backgroundColor: Colors.green.shade700,
         ),
         body: Form(
           key: _formKey,
@@ -258,16 +255,14 @@ class _ServiceProviderRegistrationScreenMState
                       child: ElevatedButton(
                         onPressed: details.onStepContinue,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: SDColors.success700,
-                          foregroundColor: SDColors.white,
+                          backgroundColor: Colors.green.shade700,
                           padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         ),
                         child: Text(
                           _currentStep == _steps.length - 1
                               ? 'Soumettre'
                               : 'Suivant',
-                          style: SDTypography.labelLarge,
+                          style: const TextStyle(fontSize: 16),
                         ),
                       ),
                     ),
@@ -278,12 +273,10 @@ class _ServiceProviderRegistrationScreenMState
                           onPressed: details.onStepCancel,
                           style: OutlinedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 12),
-                            side: const BorderSide(color: SDColors.neutral300),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           ),
-                          child: Text(
+                          child: const Text(
                             'Précédent',
-                            style: SDTypography.labelLarge.copyWith(color: SDColors.neutral700),
+                            style: TextStyle(fontSize: 16),
                           ),
                         ),
                       ),

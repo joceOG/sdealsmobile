@@ -1,14 +1,12 @@
 import 'dart:convert';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:sdealsmobile/data/services/api_client.dart';
-import 'package:sdealsmobile/data/services/websocket_service.dart';
 import 'messages_event.dart';
 import 'messages_state.dart';
 
 // 🎯 BLoC POUR GÉRER LES MESSAGES PRESTATAIRE
 class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
   final ApiClient _apiClient = ApiClient();
-  final WebSocketService _webSocketService = WebSocketService();
 
   MessagesBloc() : super(MessagesInitial()) {
     // 📨 CHARGER LES CONVERSATIONS DU PRESTATAIRE
@@ -256,59 +254,6 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
         }
       } catch (e) {
         emit(MessagesError('Erreur de connexion: $e'));
-      }
-    });
-
-    // 🔌 GESTIONNAIRES WEBSOCKET
-    on<ConnectWebSocket>((event, emit) async {
-      try {
-        await _webSocketService.connect();
-        print('🔌 WebSocket connecté pour MessagesBloc');
-      } catch (e) {
-        print('❌ Erreur connexion WebSocket: $e');
-      }
-    });
-
-    on<DisconnectWebSocket>((event, emit) async {
-      try {
-        _webSocketService.disconnect();
-        print('🔌 WebSocket déconnecté pour MessagesBloc');
-      } catch (e) {
-        print('❌ Erreur déconnexion WebSocket: $e');
-      }
-    });
-
-    on<NewMessageReceived>((event, emit) async {
-      // Mettre à jour l'état avec le nouveau message
-      final currentState = state;
-      if (currentState is MessagesLoaded) {
-        final updatedMessages = [...currentState.messages, event.messageData];
-        emit(MessagesLoaded(
-          messages: updatedMessages,
-          conversationId: currentState.conversationId,
-          hasMore: currentState.hasMore,
-          currentPage: currentState.currentPage,
-        ));
-      }
-    });
-
-    on<MessageStatusUpdated>((event, emit) async {
-      // Mettre à jour le statut d'un message
-      final currentState = state;
-      if (currentState is MessagesLoaded) {
-        final updatedMessages = currentState.messages.map((message) {
-          if (message['_id'] == event.messageId) {
-            return {...message, 'statut': event.status};
-          }
-          return message;
-        }).toList();
-
-        emit(MessagesLoaded(
-          messages: updatedMessages,
-          conversationId: currentState.conversationId,
-          hasMore: currentState.hasMore,
-          currentPage: currentState.currentPage,
-        ));
       }
     });
   }

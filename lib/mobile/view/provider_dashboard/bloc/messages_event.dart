@@ -87,22 +87,3 @@ class LoadMoreMessages extends MessagesEvent {
   final int page;
   LoadMoreMessages(this.conversationId, this.prestataireId, this.page);
 }
-
-// 🔌 CONNEXION WEBSOCKET
-class ConnectWebSocket extends MessagesEvent {}
-
-// 🔌 DÉCONNEXION WEBSOCKET
-class DisconnectWebSocket extends MessagesEvent {}
-
-// 📨 NOUVEAU MESSAGE REÇU VIA WEBSOCKET
-class NewMessageReceived extends MessagesEvent {
-  final Map<String, dynamic> messageData;
-  NewMessageReceived(this.messageData);
-}
-
-// 📨 MISE À JOUR STATUT MESSAGE
-class MessageStatusUpdated extends MessagesEvent {
-  final String messageId;
-  final String status;
-  MessageStatusUpdated(this.messageId, this.status);
-}
