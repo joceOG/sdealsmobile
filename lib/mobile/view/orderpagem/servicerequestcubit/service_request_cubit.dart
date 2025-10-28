@@ -102,10 +102,10 @@ class ServiceRequestCubit extends Cubit<ServiceRequestState> {
   }) async {
     emit(ServiceRequestLoading());
     try {
-      final data = await api.updatePrestation(
+      final data = await api.updatePrestationStatus(
         token: token,
-        id: id,
-        updates: {'status': status},
+        prestationId: id,
+        newStatus: status,
       );
       emit(ServiceRequestDetailLoaded(data));
     } catch (e) {
@@ -113,4 +113,3 @@ class ServiceRequestCubit extends Cubit<ServiceRequestState> {
     }
   }
 }
-

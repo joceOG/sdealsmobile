@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:sdealsmobile/mobile/view/provider_dashboard/widgets/mission_list_item.dart';
-import 'package:sdealsmobile/mobile/view/provider_dashboard/bloc/missions_bloc.dart';
-import 'package:sdealsmobile/mobile/view/provider_dashboard/bloc/missions_event.dart';
-import 'package:sdealsmobile/mobile/view/provider_dashboard/bloc/missions_state.dart';
+import 'package:sdealsmobile/data/services/api_client.dart';
+import 'package:sdealsmobile/data/services/authCubit.dart';
 
 class ProviderMissionsScreen extends StatefulWidget {
   const ProviderMissionsScreen({Key? key}) : super(key: key);
@@ -15,138 +13,27 @@ class ProviderMissionsScreen extends StatefulWidget {
 class _ProviderMissionsScreenState extends State<ProviderMissionsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final ApiClient _apiClient = ApiClient();
 
   // 🔍 VARIABLES DE RECHERCHE
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-  String _selectedLocation = 'Toutes';
-  String _selectedPriceRange = 'Tous';
-  String _selectedUrgency = 'Toutes';
-  bool _showFilters = false;
 
-  // Données simulées pour les missions
-  final List<Map<String, dynamic>> _availableMissions = [
-    {
-      'title': 'Réparation robinet',
-      'location': 'Cocody',
-      'price': '25,000 FCFA',
-      'urgency': 'Urgent',
-      'distance': '1.2 km',
-      'clientName': 'Marie K.',
-      'clientRating': 4.2,
-      'description':
-          'Fuite importante sous évier cuisine, eau qui s\'accumule...',
-    },
-    {
-      'title': 'Installation climatisation',
-      'location': 'Marcory',
-      'price': '80,000 FCFA',
-      'urgency': 'Standard',
-      'distance': '3.5 km',
-      'clientName': 'Paul M.',
-      'clientRating': 4.8,
-      'description':
-          'Installation de 2 climatiseurs split dans salon et chambre principale...',
-    },
-    {
-      'title': 'Débouchage canalisation',
-      'location': 'Yopougon',
-      'price': '35,000 FCFA',
-      'urgency': 'Standard',
-      'distance': '5.1 km',
-      'clientName': 'Ahmed T.',
-      'clientRating': 3.9,
-      'description':
-          'Évier bouché depuis 2 jours, l\'eau ne s\'évacue plus du tout...',
-    },
-    {
-      'title': 'Remplacement interrupteur',
-      'location': 'Abobo',
-      'price': '15,000 FCFA',
-      'urgency': 'Urgent',
-      'distance': '8.3 km',
-      'clientName': 'Sophie D.',
-      'clientRating': 4.0,
-      'description':
-          'Interrupteur cassé dans salon, risque d\'électrocution...',
-    },
-  ];
-
-  final List<Map<String, dynamic>> _ongoingMissions = [
-    {
-      'title': 'Installation plomberie salle de bain',
-      'location': 'Treichville',
-      'price': '120,000 FCFA',
-      'urgency': 'En cours',
-      'progress': 0.6,
-      'clientName': 'Jean K.',
-      'dueDate': '18/07/2025',
-    },
-    {
-      'title': 'Réparation climatisation',
-      'location': 'Plateau',
-      'price': '45,000 FCFA',
-      'urgency': 'En cours',
-      'progress': 0.3,
-      'clientName': 'Fatou B.',
-      'dueDate': '15/07/2025',
-    },
-  ];
-
-  final List<Map<String, dynamic>> _completedMissions = [
-    {
-      'title': 'Installation prise électrique',
-      'location': 'Cocody',
-      'price': '20,000 FCFA',
-      'rating': 5.0,
-      'clientName': 'Konan A.',
-      'completedDate': '10/07/2025',
-    },
-    {
-      'title': 'Réparation fuite WC',
-      'location': 'Yopougon',
-      'price': '30,000 FCFA',
-      'rating': 4.5,
-      'clientName': 'Mariam S.',
-      'completedDate': '08/07/2025',
-    },
-    {
-      'title': 'Changement robinetterie',
-      'location': 'Marcory',
-      'price': '45,000 FCFA',
-      'rating': 5.0,
-      'clientName': 'Robert L.',
-      'completedDate': '05/07/2025',
-    },
-  ];
-
-  final List<Map<String, dynamic>> _rejectedMissions = [
-    {
-      'title': 'Réparation chauffe-eau',
-      'location': 'Port-Bouët',
-      'price': '55,000 FCFA',
-      'reason': 'Indisponible',
-      'clientName': 'David K.',
-      'rejectedDate': '11/07/2025',
-    },
-    {
-      'title': 'Pose carrelage',
-      'location': 'Koumassi',
-      'price': '180,000 FCFA',
-      'reason': 'Hors compétences',
-      'clientName': 'Aminata D.',
-      'rejectedDate': '02/07/2025',
-    },
-  ];
+  // 📊 DONNÉES RÉELLES (remplace les données simulées)
+  List<Map<String, dynamic>> _availableMissions = [];
+  List<Map<String, dynamic>> _ongoingMissions = [];
+  List<Map<String, dynamic>> _completedMissions = [];
+  bool _isLoading = false;
+  String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
 
     // 🎯 CHARGER LES MISSIONS AU DÉMARRAGE
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<MissionsBloc>().add(LoadAvailableMissions());
+      _loadMissions();
     });
   }
 
@@ -157,592 +44,226 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen>
     super.dispose();
   }
 
+  // 🚀 CHARGER LES MISSIONS DEPUIS L'API
+  Future<void> _loadMissions() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final auth = context.read<AuthCubit>().state;
+      if (auth is AuthAuthenticated) {
+        // Récupérer l'ID de l'utilisateur pour filtrer les missions
+        final utilisateurId = auth.utilisateur.idutilisateur;
+
+        // Charger les missions disponibles (EN_ATTENTE) pour ce prestataire
+        final available = await _apiClient.getPrestationsByStatus(
+          token: auth.token,
+          status: 'EN_ATTENTE',
+        );
+
+        // Charger les missions acceptées (ACCEPTEE) pour ce prestataire
+        final accepted = await _apiClient.getPrestationsByStatus(
+          token: auth.token,
+          status: 'ACCEPTEE',
+        );
+
+        // Charger les missions en cours (EN_COURS) pour ce prestataire
+        final ongoing = await _apiClient.getPrestationsByStatus(
+          token: auth.token,
+          status: 'EN_COURS',
+        );
+
+        // Charger les missions terminées (TERMINEE) pour ce prestataire
+        final completed = await _apiClient.getPrestationsByStatus(
+          token: auth.token,
+          status: 'TERMINEE',
+        );
+
+        // Filtrer les missions par utilisateur (via le champ prestataire.utilisateur)
+        final filteredAvailable = available
+            .where((mission) =>
+                mission['prestataire']?['utilisateur']?.toString() ==
+                    utilisateurId ||
+                mission['prestataire']?.toString() == utilisateurId)
+            .toList();
+
+        final filteredAccepted = accepted
+            .where((mission) =>
+                mission['prestataire']?['utilisateur']?.toString() ==
+                    utilisateurId ||
+                mission['prestataire']?.toString() == utilisateurId)
+            .toList();
+
+        final filteredOngoing = ongoing
+            .where((mission) =>
+                mission['prestataire']?['utilisateur']?.toString() ==
+                    utilisateurId ||
+                mission['prestataire']?.toString() == utilisateurId)
+            .toList();
+
+        final filteredCompleted = completed
+            .where((mission) =>
+                mission['prestataire']?['utilisateur']?.toString() ==
+                    utilisateurId ||
+                mission['prestataire']?.toString() == utilisateurId)
+            .toList();
+
+        setState(() {
+          _availableMissions = filteredAvailable;
+          _ongoingMissions = [
+            ...filteredAccepted,
+            ...filteredOngoing
+          ]; // Accepter + En cours
+          _completedMissions = filteredCompleted;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Erreur lors du chargement: $e';
+        _isLoading = false;
+      });
+    }
+  }
+
+  // ✅ ACCEPTER UNE MISSION
+  Future<void> _acceptMission(Map<String, dynamic> mission) async {
+    try {
+      final auth = context.read<AuthCubit>().state;
+      if (auth is AuthAuthenticated) {
+        await _apiClient.updatePrestationStatus(
+          token: auth.token,
+          prestationId: mission['_id'],
+          newStatus: 'ACCEPTEE',
+        );
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Mission acceptée !'),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        // Recharger les missions
+        _loadMissions();
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  // ❌ REFUSER UNE MISSION
+  Future<void> _rejectMission(Map<String, dynamic> mission) async {
+    try {
+      final auth = context.read<AuthCubit>().state;
+      if (auth is AuthAuthenticated) {
+        await _apiClient.updatePrestationStatus(
+          token: auth.token,
+          prestationId: mission['_id'],
+          newStatus: 'REFUSEE',
+        );
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Mission refusée'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+
+        // Recharger les missions
+        _loadMissions();
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  // ✅ TERMINER UNE MISSION
+  Future<void> _completeMission(Map<String, dynamic> mission) async {
+    try {
+      final auth = context.read<AuthCubit>().state;
+      if (auth is AuthAuthenticated) {
+        await _apiClient.updatePrestationStatus(
+          token: auth.token,
+          prestationId: mission['_id'],
+          newStatus: 'TERMINEE',
+        );
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Mission terminée !'),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        // Recharger les missions
+        _loadMissions();
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<MissionsBloc, MissionsState>(
-      builder: (context, state) {
-        return Scaffold(
-          body: Column(
-            children: [
-              // 🔍 EN-TÊTE DE RECHERCHE
-              _buildSearchHeader(),
-
-              // Barre de filtres avec TabBar
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withOpacity(0.2),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: TabBar(
-                  controller: _tabController,
-                  labelColor: Theme.of(context).primaryColor,
-                  unselectedLabelColor: Colors.grey,
-                  indicatorColor: Theme.of(context).primaryColor,
-                  indicatorWeight: 3,
-                  onTap: (index) {
-                    // 🎯 CHARGER LES MISSIONS SELON L'ONGLET
-                    switch (index) {
-                      case 0:
-                        context
-                            .read<MissionsBloc>()
-                            .add(LoadAvailableMissions());
-                        break;
-                      case 1:
-                        context.read<MissionsBloc>().add(LoadOngoingMissions());
-                        break;
-                      case 2:
-                        context
-                            .read<MissionsBloc>()
-                            .add(LoadCompletedMissions());
-                        break;
-                      case 3:
-                        // TODO: Charger les missions refusées
-                        break;
-                    }
-                  },
-                  tabs: const [
-                    Tab(
-                      icon: Icon(Icons.local_fire_department),
-                      text: 'Disponibles',
-                    ),
-                    Tab(
-                      icon: Icon(Icons.schedule),
-                      text: 'En cours',
-                    ),
-                    Tab(
-                      icon: Icon(Icons.check_circle_outline),
-                      text: 'Terminées',
-                    ),
-                    Tab(
-                      icon: Icon(Icons.cancel_outlined),
-                      text: 'Refusées',
-                    ),
-                  ],
-                ),
-              ),
-
-              // Zone de recherche et filtres
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        decoration: InputDecoration(
-                          hintText: 'Rechercher une mission...',
-                          prefixIcon: const Icon(Icons.search),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(30),
-                            borderSide: BorderSide.none,
-                          ),
-                          filled: true,
-                          fillColor: Colors.grey[200],
-                          contentPadding:
-                              const EdgeInsets.symmetric(vertical: 0),
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.filter_list),
-                      onPressed: () {
-                        _showFilterDialog(context);
-                      },
-                    ),
-                  ],
-                ),
-              ),
-
-              // 🎯 GESTION DES ÉTATS
-              Expanded(
-                child: _buildContent(state),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  // 🎯 GESTION DES ÉTATS DU BLoC
-  Widget _buildContent(MissionsState state) {
-    if (state is MissionsLoading) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
-    }
-
-    if (state is MissionsError) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
-            const SizedBox(height: 16),
-            Text(
-              state.message,
-              style: TextStyle(fontSize: 16, color: Colors.red[600]),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () {
-                context.read<MissionsBloc>().add(LoadAvailableMissions());
-              },
-              child: const Text('Réessayer'),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (state is MissionsLoaded) {
-      return TabBarView(
-        controller: _tabController,
+    return Scaffold(
+      body: Column(
         children: [
-          // Onglet Missions disponibles
-          _buildAvailableMissionsTab(state.availableMissions ?? []),
+          // 🔍 EN-TÊTE DE RECHERCHE
+          _buildSearchHeader(),
 
-          // Onglet Missions en cours
-          _buildOngoingMissionsTab(),
-
-          // Onglet Missions terminées
-          _buildCompletedMissionsTab(),
-
-          // Onglet Missions refusées
-          _buildRejectedMissionsTab(),
-        ],
-      );
-    }
-
-    // État initial - utiliser les données simulées
-    return TabBarView(
-      controller: _tabController,
-      children: [
-        _buildAvailableMissionsTab(),
-        _buildOngoingMissionsTab(),
-        _buildCompletedMissionsTab(),
-        _buildRejectedMissionsTab(),
-      ],
-    );
-  }
-
-  Widget _buildAvailableMissionsTab([List<dynamic>? missions]) {
-    final missionsList = missions ?? _availableMissions;
-
-    if (missionsList.isEmpty) {
-      return _buildEmptyState(
-          'Aucune mission disponible actuellement', Icons.search_off);
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: missionsList.length,
-      itemBuilder: (context, index) {
-        final mission = missionsList[index];
-        return MissionListItem(
-          title: mission['title'],
-          location: mission['location'],
-          price: mission['price'],
-          urgency: mission['urgency'],
-          distance: mission['distance'],
-          onTap: () {
-            _showMissionDetailsDialog(context, mission);
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildOngoingMissionsTab() {
-    if (_ongoingMissions.isEmpty) {
-      return _buildEmptyState('Aucune mission en cours', Icons.pending_actions);
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _ongoingMissions.length,
-      itemBuilder: (context, index) {
-        final mission = _ongoingMissions[index];
-
-        return Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      mission['title'],
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Text(
-                        'EN COURS',
-                        style: TextStyle(
-                          color: Colors.blue,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    const Icon(Icons.location_on_outlined,
-                        size: 16, color: Colors.grey),
-                    const SizedBox(width: 4),
-                    Text(
-                      mission['location'],
-                      style: TextStyle(
-                        color: Colors.grey[700],
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    const Icon(Icons.person_outline,
-                        size: 16, color: Colors.grey),
-                    const SizedBox(width: 4),
-                    Text(
-                      mission['clientName'],
-                      style: TextStyle(
-                        color: Colors.grey[700],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    const Icon(Icons.calendar_today, size: 16),
-                    const SizedBox(width: 4),
-                    Text('Livraison: ${mission['dueDate']}'),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text('Avancement:'),
-                              Text('${(mission['progress'] * 100).toInt()}%'),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(10),
-                            child: LinearProgressIndicator(
-                              value: mission['progress'],
-                              minHeight: 8,
-                              backgroundColor: Colors.grey[300],
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                Theme.of(context).primaryColor,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      mission['price'],
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        OutlinedButton(
-                          onPressed: () {
-                            // Mettre à jour le statut
-                          },
-                          child: const Text('Mettre à jour'),
-                        ),
-                        const SizedBox(width: 8),
-                        ElevatedButton(
-                          onPressed: () {
-                            // Terminer la mission
-                          },
-                          child: const Text('Terminer'),
-                        ),
-                      ],
-                    ),
-                  ],
+          // Barre de filtres avec TabBar
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.2),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
                 ),
               ],
             ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildCompletedMissionsTab() {
-    if (_completedMissions.isEmpty) {
-      return _buildEmptyState(
-          'Aucune mission terminée', Icons.check_circle_outline);
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _completedMissions.length,
-      itemBuilder: (context, index) {
-        final mission = _completedMissions[index];
-
-        return Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      mission['title'],
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                    Row(
-                      children: List.generate(
-                        5,
-                        (i) => Icon(
-                          i < mission['rating']
-                              ? Icons.star
-                              : Icons.star_border,
-                          color: Colors.amber,
-                          size: 18,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    const Icon(Icons.location_on_outlined,
-                        size: 16, color: Colors.grey),
-                    const SizedBox(width: 4),
-                    Text(
-                      mission['location'],
-                      style: TextStyle(
-                        color: Colors.grey[700],
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    const Icon(Icons.person_outline,
-                        size: 16, color: Colors.grey),
-                    const SizedBox(width: 4),
-                    Text(
-                      mission['clientName'],
-                      style: TextStyle(
-                        color: Colors.grey[700],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    const Icon(Icons.event_available, size: 16),
-                    const SizedBox(width: 4),
-                    Text('Terminée le ${mission['completedDate']}'),
-                    const Spacer(),
-                    Text(
-                      mission['price'],
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(
-                      onPressed: () {
-                        // Voir détails
-                      },
-                      child: const Text('Voir détails'),
-                    ),
-                    const SizedBox(width: 8),
-                    OutlinedButton.icon(
-                      icon: const Icon(Icons.receipt_long, size: 16),
-                      label: const Text('Facture'),
-                      onPressed: () {
-                        // Voir facture
-                      },
-                    ),
-                  ],
-                ),
+            child: TabBar(
+              controller: _tabController,
+              labelColor: const Color(0xFF2E7D32),
+              unselectedLabelColor: Colors.grey,
+              indicatorColor: const Color(0xFF2E7D32),
+              indicatorWeight: 3,
+              tabs: const [
+                Tab(text: 'Disponibles'),
+                Tab(text: 'En cours'),
+                Tab(text: 'Terminées'),
               ],
             ),
           ),
-        );
-      },
-    );
-  }
 
-  Widget _buildRejectedMissionsTab() {
-    if (_rejectedMissions.isEmpty) {
-      return _buildEmptyState('Aucune mission refusée', Icons.cancel_outlined);
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _rejectedMissions.length,
-      itemBuilder: (context, index) {
-        final mission = _rejectedMissions[index];
-
-        return Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          // Contenu des onglets
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      mission['title'],
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Text(
-                        'REFUSÉE',
-                        style: TextStyle(
-                          color: Colors.grey,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    const Icon(Icons.location_on_outlined,
-                        size: 16, color: Colors.grey),
-                    const SizedBox(width: 4),
-                    Text(
-                      mission['location'],
-                      style: TextStyle(
-                        color: Colors.grey[700],
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    const Icon(Icons.person_outline,
-                        size: 16, color: Colors.grey),
-                    const SizedBox(width: 4),
-                    Text(
-                      mission['clientName'],
-                      style: TextStyle(
-                        color: Colors.grey[700],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    const Icon(Icons.info_outline, size: 16),
-                    const SizedBox(width: 4),
-                    Text('Motif: ${mission['reason']}'),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    const Icon(Icons.event_busy, size: 16),
-                    const SizedBox(width: 4),
-                    Text('Refusée le ${mission['rejectedDate']}'),
-                    const Spacer(),
-                    Text(
-                      mission['price'],
-                      style: TextStyle(
-                        color: Colors.grey[600],
-                        decoration: TextDecoration.lineThrough,
-                      ),
-                    ),
-                  ],
-                ),
+                _buildAvailableMissionsTab(),
+                _buildOngoingMissionsTab(),
+                _buildCompletedMissionsTab(),
               ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildEmptyState(String message, IconData icon) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            icon,
-            size: 64,
-            color: Colors.grey[400],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            message,
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey[600],
             ),
           ),
         ],
@@ -750,389 +271,7 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen>
     );
   }
 
-  void _showMissionDetailsDialog(
-      BuildContext context, Map<String, dynamic> mission) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        contentPadding: EdgeInsets.zero,
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).primaryColor,
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(16),
-                    topRight: Radius.circular(16),
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    mission['urgency'] == 'Urgent'
-                        ? Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.red.withOpacity(0.3),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.priority_high,
-                                    color: Colors.white, size: 14),
-                                SizedBox(width: 4),
-                                Text(
-                                  'URGENT',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          )
-                        : Container(),
-                    const SizedBox(height: 8),
-                    Text(
-                      mission['title'],
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        const Icon(Icons.location_on,
-                            color: Colors.white70, size: 16),
-                        const SizedBox(width: 4),
-                        Text(
-                          mission['location'],
-                          style: const TextStyle(
-                            color: Colors.white70,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        const Icon(Icons.directions_walk,
-                            color: Colors.white70, size: 16),
-                        const SizedBox(width: 4),
-                        Text(
-                          mission['distance'],
-                          style: const TextStyle(
-                            color: Colors.white70,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Client
-                    Row(
-                      children: [
-                        CircleAvatar(
-                          backgroundColor: Colors.grey[200],
-                          child: const Icon(
-                            Icons.person,
-                            color: Colors.grey,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              mission['clientName'],
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.star,
-                                  size: 16,
-                                  color: Colors.amber[700],
-                                ),
-                                const SizedBox(width: 2),
-                                Text(
-                                  '${mission['clientRating']}',
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Description
-                    const Text(
-                      'Description',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      mission['description'],
-                      style: const TextStyle(
-                        height: 1.4,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Budget
-                    const Text(
-                      'Budget',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.green.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: Colors.green.withOpacity(0.3),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.payments,
-                            color: Colors.green,
-                            size: 18,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            mission['price'],
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.green,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(height: 1),
-              Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    TextButton.icon(
-                      icon: const Icon(Icons.close),
-                      label: const Text('Passer'),
-                      onPressed: () {
-                        Navigator.pop(context);
-                      },
-                    ),
-                    TextButton.icon(
-                      icon: const Icon(Icons.chat),
-                      label: const Text('Contacter'),
-                      onPressed: () {
-                        Navigator.pop(context);
-                        // Naviguer vers le chat
-                      },
-                    ),
-                    ElevatedButton.icon(
-                      icon: const Icon(Icons.description),
-                      label: const Text('Proposer'),
-                      onPressed: () {
-                        Navigator.pop(context);
-                        _showApplyDialog(context, mission);
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // 🎯 DIALOGUE POUR POSTULER À UNE MISSION
-  void _showApplyDialog(BuildContext context, Map<String, dynamic> mission) {
-    final TextEditingController messageController = TextEditingController();
-    final TextEditingController priceController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Postuler à "${mission['title']}"'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: messageController,
-              decoration: const InputDecoration(
-                labelText: 'Message de candidature',
-                hintText: 'Expliquez pourquoi vous êtes le bon prestataire...',
-              ),
-              maxLines: 3,
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: priceController,
-              decoration: const InputDecoration(
-                labelText: 'Prix proposé (FCFA)',
-                hintText: 'Prix de votre prestation',
-              ),
-              keyboardType: TextInputType.number,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Annuler'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (messageController.text.isNotEmpty) {
-                context.read<MissionsBloc>().add(
-                      ApplyToMission(
-                        missionId:
-                            mission['id'] ?? '1', // TODO: Utiliser l'ID réel
-                        message: messageController.text,
-                        proposedPrice: priceController.text.isNotEmpty
-                            ? double.tryParse(priceController.text)
-                            : null,
-                      ),
-                    );
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Candidature envoyée avec succès !'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
-              }
-            },
-            child: const Text('Envoyer'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showFilterDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Filtres'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Distance
-            const Text('Distance maximale'),
-            Slider(
-              value: 10,
-              min: 1,
-              max: 20,
-              divisions: 19,
-              label: '10 km',
-              onChanged: (value) {
-                // Mettre à jour la distance
-              },
-            ),
-
-            // Budget
-            const Text('Budget'),
-            RangeSlider(
-              values: const RangeValues(10000, 100000),
-              min: 5000,
-              max: 200000,
-              divisions: 39,
-              labels: const RangeLabels('10,000 FCFA', '100,000 FCFA'),
-              onChanged: (values) {
-                // Mettre à jour le budget
-              },
-            ),
-
-            // Urgence
-            const Text('Urgence'),
-            Wrap(
-              spacing: 8,
-              children: [
-                FilterChip(
-                  label: const Text('Immédiat'),
-                  selected: true,
-                  onSelected: (selected) {
-                    // Mettre à jour le filtre
-                  },
-                ),
-                FilterChip(
-                  label: const Text('Cette semaine'),
-                  selected: true,
-                  onSelected: (selected) {
-                    // Mettre à jour le filtre
-                  },
-                ),
-                FilterChip(
-                  label: const Text('Flexible'),
-                  selected: true,
-                  onSelected: (selected) {
-                    // Mettre à jour le filtre
-                  },
-                ),
-              ],
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-            },
-            child: const Text('Annuler'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              // Appliquer les filtres
-            },
-            child: const Text('Appliquer'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 🔍 EN-TÊTE DE RECHERCHE MAGNIFIQUE
+  // 🔍 EN-TÊTE DE RECHERCHE
   Widget _buildSearchHeader() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1174,7 +313,6 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen>
                 setState(() {
                   _searchQuery = value;
                 });
-                _performSearch();
               },
               decoration: InputDecoration(
                 hintText: '🔍 Rechercher une mission...',
@@ -1186,14 +324,12 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen>
                           setState(() {
                             _searchQuery = '';
                           });
-                          _performSearch();
                         },
                         icon: Icon(Icons.clear, color: Colors.grey[600]),
                       )
                     : IconButton(
-                        onPressed: () => _showAdvancedFilters(),
-                        icon: Icon(Icons.filter_list,
-                            color: Colors.green.shade600),
+                        onPressed: () => _loadMissions(),
+                        icon: Icon(Icons.refresh, color: Colors.green.shade600),
                       ),
                 border: InputBorder.none,
                 contentPadding:
@@ -1201,205 +337,452 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen>
               ),
             ),
           ),
-
           const SizedBox(height: 12),
 
-          // Filtres rapides
-          _buildQuickFilters(),
-
-          // Filtres avancés (si activés)
-          if (_showFilters) _buildAdvancedFilters(),
-        ],
-      ),
-    );
-  }
-
-  // 🏷️ FILTRES RAPIDES
-  Widget _buildQuickFilters() {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          _buildFilterChip('📍 Toutes zones', _selectedLocation == 'Toutes',
-              () {
-            setState(() => _selectedLocation = 'Toutes');
-            _performSearch();
-          }),
-          _buildFilterChip('💰 Tous prix', _selectedPriceRange == 'Tous', () {
-            setState(() => _selectedPriceRange = 'Tous');
-            _performSearch();
-          }),
-          _buildFilterChip('⚡ Toutes urgences', _selectedUrgency == 'Toutes',
-              () {
-            setState(() => _selectedUrgency = 'Toutes');
-            _performSearch();
-          }),
-          _buildFilterChip('🗺️ Carte', false, () => _showMapView()),
-        ],
-      ),
-    );
-  }
-
-  // 🏷️ CHIP DE FILTRE
-  Widget _buildFilterChip(String label, bool selected, VoidCallback onTap) {
-    return Container(
-      margin: const EdgeInsets.only(right: 8),
-      child: FilterChip(
-        label: Text(
-          label,
-          style: TextStyle(
-            color: selected ? Colors.white : Colors.green.shade700,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        selected: selected,
-        onSelected: (_) => onTap(),
-        backgroundColor: Colors.white,
-        selectedColor: Colors.green.shade600,
-        checkmarkColor: Colors.white,
-        side: BorderSide(
-          color: selected ? Colors.green.shade600 : Colors.green.shade300,
-          width: 1,
-        ),
-      ),
-    );
-  }
-
-  // 🔧 FILTRES AVANCÉS
-  Widget _buildAdvancedFilters() {
-    return Container(
-      margin: const EdgeInsets.only(top: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.green.shade200),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+          // Bouton de rafraîchissement
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Icon(Icons.tune, color: Colors.green.shade600, size: 20),
-              const SizedBox(width: 8),
               Text(
-                'Filtres avancés',
+                '${_availableMissions.length} missions disponibles',
                 style: TextStyle(
-                  fontSize: 16,
+                  color: Colors.green.shade700,
                   fontWeight: FontWeight.bold,
-                  color: Colors.green.shade800,
                 ),
               ),
-              const Spacer(),
-              IconButton(
-                onPressed: () => setState(() => _showFilters = false),
-                icon: Icon(Icons.close, color: Colors.grey[600], size: 20),
+              TextButton.icon(
+                onPressed: _loadMissions,
+                icon: Icon(Icons.refresh, color: Colors.green.shade600),
+                label: Text(
+                  'Actualiser',
+                  style: TextStyle(color: Colors.green.shade600),
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-
-          // Localisation
-          _buildFilterSection(
-            '📍 Localisation',
-            ['Toutes', 'Cocody', 'Marcory', 'Yopougon', 'Abobo', 'Plateau'],
-            _selectedLocation,
-            (value) {
-              setState(() => _selectedLocation = value);
-              _performSearch();
-            },
-          ),
-
-          const SizedBox(height: 12),
-
-          // Prix
-          _buildFilterSection(
-            '💰 Prix',
-            ['Tous', '0-25K', '25K-50K', '50K-100K', '100K+'],
-            _selectedPriceRange,
-            (value) {
-              setState(() => _selectedPriceRange = value);
-              _performSearch();
-            },
-          ),
-
-          const SizedBox(height: 12),
-
-          // Urgence
-          _buildFilterSection(
-            '⚡ Urgence',
-            ['Toutes', 'Urgent', 'Standard', 'Flexible'],
-            _selectedUrgency,
-            (value) {
-              setState(() => _selectedUrgency = value);
-              _performSearch();
-            },
-          ),
         ],
       ),
     );
   }
 
-  // 📋 SECTION DE FILTRE
-  Widget _buildFilterSection(String title, List<String> options,
-      String selected, Function(String) onChanged) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: Colors.grey[700],
-          ),
+  // 📋 ONGLET MISSIONS DISPONIBLES
+  Widget _buildAvailableMissionsTab() {
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(
+          color: Color(0xFF2E7D32),
         ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          children: options.map((option) {
-            return ChoiceChip(
-              label: Text(option),
-              selected: selected == option,
-              onSelected: (_) => onChanged(option),
-              selectedColor: Colors.green.shade100,
-              labelStyle: TextStyle(
-                color: selected == option
-                    ? Colors.green.shade800
-                    : Colors.grey[600],
-                fontWeight:
-                    selected == option ? FontWeight.w600 : FontWeight.normal,
+      );
+    }
+
+    if (_errorMessage != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, size: 64, color: Colors.red.shade300),
+            const SizedBox(height: 16),
+            Text(
+              _errorMessage!,
+              style: const TextStyle(fontSize: 16),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _loadMissions,
+              child: const Text('Réessayer'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_availableMissions.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.assignment_outlined,
+                size: 64, color: Colors.grey.shade400),
+            const SizedBox(height: 16),
+            Text(
+              'Aucune mission disponible',
+              style: TextStyle(
+                fontSize: 18,
+                color: Colors.grey.shade600,
+                fontWeight: FontWeight.bold,
               ),
-            );
-          }).toList(),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Les nouvelles missions apparaîtront ici',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey.shade500,
+              ),
+            ),
+          ],
         ),
-      ],
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadMissions,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: _availableMissions.length,
+        itemBuilder: (context, index) {
+          final mission = _availableMissions[index];
+          return _buildMissionCard(mission, 'available');
+        },
+      ),
     );
   }
 
-  // 🔍 EFFECTUER LA RECHERCHE
-  void _performSearch() {
-    // TODO: Implémenter la logique de recherche avec le BLoC
-    context.read<MissionsBloc>().add(FilterMissions(
-          searchQuery: _searchQuery,
-          location: _selectedLocation,
-          priceRange: _selectedPriceRange,
-          urgency: _selectedUrgency,
-        ));
-  }
+  // 🚀 ONGLET MISSIONS EN COURS
+  Widget _buildOngoingMissionsTab() {
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(
+          color: Color(0xFF2E7D32),
+        ),
+      );
+    }
 
-  // 🗺️ AFFICHER LA VUE CARTE
-  void _showMapView() {
-    // TODO: Implémenter la vue carte
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Vue carte - En développement')),
+    if (_ongoingMissions.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.work_outline, size: 64, color: Colors.grey.shade400),
+            const SizedBox(height: 16),
+            Text(
+              'Aucune mission en cours',
+              style: TextStyle(
+                fontSize: 18,
+                color: Colors.grey.shade600,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Vos missions acceptées apparaîtront ici',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey.shade500,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadMissions,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: _ongoingMissions.length,
+        itemBuilder: (context, index) {
+          final mission = _ongoingMissions[index];
+          return _buildMissionCard(mission, 'ongoing');
+        },
+      ),
     );
   }
 
-  // 🔧 AFFICHER LES FILTRES AVANCÉS
-  void _showAdvancedFilters() {
-    setState(() {
-      _showFilters = !_showFilters;
-    });
+  // ✅ ONGLET MISSIONS TERMINÉES
+  Widget _buildCompletedMissionsTab() {
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(
+          color: Color(0xFF2E7D32),
+        ),
+      );
+    }
+
+    if (_completedMissions.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.check_circle_outline,
+                size: 64, color: Colors.grey.shade400),
+            const SizedBox(height: 16),
+            Text(
+              'Aucune mission terminée',
+              style: TextStyle(
+                fontSize: 18,
+                color: Colors.grey.shade600,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Vos missions terminées apparaîtront ici',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey.shade500,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadMissions,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: _completedMissions.length,
+        itemBuilder: (context, index) {
+          final mission = _completedMissions[index];
+          return _buildMissionCard(mission, 'completed');
+        },
+      ),
+    );
+  }
+
+  // 🎯 CARTE DE MISSION
+  Widget _buildMissionCard(Map<String, dynamic> mission, String type) {
+    final client = mission['utilisateur'] ?? {};
+    final clientName =
+        '${client['nom'] ?? ''} ${client['prenom'] ?? ''}'.trim();
+    final adresse = mission['adresse'] ?? 'Adresse non spécifiée';
+    final ville = mission['ville'] ?? 'Ville non spécifiée';
+    final notes = mission['notesClient'] ?? '';
+    final datePrestation = mission['datePrestation'] ?? '';
+    final montant = mission['montantTotal'] ?? 0;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // En-tête avec nom client et statut
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        clientName.isNotEmpty ? clientName : 'Client anonyme',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(Icons.location_on,
+                              size: 16, color: Colors.grey.shade600),
+                          const SizedBox(width: 4),
+                          Text(
+                            '$ville, $adresse',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: _getStatusColor(type),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    _getStatusText(type),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 12),
+
+            // Détails de la mission
+            if (datePrestation.isNotEmpty) ...[
+              Row(
+                children: [
+                  Icon(Icons.calendar_today,
+                      size: 16, color: Colors.grey.shade600),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Date: ${DateTime.parse(datePrestation).toLocal().toString().split(' ')[0]}',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey.shade700,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+            ],
+
+            if (montant > 0) ...[
+              Row(
+                children: [
+                  Icon(Icons.monetization_on,
+                      size: 16, color: Colors.green.shade600),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Montant: ${montant.toString()} FCFA',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.green.shade700,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+            ],
+
+            if (notes.isNotEmpty) ...[
+              Text(
+                'Notes: $notes',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey.shade700,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+
+            // Boutons d'action selon le type
+            _buildActionButtons(mission, type),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 🎯 BOUTONS D'ACTION
+  Widget _buildActionButtons(Map<String, dynamic> mission, String type) {
+    switch (type) {
+      case 'available':
+        return Row(
+          children: [
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () => _acceptMission(mission),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  foregroundColor: Colors.white,
+                ),
+                icon: const Icon(Icons.check),
+                label: const Text('Accepter'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () => _rejectMission(mission),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                ),
+                icon: const Icon(Icons.close),
+                label: const Text('Refuser'),
+              ),
+            ),
+          ],
+        );
+
+      case 'ongoing':
+        return SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () => _completeMission(mission),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              foregroundColor: Colors.white,
+            ),
+            icon: const Icon(Icons.check_circle),
+            label: const Text('Marquer comme terminée'),
+          ),
+        );
+
+      case 'completed':
+        return Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.green.shade50,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.green.shade200),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.green.shade600),
+              const SizedBox(width: 8),
+              Text(
+                'Mission terminée avec succès',
+                style: TextStyle(
+                  color: Colors.green.shade700,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        );
+
+      default:
+        return const SizedBox.shrink();
+    }
+  }
+
+  // 🎨 COULEUR PAR STATUT
+  Color _getStatusColor(String type) {
+    switch (type) {
+      case 'available':
+        return Colors.orange;
+      case 'ongoing':
+        return Colors.blue;
+      case 'completed':
+        return Colors.green;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  // 📝 TEXTE PAR STATUT
+  String _getStatusText(String type) {
+    switch (type) {
+      case 'available':
+        return 'Disponible';
+      case 'ongoing':
+        return 'En cours';
+      case 'completed':
+        return 'Terminée';
+      default:
+        return 'Inconnu';
+    }
   }
 }

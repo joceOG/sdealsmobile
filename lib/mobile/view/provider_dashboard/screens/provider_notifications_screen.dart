@@ -33,6 +33,8 @@ class _ProviderNotificationsScreenState
     final authState = context.read<AuthCubit>().state;
     if (authState is AuthAuthenticated) {
       _prestataireId = authState.utilisateur.idutilisateur;
+      // Définir le token d'authentification
+      context.read<NotificationsBloc>().setToken(authState.token);
       // Charger les notifications du prestataire
       context
           .read<NotificationsBloc>()

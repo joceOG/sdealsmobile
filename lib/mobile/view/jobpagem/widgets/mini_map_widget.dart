@@ -73,7 +73,7 @@ class _MiniMapWidgetState extends State<MiniMapWidget> {
     // Marqueur du prestataire avec prix
     final providerIcon =
         await CustomMarkerService.createProviderWithPriceMarker(
-      name: widget.provider.utilisateur?.fullName ?? 'Prestataire',
+      name: _getProviderName(),
       category: widget.provider.categorie?.nomcategorie ?? '',
       service: widget.provider.service?.nomservice ?? '',
       price: _getProviderPrice(),
@@ -110,6 +110,28 @@ class _MiniMapWidgetState extends State<MiniMapWidget> {
       '25 000 F CFA',
     ];
     return prices[widget.provider.hashCode % prices.length];
+  }
+
+  String _getProviderName() {
+    // Gérer différents formats de données utilisateur
+    if (widget.provider.utilisateur != null) {
+      // Format avec objet utilisateur
+      final user = widget.provider.utilisateur;
+      if (user is Map<String, dynamic>) {
+        final nom = user['nom'] ?? '';
+        final prenom = user['prenom'] ?? '';
+        if (nom.isNotEmpty && prenom.isNotEmpty) {
+          return '$nom $prenom';
+        } else if (nom.isNotEmpty) {
+          return nom;
+        } else if (prenom.isNotEmpty) {
+          return prenom;
+        }
+      }
+    }
+
+    // Fallback
+    return 'Prestataire';
   }
 
   Future<void> _getDirections() async {

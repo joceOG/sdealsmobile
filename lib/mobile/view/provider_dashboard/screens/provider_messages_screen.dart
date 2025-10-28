@@ -31,6 +31,8 @@ class _ProviderMessagesScreenState extends State<ProviderMessagesScreen>
     final authState = context.read<AuthCubit>().state;
     if (authState is AuthAuthenticated) {
       _prestataireId = authState.utilisateur.idutilisateur;
+      // 🔌 Connecter au WebSocket pour les messages en temps réel
+      context.read<MessagesBloc>().add(ConnectWebSocket());
       // Charger les conversations du prestataire
       context
           .read<MessagesBloc>()
@@ -40,6 +42,9 @@ class _ProviderMessagesScreenState extends State<ProviderMessagesScreen>
 
   @override
   void dispose() {
+    // 🔌 Déconnecter le WebSocket
+    context.read<MessagesBloc>().add(DisconnectWebSocket());
+
     _tabController.dispose();
     _searchController.dispose();
     super.dispose();
