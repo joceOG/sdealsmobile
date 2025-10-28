@@ -7,32 +7,34 @@ import 'notifications_state.dart';
 // 🎯 BLoC POUR GÉRER LES NOTIFICATIONS PRESTATAIRE
 class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
   final ApiClient _apiClient = ApiClient();
+  String? _currentToken;
 
   NotificationsBloc() : super(NotificationsInitial()) {
     // 🔔 CHARGER LES NOTIFICATIONS DU PRESTATAIRE
     on<LoadPrestataireNotifications>((event, emit) async {
       emit(NotificationsLoading());
       try {
-        final response =
-            await _apiClient.get('/notifications/user/${event.prestataireId}');
-        if (response.statusCode == 200) {
-          final data = jsonDecode(response.body);
-          final List<dynamic> notifications = data['notifications'] ?? [];
-          final int totalUnread = data['nonLues'] ?? 0;
-          final bool hasMore = data['currentPage'] < data['totalPages'];
-          final int currentPage = data['currentPage'] ?? 1;
-
-          emit(NotificationsLoaded(
-            notifications: notifications,
-            totalUnread: totalUnread,
-            stats: data['stats'],
-            hasMore: hasMore,
-            currentPage: currentPage,
-          ));
-        } else {
-          emit(NotificationsError(
-              'Erreur lors du chargement des notifications'));
+        if (_currentToken == null) {
+          emit(NotificationsError('Token d\'authentification manquant'));
+          return;
         }
+
+        final notifications = await _apiClient.getNotifications(
+          token: _currentToken!,
+          userId: event.prestataireId,
+        );
+
+        final unreadCount = await _apiClient.getUnreadNotificationCount(
+          token: _currentToken!,
+          userId: event.prestataireId,
+        );
+
+        emit(NotificationsLoaded(
+          notifications: notifications,
+          totalUnread: unreadCount,
+          hasMore: false,
+          currentPage: 1,
+        ));
       } catch (e) {
         emit(NotificationsError('Erreur de connexion: $e'));
       }
@@ -43,7 +45,7 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
       emit(NotificationsLoading());
       try {
         final response = await _apiClient.get(
-            '/notifications/user/${event.prestataireId}?nonLuesUniquement=true');
+            '/notification/user/${event.prestataireId}?nonLuesUniquement=true');
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
           final List<dynamic> notifications = data['notifications'] ?? [];
@@ -69,7 +71,7 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
       emit(NotificationsLoading());
       try {
         final response = await _apiClient.get(
-            '/notifications/user/${event.prestataireId}?type=${event.type}');
+            '/notification/user/${event.prestataireId}?type=${event.type}');
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
           final List<dynamic> notifications = data['notifications'] ?? [];
@@ -97,7 +99,7 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
       emit(NotificationsLoading());
       try {
         final response = await _apiClient.get(
-            '/notifications/user/${event.prestataireId}?priorite=${event.priority}');
+            '/notification/user/${event.prestataireId}?priorite=${event.priority}');
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
           final List<dynamic> notifications = data['notifications'] ?? [];
@@ -124,7 +126,7 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
     on<MarkNotificationAsRead>((event, emit) async {
       try {
         final response =
-            await _apiClient.put('/notifications/${event.notificationId}/read');
+            await _apiClient.put('/notification/${event.notificationId}/read');
         if (response.statusCode == 200) {
           emit(NotificationMarkedAsRead(event.notificationId));
           // Recharger les notifications
@@ -142,7 +144,7 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
     on<MarkAllNotificationsAsRead>((event, emit) async {
       try {
         final response = await _apiClient
-            .put('/notifications/user/${event.prestataireId}/mark-all-read');
+            .put('/notification/user/${event.prestataireId}/mark-all-read');
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
           emit(AllNotificationsMarkedAsRead(data['modifiedCount'] ?? 0));
@@ -160,7 +162,7 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
     on<ArchiveNotification>((event, emit) async {
       try {
         final response = await _apiClient
-            .put('/notifications/${event.notificationId}/archive');
+            .put('/notification/${event.notificationId}/archive');
         if (response.statusCode == 200) {
           emit(NotificationArchived(event.notificationId));
           // Recharger les notifications
@@ -177,7 +179,7 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
     on<DeleteNotification>((event, emit) async {
       try {
         final response =
-            await _apiClient.delete('/notifications/${event.notificationId}');
+            await _apiClient.delete('/notification/${event.notificationId}');
         if (response.statusCode == 200) {
           emit(NotificationDeleted(event.notificationId));
           // Recharger les notifications
@@ -194,7 +196,7 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
     on<LoadNotificationStats>((event, emit) async {
       try {
         final response = await _apiClient
-            .get('/notifications/stats?userId=${event.prestataireId}');
+            .get('/notification/stats?userId=${event.prestataireId}');
         if (response.statusCode == 200) {
           final stats = jsonDecode(response.body);
           emit(NotificationStatsLoaded(stats));
@@ -223,7 +225,7 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
 
         final queryString = params.isNotEmpty ? '?${params.join('&')}' : '';
         final response = await _apiClient
-            .get('/notifications/user/${event.prestataireId}$queryString');
+            .get('/notification/user/${event.prestataireId}$queryString');
 
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
@@ -250,7 +252,7 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
     on<LoadMoreNotifications>((event, emit) async {
       try {
         final response = await _apiClient.get(
-            '/notifications/user/${event.prestataireId}?page=${event.page}');
+            '/notification/user/${event.prestataireId}?page=${event.page}');
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
           final List<dynamic> newNotifications = data['notifications'] ?? [];
@@ -293,7 +295,7 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
       emit(NotificationsLoading());
       try {
         final response = await _apiClient.get(
-            '/notifications/search?userId=${event.prestataireId}&query=${event.query}');
+            '/notification/search?userId=${event.prestataireId}&query=${event.query}');
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
           final List<dynamic> results = data['notifications'] ?? [];
@@ -310,7 +312,7 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
     on<RefreshNotifications>((event, emit) async {
       try {
         final response =
-            await _apiClient.get('/notifications/user/${event.prestataireId}');
+            await _apiClient.get('/notification/user/${event.prestataireId}');
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
           final List<dynamic> notifications = data['notifications'] ?? [];
@@ -324,5 +326,9 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
         emit(NotificationsError('Erreur de connexion: $e'));
       }
     });
+  }
+
+  void setToken(String token) {
+    _currentToken = token;
   }
 }

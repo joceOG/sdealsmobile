@@ -106,6 +106,9 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
 
   @override
   void dispose() {
+    // 🔌 Déconnecter le WebSocket
+    _chatBloc.add(DisconnectWebSocket());
+
     _messageController.dispose();
     _scrollController.dispose();
     _focusNode.dispose();
@@ -113,6 +116,9 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
   }
 
   void _loadInitialData() {
+    // 🔌 Connecter au WebSocket pour les messages en temps réel
+    _chatBloc.add(ConnectWebSocket());
+
     // Charger la liste des conversations
     _chatBloc.add(LoadConversations());
 

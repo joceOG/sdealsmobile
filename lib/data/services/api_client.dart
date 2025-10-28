@@ -949,7 +949,9 @@ extension ServiceRequestsApi on ApiClient {
       if (dateHeure != null) 'dateHeure': dateHeure.toIso8601String(),
       if (notesClient != null) 'notesClient': notesClient,
       if (moyenPaiement != null) 'moyenPaiement': moyenPaiement,
-      if (montant != null) 'montant': montant,
+      // 💰 SYSTÈME GRATUIT - Montant toujours 0
+      'montantTotal': 0,
+      'statutPaiement': 'GRATUIT',
     };
     final res = await http.post(
       uri,
@@ -982,10 +984,59 @@ extension ServiceRequestsApi on ApiClient {
       'Authorization': 'Bearer $token',
     });
     if (res.statusCode == 200) {
-      final list = jsonDecode(res.body) as List<dynamic>;
-      return list.cast<Map<String, dynamic>>();
+      final data = jsonDecode(res.body);
+      if (data is List) {
+        return data.cast<Map<String, dynamic>>();
+      } else if (data is Map && data.containsKey('prestations')) {
+        return (data['prestations'] as List).cast<Map<String, dynamic>>();
+      }
+      return [];
     }
     throw Exception('Erreur getMyPrestations: ${res.statusCode}');
+  }
+
+  // ✅ Récupérer prestations par statut (pour prestataires)
+  Future<List<Map<String, dynamic>>> getPrestationsByStatus({
+    required String token,
+    required String status,
+  }) async {
+    final query = {'status': status};
+    final uri =
+        Uri.parse('$apiUrl/prestations').replace(queryParameters: query);
+    final res = await http.get(uri, headers: {
+      'Authorization': 'Bearer $token',
+    });
+    if (res.statusCode == 200) {
+      final data = jsonDecode(res.body);
+      if (data is List) {
+        return data.cast<Map<String, dynamic>>();
+      } else if (data is Map && data.containsKey('prestations')) {
+        return (data['prestations'] as List).cast<Map<String, dynamic>>();
+      }
+      return [];
+    }
+    throw Exception('Erreur getPrestationsByStatus: ${res.statusCode}');
+  }
+
+  // ✅ Mettre à jour le statut d'une prestation
+  Future<Map<String, dynamic>> updatePrestationStatus({
+    required String token,
+    required String prestationId,
+    required String newStatus,
+  }) async {
+    final uri = Uri.parse('$apiUrl/prestation/$prestationId/statut');
+    final res = await http.patch(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({'statut': newStatus}),
+    );
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body) as Map<String, dynamic>;
+    }
+    throw Exception('Erreur updatePrestationStatus: ${res.statusCode}');
   }
 
   // ✅ Détail prestation
@@ -1003,25 +1054,76 @@ extension ServiceRequestsApi on ApiClient {
     throw Exception('Erreur getPrestationById: ${res.statusCode}');
   }
 
-  // ✅ Changer statut prestation
-  Future<Map<String, dynamic>> updatePrestation({
+  // ✅ Récupérer les notifications d'un utilisateur
+  Future<List<Map<String, dynamic>>> getNotifications({
     required String token,
-    required String id,
-    Map<String, dynamic> updates = const {},
+    required String userId,
+    String? statut,
+    int limit = 50,
+    int offset = 0,
   }) async {
-    final uri = Uri.parse('$apiUrl/prestation/$id');
-    final res = await http.put(
-      uri,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-      body: jsonEncode(updates),
-    );
+    final query = <String, String>{
+      'limit': limit.toString(),
+      'offset': offset.toString(),
+      if (statut != null) 'statut': statut,
+    };
+    final uri = Uri.parse('$apiUrl/notification/user/$userId')
+        .replace(queryParameters: query);
+    final res = await http.get(uri, headers: {
+      'Authorization': 'Bearer $token',
+    });
     if (res.statusCode == 200) {
-      return jsonDecode(res.body) as Map<String, dynamic>;
+      final data = jsonDecode(res.body);
+      if (data is Map && data.containsKey('notifications')) {
+        return (data['notifications'] as List).cast<Map<String, dynamic>>();
+      }
+      return [];
     }
-    throw Exception('Erreur updatePrestation: ${res.statusCode} ${res.body}');
+    throw Exception('Erreur getNotifications: ${res.statusCode}');
+  }
+
+  // ✅ Compter les notifications non lues
+  Future<int> getUnreadNotificationCount({
+    required String token,
+    required String userId,
+  }) async {
+    final uri = Uri.parse('$apiUrl/notification/user/$userId/unread-count');
+    final res = await http.get(uri, headers: {
+      'Authorization': 'Bearer $token',
+    });
+    if (res.statusCode == 200) {
+      final data = jsonDecode(res.body);
+      return data['count'] ?? 0;
+    }
+    throw Exception('Erreur getUnreadNotificationCount: ${res.statusCode}');
+  }
+
+  // ✅ Marquer une notification comme lue
+  Future<void> markNotificationAsRead({
+    required String token,
+    required String notificationId,
+  }) async {
+    final uri = Uri.parse('$apiUrl/notification/$notificationId/read');
+    final res = await http.put(uri, headers: {
+      'Authorization': 'Bearer $token',
+    });
+    if (res.statusCode != 200) {
+      throw Exception('Erreur markNotificationAsRead: ${res.statusCode}');
+    }
+  }
+
+  // ✅ Marquer toutes les notifications comme lues
+  Future<void> markAllNotificationsAsRead({
+    required String token,
+    required String userId,
+  }) async {
+    final uri = Uri.parse('$apiUrl/notification/user/$userId/read-all');
+    final res = await http.put(uri, headers: {
+      'Authorization': 'Bearer $token',
+    });
+    if (res.statusCode != 200) {
+      throw Exception('Erreur markAllNotificationsAsRead: ${res.statusCode}');
+    }
   }
 }
 

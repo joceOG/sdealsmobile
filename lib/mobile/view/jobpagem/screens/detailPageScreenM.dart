@@ -32,6 +32,8 @@ class _DetailPageState extends State<DetailPage> {
   bool _filterVerifiedOnly = false;
   bool _isFavorited = false;
   LatLng? _userLocation;
+  String? _serviceId;
+  String? _selectedProviderId;
 
   @override
   void initState() {
@@ -69,6 +71,10 @@ class _DetailPageState extends State<DetailPage> {
       if (!mounted) return;
       setState(() {
         _providers = results;
+        // Récupérer l'ID du service depuis le premier prestataire
+        if (_providers.isNotEmpty && _providers.first['service'] != null) {
+          _serviceId = _providers.first['service']['_id']?.toString();
+        }
       });
     } catch (e) {
       if (!mounted) return;
@@ -89,9 +95,21 @@ class _DetailPageState extends State<DetailPage> {
       appBar: AppBar(
         title: Text(widget.title,
             style: const TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.green,
+        backgroundColor: const Color(0xFF2E7D32),
         foregroundColor: Colors.white,
         elevation: 0,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                const Color(0xFF2E7D32),
+                const Color(0xFF4CAF50),
+              ],
+            ),
+          ),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.ios_share_rounded),
@@ -121,8 +139,6 @@ class _DetailPageState extends State<DetailPage> {
                 children: [
                   _buildServiceImage(widget.image),
                   const SizedBox(height: 16),
-                  _buildHeaderChips(),
-                  const SizedBox(height: 14),
                   Text(
                     widget.title,
                     style: const TextStyle(
@@ -132,32 +148,8 @@ class _DetailPageState extends State<DetailPage> {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  const Text(
-                    "Description du service :\nCe service est assuré par un professionnel qualifié.",
-                    style: TextStyle(fontSize: 15.5, color: Colors.black54),
-                  ),
+                  _buildServiceDescription(),
                   const SizedBox(height: 18),
-                  Row(
-                    children: const [
-                      Icon(Icons.location_on, color: Colors.green, size: 20),
-                      SizedBox(width: 6),
-                      Text(
-                        "Disponible à : Abobo",
-                        style: TextStyle(fontSize: 14.5, color: Colors.black87),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: const [
-                      Icon(Icons.star, color: Colors.amber, size: 20),
-                      SizedBox(width: 6),
-                      Text(
-                        "Note : 4.8/5",
-                        style: TextStyle(fontSize: 14.5, color: Colors.black87),
-                      ),
-                    ],
-                  ),
                   const SizedBox(height: 28),
 
                   // Mini carte avec emplacement du prestataire
@@ -175,34 +167,6 @@ class _DetailPageState extends State<DetailPage> {
                     preferences: const [],
                   ),
                   const SizedBox(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Prestataires disponibles',
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 18),
-                      ),
-                      TextButton.icon(
-                        onPressed: () {
-                          setState(() {
-                            _filterVerifiedOnly = !_filterVerifiedOnly;
-                          });
-                          _loadProviders();
-                        },
-                        icon: Icon(
-                          _filterVerifiedOnly
-                              ? Icons.verified_rounded
-                              : Icons.verified_outlined,
-                          color: Colors.green,
-                        ),
-                        label: Text(
-                          _filterVerifiedOnly ? 'Vérifiés seulement' : 'Tous',
-                          style: const TextStyle(color: Colors.green),
-                        ),
-                      )
-                    ],
-                  ),
                 ],
               ),
             ),
@@ -212,7 +176,8 @@ class _DetailPageState extends State<DetailPage> {
               child: Padding(
                 padding: EdgeInsets.only(top: 8),
                 child: Center(
-                    child: CircularProgressIndicator(color: Colors.green)),
+                    child: CircularProgressIndicator(
+                        color: const Color(0xFF2E7D32))),
               ),
             )
           else if (_providers.isEmpty)
@@ -223,22 +188,12 @@ class _DetailPageState extends State<DetailPage> {
               ),
             )
           else
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 18),
-              sliver: SliverList.builder(
-                itemCount: _providers.length,
-                itemBuilder: (context, index) {
-                  final p = _providers[index];
-                  return _buildProviderCard(p);
-                },
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                child: _buildProvidersStories(),
               ),
             ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(18),
-              child: _buildSuggestionsSection(context),
-            ),
-          ),
           const SliverToBoxAdapter(child: SizedBox(height: 80)),
         ],
       ),
@@ -354,11 +309,12 @@ class _DetailPageState extends State<DetailPage> {
           width: double.infinity,
           child: ElevatedButton.icon(
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              padding: const EdgeInsets.symmetric(vertical: 14),
+              backgroundColor: const Color(0xFF2E7D32),
+              padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
               ),
+              elevation: 6,
             ),
             icon: const Icon(Icons.shopping_cart_checkout_rounded,
                 color: Colors.white),
@@ -420,6 +376,34 @@ class _DetailPageState extends State<DetailPage> {
                       style: const TextStyle(
                           fontWeight: FontWeight.bold, fontSize: 18)),
                   const SizedBox(height: 12),
+                  // Sélecteur de prestataire
+                  if (_providers.isNotEmpty) ...[
+                    const Text('Choisir un prestataire:',
+                        style: TextStyle(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<String>(
+                      value: _selectedProviderId,
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                        hintText: 'Sélectionnez un prestataire',
+                      ),
+                      items: _providers.map((provider) {
+                        final name =
+                            provider['utilisateur']?['nom'] ?? 'Inconnu';
+                        final price = provider['prixprestataire'] ?? 0;
+                        return DropdownMenuItem<String>(
+                          value: provider['_id']?.toString(),
+                          child: Text('$name - ${price}FCFA'),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        setSheetState(() {
+                          _selectedProviderId = value;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   TextField(
                     controller: adresseCtrl,
                     decoration: const InputDecoration(labelText: 'Adresse'),
@@ -458,7 +442,7 @@ class _DetailPageState extends State<DetailPage> {
                           setSheetState(() => selectedDateTime = dt);
                         },
                         icon: const Icon(Icons.calendar_today,
-                            color: Colors.green),
+                            color: Color(0xFF2E7D32)),
                         label: const Text('Choisir'),
                       ),
                     ],
@@ -474,15 +458,32 @@ class _DetailPageState extends State<DetailPage> {
                     width: double.infinity,
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green),
+                          backgroundColor: const Color(0xFF2E7D32),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          )),
                       onPressed: () async {
                         final auth = context.read<AuthCubit>().state
                             as AuthAuthenticated;
+
+                        // Validation
+                        if (_selectedProviderId == null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content:
+                                  Text('Veuillez sélectionner un prestataire'),
+                              backgroundColor: Colors.orange,
+                            ),
+                          );
+                          return;
+                        }
+
                         try {
                           final created = await _api.createPrestation(
                             token: auth.token,
                             utilisateurId: auth.utilisateur.idutilisateur,
-                            serviceId: null,
+                            prestataireId: _selectedProviderId,
+                            serviceId: _serviceId,
                             adresse: adresseCtrl.text.trim().isEmpty
                                 ? null
                                 : adresseCtrl.text.trim(),
@@ -493,12 +494,16 @@ class _DetailPageState extends State<DetailPage> {
                             notesClient: notesCtrl.text.trim().isEmpty
                                 ? null
                                 : notesCtrl.text.trim(),
-                            moyenPaiement: 'SOUTRAPAY',
+                            moyenPaiement: 'GRATUIT',
                           );
                           if (!mounted) return;
                           Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Demande envoyée')));
+                          ScaffoldMessenger.of(context)
+                              .showSnackBar(const SnackBar(
+                            content: Text(
+                                'Commande confirmée ! Demande envoyée aux prestataires.'),
+                            backgroundColor: Colors.green,
+                          ));
                           final id = created['_id']?.toString();
                           if (id != null) {
                             Navigator.push(
@@ -517,7 +522,7 @@ class _DetailPageState extends State<DetailPage> {
                               SnackBar(content: Text('Erreur: $e')));
                         }
                       },
-                      child: const Text('Confirmer et payer',
+                      child: const Text('Confirmer la commande',
                           style: TextStyle(color: Colors.white)),
                     ),
                   ),
@@ -549,7 +554,8 @@ class _DetailPageState extends State<DetailPage> {
                     color: Colors.grey.shade200,
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  child: const CircularProgressIndicator(color: Colors.green),
+                  child:
+                      const CircularProgressIndicator(color: Color(0xFF2E7D32)),
                 );
               },
               errorBuilder: (context, error, stackTrace) {
@@ -579,171 +585,171 @@ class _DetailPageState extends State<DetailPage> {
     );
   }
 
-  Widget _buildHeaderChips() {
-    final chips = <String>['Populaire', 'Rapide', 'Garanti', 'Top qualité'];
-    return SizedBox(
-      height: 36,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: chips.length + 1,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          if (index == 0) {
-            return FilterChip(
-              label: const Text('Vérifiés'),
-              selected: _filterVerifiedOnly,
-              onSelected: (v) {
-                setState(() => _filterVerifiedOnly = v);
-                _loadProviders();
-              },
-            );
-          }
-          final label = chips[index - 1];
-          return Chip(
-            label: Text(label),
-            backgroundColor: Colors.green.shade50,
-            side: BorderSide(color: Colors.green.withOpacity(0.25)),
-          );
-        },
-      ),
+  Widget _buildServiceDescription() {
+    // Utiliser la description du premier prestataire si disponible
+    String description = "Ce service est assuré par un professionnel qualifié.";
+    if (_providers.isNotEmpty && _providers.first['description'] != null) {
+      description = _providers.first['description'];
+    }
+
+    return Text(
+      description,
+      style: const TextStyle(fontSize: 15.5, color: Colors.black54),
     );
   }
 
-  Widget _buildProviderCard(Map<String, dynamic> p) {
-    final utilisateur = p['utilisateur'];
-    final nom = (utilisateur is Map<String, dynamic>)
-        ? '${utilisateur['nom'] ?? ''} ${utilisateur['prenom'] ?? ''}'.trim()
-        : 'Prestataire';
-    final service = p['service'];
-    final serviceName = (service is Map<String, dynamic>)
-        ? (service['nomservice'] ?? service['name'] ?? '')
-        : (service?.toString() ?? '');
-    final photo = (utilisateur is Map<String, dynamic>)
-        ? (utilisateur['photoProfil'] ?? '')
-        : '';
-    final isUrl = photo.toString().toLowerCase().startsWith('http');
-    final verified = p['verifier'] == true || p['verified'] == true;
-    final price = p['prixprestataire']?.toString() ?? '-';
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      elevation: 1.5,
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: isUrl && photo.isNotEmpty
-                  ? Image.network(photo,
-                      height: 56, width: 56, fit: BoxFit.cover)
-                  : Container(
-                      height: 56,
-                      width: 56,
-                      color: Colors.green.shade50,
-                      alignment: Alignment.center,
-                      child: const Icon(Icons.person, color: Colors.green),
-                    ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          nom.isEmpty ? 'Prestataire' : nom,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      if (verified)
-                        const Icon(Icons.verified_rounded,
-                            color: Colors.green, size: 18),
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    serviceName.toString(),
-                    style:
-                        const TextStyle(color: Colors.black54, fontSize: 12.5),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      const Icon(Icons.star, size: 16, color: Colors.amber),
-                      const SizedBox(width: 4),
-                      const Text('4.8'),
-                      const SizedBox(width: 12),
-                      const Icon(Icons.price_change_rounded,
-                          size: 16, color: Colors.green),
-                      const SizedBox(width: 4),
-                      Text('$price FCFA'),
-                    ],
-                  )
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              ),
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Demande envoyée')));
-              },
-              child: const Text('Commander',
-                  style: TextStyle(color: Colors.white)),
-            )
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSuggestionsSection(BuildContext context) {
-    final suggestions = <String>[
-      'Nettoyage ménager',
-      'Collecte d\'encombrants',
-      'Entretien espaces verts'
-    ];
+  Widget _buildProvidersStories() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Prestations similaires',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+          'Prestataires disponibles',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+            color: Colors.black87,
+          ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
         SizedBox(
-          height: 40,
-          child: ListView.separated(
+          height: 120, // Hauteur pour les stories
+          child: ListView.builder(
             scrollDirection: Axis.horizontal,
-            itemCount: suggestions.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemCount: _providers.length,
             itemBuilder: (context, index) {
-              final label = suggestions[index];
-              return ActionChip(
-                label: Text(label),
-                backgroundColor: Colors.green.shade50,
-                side: BorderSide(color: Colors.green.withOpacity(0.3)),
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Suggestion: $label')),
-                  );
-                },
-              );
+              final provider = _providers[index];
+              return _buildProviderStory(provider);
             },
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildProviderStory(Map<String, dynamic> provider) {
+    final utilisateur = provider['utilisateur'];
+    final nom = (utilisateur is Map<String, dynamic>)
+        ? '${utilisateur['nom'] ?? ''} ${utilisateur['prenom'] ?? ''}'.trim()
+        : 'Prestataire';
+    final photo = (utilisateur is Map<String, dynamic>)
+        ? (utilisateur['photoProfil'] ?? '')
+        : '';
+    final isUrl = photo.toString().toLowerCase().startsWith('http');
+    final verified =
+        provider['verifier'] == true || provider['verified'] == true;
+    final price = provider['prixprestataire']?.toString() ?? '-';
+
+    return Container(
+      width: 80,
+      margin: const EdgeInsets.only(right: 16),
+      child: Column(
+        children: [
+          // Story ronde avec photo
+          GestureDetector(
+            onTap: () {
+              // Action pour voir le profil du prestataire
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Profil de $nom')),
+              );
+            },
+            child: Stack(
+              children: [
+                // Cercle principal
+                Container(
+                  width: 70,
+                  height: 70,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: verified
+                          ? const Color(0xFF2E7D32)
+                          : Colors.grey.shade300,
+                      width: 3,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: ClipOval(
+                    child: isUrl && photo.isNotEmpty
+                        ? Image.network(
+                            photo,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                color: const Color(0xFF2E7D32).withOpacity(0.1),
+                                child: const Icon(
+                                  Icons.person,
+                                  color: Color(0xFF2E7D32),
+                                  size: 30,
+                                ),
+                              );
+                            },
+                          )
+                        : Container(
+                            color: const Color(0xFF2E7D32).withOpacity(0.1),
+                            child: const Icon(
+                              Icons.person,
+                              color: Color(0xFF2E7D32),
+                              size: 30,
+                            ),
+                          ),
+                  ),
+                ),
+                // Badge vérifié
+                if (verified)
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: Container(
+                      width: 20,
+                      height: 20,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF2E7D32),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.verified,
+                        color: Colors.white,
+                        size: 12,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          // Nom du prestataire
+          Text(
+            nom.length > 10 ? '${nom.substring(0, 10)}...' : nom,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Colors.black87,
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 2),
+          // Prix
+          Text(
+            '$price FCFA',
+            style: const TextStyle(
+              fontSize: 10,
+              color: Color(0xFF2E7D32),
+              fontWeight: FontWeight.w500,
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
     );
   }
 }

@@ -6,14 +6,13 @@ import 'package:sdealsmobile/mobile/view/jobpagem/screens/jobPageScreenM.dart';
 import 'package:sdealsmobile/mobile/view/searchpagem/screens/searchPageScreenM.dart';
 import 'package:sdealsmobile/mobile/view/shoppingpagem/screens/shoppingPageScreenM.dart';
 import 'package:sdealsmobile/mobile/view/shoppingpagem/shoppingpageblocm/shoppingPageBlocM.dart';
+import 'package:sdealsmobile/mobile/view/notificationpagem/screens/notification_screen.dart';
+import 'package:sdealsmobile/mobile/view/notificationpagem/bloc/notification_bloc.dart';
 import '../../freelancepagem/screens/freelancePageScreen.dart';
 import '../../loginpagem/screens/loginPageScreenM.dart';
 import '../homepageblocm/homePageBlocM.dart';
 import '../homepageblocm/homePageEventM.dart';
 import '../homepageblocm/homePageStateM.dart';
-import '../../locationpagem/locationpageblocm/locationPageBlocM.dart';
-import '../../locationpagem/locationpageblocm/locationPageEventM.dart';
-import '../../locationpagem/locationpageblocm/locationPageStateM.dart';
 
 class HomePageScreenM extends StatefulWidget {
   const HomePageScreenM({super.key});
@@ -91,8 +90,13 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
   }
 
   void _openNotifications() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Notifications à venir')),
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => BlocProvider(
+          create: (context) => NotificationBloc(),
+          child: NotificationScreen(),
+        ),
+      ),
     );
   }
 
