@@ -153,11 +153,16 @@ class _DetailPageState extends State<DetailPage> {
                   const SizedBox(height: 28),
 
                   // Mini carte avec emplacement du prestataire
-                  if (_providers.isNotEmpty)
-                    MiniMapWidget(
-                      provider:
-                          _providers.first, // Premier prestataire comme exemple
-                      userLocation: _userLocation,
+                  if (_providers.isNotEmpty && _userLocation != null)
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(
+                        minHeight: 100,
+                        maxHeight: 200,
+                      ),
+                      child: MiniMapWidget(
+                        provider: _providers.first,
+                        userLocation: _userLocation,
+                      ),
                     ),
 
                   const SizedBox(height: 20),
@@ -355,178 +360,428 @@ class _DetailPageState extends State<DetailPage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
+      backgroundColor: Colors.transparent,
       builder: (context) {
-        return Padding(
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
           padding: EdgeInsets.only(
             bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-            left: 16,
-            right: 16,
-            top: 16,
+            left: 20,
+            right: 20,
+            top: 20,
           ),
           child: StatefulBuilder(
             builder: (context, setSheetState) {
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Commander ${widget.title}',
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 18)),
-                  const SizedBox(height: 12),
-                  // Sélecteur de prestataire
-                  if (_providers.isNotEmpty) ...[
-                    const Text('Choisir un prestataire:',
-                        style: TextStyle(fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      value: _selectedProviderId,
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        hintText: 'Sélectionnez un prestataire',
+              return SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // En-tête moderne
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2E7D32).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.shopping_cart_checkout_rounded,
+                            color: Color(0xFF2E7D32),
+                            size: 28,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Commander',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              Text(
+                                widget.title,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey.shade600,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.close),
+                          color: Colors.grey.shade400,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    
+                    // Sélecteur de prestataire moderne
+                    if (_providers.isNotEmpty) ...[
+                      Row(
+                        children: [
+                          Icon(Icons.person, color: Colors.grey.shade700, size: 20),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'Choisir un prestataire',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 16,
+                            ),
+                          ),
+                          const Text(' *', style: TextStyle(color: Colors.red)),
+                        ],
                       ),
-                      items: _providers.map((provider) {
-                        final name =
-                            provider['utilisateur']?['nom'] ?? 'Inconnu';
-                        final price = provider['prixprestataire'] ?? 0;
-                        return DropdownMenuItem<String>(
-                          value: provider['_id']?.toString(),
-                          child: Text('$name - ${price}FCFA'),
-                        );
-                      }).toList(),
-                      onChanged: (value) {
-                        setSheetState(() {
-                          _selectedProviderId = value;
-                        });
-                      },
+                      const SizedBox(height: 8),
+                      Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey.shade300),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: DropdownButtonFormField<String>(
+                          value: _selectedProviderId,
+                          decoration: const InputDecoration(
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            prefixIcon: Icon(Icons.person_pin_circle, color: Color(0xFF2E7D32)),
+                          ),
+                          hint: Text('Sélectionnez un prestataire', style: TextStyle(color: Colors.grey.shade500)),
+                          items: _providers.map((provider) {
+                            final prenom = provider['utilisateur']?['prenom'] ?? '';
+                            final nom = provider['utilisateur']?['nom'] ?? 'Inconnu';
+                            final price = provider['prixprestataire'] ?? 0;
+                            final note = provider['note'] ?? 'N/A';
+                            return DropdownMenuItem<String>(
+                              value: provider['_id']?.toString(),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      '$prenom $nom',
+                                      style: const TextStyle(fontWeight: FontWeight.w500),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  const Icon(Icons.star, size: 14, color: Colors.amber),
+                                  const SizedBox(width: 2),
+                                  Text(
+                                    '$note',
+                                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    '${price}F',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF2E7D32),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (value) {
+                            setSheetState(() {
+                              _selectedProviderId = value;
+                            });
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                    
+                    // Adresse
+                    TextField(
+                      controller: adresseCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'Adresse',
+                        hintText: 'Ex: Rue 12, Cocody',
+                        prefixIcon: const Icon(Icons.home, color: Color(0xFF2E7D32)),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 2),
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 12),
-                  ],
-                  TextField(
-                    controller: adresseCtrl,
-                    decoration: const InputDecoration(labelText: 'Adresse'),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: villeCtrl,
-                    decoration: const InputDecoration(labelText: 'Ville'),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(selectedDateTime == null
-                            ? 'Date/heure non choisie'
-                            : 'Le ${selectedDateTime!.toLocal()}'),
+                    
+                    // Ville
+                    TextField(
+                      controller: villeCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'Ville',
+                        hintText: 'Ex: Abidjan',
+                        prefixIcon: const Icon(Icons.location_city, color: Color(0xFF2E7D32)),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 2),
+                        ),
                       ),
-                      TextButton.icon(
-                        onPressed: () async {
-                          final date = await showDatePicker(
-                            context: context,
-                            firstDate: DateTime.now(),
-                            lastDate:
-                                DateTime.now().add(const Duration(days: 90)),
-                            initialDate:
-                                DateTime.now().add(const Duration(days: 1)),
-                          );
-                          if (date == null) return;
-                          final time = await showTimePicker(
-                            context: context,
-                            initialTime: TimeOfDay.now(),
-                          );
-                          if (time == null) return;
-                          final dt = DateTime(date.year, date.month, date.day,
-                              time.hour, time.minute);
-                          setSheetState(() => selectedDateTime = dt);
-                        },
-                        icon: const Icon(Icons.calendar_today,
-                            color: Color(0xFF2E7D32)),
-                        label: const Text('Choisir'),
+                    ),
+                    const SizedBox(height: 12),
+                    
+                    // Date/Heure
+                    Container(
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade300),
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: notesCtrl,
-                    maxLines: 3,
-                    decoration: const InputDecoration(labelText: 'Notes'),
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.calendar_today, color: Color(0xFF2E7D32)),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              selectedDateTime == null
+                                  ? 'Choisir une date et heure (optionnel)'
+                                  : '${selectedDateTime!.day}/${selectedDateTime!.month}/${selectedDateTime!.year} à ${selectedDateTime!.hour}:${selectedDateTime!.minute.toString().padLeft(2, '0')}',
+                              style: TextStyle(
+                                color: selectedDateTime == null ? Colors.grey.shade500 : Colors.black87,
+                                fontSize: 15,
+                              ),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () async {
+                              final date = await showDatePicker(
+                                context: context,
+                                firstDate: DateTime.now(),
+                                lastDate: DateTime.now().add(const Duration(days: 90)),
+                                initialDate: DateTime.now().add(const Duration(days: 1)),
+                              );
+                              if (date == null) return;
+                              final time = await showTimePicker(
+                                context: context,
+                                initialTime: TimeOfDay.now(),
+                              );
+                              if (time == null) return;
+                              final dt = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+                              setSheetState(() => selectedDateTime = dt);
+                            },
+                            child: const Text('Choisir', style: TextStyle(color: Color(0xFF2E7D32))),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    
+                    // Notes
+                    TextField(
+                      controller: notesCtrl,
+                      maxLines: 3,
+                      decoration: InputDecoration(
+                        labelText: 'Notes / Instructions (optionnel)',
+                        hintText: 'Ajoutez des détails supplémentaires...',
+                        prefixIcon: const Padding(
+                          padding: EdgeInsets.only(bottom: 40),
+                          child: Icon(Icons.note_alt, color: Color(0xFF2E7D32)),
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    // Info système gratuit
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.blue.shade200),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Service 100% GRATUIT - Aucun paiement requis',
+                              style: TextStyle(
+                                color: Colors.blue.shade700,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    
+                    // Bouton de soumission moderne
+                    SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF2E7D32),
+                          foregroundColor: Colors.white,
+                          elevation: 3,
+                          shadowColor: const Color(0xFF2E7D32).withOpacity(0.4),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          )),
-                      onPressed: () async {
-                        final auth = context.read<AuthCubit>().state
-                            as AuthAuthenticated;
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        onPressed: () async {
+                          final auth = context.read<AuthCubit>().state
+                              as AuthAuthenticated;
 
-                        // Validation
-                        if (_selectedProviderId == null) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content:
-                                  Text('Veuillez sélectionner un prestataire'),
-                              backgroundColor: Colors.orange,
+                          // Validation
+                          if (_selectedProviderId == null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Row(
+                                  children: const [
+                                    Icon(Icons.warning_amber_rounded, color: Colors.white),
+                                    SizedBox(width: 8),
+                                    Expanded(child: Text('Veuillez sélectionner un prestataire')),
+                                  ],
+                                ),
+                                backgroundColor: Colors.orange,
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                            );
+                            return;
+                          }
+
+                          // Montrer un loader
+                          showDialog(
+                            context: context,
+                            barrierDismissible: false,
+                            builder: (_) => const Center(
+                              child: Card(
+                                child: Padding(
+                                  padding: EdgeInsets.all(24),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      CircularProgressIndicator(color: Color(0xFF2E7D32)),
+                                      SizedBox(height: 16),
+                                      Text('Envoi en cours...'),
+                                    ],
+                                  ),
+                                ),
+                              ),
                             ),
                           );
-                          return;
-                        }
 
-                        try {
-                          final created = await _api.createPrestation(
-                            token: auth.token,
-                            utilisateurId: auth.utilisateur.idutilisateur,
-                            prestataireId: _selectedProviderId,
-                            serviceId: _serviceId,
-                            adresse: adresseCtrl.text.trim().isEmpty
-                                ? null
-                                : adresseCtrl.text.trim(),
-                            ville: villeCtrl.text.trim().isEmpty
-                                ? null
-                                : villeCtrl.text.trim(),
-                            dateHeure: selectedDateTime,
-                            notesClient: notesCtrl.text.trim().isEmpty
-                                ? null
-                                : notesCtrl.text.trim(),
-                            moyenPaiement: 'GRATUIT',
-                          );
-                          if (!mounted) return;
-                          Navigator.pop(context);
-                          ScaffoldMessenger.of(context)
-                              .showSnackBar(const SnackBar(
-                            content: Text(
-                                'Commande confirmée ! Demande envoyée aux prestataires.'),
-                            backgroundColor: Colors.green,
-                          ));
-                          final id = created['_id']?.toString();
-                          if (id != null) {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => ServiceRequestSummaryScreen(
-                                  requestId: id,
-                                  token: auth.token,
+                          try {
+                            final created = await _api.createPrestation(
+                              token: auth.token,
+                              utilisateurId: auth.utilisateur.idutilisateur,
+                              prestataireId: _selectedProviderId,
+                              serviceId: _serviceId,
+                              adresse: adresseCtrl.text.trim().isEmpty
+                                  ? null
+                                  : adresseCtrl.text.trim(),
+                              ville: villeCtrl.text.trim().isEmpty
+                                  ? null
+                                  : villeCtrl.text.trim(),
+                              dateHeure: selectedDateTime,
+                              notesClient: notesCtrl.text.trim().isEmpty
+                                  ? null
+                                  : notesCtrl.text.trim(),
+                              moyenPaiement: 'GRATUIT',
+                            );
+                            
+                            if (!mounted) return;
+                            Navigator.pop(context); // Fermer le loader
+                            Navigator.pop(context); // Fermer le modal
+                            
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Row(
+                                  children: const [
+                                    Icon(Icons.check_circle, color: Colors.white),
+                                    SizedBox(width: 8),
+                                    Expanded(child: Text('Commande confirmée ! 🎉')),
+                                  ],
                                 ),
+                                backgroundColor: const Color(0xFF2E7D32),
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                duration: const Duration(seconds: 3),
+                              ),
+                            );
+                            
+                            final id = created['_id']?.toString();
+                            if (id != null) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ServiceRequestSummaryScreen(
+                                    requestId: id,
+                                    token: auth.token,
+                                  ),
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            if (!mounted) return;
+                            Navigator.pop(context); // Fermer le loader
+                            Navigator.pop(context); // Fermer le modal
+                            
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Row(
+                                  children: [
+                                    const Icon(Icons.error_outline, color: Colors.white),
+                                    const SizedBox(width: 8),
+                                    Expanded(child: Text('Erreur: ${e.toString()}')),
+                                  ],
+                                ),
+                                backgroundColor: Colors.red,
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                duration: const Duration(seconds: 4),
                               ),
                             );
                           }
-                        } catch (e) {
-                          if (!mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Erreur: $e')));
-                        }
-                      },
-                      child: const Text('Confirmer la commande',
-                          style: TextStyle(color: Colors.white)),
+                        },
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            Icon(Icons.send_rounded, size: 22),
+                            SizedBox(width: 8),
+                            Text(
+                              'Confirmer la commande',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               );
             },
           ),

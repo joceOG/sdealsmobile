@@ -866,6 +866,31 @@ class ApiClient {
     }
   }
 
+  // ✅ NOUVELLE MÉTHODE : Récupérer un prestataire par son ID
+  Future<Map<String, dynamic>> fetchPrestataireById(String id) async {
+    print('Récupération du prestataire avec ID: $id');
+    try {
+      final url = '${dotenv.env['API_URL']}/prestataire/$id';
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(const Duration(seconds: 10));
+
+      print('📡 Status Code: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        print('✅ Prestataire récupéré: ${data['utilisateur']?['nom']}');
+        return data;
+      } else {
+        throw Exception('Prestataire non trouvé (${response.statusCode})');
+      }
+    } catch (e) {
+      print('Erreur dans fetchPrestataireById: $e');
+      throw Exception('Échec de chargement du prestataire: $e');
+    }
+  }
+
   // ✅ NOUVELLE MÉTHODE : Rechercher freelances par catégorie
   Future<List<Map<String, dynamic>>> searchFreelances({
     String? category,

@@ -15,6 +15,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter/foundation.dart';
 import '../services/custom_marker_service.dart';
+import '../utils/navigation_helper.dart';
 
 import '../../../../data/models/service.dart';
 // import '../../../../data/models/prestataire.dart'; // ✅ Import manquant - supprimé car non utilisé
@@ -146,6 +147,22 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
   void initState() {
     super.initState();
     _getCurrentLocation();
+    // ✅ NOUVEAU : Charger les prestataires par défaut (fallback)
+    // Utiliser addPostFrameCallback pour s'assurer que le contexte est prêt
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _loadDefaultProviders();
+      }
+    });
+  }
+
+  // ✅ NOUVEAU : Charger les prestataires même sans géolocalisation
+  void _loadDefaultProviders() {
+    print('📍 Chargement des prestataires par défaut (sans géolocalisation)');
+    context.read<JobPageBlocM>().add(const LoadProviderMatchingM(
+          serviceType: '',
+          location: '',
+        ));
   }
 
   Future<void> _getCurrentLocation() async {
@@ -157,6 +174,7 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
 
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {
+        print('❌ Permission de localisation refusée - utilisation des prestataires par défaut');
         return;
       }
 
@@ -168,8 +186,9 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
         _userLocation = LatLng(position.latitude, position.longitude);
       });
 
-      // Charger les prestataires à proximité
+      // Charger les prestataires à proximité (remplace les prestataires par défaut)
       if (_userLocation != null) {
+        print('📍 Position obtenue - chargement des prestataires à proximité');
         context.read<JobPageBlocM>().add(LoadNearbyProvidersM(
               latitude: _userLocation!.latitude,
               longitude: _userLocation!.longitude,
@@ -179,7 +198,7 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
             ));
       }
     } catch (e) {
-      print('Erreur géolocalisation: $e');
+      print('❌ Erreur géolocalisation: $e - utilisation des prestataires par défaut');
     }
   }
 
@@ -310,61 +329,69 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const SizedBox(height: 16),
-                        // Quick Actions section (remplace les stories)
+                        const SizedBox(height: 24),
+                        
+                        // 🎯 SECTION 1 : HERO SEARCH BAR (Nouveau)
+                        _buildHeroSearchBar(),
+                        const SizedBox(height: 24),
+                        
+                        // 🚀 SECTION 2 : Quick Actions (optimisé)
                         _buildQuickActionsSection(),
-                        const SizedBox(height: 24), // Standardisé
+                        const SizedBox(height: 32),
+                        
+                        // 🎯 SECTION 3 : RECOMMANDATIONS IA (Remonté - prioritaire)
+                        _buildPersonalizedRecommendationsSection(),
+                        const SizedBox(height: 32),
+                        
+                        // 🔥 SECTION 4 : PROMOTIONS ACTIVES (Remonté - urgent)
+                        _buildActivePromotionsSection(),
+                        const SizedBox(height: 32), // Standardisé
 
-                        // Titre catégories
+                        // 📂 SECTION 5 : TOP CATÉGORIES
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text(
-                              'Top Catégories',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 18, // Standardisé
-                                color: Colors.black,
+                            const Expanded(
+                              child: Text(
+                                '📂 Catégories',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 18,
+                                  color: Colors.black,
+                                ),
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            GestureDetector(
-                              onTap: () {
-                                // Navigation vers la page complète des catégories
+                            TextButton.icon(
+                              onPressed: () {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (_) =>
-                                        const CategoriesListScreen(),
+                                    builder: (_) => const CategoriesListScreen(),
                                   ),
                                 );
                               },
-                              child: const Text(
-                                'Voir plus',
-                                style: TextStyle(
-                                  color: const Color(0xFF2E7D32),
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 14, // Standardisé
-                                ),
+                              icon: const Icon(Icons.arrow_forward, size: 14),
+                              label: const Text('Tout', style: TextStyle(fontSize: 13)),
+                              style: TextButton.styleFrom(
+                                foregroundColor: const Color(0xFF2E7D32),
+                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                                minimumSize: const Size(0, 32),
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 16), // Standardisé
-                        // Liste horizontale des catégories avec design amélioré
-
+                        const SizedBox(height: 16),
+                        
                         BlocBuilder<JobPageBlocM, JobPageStateM>(
                           builder: (context, state) {
                             if (state.isLoading) {
-                              return const Center(
-                                  child: CircularProgressIndicator(
-                                      color: const Color(0xFF2E7D32)));
+                              return _buildSkeletonLoader(height: 120, count: 4);
                             }
                             if (state.error.isNotEmpty) {
-                              return Text("Erreur: ${state.error}",
-                                  style: const TextStyle(color: Colors.red));
+                              return _buildErrorCard(state.error);
                             }
                             if (state.listItems.isEmpty) {
-                              return const Text("Aucune catégorie disponible");
+                              return _buildEmptyState('Aucune catégorie disponible');
                             }
 
                             return SizedBox(
@@ -372,8 +399,7 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                               child: ListView.separated(
                                 scrollDirection: Axis.horizontal,
                                 itemCount: state.listItems.length,
-                                separatorBuilder: (_, __) =>
-                                    const SizedBox(width: 16), // Standardisé
+                                separatorBuilder: (_, __) => const SizedBox(width: 16),
                                 itemBuilder: (context, index) {
                                   final cat = state.listItems[index];
                                   return _buildCategoryCardWithImage(
@@ -386,23 +412,24 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                             );
                           },
                         ),
-                        const SizedBox(height: 24), // Standardisé
-
-                        // Titre Top Services
+                        const SizedBox(height: 32),
+                        
+                        // 🛠️ SECTION 6 : TOP SERVICES
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text(
-                              'Top Services',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 18, // Standardisé
-                                color: Colors.black,
+                            const Expanded(
+                              child: Text(
+                                '🛠️ Services populaires',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 18,
+                                  color: Colors.black,
+                                ),
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            GestureDetector(
-                              onTap: () {
-                                // Navigation vers la page complète des services
+                            TextButton.icon(
+                              onPressed: () {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
@@ -410,170 +437,196 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                                   ),
                                 );
                               },
-                              child: const Text(
-                                'Voir plus',
-                                style: TextStyle(
-                                  color: const Color(0xFF2E7D32),
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 14, // Standardisé
-                                ),
+                              icon: const Icon(Icons.arrow_forward, size: 14),
+                              label: const Text('Tout', style: TextStyle(fontSize: 13)),
+                              style: TextButton.styleFrom(
+                                foregroundColor: const Color(0xFF2E7D32),
+                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                                minimumSize: const Size(0, 32),
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 16), // Standardisé
-                        // Estimation IA de prix pour un service populaire
-                        AIPriceEstimatorWidget(
-                          serviceCategory: topServices.isNotEmpty
-                              ? topServices[0]['title']!
-                              : 'Service',
-                          location: 'Abidjan',
-                          jobDescription: 'Besoin standard',
-                        ),
                         const SizedBox(height: 16),
-                        // Carrousel Top Services
+                        
+                        // Carrousel Services
                         BlocBuilder<JobPageBlocM, JobPageStateM>(
                           builder: (context, state) {
                             if (state.isLoading2) {
-                              return const Center(
-                                  child: CircularProgressIndicator());
+                              return _buildSkeletonLoader(height: 150, count: 3);
                             }
-
                             if (state.listItems2.isEmpty) {
-                              return const Center(
-                                  child: Text('Aucun service disponible'));
+                              return _buildEmptyState('Aucun service disponible');
                             }
 
-                            return CarouselSlider.builder(
-                              itemCount: state.listItems2.length,
-                              options: CarouselOptions(
-                                height: 180.0,
-                                autoPlay: true,
-                                autoPlayInterval: const Duration(seconds: 3),
-                                enlargeCenterPage: true,
-                                viewportFraction: 0.78,
-                              ),
-                              itemBuilder: (context, index, realIndex) {
-                                final Service item = state.listItems2[index];
-
-                                return GestureDetector(
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => DetailPage(
-                                          title: item.nomservice,
-                                          image: item.imageservice,
+                            return SizedBox(
+                              height: 150,
+                              child: ListView.separated(
+                                scrollDirection: Axis.horizontal,
+                                itemCount: state.listItems2.length,
+                                separatorBuilder: (_, __) => const SizedBox(width: 16),
+                                itemBuilder: (context, index) {
+                                  final service = state.listItems2[index];
+                                  
+                                  return GestureDetector(
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => DetailPage(
+                                            title: service.nomservice,
+                                            image: service.imageservice,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    child: Container(
+                                      width: 280,
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(16),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withOpacity(0.1),
+                                            blurRadius: 8,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                      child: Card(
+                                        elevation: 0,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(16),
+                                        ),
+                                        color: const Color(0xFF2E7D32).withOpacity(0.05),
+                                        child: Row(
+                                          children: [
+                                            // Image
+                                            ClipRRect(
+                                              borderRadius: const BorderRadius.horizontal(
+                                                left: Radius.circular(16),
+                                              ),
+                                              child: service.imageservice.isNotEmpty
+                                                  ? Image.network(
+                                                      service.imageservice,
+                                                      width: 110,
+                                                      height: 150,
+                                                      fit: BoxFit.cover,
+                                                      errorBuilder: (context, error, stackTrace) =>
+                                                          Container(
+                                                            width: 110,
+                                                            height: 150,
+                                                            color: const Color(0xFF2E7D32).withOpacity(0.1),
+                                                            child: const Icon(
+                                                              Icons.image,
+                                                              size: 40,
+                                                              color: const Color(0xFF2E7D32),
+                                                            ),
+                                                          ),
+                                                    )
+                                                  : Container(
+                                                      width: 110,
+                                                      height: 150,
+                                                      color: const Color(0xFF2E7D32).withOpacity(0.1),
+                                                      child: const Icon(
+                                                        Icons.handyman,
+                                                        size: 40,
+                                                        color: const Color(0xFF2E7D32),
+                                                      ),
+                                                    ),
+                                            ),
+                                            // Contenu
+                                            Expanded(
+                                              child: Padding(
+                                                padding: const EdgeInsets.all(10),
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  mainAxisAlignment: MainAxisAlignment.center,
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    Text(
+                                                      service.nomservice,
+                                                      style: const TextStyle(
+                                                        fontWeight: FontWeight.bold,
+                                                        fontSize: 15,
+                                                        color: Colors.black87,
+                                                      ),
+                                                      maxLines: 2,
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                    const SizedBox(height: 4),
+                                                    if (service.categorie?.nomcategorie != null)
+                                                      Text(
+                                                        service.categorie!.nomcategorie,
+                                                        style: TextStyle(
+                                                          fontSize: 12,
+                                                          color: Colors.grey.shade600,
+                                                        ),
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow.ellipsis,
+                                                      ),
+                                                    const Spacer(),
+                                                    Row(
+                                                      children: [
+                                                        Expanded(
+                                                          child: Text(
+                                                            '${service.prixmoyen} FCFA/h',
+                                                            style: const TextStyle(
+                                                              color: const Color(0xFF2E7D32),
+                                                              fontSize: 13,
+                                                              fontWeight: FontWeight.bold,
+                                                            ),
+                                                            overflow: TextOverflow.ellipsis,
+                                                          ),
+                                                        ),
+                                                        Container(
+                                                          padding: const EdgeInsets.symmetric(
+                                                            horizontal: 6,
+                                                            vertical: 2,
+                                                          ),
+                                                          decoration: BoxDecoration(
+                                                            color: const Color(0xFF2E7D32),
+                                                            borderRadius: BorderRadius.circular(8),
+                                                          ),
+                                                          child: const Icon(
+                                                            Icons.arrow_forward,
+                                                            color: Colors.white,
+                                                            size: 14,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
-                                    );
-                                  },
-                                  child: Card(
-                                    elevation: 4, // Standardisé
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(
-                                          16), // Standardisé
                                     ),
-                                    color: const Color(0xFF2E7D32)
-                                        .withOpacity(0.1),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Expanded(
-                                          child: ClipRRect(
-                                            borderRadius:
-                                                const BorderRadius.vertical(
-                                              top: Radius.circular(14.0),
-                                            ),
-                                            child: item.imageservice.isNotEmpty
-                                                ? Image.network(
-                                                    item.imageservice,
-                                                    fit: BoxFit.cover,
-                                                    width: double.infinity,
-                                                  )
-                                                : Image.asset(
-                                                    'assets/default.png',
-                                                    fit: BoxFit.cover,
-                                                    width: double.infinity,
-                                                  ),
-                                          ),
-                                        ),
-                                        Padding(
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 8, vertical: 4),
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Text(
-                                                item.nomservice,
-                                                style: const TextStyle(
-                                                  color: Colors.black87,
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: 16, // Standardisé
-                                                ),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                              const SizedBox(
-                                                  height: 4), // Standardisé
-                                              Text(
-                                                'À partir de ${item.prixmoyen} FCFA/h',
-                                                style: const TextStyle(
-                                                  color:
-                                                      const Color(0xFF2E7D32),
-                                                  fontSize: 12, // Standardisé
-                                                  fontWeight: FontWeight.w500,
-                                                ),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                              const SizedBox(
-                                                  height: 4), // Standardisé
-                                              Text(
-                                                'Catégorie: ${item.categorie?.nomcategorie}',
-                                                style: const TextStyle(
-                                                  color: Colors.black54,
-                                                  fontSize: 12, // Standardisé
-                                                ),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              },
+                                  );
+                                },
+                              ),
                             );
                           },
                         ),
-                        const SizedBox(height: 32), // Espacement large maintenu
+                        const SizedBox(height: 32),
 
-                        // ✅ NOUVEAU : Section "Autour de moi" avec carte
-                        _buildAroundMeSection(),
-
-                        const SizedBox(height: 32), // Espacement large maintenu
-
-                        // Titre Top Prestataires
+                        // ⭐ SECTION 7 : TOP PRESTATAIRES
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text(
-                              'Top Prestataires',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 18, // Standardisé
-                                color: Colors.black,
+                            const Expanded(
+                              child: Text(
+                                '⭐ Prestataires',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 18,
+                                  color: Colors.black,
+                                ),
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            GestureDetector(
-                              onTap: () {
-                                // Navigation vers la page complète des prestataires
+                            TextButton.icon(
+                              onPressed: () {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
@@ -581,45 +634,57 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                                   ),
                                 );
                               },
-                              child: const Text(
-                                'Voir plus',
-                                style: TextStyle(
-                                  color: const Color(0xFF2E7D32),
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 14, // Standardisé
-                                ),
+                              icon: const Icon(Icons.arrow_forward, size: 14),
+                              label: const Text('Tout', style: TextStyle(fontSize: 13)),
+                              style: TextButton.styleFrom(
+                                foregroundColor: const Color(0xFF2E7D32),
+                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                                minimumSize: const Size(0, 32),
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 16), // Standardisé
-
-                        // À la une cette semaine
-                        _buildFeaturedSection(),
-                        const SizedBox(height: 24),
-
-                        // 🥇 PRIORITÉ 1 : Section Promotions actives
-                        _buildActivePromotionsSection(),
-                        const SizedBox(height: 24),
-
-                        // 🥈 PRIORITÉ 2 : Témoignages clients
-                        _buildRecentReviewsSection(),
-                        const SizedBox(height: 24),
-
-                        // 🥉 PRIORITÉ 3 : Recommandations personnalisées
-                        _buildPersonalizedRecommendationsSection(),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 16),
 
                         // Carrousel Top Prestataires (vraies données)
                         BlocBuilder<JobPageBlocM, JobPageStateM>(
-                            builder: (context, state) {
-                          // Utiliser les vrais prestataires du state
-                          final topPrestatairesReal =
-                              state.nearbyProviders.take(5).toList();
+                          builder: (context, state) {
+                            // ✅ AMÉLIORÉ : Utiliser nearbyProviders si disponible, sinon matchedProviders
+                            List<dynamic> topPrestatairesReal;
+                            
+                            if (state.nearbyProviders.isNotEmpty) {
+                              // Prestataires à proximité (avec géolocalisation)
+                              topPrestatairesReal = state.nearbyProviders.take(5).toList();
+                              print('✅ Affichage de ${topPrestatairesReal.length} prestataires à proximité');
+                            } else if (state.matchedProviders.isNotEmpty) {
+                              // Prestataires par défaut (sans géolocalisation)
+                              topPrestatairesReal = state.matchedProviders.take(5).toList();
+                              print('✅ Affichage de ${topPrestatairesReal.length} prestataires par défaut');
+                            } else {
+                              // Aucun prestataire
+                              topPrestatairesReal = [];
+                            }
 
                           if (topPrestatairesReal.isEmpty) {
+                            // Afficher un loader si en cours de chargement
+                            if (state.isNearbyLoading || state.isMatchingLoading) {
+                              return SizedBox(
+                                height: 150,
+                                child: Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: const [
+                                      CircularProgressIndicator(color: Color(0xFF2E7D32)),
+                                      SizedBox(height: 8),
+                                      Text('Chargement des prestataires...'),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }
+                            
                             return const SizedBox(
-                              height: 170,
+                              height: 150,
                               child: Center(
                                 child: Text('Aucun prestataire trouvé',
                                     style: TextStyle(color: Colors.grey)),
@@ -630,11 +695,11 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                           return CarouselSlider.builder(
                             itemCount: topPrestatairesReal.length,
                             options: CarouselOptions(
-                              height: 170.0,
+                              height: 150.0, // Réduit de 170 à 150 pour meilleur UX
                               autoPlay: true,
-                              autoPlayInterval: const Duration(seconds: 4),
+                              autoPlayInterval: const Duration(seconds: 5), // Plus lent
                               enlargeCenterPage: true,
-                              viewportFraction: 0.85,
+                              viewportFraction: 0.88, // Montre plus de contexte
                             ),
                             itemBuilder: (context, index, realIndex) {
                               final prestataire = topPrestatairesReal[index];
@@ -665,17 +730,11 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
 
                               return GestureDetector(
                                 onTap: () {
-                                  // Redirection vers la page de détails du prestataire
-                                  Navigator.push(
+                                  // ✅ Navigation vers le profil complet du prestataire
+                                  NavigationHelper.navigateToProviderProfile(
                                     context,
-                                    MaterialPageRoute(
-                                      builder: (_) => DetailPage(
-                                        title: providerName,
-                                        image: imageUrl.isNotEmpty
-                                            ? imageUrl
-                                            : 'assets/profil.png',
-                                      ),
-                                    ),
+                                    providerId: prestataire.idprestataire,
+                                    providerData: prestataire.toJson(),
                                   );
                                 },
                                 child: Card(
@@ -859,6 +918,12 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                             },
                           );
                         }),
+                        const SizedBox(height: 32),
+                        
+                        // 📍 SECTION 8 : AUTOUR DE MOI (Carte interactive + liste)
+                        _buildAroundMeSection(),
+                        
+                        const SizedBox(height: 60), // Espacement final pour FAB
                       ],
                     ),
                   ),
@@ -892,21 +957,19 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
             child: Padding(
               padding: EdgeInsets.symmetric(horizontal: 16.0),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Métiers',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
+                  Expanded(
+                    child: Text(
+                      'Métiers',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  Row(
-                    children: [
-                      Icon(Icons.search, color: Colors.white, size: 20),
-                    ],
-                  ),
+                  Icon(Icons.search, color: Colors.white, size: 20),
                 ],
               ),
             ),
@@ -1103,14 +1166,16 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
-              'Actions rapides',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 18, // Standardisé
-                color: Colors.black,
+            const Expanded(
+              child: Text(
+                'Actions rapides',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                  color: Colors.black,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
             GestureDetector(
@@ -1164,40 +1229,62 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 85,
-        padding: const EdgeInsets.all(6), // Réduit de 8 à 6
+        width: 90,
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
         decoration: BoxDecoration(
-          color: Colors.white,
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.white,
+              color.withOpacity(0.05),
+            ],
+          ),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withOpacity(0.2), width: 1.5),
+          border: Border.all(color: color.withOpacity(0.3), width: 2),
           boxShadow: [
             BoxShadow(
-              color: color.withOpacity(0.1),
-              blurRadius: 8,
+              color: color.withOpacity(0.15),
+              blurRadius: 12,
               offset: const Offset(0, 4),
             ),
           ],
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              padding: const EdgeInsets.all(6), // Réduit de 8 à 6
+              padding: const EdgeInsets.all(5),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(10), // Réduit de 12 à 10
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    color.withOpacity(0.15),
+                    color.withOpacity(0.05),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: [
+                  BoxShadow(
+                    color: color.withOpacity(0.2),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
               child: Icon(
                 icon,
                 color: color,
-                size: 20, // Réduit de 24 à 20
+                size: 18,
               ),
             ),
-            const SizedBox(height: 4), // Réduit de 6 à 4
+            const SizedBox(height: 3),
             Text(
               title,
               style: const TextStyle(
-                fontSize: 11, // Réduit de 12 à 11
+                fontSize: 10,
                 fontWeight: FontWeight.bold,
                 color: Colors.black87,
               ),
@@ -1205,11 +1292,13 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
+            const SizedBox(height: 1),
             Text(
               subtitle,
               style: TextStyle(
-                fontSize: 9, // Réduit de 10 à 9
+                fontSize: 8,
                 color: Colors.grey.shade600,
+                fontWeight: FontWeight.w500,
               ),
               textAlign: TextAlign.center,
               maxLines: 1,
@@ -1257,6 +1346,220 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
         print('🤖 Ouverture assistant IA');
         break;
     }
+  }
+
+  // 🎯 NOUVEAU : Hero Search Bar
+  Widget _buildHeroSearchBar() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            const Color(0xFF2E7D32),
+            const Color(0xFF4CAF50),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF2E7D32).withOpacity(0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '👋 Bonjour !',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'De quoi avez-vous besoin ?',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 20),
+          // Search Bar
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: TextField(
+              decoration: InputDecoration(
+                hintText: 'Rechercher un service, prestataire...',
+                hintStyle: TextStyle(color: Colors.grey.shade400),
+                prefixIcon: const Icon(Icons.search, color: Color(0xFF2E7D32)),
+                suffixIcon: Container(
+                  margin: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2E7D32),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.tune, color: Colors.white, size: 20),
+                ),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 16,
+                ),
+              ),
+              onTap: () {
+                // TODO: Navigation vers page de recherche
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Fonction de recherche bientôt disponible'),
+                    duration: Duration(seconds: 1),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Stats rapides
+          Row(
+            children: [
+              Expanded(
+                child: _buildStatChip(
+                  icon: Icons.person,
+                  label: '${_markers.length} prestataires',
+                  color: Colors.white70,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildStatChip(
+                  icon: Icons.location_on,
+                  label: 'À proximité',
+                  color: Colors.white70,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatChip({
+    required IconData icon,
+    required String label,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 📦 NOUVEAU : Skeleton Loader
+  Widget _buildSkeletonLoader({required double height, int count = 3}) {
+    return SizedBox(
+      height: height,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: count,
+        separatorBuilder: (_, __) => const SizedBox(width: 16),
+        itemBuilder: (_, __) => Container(
+          width: 160,
+          decoration: BoxDecoration(
+            color: Colors.grey.shade200,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Center(
+            child: CircularProgressIndicator(
+              color: const Color(0xFF2E7D32),
+              strokeWidth: 2,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ⚠️ NOUVEAU : Error Card
+  Widget _buildErrorCard(String error) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.red.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.red.shade200),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.error_outline, color: Colors.red.shade700),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              error,
+              style: TextStyle(color: Colors.red.shade700),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 🔍 NOUVEAU : Empty State
+  Widget _buildEmptyState(String message) {
+    return Container(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        children: [
+          Icon(Icons.inbox_outlined, size: 64, color: Colors.grey.shade300),
+          const SizedBox(height: 16),
+          Text(
+            message,
+            style: TextStyle(
+              color: Colors.grey.shade600,
+              fontSize: 16,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
   }
 
   // ✅ NOUVEAU : Afficher la section "Autour de moi"
@@ -1711,15 +2014,11 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
           onTap: () {
-            // Navigation vers le détail du prestataire
-            Navigator.push(
+            // ✅ Navigation vers le profil complet du prestataire
+            NavigationHelper.navigateToProviderProfile(
               context,
-              MaterialPageRoute(
-                builder: (_) => DetailPage(
-                  title: provider.utilisateur?.fullName ?? 'Prestataire',
-                  image: 'assets/categories/Image${(index % 5) + 1}.png',
-                ),
-              ),
+              providerId: provider.idprestataire,
+              providerData: provider.toJson(),
             );
           },
           child: Padding(
@@ -1770,19 +2069,33 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                 // Note et distance
                 Row(
                   children: [
-                    const Icon(Icons.star, color: Colors.amber, size: 16),
-                    const SizedBox(width: 4),
-                    Text(
-                      provider.note ?? 'N/A',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    const Icon(Icons.star, color: Colors.amber, size: 14),
+                    const SizedBox(width: 3),
+                    Flexible(
+                      flex: 2,
+                      child: Text(
+                        provider.note ?? 'N/A',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 8),
                     const Icon(Icons.location_on,
-                        color: const Color(0xFF2E7D32), size: 16),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${(index + 1) * 0.5} km',
-                      style: const TextStyle(color: Colors.green, fontSize: 12),
+                        color: const Color(0xFF2E7D32), size: 14),
+                    const SizedBox(width: 3),
+                    Flexible(
+                      flex: 3,
+                      child: Text(
+                        '${(index + 1) * 0.5} km',
+                        style: const TextStyle(
+                          color: Colors.green,
+                          fontSize: 11,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ],
                 ),
@@ -2123,24 +2436,26 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                         end: Alignment.bottomRight,
                       ),
                     ),
-                    padding: const EdgeInsets.all(12), // Réduit de 16 à 12
+                    padding: const EdgeInsets.all(10),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min, // Évite l'overflow
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Expanded(
                               child: Text(
                                 promo['title'],
                                 style: const TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 16,
+                                  fontSize: 15,
                                   color: Colors.black87,
                                 ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
+                            const SizedBox(width: 8),
                             Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 8,
@@ -2161,72 +2476,75 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 6),
                         Text(
                           promo['description'],
                           style: const TextStyle(
-                            fontSize: 13,
+                            fontSize: 12,
                             color: Colors.black54,
                           ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 6),
                         Row(
                           children: [
-                            Icon(Icons.code, size: 16, color: promo['color']),
+                            Icon(Icons.code, size: 14, color: promo['color']),
                             const SizedBox(width: 4),
                             Text(
                               promo['code'],
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 color: promo['color'],
-                                fontSize: 12,
+                                fontSize: 11,
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(
-                            height: 6), // Remplace Spacer par SizedBox fixe
+                        const SizedBox(height: 6),
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Expanded(
-                              // Wrap text avec Expanded
+                              flex: 3,
                               child: Text(
                                 'Expire le ${promo['expiry']}',
                                 style: const TextStyle(
-                                  fontSize: 10, // Réduit de 11 à 10
+                                  fontSize: 9,
                                   color: Colors.grey,
                                 ),
-                                overflow:
-                                    TextOverflow.ellipsis, // Gère l'overflow
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            const SizedBox(width: 8), // Espacement minimal
-                            ElevatedButton(
-                              onPressed: () {
-                                // TODO: Appliquer la promotion
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content:
-                                        Text('Code ${promo['code']} copié !'),
-                                    duration: const Duration(seconds: 2),
+                            const SizedBox(width: 6),
+                            Flexible(
+                              flex: 2,
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  // TODO: Appliquer la promotion
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content:
+                                          Text('Code ${promo['code']} copié !'),
+                                      duration: const Duration(seconds: 2),
+                                    ),
+                                  );
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: promo['color'],
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 3,
                                   ),
-                                );
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: promo['color'],
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, // Réduit de 12 à 8
-                                  vertical: 4, // Réduit de 6 à 4
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  minimumSize: const Size(0, 24),
                                 ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
+                                child: const Text(
+                                  'Utiliser',
+                                  style: TextStyle(fontSize: 9),
                                 ),
-                              ),
-                              child: const Text(
-                                'Utiliser',
-                                style: TextStyle(fontSize: 11),
                               ),
                             ),
                           ],
@@ -2341,92 +2659,92 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                     borderRadius: BorderRadius.circular(16), // Standardisé
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.all(12), // Réduit de 16 à 12
+                    padding: const EdgeInsets.all(10),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min, // Évite l'overflow
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Row(
                           children: [
                             CircleAvatar(
-                              radius: 20,
+                              radius: 18,
                               backgroundImage: NetworkImage(review['avatar']),
                               onBackgroundImageError: (_, __) {},
                               child: review['avatar'] == null
-                                  ? const Icon(Icons.person)
+                                  ? const Icon(Icons.person, size: 18)
                                   : null,
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: 10),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(
                                     review['name'],
                                     style: const TextStyle(
                                       fontWeight: FontWeight.bold,
-                                      fontSize: 14,
+                                      fontSize: 13,
                                     ),
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                   Text(
                                     review['service'],
                                     style: const TextStyle(
-                                      fontSize: 12,
+                                      fontSize: 11,
                                       color: Colors.grey,
                                     ),
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ],
                               ),
                             ),
                             Row(
+                              mainAxisSize: MainAxisSize.min,
                               children: List.generate(5, (starIndex) {
                                 return Icon(
                                   starIndex < review['rating']
                                       ? Icons.star
                                       : Icons.star_border,
                                   color: Colors.amber,
-                                  size: 16,
+                                  size: 14,
                                 );
                               }),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 8), // Réduit de 12 à 8
+                        const SizedBox(height: 6),
                         Flexible(
-                          // Remplace Expanded par Flexible
                           child: Text(
                             review['comment'],
                             style: const TextStyle(
-                              fontSize: 12, // Réduit de 13 à 12
+                              fontSize: 11,
                               color: Colors.black87,
-                              height: 1.3, // Réduit de 1.4 à 1.3
+                              height: 1.3,
                             ),
-                            maxLines: 3, // Réduit de 4 à 3 lignes
+                            maxLines: 3,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 6),
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Expanded(
-                              // Wrap avec Expanded
                               child: Text(
-                                'Prestataire: ${review['provider']}',
+                                'Par ${review['provider']}',
                                 style: const TextStyle(
-                                  fontSize: 10, // Réduit de 11 à 10
+                                  fontSize: 9,
                                   color: const Color(0xFF2E7D32),
                                   fontWeight: FontWeight.w500,
                                 ),
-                                overflow:
-                                    TextOverflow.ellipsis, // Gère l'overflow
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            const SizedBox(width: 8), // Espacement minimal
+                            const SizedBox(width: 6),
                             Text(
-                              'Il y a ${review['date']}',
+                              review['date'],
                               style: const TextStyle(
-                                fontSize: 11,
+                                fontSize: 9,
                                 color: Colors.grey,
                               ),
                             ),
@@ -2532,7 +2850,7 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
             ),
             const SizedBox(height: 12),
             SizedBox(
-              height: 240, // Augmenté de 220 à 240
+              height: 220, // Optimisé pour meilleur UX
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 itemCount: recommendations.length,
@@ -2659,105 +2977,102 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                           ),
                           // Contenu
                           Flexible(
-                            // Remplace Expanded pour éviter overflow
                             child: Padding(
-                              padding: const EdgeInsets.all(
-                                  6), // Réduit encore de 8 à 6
+                              padding: const EdgeInsets.all(4),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize:
-                                    MainAxisSize.min, // Force taille minimale
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(
                                     rec['title'],
                                     style: const TextStyle(
                                       fontWeight: FontWeight.bold,
-                                      fontSize: 16,
+                                      fontSize: 14,
                                       color: Colors.black87,
                                     ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
-                                  const SizedBox(height: 2), // Réduit de 4 à 2
+                                  const SizedBox(height: 2),
                                   Text(
                                     rec['reason'],
                                     style: const TextStyle(
-                                      fontSize: 10, // Réduit de 12 à 10
+                                      fontSize: 9,
                                       color: Colors.blue,
                                       fontStyle: FontStyle.italic,
                                     ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
-                                  const SizedBox(height: 4), // Réduit de 8 à 4
+                                  const SizedBox(height: 2),
                                   Row(
                                     children: [
                                       Expanded(
                                         child: Text(
                                           rec['provider'],
                                           style: const TextStyle(
-                                            fontSize: 13,
+                                            fontSize: 12,
                                             fontWeight: FontWeight.w500,
                                           ),
+                                          overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
-                                      Row(
-                                        children: [
-                                          const Icon(
-                                            Icons.star,
-                                            color: Colors.amber,
-                                            size: 14,
-                                          ),
-                                          const SizedBox(width: 2),
-                                          Text(
-                                            rec['rating'].toString(),
-                                            style: const TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                          ),
-                                        ],
+                                      const SizedBox(width: 6),
+                                      const Icon(
+                                        Icons.star,
+                                        color: Colors.amber,
+                                        size: 12,
+                                      ),
+                                      const SizedBox(width: 2),
+                                      Text(
+                                        rec['rating'].toString(),
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w500,
+                                        ),
                                       ),
                                     ],
                                   ),
-                                  const SizedBox(
-                                      height:
-                                          4), // Remplace Spacer par SizedBox fixe
+                                  const SizedBox(height: 2),
                                   Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
                                     children: [
                                       Expanded(
-                                        // Wrap prix avec Expanded
+                                        flex: 3,
                                         child: Text(
                                           rec['price'],
                                           style: const TextStyle(
-                                            fontSize: 13, // Réduit de 14 à 13
+                                            fontSize: 12,
                                             fontWeight: FontWeight.bold,
                                             color: const Color(0xFF2E7D32),
                                           ),
-                                          overflow: TextOverflow
-                                              .ellipsis, // Gère l'overflow
+                                          overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
-                                      const SizedBox(
-                                          width: 8), // Espacement minimal
-                                      ElevatedButton(
-                                        onPressed: () {
-                                          // TODO: Navigation vers les détails du service
-                                        },
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor:
-                                              const Color(0xFF2E7D32),
-                                          foregroundColor: Colors.white,
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 8, // Réduit de 12 à 8
-                                            vertical: 4, // Réduit de 6 à 4
+                                      const SizedBox(width: 4),
+                                      Flexible(
+                                        flex: 2,
+                                        child: ElevatedButton(
+                                          onPressed: () {
+                                            // TODO: Navigation vers les détails du service
+                                          },
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor:
+                                                const Color(0xFF2E7D32),
+                                            foregroundColor: Colors.white,
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 4,
+                                              vertical: 2,
+                                            ),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
+                                            ),
+                                            minimumSize: const Size(0, 24),
                                           ),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(8),
+                                          child: const Text(
+                                            'Voir',
+                                            style: TextStyle(fontSize: 9),
                                           ),
-                                        ),
-                                        child: const Text(
-                                          'Réserver',
-                                          style: TextStyle(fontSize: 11),
                                         ),
                                       ),
                                     ],
