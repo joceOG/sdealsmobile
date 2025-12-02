@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sdealsmobile/data/services/authCubit.dart';
 import 'package:sdealsmobile/mobile/view/jobpagem/screens/jobPageScreenM.dart';
+import 'package:sdealsmobile/mobile/view/jobpagem/jobpageblocm/jobPageBlocM.dart';
 import 'package:sdealsmobile/mobile/view/searchpagem/screens/searchPageScreenM.dart';
 import 'package:sdealsmobile/mobile/view/shoppingpagem/screens/shoppingPageScreenM.dart';
 import 'package:sdealsmobile/mobile/view/shoppingpagem/shoppingpageblocm/shoppingPageBlocM.dart';
@@ -59,7 +60,10 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
   void _updateTabsPages(dynamic categories) {
     if (categories == null) return;
     try {
-      _tabsData[0]["page"] = const JobPageScreenM();
+      _tabsData[0]["page"] = BlocProvider<JobPageBlocM>(
+        create: (context) => JobPageBlocM(),
+        child: const JobPageScreenM(),
+      );
 
       _tabsData[1]["page"] = FreelancePageScreen(categories: categories);
 

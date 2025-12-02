@@ -103,12 +103,18 @@ class Prestataire {
         specialite: json['specialite'] != null ? List<String>.from(json['specialite']) : null,
         anneeExperience: json['anneeExperience'] as String?,
         description: json['description'] as String?,
-        rayonIntervention: json['rayonIntervention'] as double?,
+        rayonIntervention: json['rayonIntervention'] != null 
+            ? (json['rayonIntervention'] as num).toDouble()
+            : null,
         zoneIntervention: json['zoneIntervention'] != null
             ? List<String>.from(json['zoneIntervention'])
             : null,
-        tarifHoraireMin: json['tarifHoraireMin'] as double?,
-        tarifHoraireMax: json['tarifHoraireMax'] as double?,
+        tarifHoraireMin: json['tarifHoraireMin'] != null
+            ? (json['tarifHoraireMin'] as num).toDouble()
+            : null,
+        tarifHoraireMax: json['tarifHoraireMax'] != null
+            ? (json['tarifHoraireMax'] as num).toDouble()
+            : null,
         diplomeCertificat: json['diplomeCertificat'] != null
             ? List<String>.from(json['diplomeCertificat'])
             : null,

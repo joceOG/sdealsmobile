@@ -4,6 +4,7 @@ import '../jobpageblocm/jobPageBlocM.dart';
 import '../jobpageblocm/jobPageEventM.dart';
 import '../jobpageblocm/jobPageStateM.dart';
 import 'detailPageScreenM.dart';
+import '../utils/navigation_helper.dart';
 
 class ProvidersListScreen extends StatefulWidget {
   const ProvidersListScreen({super.key});
@@ -181,15 +182,11 @@ class _ProvidersListScreenState extends State<ProvidersListScreen> {
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
         onTap: () {
-          // Navigation vers les détails du prestataire
-          Navigator.push(
+          // ✅ Navigation vers le profil complet du prestataire
+          NavigationHelper.navigateToProviderProfile(
             context,
-            MaterialPageRoute(
-              builder: (_) => DetailPage(
-                title: provider.utilisateur?.fullName ?? 'Prestataire',
-                image: provider.utilisateur?.photoProfil ?? 'assets/profil.png',
-              ),
-            ),
+            providerId: provider.idprestataire,
+            providerData: provider.toJson(),
           );
         },
         child: Container(
