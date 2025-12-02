@@ -921,15 +921,46 @@ class _FreelancePageScreenContentState
         child: Row(
           children: [
             const SizedBox(width: 18),
-            CircleAvatar(
-              radius: 38,
-              backgroundImage: featuredFreelancer.imagePath.startsWith('http')
-                  ? NetworkImage(featuredFreelancer.imagePath) as ImageProvider
-                  : AssetImage(
-                      featuredFreelancer.imagePath.isNotEmpty
-                          ? featuredFreelancer.imagePath
-                          : 'assets/profile_picture.jpg',
-                    ),
+            // ✅ CircleAvatar avec gestion d'erreur pour images réseau
+            ClipOval(
+              child: SizedBox(
+                width: 76,
+                height: 76,
+                child: featuredFreelancer.imagePath.startsWith('http')
+                    ? Image.network(
+                        featuredFreelancer.imagePath,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          // Fallback vers asset en cas d'erreur
+                          return Image.asset(
+                            'assets/profile_picture.jpg',
+                            fit: BoxFit.cover,
+                          );
+                        },
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Container(
+                            color: Colors.green.shade100,
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                value: loadingProgress.expectedTotalBytes != null
+                                    ? loadingProgress.cumulativeBytesLoaded /
+                                        loadingProgress.expectedTotalBytes!
+                                    : null,
+                                strokeWidth: 2,
+                                color: Colors.green,
+                              ),
+                            ),
+                          );
+                        },
+                      )
+                    : Image.asset(
+                        featuredFreelancer.imagePath.isNotEmpty
+                            ? featuredFreelancer.imagePath
+                            : 'assets/profile_picture.jpg',
+                        fit: BoxFit.cover,
+                      ),
+              ),
             ),
             const SizedBox(width: 18),
             Expanded(

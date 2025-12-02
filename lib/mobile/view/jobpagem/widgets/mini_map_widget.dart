@@ -70,16 +70,45 @@ class _MiniMapWidgetState extends State<MiniMapWidget> {
       );
     }
 
+    // Récupérer les données de façon sécurisée
+    final categorie = _getProviderProperty('categorie');
+    final service = _getProviderProperty('service');
+    final verifier = _getProviderProperty('verifier');
+    final disponibilite = _getProviderProperty('disponibilite');
+    final note = _getProviderProperty('note');
+    
+    String categoryName = '';
+    if (categorie is Map<String, dynamic>) {
+      categoryName = categorie['nomcategorie']?.toString() ?? '';
+    } else if (categorie != null) {
+      try {
+        categoryName = categorie.nomcategorie ?? '';
+      } catch (e) {
+        // Ignore
+      }
+    }
+    
+    String serviceName = '';
+    if (service is Map<String, dynamic>) {
+      serviceName = service['nomservice']?.toString() ?? '';
+    } else if (service != null) {
+      try {
+        serviceName = service.nomservice ?? '';
+      } catch (e) {
+        // Ignore
+      }
+    }
+
     // Marqueur du prestataire avec prix
     final providerIcon =
         await CustomMarkerService.createProviderWithPriceMarker(
       name: _getProviderName(),
-      category: widget.provider.categorie?.nomcategorie ?? '',
-      service: widget.provider.service?.nomservice ?? '',
+      category: categoryName,
+      service: serviceName,
       price: _getProviderPrice(),
-      isVerified: widget.provider.verifier == true,
-      isUrgent: widget.provider.disponibilite == 'urgent' ||
-          (widget.provider.note != null && widget.provider.note < 3.0),
+      isVerified: verifier == true,
+      isUrgent: disponibilite == 'urgent' ||
+          (note != null && note is num && note < 3.0),
     );
 
     markers.add(
@@ -88,8 +117,8 @@ class _MiniMapWidgetState extends State<MiniMapWidget> {
         position: providerPosition,
         icon: providerIcon,
         infoWindow: InfoWindow(
-          title: widget.provider.utilisateur?.fullName ?? 'Prestataire',
-          snippet: widget.provider.service?.nomservice ?? 'Service',
+          title: _getProviderName(),
+          snippet: serviceName.isNotEmpty ? serviceName : 'Service',
         ),
       ),
     );
@@ -112,20 +141,78 @@ class _MiniMapWidgetState extends State<MiniMapWidget> {
     return prices[widget.provider.hashCode % prices.length];
   }
 
+  // ✅ Helper pour accéder aux propriétés de façon universelle (Map ou Objet)
+  dynamic _getProviderProperty(String key) {
+    if (widget.provider == null) return null;
+    
+    // Si c'est un Map
+    if (widget.provider is Map<String, dynamic>) {
+      return widget.provider[key];
+    }
+    
+    // Si c'est un objet avec propriétés
+    try {
+      switch (key) {
+        case 'utilisateur':
+          return widget.provider.utilisateur;
+        case 'categorie':
+          return widget.provider.categorie;
+        case 'service':
+          return widget.provider.service;
+        case 'verifier':
+          return widget.provider.verifier;
+        case 'disponibilite':
+          return widget.provider.disponibilite;
+        case 'note':
+          return widget.provider.note;
+        default:
+          return null;
+      }
+    } catch (e) {
+      return null;
+    }
+  }
+
   String _getProviderName() {
-    // Gérer différents formats de données utilisateur
-    if (widget.provider.utilisateur != null) {
-      // Format avec objet utilisateur
-      final user = widget.provider.utilisateur;
-      if (user is Map<String, dynamic>) {
-        final nom = user['nom'] ?? '';
-        final prenom = user['prenom'] ?? '';
+    // Récupérer l'utilisateur de façon sécurisée
+    final utilisateur = _getProviderProperty('utilisateur');
+    
+    if (utilisateur != null) {
+      // Si utilisateur est un Map
+      if (utilisateur is Map<String, dynamic>) {
+        final nom = utilisateur['nom']?.toString() ?? '';
+        final prenom = utilisateur['prenom']?.toString() ?? '';
+        
         if (nom.isNotEmpty && prenom.isNotEmpty) {
           return '$nom $prenom';
         } else if (nom.isNotEmpty) {
           return nom;
         } else if (prenom.isNotEmpty) {
           return prenom;
+        }
+        
+        // Essayer fullName
+        final fullName = utilisateur['fullName']?.toString() ?? '';
+        if (fullName.isNotEmpty) {
+          return fullName;
+        }
+      } else {
+        // Si utilisateur est un objet
+        try {
+          final fullName = utilisateur.fullName ?? '';
+          if (fullName.isNotEmpty) return fullName;
+          
+          final nom = utilisateur.nom ?? '';
+          final prenom = utilisateur.prenom ?? '';
+          if (nom.isNotEmpty && prenom.isNotEmpty) {
+            return '$nom $prenom';
+          } else if (nom.isNotEmpty) {
+            return nom;
+          } else if (prenom.isNotEmpty) {
+            return prenom;
+          }
+        } catch (e) {
+          // Ignore
         }
       }
     }
@@ -164,6 +251,32 @@ class _MiniMapWidgetState extends State<MiniMapWidget> {
     final providerLng = -4.0083 + (widget.provider.hashCode % 100) * 0.001;
     final providerPosition = LatLng(providerLat, providerLng);
 
+    // Récupérer les données de façon sécurisée
+    final categorie = _getProviderProperty('categorie');
+    final service = _getProviderProperty('service');
+    
+    String categoryName = '';
+    if (categorie is Map<String, dynamic>) {
+      categoryName = categorie['nomcategorie']?.toString() ?? '';
+    } else if (categorie != null) {
+      try {
+        categoryName = categorie.nomcategorie ?? '';
+      } catch (e) {
+        // Ignore
+      }
+    }
+    
+    String serviceName = '';
+    if (service is Map<String, dynamic>) {
+      serviceName = service['nomservice']?.toString() ?? '';
+    } else if (service != null) {
+      try {
+        serviceName = service.nomservice ?? '';
+      } catch (e) {
+        // Ignore
+      }
+    }
+
     // Naviguer vers la full map
     Navigator.push(
       context,
@@ -172,8 +285,8 @@ class _MiniMapWidgetState extends State<MiniMapWidget> {
           initialPosition: providerPosition,
           providers: [widget.provider], // Liste avec le prestataire actuel
           searchRadius: 10.0,
-          selectedCategory: widget.provider.categorie?.nomcategorie ?? '',
-          selectedService: widget.provider.service?.nomservice ?? '',
+          selectedCategory: categoryName,
+          selectedService: serviceName,
         ),
       ),
     );

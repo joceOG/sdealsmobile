@@ -527,6 +527,8 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                                                   fontSize: 12, // Standardisé
                                                   fontWeight: FontWeight.w500,
                                                 ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
                                               ),
                                               const SizedBox(
                                                   height: 4), // Standardisé
@@ -536,6 +538,8 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                                                   color: Colors.black54,
                                                   fontSize: 12, // Standardisé
                                                 ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
                                               ),
                                             ],
                                           ),
@@ -781,6 +785,7 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                                                       color: Colors.green),
                                                   const SizedBox(width: 3),
                                                   Expanded(
+                                                    flex: 3,
                                                     child: Text(
                                                       location,
                                                       style: const TextStyle(
@@ -788,6 +793,7 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                                                         color: const Color(
                                                             0xFF2E7D32),
                                                       ),
+                                                      maxLines: 1,
                                                       overflow:
                                                           TextOverflow.ellipsis,
                                                     ),
@@ -797,13 +803,18 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                                                       size: 14,
                                                       color: Colors.amber),
                                                   const SizedBox(width: 2),
-                                                  Text(
-                                                    rating,
-                                                    style: const TextStyle(
-                                                      fontSize: 12,
-                                                      color: Colors.amber,
-                                                      fontWeight:
-                                                          FontWeight.w600,
+                                                  Flexible(
+                                                    flex: 1,
+                                                    child: Text(
+                                                      rating,
+                                                      style: const TextStyle(
+                                                        fontSize: 12,
+                                                        color: Colors.amber,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                      ),
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
                                                     ),
                                                   ),
                                                 ],
@@ -2445,11 +2456,11 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
             'provider': 'Aminata Services',
             'rating': 4.8,
             'price': '15 000 FCFA',
-            'image':
-                'https://images.unsplash.com/photo-1558618047-b2b7cd7006ec?w=150',
+            'image': null, // Utilise l'icône par défaut au lieu d'URL cassée
             'category': 'Ménage',
             'discount': '10%',
-            'urgent': false
+            'urgent': false,
+            'icon': Icons.cleaning_services,
           },
           {
             'title': 'Réparation électrique',
@@ -2457,11 +2468,11 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
             'provider': 'Électro Pro',
             'rating': 4.9,
             'price': '25 000 FCFA',
-            'image':
-                'https://images.unsplash.com/photo-1621905251918-48416bd8575a?w=150',
+            'image': null, // Utilise l'icône par défaut au lieu d'URL cassée
             'category': 'Électricité',
             'discount': null,
-            'urgent': true
+            'urgent': true,
+            'icon': Icons.electrical_services,
           },
           {
             'title': 'Jardinage & Taille',
@@ -2469,11 +2480,11 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
             'provider': 'Vert Jardin',
             'rating': 4.7,
             'price': '20 000 FCFA',
-            'image':
-                'https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=150',
+            'image': null, // Utilise l'icône par défaut au lieu d'URL cassée
             'category': 'Jardinage',
             'discount': '15%',
-            'urgent': false
+            'urgent': false,
+            'icon': Icons.local_florist,
           },
         ];
 
@@ -2550,22 +2561,47 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                                 child: Container(
                                   height: 100,
                                   width: double.infinity,
-                                  color: Colors.grey.shade200,
-                                  child: rec['image'] != null
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: [
+                                        const Color(0xFF2E7D32).withOpacity(0.1),
+                                        const Color(0xFF2E7D32).withOpacity(0.05),
+                                      ],
+                                    ),
+                                  ),
+                                  child: rec['image'] != null && rec['image'].toString().isNotEmpty
                                       ? Image.network(
                                           rec['image'],
                                           fit: BoxFit.cover,
-                                          errorBuilder: (_, __, ___) =>
-                                              const Icon(
-                                            Icons.image_not_supported,
-                                            size: 40,
-                                            color: Colors.grey,
+                                          loadingBuilder: (context, child, loadingProgress) {
+                                            if (loadingProgress == null) return child;
+                                            return Center(
+                                              child: CircularProgressIndicator(
+                                                value: loadingProgress.expectedTotalBytes != null
+                                                    ? loadingProgress.cumulativeBytesLoaded /
+                                                        loadingProgress.expectedTotalBytes!
+                                                    : null,
+                                                strokeWidth: 2,
+                                                color: const Color(0xFF2E7D32),
+                                              ),
+                                            );
+                                          },
+                                          errorBuilder: (_, __, ___) => Center(
+                                            child: Icon(
+                                              rec['icon'] ?? Icons.home_repair_service,
+                                              size: 50,
+                                              color: const Color(0xFF2E7D32),
+                                            ),
                                           ),
                                         )
-                                      : const Icon(
-                                          Icons.handyman,
-                                          size: 40,
-                                          color: Colors.grey,
+                                      : Center(
+                                          child: Icon(
+                                            rec['icon'] ?? Icons.handyman,
+                                            size: 50,
+                                            color: const Color(0xFF2E7D32),
+                                          ),
                                         ),
                                 ),
                               ),
