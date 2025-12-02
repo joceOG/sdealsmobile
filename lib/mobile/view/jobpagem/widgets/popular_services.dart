@@ -58,6 +58,13 @@ class PopularServices extends StatelessWidget {
                           height: 100,
                           width: double.infinity,
                           fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              height: 100,
+                              color: Colors.grey.shade200,
+                              child: const Icon(Icons.home_repair_service, size: 40, color: Colors.grey),
+                            );
+                          },
                         ),
                       ),
                       Padding(
@@ -85,13 +92,19 @@ class PopularServices extends StatelessWidget {
                             Row(
                               children: const [
                                 Icon(Icons.star, size: 16, color: Colors.amber),
+                                SizedBox(width: 2),
                                 Text('4.5'),
-                                Spacer(),
-                                Text(
-                                  'Abidjan',
-                                  style: TextStyle(
-                                    color: Colors.grey,
-                                    fontSize: 12,
+                                SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Abidjan',
+                                    style: TextStyle(
+                                      color: Colors.grey,
+                                      fontSize: 12,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    textAlign: TextAlign.right,
                                   ),
                                 ),
                               ],

@@ -115,17 +115,23 @@ class _AIProviderMatcherWidgetState extends State<AIProviderMatcherWidget> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  "Prestataires recommandés par IA",
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                const Expanded(
+                  child: Text(
+                    "Prestataires recommandés par IA",
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 IconButton(
-                  icon: Icon(Icons.refresh),
+                  icon: const Icon(Icons.refresh),
                   onPressed: _findMatchingProviders,
                   tooltip: 'Actualiser les recommandations',
+                  padding: const EdgeInsets.all(8),
+                  constraints: const BoxConstraints(),
                 ),
               ],
             ),
@@ -226,6 +232,7 @@ class _AIProviderMatcherWidgetState extends State<AIProviderMatcherWidget> {
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Avatar du prestataire
                     CircleAvatar(
@@ -247,7 +254,8 @@ class _AIProviderMatcherWidgetState extends State<AIProviderMatcherWidget> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Flexible(
+                              Expanded(
+                                flex: 3,
                                 child: Text(
                                   provider.utilisateur.prenom!,
                                   style: const TextStyle(
@@ -258,18 +266,24 @@ class _AIProviderMatcherWidgetState extends State<AIProviderMatcherWidget> {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: Theme.of(context).primaryColor,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Text(
-                                  'Match $matchPercent%',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
+                              const SizedBox(width: 8),
+                              Flexible(
+                                flex: 2,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(context).primaryColor,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    'Match $matchPercent%',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                               ),
@@ -278,7 +292,12 @@ class _AIProviderMatcherWidgetState extends State<AIProviderMatcherWidget> {
                           const SizedBox(height: 4),
                           
                           // Localisation du prestataire
-                          Text(provider.localisation),
+                          Text(
+                            provider.localisation,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 14),
+                          ),
                           const SizedBox(height: 4),
                           
                           // Note et avis (simulés)
@@ -286,11 +305,21 @@ class _AIProviderMatcherWidgetState extends State<AIProviderMatcherWidget> {
                             children: [
                               const Icon(Icons.star, size: 16, color: Colors.amber),
                               const SizedBox(width: 4),
-                              Text(
-                                provider.utilisateur.note!,
-                                style: const TextStyle(fontWeight: FontWeight.bold),
+                              Flexible(
+                                child: Text(
+                                  provider.utilisateur.note!,
+                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
-                              const Text(' (12 avis)'),
+                              const Flexible(
+                                child: Text(
+                                  ' (12 avis)',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
                             ],
                           ),
                           const SizedBox(height: 4),

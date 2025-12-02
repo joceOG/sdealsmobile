@@ -166,13 +166,23 @@ class _AIPriceEstimatorWidgetState extends State<AIPriceEstimatorWidget> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'Fourchette de prix',
-                    style: TextStyle(fontWeight: FontWeight.bold),
+                  const Flexible(
+                    flex: 2,
+                    child: Text(
+                      'Fourchette de prix',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                  Text(
-                    _priceEstimation!.formattedPriceRange,
-                    style: TextStyle(fontWeight: FontWeight.bold),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    flex: 3,
+                    child: Text(
+                      _priceEstimation!.formattedPriceRange,
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                      textAlign: TextAlign.right,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ],
               ),
@@ -180,12 +190,24 @@ class _AIPriceEstimatorWidgetState extends State<AIPriceEstimatorWidget> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Prix moyen'),
-                  Text(
-                    formatPrice((_priceEstimation!.minPrice + _priceEstimation!.maxPrice) / 2),
-                    style: TextStyle(
-                      color: Theme.of(context).primaryColor,
-                      fontWeight: FontWeight.bold,
+                  const Flexible(
+                    flex: 2,
+                    child: Text(
+                      'Prix moyen',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    flex: 3,
+                    child: Text(
+                      formatPrice((_priceEstimation!.minPrice + _priceEstimation!.maxPrice) / 2),
+                      style: TextStyle(
+                        color: Theme.of(context).primaryColor,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.right,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],

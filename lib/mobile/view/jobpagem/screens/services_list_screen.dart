@@ -173,18 +173,37 @@ class _ServicesListScreenState extends State<ServicesListScreen> {
                         ? Image.network(
                             service.imageservice,
                             fit: BoxFit.cover,
+                            loadingBuilder: (context, child, loadingProgress) {
+                              if (loadingProgress == null) return child;
+                              return Center(
+                                child: CircularProgressIndicator(
+                                  value: loadingProgress.expectedTotalBytes != null
+                                      ? loadingProgress.cumulativeBytesLoaded /
+                                          loadingProgress.expectedTotalBytes!
+                                      : null,
+                                  strokeWidth: 2,
+                                  color: const Color(0xFF2E7D32),
+                                ),
+                              );
+                            },
                             errorBuilder: (context, error, stackTrace) {
-                              return Icon(
-                                _getServiceIcon(service.nomservice),
-                                size: 40,
-                                color: const Color(0xFF2E7D32),
+                              return Container(
+                                color: const Color(0xFF2E7D32).withOpacity(0.1),
+                                child: Icon(
+                                  _getServiceIcon(service.nomservice),
+                                  size: 40,
+                                  color: const Color(0xFF2E7D32),
+                                ),
                               );
                             },
                           )
-                        : Icon(
-                            _getServiceIcon(service.nomservice),
-                            size: 40,
-                            color: const Color(0xFF2E7D32),
+                        : Container(
+                            color: const Color(0xFF2E7D32).withOpacity(0.1),
+                            child: Icon(
+                              _getServiceIcon(service.nomservice),
+                              size: 40,
+                              color: const Color(0xFF2E7D32),
+                            ),
                           ),
                   ),
                 ),
@@ -228,18 +247,22 @@ class _ServicesListScreenState extends State<ServicesListScreen> {
                       // Prix
                       Row(
                         children: [
-                          Icon(
+                          const Icon(
                             Icons.attach_money,
                             size: 16,
-                            color: const Color(0xFF2E7D32),
+                            color: Color(0xFF2E7D32),
                           ),
                           const SizedBox(width: 4),
-                          Text(
-                            'À partir de ${service.prixmoyen} FCFA/h',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF2E7D32),
+                          Expanded(
+                            child: Text(
+                              'À partir de ${service.prixmoyen} FCFA/h',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF2E7D32),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ],
