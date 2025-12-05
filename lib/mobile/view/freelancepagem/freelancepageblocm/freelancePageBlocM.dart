@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 import 'package:sdealsmobile/data/models/categorie.dart';
+import 'package:sdealsmobile/data/models/service.dart';
 import 'package:sdealsmobile/data/services/api_client.dart';
 
 class FreelancePageBlocM
@@ -16,6 +17,7 @@ class FreelancePageBlocM
   FreelancePageBlocM() : super(FreelancePageStateM.initial()) {
     on<LoadCategorieDataM>(_onLoadCategorieDataM);
     on<LoadFreelancersEvent>(_onLoadFreelancers);
+    on<LoadServicesEvent>(_onLoadServices);
     on<FilterByCategoryEvent>(_onFilterByCategory);
     on<SearchFreelancerEvent>(_onSearchFreelancer);
     on<ClearFiltersEvent>(_onClearFilters);
@@ -23,9 +25,9 @@ class FreelancePageBlocM
   }
 
   Future<void> _onLoadCategorieDataM(
-    LoadCategorieDataM event,
-    Emitter<FreelancePageStateM> emit,
-  ) async {
+      LoadCategorieDataM event,
+      Emitter<FreelancePageStateM> emit,
+      ) async {
     emit(state.copyWith(isLoading: true));
 
     ApiClient apiClient = ApiClient();
@@ -34,7 +36,7 @@ class FreelancePageBlocM
       var nomgroupe = "Freelance"; // Sans trait d'union
       print("Chargement des catégories pour le groupe: $nomgroupe");
       List<Categorie> list_categorie =
-          await apiClient.fetchCategorie(nomgroupe);
+      await apiClient.fetchCategorie(nomgroupe);
 
       // Charger également les freelancers par défaut
       add(LoadFreelancersEvent());
@@ -49,9 +51,9 @@ class FreelancePageBlocM
   }
 
   Future<void> _onLoadFreelancers(
-    LoadFreelancersEvent event,
-    Emitter<FreelancePageStateM> emit,
-  ) async {
+      LoadFreelancersEvent event,
+      Emitter<FreelancePageStateM> emit,
+      ) async {
     // ✅ MAINTENANT CONNECTÉ AU VRAI BACKEND !
     try {
       ApiClient apiClient = ApiClient();
@@ -64,8 +66,8 @@ class FreelancePageBlocM
       );
 
       final List<Map<String, dynamic>> freelancesData =
-          (response['freelances'] as List<dynamic>)
-              .cast<Map<String, dynamic>>();
+      (response['freelances'] as List<dynamic>)
+          .cast<Map<String, dynamic>>();
       final pagination = response['pagination'];
 
       print("📦 Données brutes reçues: ${freelancesData.length} freelances");
@@ -129,10 +131,39 @@ class FreelancePageBlocM
     }
   }
 
+  // ✅ Chargement des services
+  Future<void> _onLoadServices(
+      LoadServicesEvent event,
+      Emitter<FreelancePageStateM> emit,
+      ) async {
+    emit(state.copyWith(isLoadingServices: true));
+
+    try {
+      ApiClient apiClient = ApiClient();
+      var nomGroupe = "Freelance";
+      print("🛠️ Chargement des services pour le groupe: $nomGroupe");
+
+      List<Service> services = await apiClient.fetchServices(nomGroupe);
+
+      print("✅ Services chargés: ${services.length}");
+      emit(state.copyWith(
+        services: services,
+        isLoadingServices: false,
+        servicesError: '',
+      ));
+    } catch (error) {
+      print("❌ Erreur chargement services: $error");
+      emit(state.copyWith(
+        isLoadingServices: false,
+        servicesError: error.toString(),
+      ));
+    }
+  }
+
   void _onFilterByCategory(
-    FilterByCategoryEvent event,
-    Emitter<FreelancePageStateM> emit,
-  ) {
+      FilterByCategoryEvent event,
+      Emitter<FreelancePageStateM> emit,
+      ) {
     final category = event.category;
 
     if (category == null || category == 'Tous') {
@@ -155,9 +186,9 @@ class FreelancePageBlocM
   }
 
   void _onSearchFreelancer(
-    SearchFreelancerEvent event,
-    Emitter<FreelancePageStateM> emit,
-  ) {
+      SearchFreelancerEvent event,
+      Emitter<FreelancePageStateM> emit,
+      ) {
     final query = event.query.toLowerCase();
 
     // Appliquer d'abord le filtre de catégorie s'il existe
@@ -170,7 +201,7 @@ class FreelancePageBlocM
 
     // Appliquer ensuite la recherche sur les résultats filtrés par catégorie
     final List<FreelanceModel> searchFiltered =
-        _applySearch(categoryFiltered, query);
+    _applySearch(categoryFiltered, query);
 
     emit(state.copyWith(
       searchQuery: query,
@@ -179,9 +210,9 @@ class FreelancePageBlocM
   }
 
   void _onClearFilters(
-    ClearFiltersEvent event,
-    Emitter<FreelancePageStateM> emit,
-  ) {
+      ClearFiltersEvent event,
+      Emitter<FreelancePageStateM> emit,
+      ) {
     emit(state.copyWith(
       selectedCategory: null,
       searchQuery: '',
@@ -191,9 +222,9 @@ class FreelancePageBlocM
 
   // ✅ NOUVELLE MÉTHODE : Gérer l'inscription freelance
   Future<void> _onSubmitFreelanceRegistration(
-    SubmitFreelanceRegistrationEvent event,
-    Emitter<FreelancePageStateM> emit,
-  ) async {
+      SubmitFreelanceRegistrationEvent event,
+      Emitter<FreelancePageStateM> emit,
+      ) async {
     emit(state.copyWith(
       isRegistrationLoading: true,
       registrationError: null,
@@ -254,7 +285,7 @@ class FreelancePageBlocM
         emit(state.copyWith(
           isRegistrationLoading: false,
           registrationSuccess:
-              "🎉 Inscription freelance réussie ! Bienvenue dans l'équipe Soutrali !",
+          "🎉 Inscription freelance réussie ! Bienvenue dans l'équipe Soutrali !",
         ));
       } else {
         final errorData = jsonDecode(freelanceResponse.body);
@@ -262,7 +293,7 @@ class FreelancePageBlocM
         emit(state.copyWith(
           isRegistrationLoading: false,
           registrationError:
-              "Erreur création freelance: ${errorData['error'] ?? freelanceResponse.body}",
+          "Erreur création freelance: ${errorData['error'] ?? freelanceResponse.body}",
         ));
       }
     } catch (e) {
@@ -289,7 +320,7 @@ class FreelancePageBlocM
       "telephone": formData['phone'] ?? '',
       "email": formData['email'] ?? '',
       "password":
-          formData['password'] ?? 'freelance123', // Mot de passe par défaut
+      formData['password'] ?? 'freelance123', // Mot de passe par défaut
       "genre": formData['gender'] ?? 'Homme',
       "role": "freelance", // ✅ Ajouter le rôle freelance
     };
@@ -302,7 +333,7 @@ class FreelancePageBlocM
     final selectedCategories =
         formData['selectedCategories'] as Set<String>? ?? {};
     final mainCategory =
-        selectedCategories.isNotEmpty ? selectedCategories.first : 'Autre';
+    selectedCategories.isNotEmpty ? selectedCategories.first : 'Autre';
 
     // Compétences depuis les étapes du formulaire
     final skills = <String>[];
@@ -364,7 +395,7 @@ class FreelancePageBlocM
       // Préférences
       "preferredCategories": selectedCategories.toList(),
       "minimumProjectBudget":
-          (formData['hourlyRate'] ?? 0) * 8, // Estimation 1 jour
+      (formData['hourlyRate'] ?? 0) * 8, // Estimation 1 jour
       "maxProjectsPerMonth": formData['maxProjectsPerMonth'] ?? 5,
 
       // Statut du compte
