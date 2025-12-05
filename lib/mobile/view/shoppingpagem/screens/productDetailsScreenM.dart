@@ -1,15 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:sdealsmobile/mobile/view/common/utils/app_snackbar.dart';
-import '../../common/widgets/empty_state_widget.dart';
-import '../../common/widgets/app_image.dart';
 import '../shoppingpageblocm/shoppingPageStateM.dart' as bloc_model;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:sdealsmobile/data/services/authCubit.dart';
 import '../shoppingpageblocm/shoppingPageBlocM.dart';
 import '../shoppingpageblocm/shoppingPageEventM.dart';
 import 'panierProductScreenM.dart';
-// ✅ Design System
-import '../../../../design_system/design_system.dart';
 
 // Type alias pour simplifier l'import
 typedef Product = bloc_model.Product;
@@ -30,7 +25,7 @@ class _ProductDetailsState extends State<ProductDetails> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: SDColors.neutral50,
+      backgroundColor: Colors.grey.shade50,
       body: CustomScrollView(
         slivers: [
           // Header avec image du produit
@@ -39,33 +34,33 @@ class _ProductDetailsState extends State<ProductDetails> {
           // Contenu principal
           SliverToBoxAdapter(
             child: Padding(
-              padding: EdgeInsets.all(SDSpacing.sm),
+              padding: const EdgeInsets.all(16.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Informations principales du produit
                   _buildProductInfo(),
-                  SizedBox(height: SDSpacing.sm),
+                  const SizedBox(height: 16),
 
                   // Prix et disponibilité
                   _buildPricingSection(),
-                  SizedBox(height: SDSpacing.sm),
+                  const SizedBox(height: 16),
 
                   // Évaluation
                   _buildRatingSection(),
-                  SizedBox(height: SDSpacing.sm),
+                  const SizedBox(height: 16),
 
                   // Sélecteur de quantité
                   _buildQuantitySelector(),
-                  SizedBox(height: SDSpacing.sm),
+                  const SizedBox(height: 16),
 
                   // Description (si disponible)
                   _buildDescriptionSection(),
-                  SizedBox(height: SDSpacing.md),
+                  const SizedBox(height: 24),
 
                   // Boutons d'action
                   _buildActionButtons(context),
-                  SizedBox(height: SDSpacing.lg),
+                  const SizedBox(height: 32),
                 ],
               ),
             ),
@@ -80,14 +75,14 @@ class _ProductDetailsState extends State<ProductDetails> {
       expandedHeight: 300.0,
       floating: false,
       pinned: true,
-      backgroundColor: SDColors.primary600,
+      backgroundColor: Colors.green,
       flexibleSpace: FlexibleSpaceBar(
         title: Text(
           widget.product.name,
-          style: SDTypography.titleMedium.copyWith(
-            color: SDColors.white,
+          style: const TextStyle(
+            color: Colors.white,
             fontWeight: FontWeight.bold,
-            shadows: [Shadow(blurRadius: 2, color: SDColors.neutral900.withOpacity(0.54))],
+            shadows: [Shadow(blurRadius: 2, color: Colors.black54)],
           ),
         ),
         background: _buildProductImage(),
@@ -101,27 +96,34 @@ class _ProductDetailsState extends State<ProductDetails> {
             return IconButton(
               icon: Icon(
                 isFavorite ? Icons.favorite : Icons.favorite_border,
-                color: isFavorite ? SDColors.error500 : SDColors.white,
+                color: isFavorite ? Colors.red : Colors.white,
               ),
               onPressed: () {
                 context
                     .read<ShoppingPageBlocM>()
                     .add(ToggleFavoriteEvent(widget.product.id));
-                if (isFavorite) {
-                  AppSnackBar.info(context, '${widget.product.name} retiré des favoris!');
-                } else {
-                  AppSnackBar.success(context, '${widget.product.name} ajouté aux favoris!');
-                }
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      isFavorite
+                          ? '${widget.product.name} retiré des favoris!'
+                          : '${widget.product.name} ajouté aux favoris!',
+                    ),
+                    duration: const Duration(seconds: 1),
+                  ),
+                );
               },
             );
           },
         ),
         // Bouton partage
         IconButton(
-          icon: Icon(Icons.share, color: SDColors.white),
+          icon: const Icon(Icons.share, color: Colors.white),
           onPressed: () {
             // TODO: Implémenter le partage
-            AppSnackBar.info(context, 'Fonctionnalité de partage à venir');
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Fonctionnalité de partage à venir')),
+            );
           },
         ),
       ],
@@ -135,8 +137,8 @@ class _ProductDetailsState extends State<ProductDetails> {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            SDColors.primary600,
-            SDColors.primary800,
+            Colors.green.shade600,
+            Colors.green.shade800,
           ],
         ),
       ),
@@ -145,10 +147,12 @@ class _ProductDetailsState extends State<ProductDetails> {
           ? Stack(
               fit: StackFit.expand,
               children: [
-                AppImage(
-                  imageUrl: widget.product.image,
+                Image.network(
+                  widget.product.image,
                   fit: BoxFit.cover,
-                  placeholderAsset: 'assets/products/default.png',
+                  errorBuilder: (context, error, stackTrace) {
+                    return _buildDefaultImage();
+                  },
                 ),
                 Container(
                   decoration: BoxDecoration(
@@ -157,7 +161,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                       end: Alignment.bottomCenter,
                       colors: [
                         Colors.transparent,
-                        SDColors.neutral900.withOpacity(0.3),
+                        Colors.black.withOpacity(0.3),
                       ],
                     ),
                   ),
@@ -183,7 +187,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                       end: Alignment.bottomCenter,
                       colors: [
                         Colors.transparent,
-                        SDColors.neutral900.withOpacity(0.3),
+                        Colors.black.withOpacity(0.3),
                       ],
                     ),
                   ),
@@ -195,12 +199,12 @@ class _ProductDetailsState extends State<ProductDetails> {
 
   Widget _buildDefaultImage() {
     return Container(
-      color: SDColors.neutral200,
+      color: Colors.grey.shade200,
       child: Center(
         child: Icon(
           Icons.shopping_bag,
           size: 100,
-          color: SDColors.neutral400,
+          color: Colors.grey.shade400,
         ),
       ),
     );
@@ -209,41 +213,45 @@ class _ProductDetailsState extends State<ProductDetails> {
   Widget _buildProductInfo() {
     return Card(
       elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: EdgeInsets.all(SDSpacing.sm),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               widget.product.name,
-              style: SDTypography.titleLarge.copyWith(fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-            SizedBox(height: SDSpacing.xs),
+            const SizedBox(height: 8),
             Row(
               children: [
-                Text(
+                const Text(
                   'Marque: ',
-                  style: SDTypography.bodyMedium.copyWith(fontWeight: FontWeight.w600),
+                  style: TextStyle(fontWeight: FontWeight.w600),
                 ),
                 Text(
                   widget.product.brand,
-                  style: SDTypography.bodyMedium.copyWith(
-                    color: SDColors.info600,
+                  style: TextStyle(
+                    color: Colors.blue.shade700,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
               ],
             ),
-            SizedBox(height: SDSpacing.xxxs),
+            const SizedBox(height: 4),
             Row(
               children: [
-                Icon(Icons.category, size: 16, color: SDColors.neutral600),
-                SizedBox(width: SDSpacing.xxxs),
+                Icon(Icons.category, size: 16, color: Colors.grey.shade600),
+                const SizedBox(width: 4),
                 Text(
                   widget.product.size,
-                  style: SDTypography.bodySmall.copyWith(
-                    color: SDColors.neutral600,
+                  style: TextStyle(
+                    color: Colors.grey.shade600,
+                    fontSize: 14,
                   ),
                 ),
               ],
@@ -257,9 +265,9 @@ class _ProductDetailsState extends State<ProductDetails> {
   Widget _buildPricingSection() {
     return Card(
       elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: EdgeInsets.all(SDSpacing.sm),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -268,30 +276,32 @@ class _ProductDetailsState extends State<ProductDetails> {
               children: [
                 Text(
                   widget.product.price,
-                  style: SDTypography.displaySmall.copyWith(
+                  style: const TextStyle(
+                    fontSize: 24,
                     fontWeight: FontWeight.bold,
-                    color: SDColors.success500,
+                    color: Colors.green,
                   ),
                 ),
                 Container(
                   padding:
-                      EdgeInsets.symmetric(horizontal: SDSpacing.xs, vertical: SDSpacing.xxxs),
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: SDColors.success100,
-                    borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
-                    border: Border.all(color: SDColors.success200),
+                    color: Colors.green.shade100,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.green.shade300),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(Icons.check_circle,
-                          size: 16, color: SDColors.success700),
-                      SizedBox(width: SDSpacing.xxxs),
+                          size: 16, color: Colors.green.shade700),
+                      const SizedBox(width: 4),
                       Text(
                         'Disponible',
-                        style: SDTypography.labelSmall.copyWith(
-                          color: SDColors.success700,
+                        style: TextStyle(
+                          color: Colors.green.shade700,
                           fontWeight: FontWeight.w600,
+                          fontSize: 12,
                         ),
                       ),
                     ],
@@ -299,15 +309,16 @@ class _ProductDetailsState extends State<ProductDetails> {
                 ),
               ],
             ),
-            SizedBox(height: SDSpacing.xs),
+            const SizedBox(height: 12),
             Row(
               children: [
-                Icon(Icons.local_shipping, size: 16, color: SDColors.neutral600),
-                SizedBox(width: SDSpacing.xxxs),
+                Icon(Icons.local_shipping, size: 16, color: Colors.grey.shade600),
+                const SizedBox(width: 4),
                 Text(
                   'Livraison disponible',
-                  style: SDTypography.bodySmall.copyWith(
-                    color: SDColors.neutral600,
+                  style: TextStyle(
+                    color: Colors.grey.shade600,
+                    fontSize: 14,
                   ),
                 ),
               ],
@@ -321,9 +332,9 @@ class _ProductDetailsState extends State<ProductDetails> {
   Widget _buildRatingSection() {
     return Card(
       elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: EdgeInsets.all(SDSpacing.sm),
+        padding: const EdgeInsets.all(16),
         child: Row(
           children: [
             ...List.generate(
@@ -332,14 +343,15 @@ class _ProductDetailsState extends State<ProductDetails> {
                 index < widget.product.rating.floor()
                     ? Icons.star
                     : Icons.star_border,
-                color: SDColors.warning500,
+                color: Colors.amber,
                 size: 24,
               ),
             ),
-            SizedBox(width: SDSpacing.xs),
+            const SizedBox(width: 8),
             Text(
               '${widget.product.rating.toStringAsFixed(1)} / 5.0',
-              style: SDTypography.titleSmall.copyWith(
+              style: const TextStyle(
+                fontSize: 16,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -352,27 +364,28 @@ class _ProductDetailsState extends State<ProductDetails> {
   Widget _buildQuantitySelector() {
     return Card(
       elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: EdgeInsets.all(SDSpacing.sm),
+        padding: const EdgeInsets.all(16),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
+            const Text(
               'Quantité',
-              style: SDTypography.titleSmall.copyWith(
+              style: TextStyle(
+                fontSize: 16,
                 fontWeight: FontWeight.w600,
               ),
             ),
             Container(
               decoration: BoxDecoration(
-                border: Border.all(color: SDColors.neutral300),
-                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
+                border: Border.all(color: Colors.grey.shade300),
+                borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
                 children: [
                   IconButton(
-                    icon: Icon(Icons.remove, color: SDColors.neutral900),
+                    icon: const Icon(Icons.remove),
                     onPressed: _quantity > 1
                         ? () {
                             setState(() {
@@ -382,16 +395,17 @@ class _ProductDetailsState extends State<ProductDetails> {
                         : null,
                   ),
                   Container(
-                    padding: EdgeInsets.symmetric(horizontal: SDSpacing.sm),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Text(
                       '$_quantity',
-                      style: SDTypography.titleMedium.copyWith(
+                      style: const TextStyle(
+                        fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
                   IconButton(
-                    icon: Icon(Icons.add, color: SDColors.neutral900),
+                    icon: const Icon(Icons.add),
                     onPressed: () {
                       setState(() {
                         _quantity++;
@@ -410,23 +424,25 @@ class _ProductDetailsState extends State<ProductDetails> {
   Widget _buildDescriptionSection() {
     return Card(
       elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: EdgeInsets.all(SDSpacing.sm),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            const Text(
               'Description',
-              style: SDTypography.titleMedium.copyWith(
+              style: TextStyle(
+                fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
             ),
-            SizedBox(height: SDSpacing.xs),
+            const SizedBox(height: 8),
             Text(
               'Article de qualité ${widget.product.brand}. ${widget.product.size}.',
-              style: SDTypography.bodySmall.copyWith(
-                color: SDColors.neutral700,
+              style: TextStyle(
+                color: Colors.grey.shade700,
+                fontSize: 14,
                 height: 1.5,
               ),
             ),
@@ -466,21 +482,20 @@ class _ProductDetailsState extends State<ProductDetails> {
                             SnackBar(
                               content: Row(
                                 children: [
-                                  Icon(Icons.check_circle,
-                                      color: SDColors.white),
-                                  SizedBox(width: SDSpacing.xs),
+                                  const Icon(Icons.check_circle,
+                                      color: Colors.white),
+                                  const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
-                                        '${widget.product.name} ajouté au panier!',
-                                        style: SDTypography.bodyMedium.copyWith(color: SDColors.white)),
+                                        '${widget.product.name} ajouté au panier!'),
                                   ),
                                 ],
                               ),
-                              backgroundColor: SDColors.success500,
-                              duration: Duration(seconds: 2),
+                              backgroundColor: Colors.green,
+                              duration: const Duration(seconds: 2),
                               action: SnackBarAction(
                                 label: 'Voir',
-                                textColor: SDColors.white,
+                                textColor: Colors.white,
                                 onPressed: () {
                                   Navigator.push(
                                     context,
@@ -499,42 +514,41 @@ class _ProductDetailsState extends State<ProductDetails> {
                           );
                         } else {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
+                            const SnackBar(
                               content: Text(
-                                  'Veuillez vous connecter pour ajouter au panier',
-                                  style: SDTypography.bodyMedium.copyWith(color: SDColors.white)),
-                              backgroundColor: SDColors.warning500,
+                                  'Veuillez vous connecter pour ajouter au panier'),
+                              backgroundColor: Colors.orange,
                             ),
                           );
                         }
                       },
                 icon: isAdding
-                    ? SizedBox(
+                    ? const SizedBox(
                         width: 20,
                         height: 20,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(SDColors.white),
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                         ),
                       )
-                    : Icon(Icons.shopping_cart, color: SDColors.white),
+                    : const Icon(Icons.shopping_cart),
                 label: Text(
                   isAdding ? 'Ajout en cours...' : 'Ajouter au panier',
-                  style: SDTypography.labelMedium.copyWith(color: SDColors.white),
+                  style: const TextStyle(fontSize: 16),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: SDColors.success500,
-                  foregroundColor: SDColors.white,
-                  padding: EdgeInsets.symmetric(vertical: SDSpacing.sm),
+                  backgroundColor: Colors.green,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                 ),
               );
             },
           ),
         ),
-        SizedBox(height: SDSpacing.xs),
+        const SizedBox(height: 12),
         // Bouton secondaire : Acheter maintenant
         SizedBox(
           width: double.infinity,
@@ -542,22 +556,21 @@ class _ProductDetailsState extends State<ProductDetails> {
             onPressed: () {
               // TODO: Implémenter l'achat direct
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                    content: Text('Fonctionnalité achat direct à venir',
-                        style: SDTypography.bodyMedium)),
+                const SnackBar(
+                    content: Text('Fonctionnalité achat direct à venir')),
               );
             },
-            icon: Icon(Icons.flash_on, color: SDColors.success500),
-            label: Text(
+            icon: const Icon(Icons.flash_on),
+            label: const Text(
               'Acheter maintenant',
-              style: SDTypography.labelMedium.copyWith(color: SDColors.success500),
+              style: TextStyle(fontSize: 16),
             ),
             style: OutlinedButton.styleFrom(
-              foregroundColor: SDColors.success500,
-              side: BorderSide(color: SDColors.success500, width: 2),
-              padding: EdgeInsets.symmetric(vertical: SDSpacing.sm),
+              foregroundColor: Colors.green,
+              side: const BorderSide(color: Colors.green, width: 2),
+              padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                borderRadius: BorderRadius.circular(12),
               ),
             ),
           ),

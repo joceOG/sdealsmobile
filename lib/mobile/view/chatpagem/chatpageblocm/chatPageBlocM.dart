@@ -1,902 +1,1832 @@
-import 'dart:async';
-import 'package:flutter/foundation.dart';
-import 'package:uuid/uuid.dart';
-import 'package:bloc/bloc.dart';
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
-import 'package:sdealsmobile/mobile/view/chatpagem/chatpageblocm/chatPageEventM.dart';
-import 'package:sdealsmobile/mobile/view/chatpagem/chatpageblocm/chatPageStateM.dart';
 import '../../../data/models/conversation_model.dart';
 import '../../../data/models/message_model.dart';
-import 'package:sdealsmobile/data/models/categorie.dart';
-import 'package:sdealsmobile/data/services/api_client.dart';
-import 'package:sdealsmobile/data/services/websocket_service.dart';
-import 'package:sdealsmobile/data/services/notification_service.dart';
+import '../chatpageblocm/chatPageBlocM.dart';
+import '../chatpageblocm/chatPageEventM.dart';
+import '../chatpageblocm/chatPageStateM.dart';
+import '../../common/widgets/empty_state_widget.dart';
+import '../../searchpagem/screens/searchPageScreenM.dart';
 
-class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
-  final ApiClient _apiClient = ApiClient();
-  final WebSocketService _webSocketService = WebSocketService();
-  final NotificationService _notificationService = NotificationService();
+// ✅ Design System
+import '../../../../design_system/design_system.dart';
 
-  // ✅ ID utilisateur passé au constructeur (depuis AuthCubit)
-  final String _currentUserId;
-  final _uuid = const Uuid();
+/// Filtres type Figma : Tous, Travaux (prestataires), Freelance, Produits (vendeurs).
+enum _MessagesInboxFilter { tous, travaux, freelance, produits }
 
-  ChatPageBlocM({String? userId})
-      : _currentUserId =
-            userId ?? 'currentUser', // ⚠️ Fallback sur mock si non fourni
-        super(ChatPageStateM.initial()) {
-    on<LoadConversations>(_onLoadConversations);
-    on<SelectConversation>(_onSelectConversation);
-    on<LoadMessages>(_onLoadMessages);
-    on<SendMessage>(_onSendMessage);
-    on<MarkMessageAsRead>(_onMarkMessageAsRead);
-    on<MarkConversationAsRead>(_onMarkConversationAsRead);
-    on<CreateConversation>(_onCreateConversation);
-    on<SearchConversations>(_onSearchConversations);
-    on<ConnectWebSocket>(_onConnectWebSocket);
-    on<DisconnectWebSocket>(_onDisconnectWebSocket);
-    on<NewMessageReceived>(_onNewMessageReceived);
-    on<MessageStatusUpdated>(_onMessageStatusUpdated);
-    on<SendChatNotification>(_onSendChatNotification);
-    on<ChatNotificationReceived>(_onChatNotificationReceived);
-    on<SearchMessages>(_onSearchMessages);
-    on<DeleteMessage>(_onDeleteMessage);
+class ChatPageScreenM extends StatefulWidget {
+  final String? conversationId;
+  final String? participantId;
+  final String? participantName;
+  final String? participantImage;
+  final ConversationType? type;
 
-    // Gardons la compatibilité avec le code existant
-    on<LoadCategorieDataM>(_onLoadCategorieDataM);
+  const ChatPageScreenM({
+    super.key,
+    this.conversationId,
+    this.participantId,
+    this.participantName,
+    this.participantImage,
+    this.type,
+  });
 
-    // Configuration des callbacks WebSocket
-    _setupWebSocketCallbacks();
-  }
+  @override
+  State<ChatPageScreenM> createState() => _ChatPageScreenMState();
+}
 
-  // Ajouté pour la compatibilité avec le code existant
-  Future<void> _onLoadCategorieDataM(
-      LoadCategorieDataM event, Emitter<ChatPageStateM> emit) async {
-    emit(state.copyWith(isLoading: true));
+class _ChatPageScreenMState extends State<ChatPageScreenM>
+    with TickerProviderStateMixin {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  final TextEditingController _messageController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+  final FocusNode _focusNode = FocusNode();
+  final TextEditingController _listSearchController = TextEditingController();
+  _MessagesInboxFilter _inboxFilter = _MessagesInboxFilter.tous;
+  bool _arrowPressed = false;
+  File? _selectedImage;
+  int _prestatairePressed = -1;
 
-    try {
-      var nomgroupe = "Métiers";
-      List<Categorie> list_categorie =
-          await _apiClient.fetchCategorie(nomgroupe);
-      emit(state.copyWith(listItems: list_categorie, isLoading: false));
-    } catch (error) {
-      emit(state.copyWith(error: error.toString(), isLoading: false));
+  late ChatPageBlocM _chatBloc;
+
+  // Méthode pour obtenir la couleur selon le type de conversation
+  Color _getConversationColor(ConversationType type) {
+    switch (type) {
+      case ConversationType.prestataire:
+        return SDColors.primary600;
+      case ConversationType.vendeur:
+        return SDColors.primary700;
+      case ConversationType.freelance:
+        return SDColors.primary500;
     }
   }
 
-  Future<void> _onLoadConversations(
-      LoadConversations event, Emitter<ChatPageStateM> emit) async {
-    emit(state.copyWith(status: ChatPageStatus.loading));
-
-    try {
-      List<ConversationModel> conversations;
-
-      // 🔄 Tenter d'abord l'API backend
-      try {
-        print('🔄 Tentative chargement conversations depuis API...');
-        final conversationsData =
-            await _apiClient.getConversations(_currentUserId);
-
-        // Convertir les données backend en modèles
-        conversations = conversationsData
-            .map((data) => ConversationModel.fromBackend(data, _currentUserId))
-            .toList();
-
-        print('✅ ${conversations.length} conversations chargées depuis API');
-      } catch (apiError) {
-        // ⚠️ Fallback sur les données mock si l'API échoue
-        print('⚠️ API indisponible, utilisation des données mock: $apiError');
-        await Future.delayed(const Duration(milliseconds: 500));
-        conversations = mockConversations;
-        print('📦 ${conversations.length} conversations mock chargées');
-      }
-
-      emit(state.copyWith(
-        status: ChatPageStatus.loaded,
-        conversations: conversations,
-        clearSelectedConversation: true,
-      ));
-    } catch (error) {
-      if (kDebugMode) {
-        print('❌ Error loading conversations: $error');
-      }
-      emit(state.copyWith(
-        status: ChatPageStatus.error,
-        error: error.toString(),
-      ));
+  // Méthode pour obtenir le label selon le type de conversation
+  String _getConversationLabel(ConversationType type) {
+    switch (type) {
+      case ConversationType.prestataire:
+        return 'Prestataire';
+      case ConversationType.vendeur:
+        return 'Vendeur';
+      case ConversationType.freelance:
+        return 'Freelance';
     }
   }
 
-  Future<void> _onSelectConversation(
-      SelectConversation event, Emitter<ChatPageStateM> emit) async {
-    emit(state.copyWith(
-      selectedConversation: event.conversation,
-    ));
-
-    // Automatiquement charger les messages lorsqu'une conversation est sélectionnée
-    add(LoadMessages(event.conversation.id));
-
-    // Marquer la conversation comme lue
-    if (event.conversation.unread) {
-      add(MarkConversationAsRead(event.conversation.id));
+  /// Libellé court pour la ligne d’aperçu (style Figma : « Métier : extrait »).
+  String _getInboxCategoryLabel(ConversationType type) {
+    switch (type) {
+      case ConversationType.prestataire:
+        return 'Travaux';
+      case ConversationType.freelance:
+        return 'Freelance';
+      case ConversationType.vendeur:
+        return 'Produits';
     }
   }
 
-  Future<void> _onLoadMessages(
-      LoadMessages event, Emitter<ChatPageStateM> emit) async {
-    if (state.selectedConversation == null) return;
+  String _formatListRowTime(DateTime t) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final day = DateTime(t.year, t.month, t.day);
+    if (day == today) {
+      final h = t.hour.toString().padLeft(2, '0');
+      final m = t.minute.toString().padLeft(2, '0');
+      return '$h:$m';
+    }
+    if (day == today.subtract(const Duration(days: 1))) {
+      return 'Hier';
+    }
+    if (now.difference(day).inDays < 7) {
+      const wd = ['Lun.', 'Mar.', 'Mer.', 'Jeu.', 'Ven.', 'Sam.', 'Dim.'];
+      return wd[t.weekday - 1];
+    }
+    const months = [
+      'janv.',
+      'févr.',
+      'mars',
+      'avr.',
+      'mai',
+      'juin',
+      'juil.',
+      'août',
+      'sept.',
+      'oct.',
+      'nov.',
+      'déc.'
+    ];
+    return '${t.day} ${months[t.month - 1]}';
+  }
 
-    emit(state.copyWith(status: ChatPageStatus.loading));
-
-    try {
-      List<MessageModel> messages;
-
-      // 🔄 Tenter d'abord l'API backend
-      try {
-        print(
-            '🔄 Tentative chargement messages depuis API pour conversation: ${event.conversationId}');
-        final messagesData =
-            await _apiClient.getConversationMessages(event.conversationId);
-
-        // Convertir les données backend en modèles
-        messages =
-            messagesData.map((data) => MessageModel.fromBackend(data)).toList();
-
-        print('✅ ${messages.length} messages chargés depuis API');
-      } catch (apiError) {
-        // ⚠️ Fallback sur les données mock si l'API échoue
-        print('⚠️ API indisponible, utilisation des données mock: $apiError');
-        await Future.delayed(const Duration(milliseconds: 500));
-
-        // Utilisons des données mockées pour le développement
-        switch (event.conversationId) {
-          case 'conv1':
-            messages = mockMessages;
-            break;
-          case 'conv2':
-            messages = mockVendeurMessages;
-            break;
-          case 'conv3':
-            messages = mockFreelanceMessages;
-            break;
-          default:
-            messages = [];
-            break;
-        }
-        print('📦 ${messages.length} messages mock chargés');
-      }
-
-      // Mettre à jour les messages pour la conversation actuelle
-      final updatedMessagesMap =
-          Map<String, List<MessageModel>>.from(state.messagesByConversation);
-      updatedMessagesMap[event.conversationId] = messages;
-
-      emit(state.copyWith(
-        status: ChatPageStatus.loaded,
-        messagesByConversation: updatedMessagesMap,
-      ));
-    } catch (error) {
-      if (kDebugMode) {
-        print('❌ Error loading messages: $error');
-      }
-      emit(state.copyWith(
-        status: ChatPageStatus.error,
-        error: error.toString(),
-      ));
+  bool _matchesInboxFilter(ConversationType type, _MessagesInboxFilter f) {
+    switch (f) {
+      case _MessagesInboxFilter.tous:
+        return true;
+      case _MessagesInboxFilter.travaux:
+        return type == ConversationType.prestataire;
+      case _MessagesInboxFilter.freelance:
+        return type == ConversationType.freelance;
+      case _MessagesInboxFilter.produits:
+        return type == ConversationType.vendeur;
     }
   }
 
-  Future<void> _onSendMessage(
-      SendMessage event, Emitter<ChatPageStateM> emit) async {
-    if (state.selectedConversation == null) return;
-
-    try {
-      // Créer un nouveau message avec un ID temporaire
-      final newMessage = MessageModel(
-        id: _uuid.v4(),
-        senderId: _currentUserId,
-        receiverId: state.selectedConversation!.participantId,
-        timestamp: DateTime.now(),
-        content: event.content,
-        type: event.type,
-        status: MessageStatus.sending, // Message en cours d'envoi
-      );
-
-      // Ajouter immédiatement le message à l'UI pour un feedback instantané
-      final currentMessages = state.selectedConversationMessages;
-      final updatedMessages = List<MessageModel>.from(currentMessages)
-        ..add(newMessage);
-
-      final updatedMessagesMap =
-          Map<String, List<MessageModel>>.from(state.messagesByConversation);
-      updatedMessagesMap[event.conversationId] = updatedMessages;
-
-      // Mettre à jour également la dernière conversation
-      final updatedConversation = state.selectedConversation!.copyWith(
-        lastMessage: newMessage,
-        lastUpdated: DateTime.now(),
-        unread: false,
-      );
-
-      final updatedConversations = state.conversations.map((conv) {
-        if (conv.id == updatedConversation.id) {
-          return updatedConversation;
-        }
-        return conv;
-      }).toList();
-
-      emit(state.copyWith(
-        messagesByConversation: updatedMessagesMap,
-        conversations: updatedConversations,
-        selectedConversation: updatedConversation,
-      ));
-
-      // 🔄 Tenter d'envoyer via l'API backend
-      MessageModel sentMessage;
-      try {
-        print('🔄 Tentative envoi message via API...');
-        final responseData = await _apiClient.sendMessage(
-          expediteur: _currentUserId,
-          destinataire: state.selectedConversation!.participantId,
-          contenu: event.content,
-          pieceJointe: event.imageFile,
-          typePieceJointe: event.imageFile != null ? 'IMAGE' : null,
-        );
-
-        // Convertir la réponse backend en MessageModel
-        sentMessage = MessageModel.fromBackend(responseData);
-        print('✅ Message envoyé via API avec ID: ${sentMessage.id}');
-
-        // Envoyer aussi via WebSocket pour temps réel
-        if (_webSocketService.isConnected) {
-          _webSocketService.sendMessage(
-            expediteur: _currentUserId,
-            destinataire: state.selectedConversation!.participantId,
-            contenu: event.content,
-            conversationId: event.conversationId,
-          );
-        }
-      } catch (apiError) {
-        // ⚠️ Fallback sur simulation si l'API échoue
-        print('⚠️ API indisponible, simulation envoi: $apiError');
-        await Future.delayed(const Duration(milliseconds: 500));
-        sentMessage = newMessage.copyWith(newStatus: MessageStatus.sent);
-
-        // Simuler la réception après un délai
-        await Future.delayed(const Duration(seconds: 1));
-        sentMessage = sentMessage.copyWith(newStatus: MessageStatus.delivered);
-      }
-
-      // Mettre à jour les messages avec le message envoyé
-      final finalMessages = updatedMessages.map((msg) {
-        if (msg.id == newMessage.id) {
-          return sentMessage;
-        }
-        return msg;
-      }).toList();
-
-      updatedMessagesMap[event.conversationId] = finalMessages;
-
-      emit(state.copyWith(
-        messagesByConversation: updatedMessagesMap,
-      ));
-    } catch (error) {
-      if (kDebugMode) {
-        print('Error sending message: $error');
-      }
-
-      // Mettre à jour le message avec le statut d'échec
-      final updatedMessages = state.selectedConversationMessages.map((msg) {
-        if (msg.status == MessageStatus.sending) {
-          return msg.copyWith(newStatus: MessageStatus.failed);
-        }
-        return msg;
-      }).toList();
-
-      final updatedMessagesMap =
-          Map<String, List<MessageModel>>.from(state.messagesByConversation);
-      updatedMessagesMap[event.conversationId] = updatedMessages;
-
-      emit(state.copyWith(
-        messagesByConversation: updatedMessagesMap,
-        error: error.toString(),
-      ));
-    }
+  List<ConversationModel> _filteredConversations(
+      List<ConversationModel> all) {
+    final q = _listSearchController.text.trim().toLowerCase();
+    return all.where((c) {
+      if (!_matchesInboxFilter(c.type, _inboxFilter)) return false;
+      if (q.isEmpty) return true;
+      final name = c.participantName.toLowerCase();
+      final last = c.lastMessage?.content.toLowerCase() ?? '';
+      return name.contains(q) || last.contains(q);
+    }).toList();
   }
 
-  Future<void> _onMarkMessageAsRead(
-      MarkMessageAsRead event, Emitter<ChatPageStateM> emit) async {
-    try {
-      // Dans un environnement réel, nous appellerions l'API ici
-      // await _apiClient.markMessageAsRead(event.conversationId, event.messageId);
-
-      // Simuler le succès de l'API
-      await Future.delayed(const Duration(milliseconds: 200));
-
-      // Mettre à jour le message localement
-      if (!state.messagesByConversation.containsKey(event.conversationId))
-        return;
-
-      final updatedMessages =
-          state.messagesByConversation[event.conversationId]!.map((msg) {
-        if (msg.id == event.messageId) {
-          return msg.copyWith(newStatus: MessageStatus.seen);
-        }
-        return msg;
-      }).toList();
-
-      final updatedMessagesMap =
-          Map<String, List<MessageModel>>.from(state.messagesByConversation);
-      updatedMessagesMap[event.conversationId] = updatedMessages;
-
-      emit(state.copyWith(
-        messagesByConversation: updatedMessagesMap,
-      ));
-    } catch (error) {
-      if (kDebugMode) {
-        print('Error marking message as read: $error');
-      }
-    }
+  void _onComposeTap() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: SDColors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: EdgeInsets.all(SDSpacing.md),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.edit_rounded, color: SDColors.primary700),
+                  SizedBox(width: SDSpacing.sm),
+                  Text(
+                    'Nouvelle conversation',
+                    style: SDTypography.titleMedium.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: SDSpacing.sm),
+              Text(
+                'Recherchez un prestataire, un freelance ou une boutique depuis Explorer, puis contactez-les.',
+                style: SDTypography.bodyMedium.copyWith(
+                  color: SDColors.neutral600,
+                ),
+              ),
+              SizedBox(height: SDSpacing.md),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: SDColors.primary700,
+                  foregroundColor: SDColors.white,
+                  padding: EdgeInsets.symmetric(vertical: SDSpacing.sm),
+                ),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const SearchPageScreenM(),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.travel_explore_rounded),
+                label: const Text('Ouvrir la recherche'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Fermer'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
-  Future<void> _onMarkConversationAsRead(
-      MarkConversationAsRead event, Emitter<ChatPageStateM> emit) async {
-    try {
-      // 🔄 Tenter d'appeler l'API backend
-      try {
-        print(
-            '🔄 Marquage conversation comme lue via API: ${event.conversationId}');
-        await _apiClient.markMessagesAsRead(
-            event.conversationId, _currentUserId);
-        print('✅ Conversation marquée comme lue via API');
-      } catch (apiError) {
-        // ⚠️ Fallback sur simulation si l'API échoue
-        print('⚠️ API indisponible, simulation marquage: $apiError');
-        await Future.delayed(const Duration(milliseconds: 200));
-      }
-
-      // Mettre à jour la conversation localement
-      final updatedConversations = state.conversations.map((conv) {
-        if (conv.id == event.conversationId) {
-          return conv.copyWith(unread: false, unreadCount: 0);
-        }
-        return conv;
-      }).toList();
-
-      // Mettre à jour les messages de la conversation
-      if (state.messagesByConversation.containsKey(event.conversationId)) {
-        final messages = state.messagesByConversation[event.conversationId]!;
-        final updatedMessages = messages.map((msg) {
-          if (msg.receiverId == _currentUserId &&
-              msg.status != MessageStatus.seen) {
-            return msg.copyWith(newStatus: MessageStatus.seen);
-          }
-          return msg;
-        }).toList();
-
-        final updatedMessagesMap =
-            Map<String, List<MessageModel>>.from(state.messagesByConversation);
-        updatedMessagesMap[event.conversationId] = updatedMessages;
-
-        emit(state.copyWith(
-          conversations: updatedConversations,
-          messagesByConversation: updatedMessagesMap,
-          selectedConversation:
-              state.selectedConversation?.id == event.conversationId
-                  ? state.selectedConversation!
-                      .copyWith(unread: false, unreadCount: 0)
-                  : null,
-        ));
-      } else {
-        emit(state.copyWith(
-          conversations: updatedConversations,
-          selectedConversation:
-              state.selectedConversation?.id == event.conversationId
-                  ? state.selectedConversation!
-                      .copyWith(unread: false, unreadCount: 0)
-                  : null,
-        ));
-      }
-    } catch (error) {
-      if (kDebugMode) {
-        print('Error marking conversation as read: $error');
-      }
-    }
+  /// AppBar uniquement en conversation sur **mobile** (retour + titre + menu).
+  PreferredSizeWidget _buildMobileConversationAppBar(ChatPageStateM state) {
+    return AppBar(
+      backgroundColor: SDColors.white,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      centerTitle: true,
+      automaticallyImplyLeading: false,
+      leading: IconButton(
+        icon: Icon(Icons.arrow_back_ios_new_rounded,
+            color: SDColors.neutral900, size: 20),
+        onPressed: () {
+          context.read<ChatPageBlocM>().add(const LoadConversations());
+        },
+      ),
+      title: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Flexible(
+            child: Text(
+              state.selectedConversation!.participantName,
+              style: SDTypography.titleMedium.copyWith(
+                color: SDColors.neutral900,
+                fontWeight: FontWeight.w800,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          SizedBox(width: SDSpacing.xxs),
+          Container(
+            padding: EdgeInsets.symmetric(
+              horizontal: SDSpacing.xxs,
+              vertical: 2,
+            ),
+            decoration: BoxDecoration(
+              color: _getConversationColor(state.selectedConversation!.type)
+                  .withOpacity(0.15),
+              borderRadius:
+              BorderRadius.circular(SDSpacing.borderRadiusSmall),
+            ),
+            child: Text(
+              _getConversationLabel(state.selectedConversation!.type),
+              style: SDTypography.labelSmall.copyWith(
+                color:
+                _getConversationColor(state.selectedConversation!.type),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        IconButton(
+          icon: Icon(Icons.more_vert_rounded, color: SDColors.neutral800),
+          onPressed: () {},
+        ),
+      ],
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(1),
+        child: Divider(height: 1, color: SDColors.neutral200),
+      ),
+    );
   }
 
-  Future<void> _onCreateConversation(
-      CreateConversation event, Emitter<ChatPageStateM> emit) async {
-    emit(state.copyWith(status: ChatPageStatus.loading));
+  /// Même ligne titre + action à droite que Freelance / Marketplace (`_buildTopHeader`).
+  Widget _buildMessagesTopHeader() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: Text(
+            'Messages',
+            textAlign: TextAlign.start,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: SDTypography.headlineSmall.copyWith(
+              color: SDColors.neutral900,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        Container(
+          decoration: BoxDecoration(
+            color: SDColors.white,
+            shape: BoxShape.circle,
+            border: Border.all(color: SDColors.neutral200),
+          ),
+          child: IconButton(
+            onPressed: _onComposeTap,
+            icon: Icon(Icons.edit_rounded, color: SDColors.primary700, size: 22),
+            tooltip: 'Nouveau message',
+            visualDensity: VisualDensity.compact,
+          ),
+        ),
+      ],
+    );
+  }
 
-    try {
-      // Vérifier si une conversation existe déjà avec ce participant
-      final existingConversation = state.conversations.firstWhere(
-        (conv) => conv.participantId == event.participantId,
-        orElse: () => ConversationModel(
-          id: '',
-          userId: '',
-          participantId: '',
-          participantName: '',
-          participantImage: '',
-          lastUpdated: DateTime.now(),
-          type: ConversationType.prestataire,
+  /// Gabarit identique à `FreelancePageScreen._buildSearchField` : pill blanche,
+  /// bordure `primary100`, ombre, loupe + zone centrale + bouton **tune** vert.
+  /// La zone centrale est un [TextField] pour filtrer la liste localement.
+  Widget _buildFreelanceStyleInboxSearch(BuildContext context) {
+    void openGlobalSearch() {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => const SearchPageScreenM(initialIndex: 0),
         ),
       );
+    }
 
-      if (existingConversation.id.isNotEmpty) {
-        // Conversation existante trouvée, la sélectionner
-        emit(state.copyWith(
-          status: ChatPageStatus.loaded,
-          selectedConversation: existingConversation,
-        ));
-        add(LoadMessages(existingConversation.id));
-        return;
-      }
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: SDSpacing.sm,
+        vertical: SDSpacing.xs,
+      ),
+      decoration: BoxDecoration(
+        color: SDColors.white,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: SDColors.primary100, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: SDColors.neutral900.withOpacity(0.05),
+            blurRadius: 6,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.search, color: SDColors.primary600, size: 20),
+          SizedBox(width: SDSpacing.xs),
+          Expanded(
+            child: TextField(
+              controller: _listSearchController,
+              onChanged: (_) => setState(() {}),
+              textInputAction: TextInputAction.search,
+              decoration: InputDecoration(
+                hintText: 'Rechercher une conversation…',
+                hintStyle: SDTypography.bodyMedium.copyWith(
+                  color: SDColors.neutral400,
+                  fontSize: 13,
+                ),
+                border: InputBorder.none,
+                isDense: true,
+                contentPadding: EdgeInsets.zero,
+              ),
+              style: SDTypography.bodyMedium.copyWith(
+                color: SDColors.neutral900,
+                fontSize: 13,
+              ),
+            ),
+          ),
+          GestureDetector(
+            onTap: openGlobalSearch,
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: SDColors.primary600,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.tune, color: SDColors.white, size: 17),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-      // Créer une nouvelle conversation
-      // Dans un environnement réel, nous appellerions l'API ici
-      // final newConversation = await _apiClient.createConversation(
-      //   _currentUserId,
-      //   event.participantId,
-      //   event.participantName,
-      // );
-
-      // Simuler la création d'une nouvelle conversation
-      await Future.delayed(const Duration(milliseconds: 500));
-
-      final newConversation = ConversationModel(
-        id: _uuid.v4(),
-        userId: _currentUserId,
-        participantId: event.participantId,
-        participantName: event.participantName,
-        participantImage: event.participantImage,
-        lastUpdated: DateTime.now(),
-        type: event.type,
-        unread: false,
-        unreadCount: 0,
-        isOnline: false,
+  Widget _buildFilterChips() {
+    Widget chip({
+      required String label,
+      required IconData icon,
+      required _MessagesInboxFilter value,
+    }) {
+      final selected = _inboxFilter == value;
+      return Padding(
+        padding: const EdgeInsets.only(right: 8),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => setState(() => _inboxFilter = value),
+            borderRadius: BorderRadius.circular(22),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: selected ? SDColors.neutral200 : SDColors.white,
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(
+                  color: selected
+                      ? SDColors.neutral300
+                      : SDColors.neutral300.withOpacity(0.85),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    icon,
+                    size: 18,
+                    color: selected
+                        ? SDColors.neutral900
+                        : SDColors.neutral600,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    label,
+                    style: SDTypography.labelMedium.copyWith(
+                      color: selected
+                          ? SDColors.neutral900
+                          : SDColors.neutral700,
+                      fontWeight:
+                      selected ? FontWeight.w800 : FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       );
+    }
 
-      final updatedConversations = [newConversation, ...state.conversations];
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: EdgeInsets.fromLTRB(SDSpacing.md, 0, SDSpacing.md, SDSpacing.sm),
+      child: Row(
+        children: [
+          chip(
+            label: 'Tous',
+            icon: Icons.forum_outlined,
+            value: _MessagesInboxFilter.tous,
+          ),
+          chip(
+            label: 'Travaux',
+            icon: Icons.work_outline_rounded,
+            value: _MessagesInboxFilter.travaux,
+          ),
+          chip(
+            label: 'Freelance',
+            icon: Icons.person_outline_rounded,
+            value: _MessagesInboxFilter.freelance,
+          ),
+          chip(
+            label: 'Produits',
+            icon: Icons.shopping_bag_outlined,
+            value: _MessagesInboxFilter.produits,
+          ),
+        ],
+      ),
+    );
+  }
 
-      emit(state.copyWith(
-        status: ChatPageStatus.loaded,
-        conversations: updatedConversations,
-        selectedConversation: newConversation,
-      ));
+  // Méthode pour formater l'horodatage des messages
+  String _formatMessageTime(DateTime timestamp) {
+    // Format HH:MM
+    final String hour = timestamp.hour.toString().padLeft(2, '0');
+    final String minute = timestamp.minute.toString().padLeft(2, '0');
 
-      // Initialiser la liste des messages pour cette conversation
-      final updatedMessagesMap =
-          Map<String, List<MessageModel>>.from(state.messagesByConversation);
-      updatedMessagesMap[newConversation.id] = [];
+    // Vérifier si le message est d'aujourd'hui
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final messageDate =
+    DateTime(timestamp.year, timestamp.month, timestamp.day);
 
-      emit(state.copyWith(
-        messagesByConversation: updatedMessagesMap,
-      ));
-    } catch (error) {
-      if (kDebugMode) {
-        print('Error creating conversation: $error');
-      }
-      emit(state.copyWith(
-        status: ChatPageStatus.error,
-        error: error.toString(),
+    if (messageDate == today) {
+      // Si c'est aujourd'hui, afficher seulement l'heure
+      return '$hour:$minute';
+    } else if (messageDate == today.subtract(const Duration(days: 1))) {
+      // Si c'est hier
+      return 'Hier, $hour:$minute';
+    } else if (now.difference(timestamp).inDays < 7) {
+      // Si c'est dans la semaine, afficher le nom du jour
+      final weekdays = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+      final weekday = weekdays[timestamp.weekday - 1];
+      return '$weekday, $hour:$minute';
+    } else {
+      // Sinon afficher la date complète
+      final day = timestamp.day.toString().padLeft(2, '0');
+      final month = timestamp.month.toString().padLeft(2, '0');
+      return '$day/$month, $hour:$minute';
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _chatBloc = BlocProvider.of<ChatPageBlocM>(context);
+    _loadInitialData();
+  }
+
+  @override
+  void dispose() {
+    // 🔌 Déconnecter le WebSocket
+    _chatBloc.add(DisconnectWebSocket());
+
+    _messageController.dispose();
+    _listSearchController.dispose();
+    _scrollController.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _loadInitialData() {
+    // 🔌 Connecter au WebSocket pour les messages en temps réel
+    _chatBloc.add(ConnectWebSocket());
+
+    // Charger la liste des conversations
+    _chatBloc.add(LoadConversations());
+
+    // Si nous avons un ID de conversation, on charge ses messages
+    if (widget.conversationId != null) {
+      _chatBloc.add(LoadMessages(widget.conversationId!));
+    }
+    // Si nous avons des informations sur un participant mais pas d'ID de conversation,
+    // on crée une nouvelle conversation
+    else if (widget.participantId != null) {
+      _chatBloc.add(CreateConversation(
+        participantId: widget.participantId!,
+        participantName: widget.participantName ?? 'Utilisateur',
+        participantImage:
+        widget.participantImage ?? 'assets/images/default_user.png',
+        type: widget.type ?? ConversationType.prestataire,
       ));
     }
   }
 
-  Future<void> _onSearchConversations(
-      SearchConversations event, Emitter<ChatPageStateM> emit) async {
-    if (event.query.isEmpty) {
-      add(const LoadConversations());
+  void _sendMessage() {
+    if (_messageController.text.trim().isEmpty && _selectedImage == null)
       return;
-    }
 
-    emit(state.copyWith(status: ChatPageStatus.loading));
-
-    try {
-      // Dans un environnement réel, nous appellerions l'API ici
-      // final List<ConversationModel> filteredConversations =
-      //    await _apiClient.searchConversations(_currentUserId, event.query);
-
-      // Simuler une recherche locale
-      final lowercaseQuery = event.query.toLowerCase();
-      final filteredConversations = mockConversations.where((conv) {
-        return conv.participantName.toLowerCase().contains(lowercaseQuery) ||
-            (conv.lastMessage?.content.toLowerCase().contains(lowercaseQuery) ??
-                false);
-      }).toList();
-
-      await Future.delayed(const Duration(milliseconds: 300));
-
-      emit(state.copyWith(
-        status: ChatPageStatus.loaded,
-        conversations: filteredConversations,
-      ));
-    } catch (error) {
-      if (kDebugMode) {
-        print('Error searching conversations: $error');
-      }
-      emit(state.copyWith(
-        status: ChatPageStatus.error,
-        error: error.toString(),
-      ));
-    }
-  }
-
-  // 🔌 CONFIGURATION DES CALLBACKS WEBSOCKET
-  void _setupWebSocketCallbacks() {
-    _webSocketService.onNewMessage((data) {
-      add(NewMessageReceived(data));
-    });
-
-    _webSocketService.onMessageNotification((data) {
-      // Gérer les notifications de nouveaux messages
-      print('🔔 Notification message reçue: $data');
-    });
-
-    _webSocketService.onMessageError((error) {
-      print('❌ Erreur message WebSocket: $error');
-    });
-  }
-
-  // 🔌 CONNEXION WEBSOCKET
-  Future<void> _onConnectWebSocket(
-      ConnectWebSocket event, Emitter<ChatPageStateM> emit) async {
-    try {
-      await _webSocketService.connect();
-      _webSocketService.authenticate(_currentUserId);
-      emit(state.copyWith(isWebSocketConnected: true));
-    } catch (error) {
-      emit(state.copyWith(
-        isWebSocketConnected: false,
-        error: 'Erreur connexion WebSocket: $error',
-      ));
-    }
-  }
-
-  // 🔌 DÉCONNEXION WEBSOCKET
-  Future<void> _onDisconnectWebSocket(
-      DisconnectWebSocket event, Emitter<ChatPageStateM> emit) async {
-    _webSocketService.disconnect();
-    emit(state.copyWith(isWebSocketConnected: false));
-  }
-
-  // 📨 NOUVEAU MESSAGE REÇU VIA WEBSOCKET
-  Future<void> _onNewMessageReceived(
-      NewMessageReceived event, Emitter<ChatPageStateM> emit) async {
-    try {
-      final messageData = event.messageData;
-
-      // Créer le message à partir des données WebSocket
-      final newMessage = MessageModel(
-        id: messageData['_id'] ?? _uuid.v4(),
-        senderId: messageData['expediteur']?.toString() ?? '',
-        receiverId: messageData['destinataire']?.toString() ?? '',
-        timestamp: DateTime.parse(
-            messageData['createdAt'] ?? DateTime.now().toIso8601String()),
-        content: messageData['contenu'] ?? '',
-        type: MessageType.text, // À adapter selon le type
-        status: MessageStatus.delivered,
-      );
-
-      final conversationId = messageData['conversationId'] ?? '';
-
-      // Ajouter le message à la conversation
-      final currentMessages =
-          state.messagesByConversation[conversationId] ?? [];
-      final updatedMessages = [...currentMessages, newMessage];
-
-      final updatedMessagesMap =
-          Map<String, List<MessageModel>>.from(state.messagesByConversation);
-      updatedMessagesMap[conversationId] = updatedMessages;
-
-      // Mettre à jour la conversation avec le dernier message
-      final updatedConversations = state.conversations.map((conv) {
-        if (conv.id == conversationId) {
-          return conv.copyWith(
-            lastMessage: newMessage,
-            lastUpdated: newMessage.timestamp,
-            unread: newMessage.receiverId == _currentUserId,
-            unreadCount: newMessage.receiverId == _currentUserId
-                ? (conv.unreadCount + 1)
-                : conv.unreadCount,
-          );
-        }
-        return conv;
-      }).toList();
-
-      emit(state.copyWith(
-        messagesByConversation: updatedMessagesMap,
-        conversations: updatedConversations,
-      ));
-    } catch (error) {
-      print('❌ Erreur traitement nouveau message: $error');
-    }
-  }
-
-  // 📊 MISE À JOUR STATUT MESSAGE
-  Future<void> _onMessageStatusUpdated(
-      MessageStatusUpdated event, Emitter<ChatPageStateM> emit) async {
-    try {
-      final conversationId = event.conversationId;
-      final messageId = event.messageId;
-      final newStatus = event.status;
-
-      if (!state.messagesByConversation.containsKey(conversationId)) return;
-
-      final updatedMessages =
-          state.messagesByConversation[conversationId]!.map((msg) {
-        if (msg.id == messageId) {
-          return msg.copyWith(newStatus: newStatus);
-        }
-        return msg;
-      }).toList();
-
-      final updatedMessagesMap =
-          Map<String, List<MessageModel>>.from(state.messagesByConversation);
-      updatedMessagesMap[conversationId] = updatedMessages;
-
-      emit(state.copyWith(
-        messagesByConversation: updatedMessagesMap,
-      ));
-    } catch (error) {
-      print('❌ Erreur mise à jour statut message: $error');
-    }
-  }
-
-  // 🔔 ENVOYER NOTIFICATION CHAT
-  Future<void> _onSendChatNotification(
-    SendChatNotification event,
-    Emitter<ChatPageStateM> emit,
-  ) async {
-    try {
-      final success = await _notificationService.notifyNewMessage(
-        userId: event.userId,
-        senderName: 'Vous',
-        message: event.message,
-        conversationId: 'current_conversation',
-      );
-
-      if (success) {
-        print('✅ Notification chat envoyée avec succès');
+    final state = _chatBloc.state;
+    if (state.status == ChatPageStatus.loaded &&
+        state.selectedConversation != null) {
+      if (_selectedImage != null) {
+        // Envoyer une image
+        _chatBloc.add(SendMessage(
+          conversationId: state.selectedConversation!.id,
+          content: _selectedImage!.path,
+          type: MessageType.image,
+        ));
+        setState(() => _selectedImage = null);
       } else {
-        print('❌ Échec envoi notification chat');
-      }
-    } catch (error) {
-      print('❌ Erreur envoi notification chat: $error');
-    }
-  }
-
-  // 🔔 NOTIFICATION CHAT REÇUE
-  Future<void> _onChatNotificationReceived(
-    ChatNotificationReceived event,
-    Emitter<ChatPageStateM> emit,
-  ) async {
-    try {
-      final notificationData = event.notificationData;
-      final type = notificationData['type']?.toString() ?? '';
-
-      print('🔔 Notification chat reçue: $type');
-
-      // Traiter selon le type de notification
-      switch (type) {
-        case 'new_message':
-          _handleNewMessageNotification(notificationData, emit);
-          break;
-        case 'message_status':
-          _handleMessageStatusNotification(notificationData, emit);
-          break;
-        default:
-          print('📱 Notification chat générique: $notificationData');
-      }
-    } catch (error) {
-      print('❌ Erreur traitement notification chat: $error');
-    }
-  }
-
-  // 📨 TRAITER NOTIFICATION NOUVEAU MESSAGE
-  void _handleNewMessageNotification(
-    Map<String, dynamic> data,
-    Emitter<ChatPageStateM> emit,
-  ) {
-    final conversationId = data['conversationId']?.toString() ?? '';
-    final senderName = data['senderName']?.toString() ?? '';
-    final message = data['message']?.toString() ?? '';
-
-    print('📨 Nouveau message de $senderName: $message');
-
-    // Mettre à jour les conversations avec le nouveau message
-    final updatedConversations = state.conversations.map((conv) {
-      if (conv.id == conversationId) {
-        return conv.copyWith(
-          unread: true,
-          unreadCount: conv.unreadCount + 1,
-          lastUpdated: DateTime.now(),
-        );
-      }
-      return conv;
-    }).toList();
-
-    emit(state.copyWith(
-      conversations: updatedConversations,
-    ));
-  }
-
-  // 📊 TRAITER NOTIFICATION STATUT MESSAGE
-  void _handleMessageStatusNotification(
-    Map<String, dynamic> data,
-    Emitter<ChatPageStateM> emit,
-  ) {
-    final messageId = data['messageId']?.toString() ?? '';
-    final status = data['status']?.toString() ?? '';
-    final conversationId = data['conversationId']?.toString() ?? '';
-
-    print('📊 Statut message $messageId mis à jour: $status');
-
-    // Mettre à jour le statut du message
-    if (state.messagesByConversation.containsKey(conversationId)) {
-      final messages = state.messagesByConversation[conversationId]!;
-      final updatedMessages = messages.map((msg) {
-        if (msg.id == messageId) {
-          return msg.copyWith(newStatus: _parseMessageStatus(status));
-        }
-        return msg;
-      }).toList();
-
-      final updatedMessagesMap =
-          Map<String, List<MessageModel>>.from(state.messagesByConversation);
-      updatedMessagesMap[conversationId] = updatedMessages;
-
-      emit(state.copyWith(
-        messagesByConversation: updatedMessagesMap,
-      ));
-    }
-  }
-
-  // 🔄 PARSER LE STATUT DU MESSAGE
-  MessageStatus _parseMessageStatus(String status) {
-    switch (status.toLowerCase()) {
-      case 'envoyé':
-        return MessageStatus.sent;
-      case 'livré':
-        return MessageStatus.delivered;
-      case 'lu':
-        return MessageStatus.seen;
-      case 'échec':
-        return MessageStatus.failed;
-      default:
-        return MessageStatus.sending;
-    }
-  }
-
-  // 🧹 NETTOYAGE
-  // 🔍 RECHERCHER DANS LES MESSAGES
-  Future<void> _onSearchMessages(
-      SearchMessages event, Emitter<ChatPageStateM> emit) async {
-    if (event.query.isEmpty) {
-      // Si la recherche est vide, recharger toutes les conversations
-      add(const LoadConversations());
-      return;
-    }
-
-    emit(state.copyWith(status: ChatPageStatus.loading));
-
-    try {
-      // 🔄 Tenter d'abord l'API backend
-      try {
-        print('🔍 Recherche messages via API: "${event.query}"');
-        final messagesData =
-            await _apiClient.searchMessages(_currentUserId, event.query);
-
-        // Grouper les messages par conversation
-        final Map<String, List<MessageModel>> messagesByConv = {};
-        for (var data in messagesData) {
-          final message = MessageModel.fromBackend(data);
-          final convId = data['conversationId']?.toString() ?? '';
-
-          if (!messagesByConv.containsKey(convId)) {
-            messagesByConv[convId] = [];
-          }
-          messagesByConv[convId]!.add(message);
-        }
-
-        print(
-            '✅ ${messagesData.length} messages trouvés dans ${messagesByConv.length} conversations');
-
-        emit(state.copyWith(
-          status: ChatPageStatus.loaded,
-          messagesByConversation: messagesByConv,
+        // Envoyer un message texte
+        _chatBloc.add(SendMessage(
+          conversationId: state.selectedConversation!.id,
+          content: _messageController.text.trim(),
+          type: MessageType.text,
         ));
-      } catch (apiError) {
-        // ⚠️ Fallback sur recherche locale si l'API échoue
-        print('⚠️ API indisponible, recherche locale: $apiError');
-
-        final query = event.query.toLowerCase();
-        final filteredConversations = state.conversations.where((conv) {
-          return conv.participantName.toLowerCase().contains(query) ||
-              (conv.lastMessage?.content.toLowerCase().contains(query) ??
-                  false);
-        }).toList();
-
-        print(
-            '📦 ${filteredConversations.length} conversations trouvées localement');
-
-        emit(state.copyWith(
-          status: ChatPageStatus.loaded,
-          conversations: filteredConversations,
-        ));
-      }
-    } catch (error) {
-      if (kDebugMode) {
-        print('❌ Error searching messages: $error');
-      }
-      emit(state.copyWith(
-        status: ChatPageStatus.error,
-        error: error.toString(),
-      ));
-    }
-  }
-
-  // 🗑️ SUPPRIMER UN MESSAGE
-  Future<void> _onDeleteMessage(
-      DeleteMessage event, Emitter<ChatPageStateM> emit) async {
-    try {
-      // 🔄 Tenter d'abord l'API backend
-      try {
-        print('🗑️ Suppression message via API: ${event.messageId}');
-        await _apiClient.deleteMessageForUser(event.messageId, _currentUserId);
-        print('✅ Message supprimé via API');
-      } catch (apiError) {
-        // ⚠️ Fallback sur suppression locale si l'API échoue
-        print('⚠️ API indisponible, suppression locale: $apiError');
+        _messageController.clear();
       }
 
-      // Supprimer le message localement
-      if (!state.messagesByConversation.containsKey(event.conversationId)) {
-        return;
-      }
-
-      final updatedMessages = state
-          .messagesByConversation[event.conversationId]!
-          .where((msg) => msg.id != event.messageId)
-          .toList();
-
-      final updatedMessagesMap =
-          Map<String, List<MessageModel>>.from(state.messagesByConversation);
-      updatedMessagesMap[event.conversationId] = updatedMessages;
-
-      // Mettre à jour le dernier message de la conversation
-      final lastMessage =
-          updatedMessages.isNotEmpty ? updatedMessages.last : null;
-      final updatedConversations = state.conversations.map((conv) {
-        if (conv.id == event.conversationId) {
-          return conv.copyWith(
-            lastMessage: lastMessage,
-            lastUpdated: lastMessage?.timestamp ?? DateTime.now(),
+      // Faire défiler vers le bas après l'envoi
+      Future.delayed(const Duration(milliseconds: 100), () {
+        if (_scrollController.hasClients) {
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
           );
         }
-        return conv;
-      }).toList();
-
-      emit(state.copyWith(
-        messagesByConversation: updatedMessagesMap,
-        conversations: updatedConversations,
-      ));
-
-      print('✅ Message supprimé localement');
-    } catch (error) {
-      if (kDebugMode) {
-        print('❌ Error deleting message: $error');
-      }
-      emit(state.copyWith(
-        error: error.toString(),
-      ));
+      });
     }
   }
 
-  Future<void> close() {
-    _webSocketService.dispose();
-    _notificationService.dispose();
-    return super.close();
+  @override
+  Widget build(BuildContext context) {
+    return BlocConsumer<ChatPageBlocM, ChatPageStateM>(
+      listener: (context, state) {
+        // Gérer les erreurs
+        if (state.error != null && state.error!.isNotEmpty) {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text(state.error!)));
+        }
+
+        // Faire défiler vers le bas après l'envoi ou la réception d'un message
+        if (state.status == ChatPageStatus.loaded &&
+            state.selectedConversation != null &&
+            state.messagesByConversation
+                .containsKey(state.selectedConversation!.id)) {
+          Future.delayed(const Duration(milliseconds: 100), () {
+            if (_scrollController.hasClients) {
+              _scrollController.animateTo(
+                _scrollController.position.maxScrollExtent,
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeOut,
+              );
+            }
+          });
+        }
+      },
+      builder: (context, state) {
+        // Déterminer si on est sur mobile ou sur un écran plus grand
+        final bool isMobile = MediaQuery.of(context).size.width < 600;
+        final bool showConversationList =
+            !isMobile || state.selectedConversation == null;
+        final bool showConversation =
+            !isMobile || state.selectedConversation != null;
+        final bool showMobileChatAppBar =
+            isMobile && state.selectedConversation != null;
+
+        final filtered = _filteredConversations(state.conversations);
+
+        return Scaffold(
+          key: _scaffoldKey,
+          backgroundColor: SDColors.white,
+          appBar: showMobileChatAppBar
+              ? PreferredSize(
+            preferredSize: Size.fromHeight(kToolbarHeight + 1),
+            child: _buildMobileConversationAppBar(state),
+          )
+              : null,
+          body: SafeArea(
+            top: !showMobileChatAppBar,
+            bottom: false,
+            child: Column(
+              children: [
+                if (showConversationList) ...[
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      SDSpacing.md,
+                      SDSpacing.sm,
+                      SDSpacing.md,
+                      0,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _buildMessagesTopHeader(),
+                        SizedBox(height: SDSpacing.md),
+                        _buildFreelanceStyleInboxSearch(context),
+                      ],
+                    ),
+                  ),
+                  _buildFilterChips(),
+                ],
+                Expanded(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Liste des conversations (affichée uniquement si nécessaire selon la responsivité)
+                      if (showConversationList)
+                        Flexible(
+                          flex: 3,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: SDColors.white,
+                              borderRadius: BorderRadius.circular(SDSpacing.borderRadiusXLarge),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: SDColors.neutral900.withOpacity(0.05),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              children: [
+                                Expanded(
+                                  child: state.status == ChatPageStatus.loading
+                                      ? const Center(
+                                      child: CircularProgressIndicator())
+                                      : state.conversations.isEmpty
+                                      ? EmptyStateWidget(
+                                    imagePath: 'assets/messages_vides.png',
+                                    title: 'Aucune conversation',
+                                    message: 'Démarrez une nouvelle conversation en contactant un prestataire ou un vendeur',
+                                    imageSize: 180,
+                                  )
+                                      : filtered.isEmpty
+                                      ? Center(
+                                    child: Padding(
+                                      padding: EdgeInsets.all(SDSpacing.md),
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.search_off_rounded,
+                                              size: 48,
+                                              color: SDColors.neutral400),
+                                          SizedBox(height: SDSpacing.sm),
+                                          Text(
+                                            'Aucun résultat',
+                                            style: SDTypography.titleSmall
+                                                .copyWith(
+                                                fontWeight:
+                                                FontWeight.w700),
+                                          ),
+                                          Text(
+                                            'Essayez un autre filtre ou une autre recherche.',
+                                            textAlign: TextAlign.center,
+                                            style: SDTypography.bodySmall
+                                                .copyWith(
+                                                color: SDColors
+                                                    .neutral500),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  )
+                                      : ListView.builder(
+                                    padding: EdgeInsets.only(
+                                        bottom: SDSpacing.sm),
+                                    itemCount: filtered.length,
+                                    itemBuilder: (context, index) {
+                                      final conversation =
+                                      filtered[index];
+                                      final bool isSelected = state
+                                          .selectedConversation
+                                          ?.id ==
+                                          conversation.id;
+                                      final snippet = conversation
+                                          .lastMessage !=
+                                          null
+                                          ? conversation
+                                          .lastMessage!.content
+                                          : 'Aucun message';
+                                      final preview =
+                                          '${_getInboxCategoryLabel(conversation.type)} : $snippet';
+                                      final initial = conversation
+                                          .participantName
+                                          .trim()
+                                          .isNotEmpty
+                                          ? conversation
+                                          .participantName
+                                          .trim()[0]
+                                          .toUpperCase()
+                                          : '?';
+
+                                      return InkWell(
+                                        onTap: () {
+                                          _chatBloc.add(
+                                              SelectConversation(
+                                                  conversation));
+                                        },
+                                        child: Container(
+                                          padding: EdgeInsets
+                                              .symmetric(
+                                              vertical: SDSpacing.sm,
+                                              horizontal: SDSpacing.sm),
+                                          decoration: BoxDecoration(
+                                            color: isSelected
+                                                ? SDColors.primary600
+                                                .withOpacity(0.08)
+                                                : null,
+                                            border: Border(
+                                              bottom: BorderSide(
+                                                color: SDColors.neutral300
+                                                    .withOpacity(0.35),
+                                                width: 1,
+                                              ),
+                                            ),
+                                          ),
+                                          child: Row(
+                                            crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                            children: [
+                                              Stack(
+                                                clipBehavior: Clip.none,
+                                                children: [
+                                                  Container(
+                                                    width: 48,
+                                                    height: 48,
+                                                    decoration:
+                                                    BoxDecoration(
+                                                      shape: BoxShape
+                                                          .circle,
+                                                      color: SDColors
+                                                          .neutral300,
+                                                      image: conversation
+                                                          .participantImage
+                                                          .isNotEmpty
+                                                          ? DecorationImage(
+                                                        image: AssetImage(
+                                                            conversation
+                                                                .participantImage),
+                                                        fit: BoxFit
+                                                            .cover,
+                                                      )
+                                                          : null,
+                                                    ),
+                                                    child: conversation
+                                                        .participantImage
+                                                        .isEmpty
+                                                        ? Center(
+                                                      child: Text(
+                                                        initial,
+                                                        style: SDTypography
+                                                            .titleSmall
+                                                            .copyWith(
+                                                          color: SDColors
+                                                              .white,
+                                                          fontWeight:
+                                                          FontWeight.w800,
+                                                        ),
+                                                      ),
+                                                    )
+                                                        : null,
+                                                  ),
+                                                  if (conversation
+                                                      .isOnline)
+                                                    Positioned(
+                                                      right: 0,
+                                                      bottom: 0,
+                                                      child: Container(
+                                                        width: 12,
+                                                        height: 12,
+                                                        decoration:
+                                                        BoxDecoration(
+                                                          color: SDColors
+                                                              .success500,
+                                                          shape: BoxShape
+                                                              .circle,
+                                                          border: Border.all(
+                                                              color: SDColors
+                                                                  .white,
+                                                              width: 2),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                ],
+                                              ),
+                                              SizedBox(
+                                                  width: SDSpacing.sm),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                  CrossAxisAlignment
+                                                      .start,
+                                                  children: [
+                                                    Row(
+                                                      children: [
+                                                        Expanded(
+                                                          child: Text(
+                                                            conversation
+                                                                .participantName,
+                                                            style: SDTypography
+                                                                .titleSmall
+                                                                .copyWith(
+                                                              fontWeight:
+                                                              FontWeight
+                                                                  .w800,
+                                                              color: SDColors
+                                                                  .neutral900,
+                                                            ),
+                                                            maxLines: 1,
+                                                            overflow:
+                                                            TextOverflow
+                                                                .ellipsis,
+                                                          ),
+                                                        ),
+                                                        Text(
+                                                          _formatListRowTime(
+                                                              conversation
+                                                                  .lastUpdated),
+                                                          style: SDTypography
+                                                              .labelSmall
+                                                              .copyWith(
+                                                            color: SDColors
+                                                                .neutral500,
+                                                            fontWeight:
+                                                            FontWeight
+                                                                .w600,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    SizedBox(
+                                                        height: SDSpacing
+                                                            .xxs),
+                                                    Text(
+                                                      preview,
+                                                      style: SDTypography
+                                                          .bodySmall
+                                                          .copyWith(
+                                                        color: SDColors
+                                                            .neutral600,
+                                                      ),
+                                                      maxLines: 2,
+                                                      overflow:
+                                                      TextOverflow
+                                                          .ellipsis,
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                              SizedBox(
+                                                  width: SDSpacing.xs),
+                                              if (conversation
+                                                  .unreadCount >
+                                                  0)
+                                                Container(
+                                                  constraints:
+                                                  const BoxConstraints(
+                                                    minWidth: 22,
+                                                    minHeight: 22,
+                                                  ),
+                                                  padding:
+                                                  const EdgeInsets
+                                                      .symmetric(
+                                                      horizontal: 6,
+                                                      vertical: 2),
+                                                  decoration:
+                                                  BoxDecoration(
+                                                    color: SDColors
+                                                        .primary700,
+                                                    shape: BoxShape
+                                                        .circle,
+                                                  ),
+                                                  alignment:
+                                                  Alignment.center,
+                                                  child: Text(
+                                                    '${conversation.unreadCount}',
+                                                    style: SDTypography
+                                                        .labelSmall
+                                                        .copyWith(
+                                                      color: SDColors
+                                                          .white,
+                                                      fontSize: 11,
+                                                      fontWeight:
+                                                      FontWeight
+                                                          .w800,
+                                                    ),
+                                                  ),
+                                                )
+                                              else
+                                                const SizedBox(
+                                                    width: 22),
+                                            ],
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      // Zone de messages (affichée uniquement si une conversation est sélectionnée sur mobile)
+                      if (showConversation)
+                        Flexible(
+                          flex: 7,
+                          child: AnimatedContainer(
+                            duration: SDAnimations.medium,
+                            curve: Curves.easeInOut,
+                            decoration: BoxDecoration(
+                              color: SDColors.white,
+                              borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: SDColors.neutral900.withOpacity(0.05),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: state.selectedConversation == null
+                                ? Center(
+                                child: Text('Sélectionnez une conversation'))
+                                : AnimatedOpacity(
+                              duration: const Duration(milliseconds: 200),
+                              opacity: state.selectedConversation != null
+                                  ? 1.0
+                                  : 0.0,
+                              child: Column(
+                                children: [
+                                  // En-tête de la conversation
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 12.0, horizontal: 16.0),
+                                    decoration: BoxDecoration(
+                                      border: Border(
+                                        bottom: BorderSide(
+                                          color:
+                                          Colors.grey.withOpacity(0.3),
+                                          width: 1,
+                                        ),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        // Avatar
+                                        Container(
+                                          width: 40,
+                                          height: 40,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            color: Colors.grey.shade300,
+                                            image: state
+                                                .selectedConversation!
+                                                .participantImage
+                                                .isNotEmpty
+                                                ? DecorationImage(
+                                              image: AssetImage(state
+                                                  .selectedConversation!
+                                                  .participantImage),
+                                              fit: BoxFit.cover,
+                                            )
+                                                : null,
+                                          ),
+                                          child: state.selectedConversation!
+                                              .participantImage.isEmpty
+                                              ? Center(
+                                            child: Text(
+                                              state
+                                                  .selectedConversation!
+                                                  .participantName[0]
+                                                  .toUpperCase(),
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontWeight:
+                                                FontWeight.bold,
+                                              ),
+                                            ),
+                                          )
+                                              : null,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        // Nom et statut
+                                        Column(
+                                          crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              state.selectedConversation!
+                                                  .participantName,
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 16,
+                                              ),
+                                            ),
+                                            Row(
+                                              children: [
+                                                Container(
+                                                  width: 8,
+                                                  height: 8,
+                                                  decoration: BoxDecoration(
+                                                    shape: BoxShape.circle,
+                                                    color: state
+                                                        .selectedConversation!
+                                                        .isOnline
+                                                        ? Colors.green
+                                                        : Colors
+                                                        .grey.shade400,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  state.selectedConversation!
+                                                      .isOnline
+                                                      ? 'En ligne'
+                                                      : 'Hors ligne',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: Colors
+                                                        .grey.shade600,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  // Liste des messages
+                                  Expanded(
+                                    child: state.messagesByConversation
+                                        .containsKey(state
+                                        .selectedConversation!
+                                        .id) &&
+                                        state
+                                            .messagesByConversation[state
+                                            .selectedConversation!
+                                            .id]!
+                                            .isNotEmpty
+                                        ? ListView.builder(
+                                      controller: _scrollController,
+                                      padding:
+                                      const EdgeInsets.all(16.0),
+                                      itemCount: state
+                                          .messagesByConversation[state
+                                          .selectedConversation!
+                                          .id]!
+                                          .length,
+                                      itemBuilder: (context, index) {
+                                        final message = state
+                                            .messagesByConversation[
+                                        state
+                                            .selectedConversation!
+                                            .id]![index];
+                                        final bool isMe = message
+                                            .senderId ==
+                                            'currentUser'; // À adapter selon votre logique d'ID utilisateur
+
+                                        return Padding(
+                                          padding:
+                                          const EdgeInsets.only(
+                                              bottom: 12.0),
+                                          child: Row(
+                                            mainAxisAlignment: isMe
+                                                ? MainAxisAlignment
+                                                .end
+                                                : MainAxisAlignment
+                                                .start,
+                                            crossAxisAlignment:
+                                            CrossAxisAlignment
+                                                .end,
+                                            children: [
+                                              // Avatar du participant (uniquement pour les messages reçus)
+                                              if (!isMe &&
+                                                  index == 0 ||
+                                                  !isMe &&
+                                                      index > 0 &&
+                                                      state
+                                                          .messagesByConversation[
+                                                      state.selectedConversation!.id]![
+                                                      index -
+                                                          1]
+                                                          .senderId ==
+                                                          'currentUser')
+                                                Container(
+                                                  width: 28,
+                                                  height: 28,
+                                                  margin:
+                                                  const EdgeInsets
+                                                      .only(
+                                                      right: 8.0),
+                                                  decoration:
+                                                  BoxDecoration(
+                                                    shape: BoxShape
+                                                        .circle,
+                                                    color: Colors.grey
+                                                        .shade300,
+                                                    image: state
+                                                        .selectedConversation!
+                                                        .participantImage
+                                                        .isNotEmpty
+                                                        ? DecorationImage(
+                                                      image: AssetImage(state
+                                                          .selectedConversation!
+                                                          .participantImage),
+                                                      fit: BoxFit
+                                                          .cover,
+                                                    )
+                                                        : null,
+                                                    border: Border.all(
+                                                        color: Colors
+                                                            .white,
+                                                        width: 1.5),
+                                                    boxShadow: [
+                                                      BoxShadow(
+                                                        color: Colors
+                                                            .black12,
+                                                        blurRadius: 3,
+                                                        offset:
+                                                        Offset(
+                                                            0, 1),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  child: state
+                                                      .selectedConversation!
+                                                      .participantImage
+                                                      .isEmpty
+                                                      ? Center(
+                                                    child: Text(
+                                                      state
+                                                          .selectedConversation!
+                                                          .participantName[
+                                                      0]
+                                                          .toUpperCase(),
+                                                      style:
+                                                      TextStyle(
+                                                        color: Colors
+                                                            .white,
+                                                        fontWeight:
+                                                        FontWeight.bold,
+                                                        fontSize:
+                                                        12,
+                                                      ),
+                                                    ),
+                                                  )
+                                                      : null,
+                                                )
+                                              else if (!isMe)
+                                                SizedBox(
+                                                    width:
+                                                    36), // Espacement pour aligner les messages
+
+                                              Container(
+                                                padding:
+                                                const EdgeInsets
+                                                    .symmetric(
+                                                    horizontal:
+                                                    14.0,
+                                                    vertical:
+                                                    10.0),
+                                                decoration:
+                                                BoxDecoration(
+                                                  color: isMe
+                                                      ? Color(
+                                                      0xFFE6F8E6)
+                                                      : Colors.white,
+                                                  borderRadius:
+                                                  BorderRadius
+                                                      .only(
+                                                    topLeft: Radius
+                                                        .circular(
+                                                        18.0),
+                                                    topRight: Radius
+                                                        .circular(
+                                                        18.0),
+                                                    bottomLeft: isMe
+                                                        ? Radius
+                                                        .circular(
+                                                        18.0)
+                                                        : Radius
+                                                        .circular(
+                                                        4.0),
+                                                    bottomRight: isMe
+                                                        ? Radius
+                                                        .circular(
+                                                        4.0)
+                                                        : Radius
+                                                        .circular(
+                                                        18.0),
+                                                  ),
+                                                  boxShadow: [
+                                                    BoxShadow(
+                                                      color: Colors
+                                                          .black
+                                                          .withOpacity(
+                                                          0.05),
+                                                      blurRadius: 3,
+                                                      offset: Offset(
+                                                          0, 1),
+                                                    ),
+                                                  ],
+                                                  border: Border.all(
+                                                      color: isMe
+                                                          ? Colors
+                                                          .green
+                                                          .shade100
+                                                          : Colors
+                                                          .grey
+                                                          .shade200,
+                                                      width: 1),
+                                                ),
+                                                constraints:
+                                                BoxConstraints(
+                                                  maxWidth: MediaQuery.of(
+                                                      context)
+                                                      .size
+                                                      .width *
+                                                      0.65,
+                                                ),
+                                                child: Column(
+                                                  crossAxisAlignment: isMe
+                                                      ? CrossAxisAlignment
+                                                      .end
+                                                      : CrossAxisAlignment
+                                                      .start,
+                                                  children: [
+                                                    Text(
+                                                      message.content,
+                                                      style:
+                                                      TextStyle(
+                                                        fontSize: 15,
+                                                        color: isMe
+                                                            ? Colors
+                                                            .black87
+                                                            : Colors
+                                                            .black87,
+                                                        height: 1.3,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(
+                                                        height: 4),
+                                                    Row(
+                                                      mainAxisSize:
+                                                      MainAxisSize
+                                                          .min,
+                                                      children: [
+                                                        Text(
+                                                          _formatMessageTime(
+                                                              message
+                                                                  .timestamp),
+                                                          style:
+                                                          TextStyle(
+                                                            fontSize:
+                                                            11,
+                                                            color: Colors
+                                                                .grey
+                                                                .shade600,
+                                                            fontWeight:
+                                                            FontWeight
+                                                                .w500,
+                                                          ),
+                                                        ),
+                                                        if (isMe) ...[
+                                                          const SizedBox(
+                                                              width:
+                                                              4),
+                                                          Icon(
+                                                            message.status ==
+                                                                MessageStatus.seen
+                                                                ? Icons.done_all
+                                                                : message.status == MessageStatus.delivered
+                                                                ? Icons.done_all
+                                                                : message.status == MessageStatus.sent
+                                                                ? Icons.done
+                                                                : Icons.access_time,
+                                                            size: 14,
+                                                            color: message.status ==
+                                                                MessageStatus
+                                                                    .seen
+                                                                ? Colors
+                                                                .blue
+                                                                : Colors
+                                                                .grey,
+                                                          ),
+                                                        ],
+                                                      ],
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      },
+                                    )
+                                        : Center(
+                                        child: Text('Aucun message')),
+                                  ),
+                                  // Zone de saisie
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8.0, vertical: 8.0),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      border: Border(
+                                        top: BorderSide(
+                                          color:
+                                          Colors.grey.withOpacity(0.3),
+                                          width: 1,
+                                        ),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        // Bouton pour ajouter une image
+                                        IconButton(
+                                          icon: Icon(Icons.image),
+                                          onPressed: () {
+                                            // Implémenter la sélection d'images
+                                          },
+                                        ),
+                                        // Champ de texte
+                                        Expanded(
+                                          child: TextField(
+                                            controller: _messageController,
+                                            focusNode: _focusNode,
+                                            decoration: InputDecoration(
+                                              hintText:
+                                              'Tapez un message...',
+                                              border: OutlineInputBorder(
+                                                borderRadius:
+                                                BorderRadius.circular(
+                                                    20.0),
+                                                borderSide: BorderSide.none,
+                                              ),
+                                              filled: true,
+                                              fillColor:
+                                              Colors.grey.shade100,
+                                              contentPadding:
+                                              const EdgeInsets
+                                                  .symmetric(
+                                                  horizontal: 16.0,
+                                                  vertical: 8.0),
+                                            ),
+                                          ),
+                                        ),
+                                        // Bouton d'envoi
+                                        IconButton(
+                                          icon: Icon(Icons.send,
+                                              color: Colors.green),
+                                          onPressed: _sendMessage,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ), // Column
+          ), // SafeArea
+        ); // Scaffold
+      },
+    ); // BlocConsumer
+  }
+
+  Widget _buildStyledCategoryItem(
+      String title, String subtitle, String imagePath,
+      {bool isPopular = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        elevation: 4,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(22),
+          onTap: () {},
+          child: Stack(
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.white, Colors.green.withOpacity(0.07)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(22),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.green.withOpacity(0.08),
+                      blurRadius: 12,
+                      offset: Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(14.0),
+                  child: Row(
+                    children: [
+                      AnimatedScale(
+                        scale: 1.0,
+                        duration: const Duration(milliseconds: 100),
+                        child: CircleAvatar(
+                          radius: 30,
+                          backgroundImage: AssetImage(imagePath),
+                        ),
+                      ),
+                      const SizedBox(width: 18),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            style: const TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black),
+                          ),
+                          Text(
+                            subtitle,
+                            style: const TextStyle(
+                                fontSize: 15, color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                      const Spacer(),
+                      GestureDetector(
+                        onTapDown: (_) => setState(() => _arrowPressed = true),
+                        onTapUp: (_) => setState(() => _arrowPressed = false),
+                        onTapCancel: () =>
+                            setState(() => _arrowPressed = false),
+                        child: AnimatedScale(
+                          scale: _arrowPressed ? 1.15 : 1.0,
+                          duration: Duration(milliseconds: 120),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [Color(0xFF43EA5E), Color(0xFF1CBF3F)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.green.withOpacity(0.25),
+                                  blurRadius: 8,
+                                  offset: Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            padding: EdgeInsets.all(6),
+                            child: Icon(
+                              Icons.arrow_forward_ios,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (isPopular)
+                Positioned(
+                  top: 10,
+                  right: 10,
+                  child: TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0, end: 1),
+                    duration: Duration(milliseconds: 600),
+                    builder: (context, value, child) => Opacity(
+                      opacity: value,
+                      child: child,
+                    ),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.shade200,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Text(
+                        'Populaire',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStyledProviderItem(String name, String price, String imagePath,
+      {bool isPopular = false, required int index}) {
+    final bool pressed = _prestatairePressed == index;
+    return AnimatedScale(
+      scale: pressed ? 0.96 : 1.0,
+      duration: const Duration(milliseconds: 120),
+      child: GestureDetector(
+        onTapDown: (_) => setState(() => _prestatairePressed = index),
+        onTapUp: (_) => setState(() => _prestatairePressed = -1),
+        onTapCancel: () => setState(() => _prestatairePressed = -1),
+        child: Container(
+          width: 120,
+          margin: const EdgeInsets.symmetric(vertical: 4),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Colors.white, Colors.green.withOpacity(0.08)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(22),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.green.withOpacity(0.10),
+                blurRadius: 12,
+                offset: Offset(0, 4),
+              ),
+              if (isPopular)
+                BoxShadow(
+                  color: Colors.orange.withOpacity(0.18),
+                  blurRadius: 18,
+                  spreadRadius: 2,
+                  offset: Offset(0, 2),
+                ),
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(22),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(22),
+              splashColor: Colors.green.withOpacity(0.08),
+              onTap: () {},
+              child: Stack(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8.0, vertical: 12.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          decoration: isPopular
+                              ? BoxDecoration(
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.orange.withOpacity(0.25),
+                                blurRadius: 18,
+                                spreadRadius: 2,
+                              ),
+                            ],
+                            shape: BoxShape.circle,
+                          )
+                              : null,
+                          child: CircleAvatar(
+                            radius: 40,
+                            backgroundImage: AssetImage(imagePath),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          name,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: Colors.black,
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          price,
+                          style: const TextStyle(
+                            color: Colors.green,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (isPopular)
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: TweenAnimationBuilder<double>(
+                        tween: Tween(begin: 0, end: 1),
+                        duration: const Duration(milliseconds: 600),
+                        builder: (context, value, child) => Opacity(
+                          opacity: value,
+                          child: child,
+                        ),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.shade200,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Text(
+                            'Populaire',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStyledNavButton(String label, IconData icon) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.95, end: 1.0),
+      duration: const Duration(milliseconds: 400),
+      builder: (context, value, child) => Transform.scale(
+        scale: value,
+        child: child,
+      ),
+      child: GestureDetector(
+        onTapDown: (_) {},
+        child: Container(
+          margin: const EdgeInsets.symmetric(vertical: 4),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Color(0xFF43EA5E), Color(0xFF1CBF3F)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.green.withOpacity(0.18),
+                      blurRadius: 12,
+                      offset: Offset(0, 4),
+                    ),
+                  ],
+                  borderRadius: BorderRadius.circular(32),
+                ),
+                child: CircleAvatar(
+                  radius: 32,
+                  backgroundColor: Colors.transparent,
+                  child: Icon(icon, color: Colors.white, size: 32),
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: 70,
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 13),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AnimatedSearchBar extends StatefulWidget {
+  @override
+  State<_AnimatedSearchBar> createState() => _AnimatedSearchBarState();
+}
+
+class _AnimatedSearchBarState extends State<_AnimatedSearchBar> {
+  bool _focused = false;
+  final FocusNode _focusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode.addListener(() {
+      setState(() {
+        _focused = _focusNode.hasFocus;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedScale(
+      scale: _focused ? 1.035 : 1.0,
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOut,
+      child: Container(
+        height: 52,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(32),
+          border: Border.all(
+              color: _focused ? Colors.green : Colors.green.shade200,
+              width: 1.4),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.green.withOpacity(_focused ? 0.13 : 0.07),
+              blurRadius: _focused ? 18 : 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            const SizedBox(width: 10),
+            Material(
+              color: Colors.green,
+              shape: const CircleBorder(),
+              elevation: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(7.0),
+                child:
+                Icon(Icons.search_rounded, color: Colors.white, size: 22),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: TextField(
+                focusNode: _focusNode,
+                style: const TextStyle(fontSize: 16),
+                cursorColor: Colors.green,
+                decoration: InputDecoration(
+                  hintText: 'Rechercher sur soutralideals',
+                  hintStyle: TextStyle(
+                      color: Colors.green.shade400,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500),
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+          ],
+        ),
+      ),
+    );
   }
 }

@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../shoppingpageblocm/shoppingPageBlocM.dart';
 import '../shoppingpageblocm/shoppingPageEventM.dart';
-
-import '../../../../design_system/colors.dart';
-import '../../../../design_system/typography.dart';
+import '../shoppingpageblocm/shoppingPageStateM.dart' as bloc_model;
 
 class FilterBottomSheet {
   static void show(BuildContext context) {
@@ -34,16 +32,16 @@ class FilterBottomSheet {
             return Container(
               height: MediaQuery.of(context).size.height * 0.75,
               decoration: BoxDecoration(
-                color: SDColors.white,
+                color: Colors.white,
                 borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(25),
                   topRight: Radius.circular(25),
                 ),
-                boxShadow: const [
+                boxShadow: [
                   BoxShadow(
-                    color: SDColors.overlayLight,
+                    color: Colors.black.withOpacity(0.2),
                     blurRadius: 20,
-                    offset: Offset(0, -5),
+                    offset: const Offset(0, -5),
                   ),
                 ],
               ),
@@ -55,7 +53,7 @@ class FilterBottomSheet {
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: SDColors.neutral300,
+                      color: Colors.grey.shade300,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -68,7 +66,10 @@ class FilterBottomSheet {
                       children: [
                         const Text(
                           'Filtres Avancés',
-                          style: SDTypography.titleLarge,
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                         IconButton(
                           icon: const Icon(Icons.close),
@@ -95,11 +96,11 @@ class FilterBottomSheet {
                                   min: 0,
                                   max: 1000,
                                   divisions: 20,
-                                  activeColor: SDColors.primary600,
-                                    labels: RangeLabels(
-                                      "${priceRange.start.round().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]} ')} FCFA",
-                                      "${priceRange.end.round().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]} ')} FCFA",
-                                    ),
+                                  activeColor: Colors.green,
+                                  labels: RangeLabels(
+                                    "${priceRange.start.round()} FCFA",
+                                    "${priceRange.end.round()} FCFA",
+                                  ),
                                   onChanged: (values) {
                                     setStateModal(() {
                                       priceRange = values;
@@ -112,15 +113,15 @@ class FilterBottomSheet {
                                   children: [
                                     Text(
                                       '${priceRange.start.round()} FCFA',
-                                      style: SDTypography.bodySmall.copyWith(
-                                        color: SDColors.neutral700,
+                                      style: TextStyle(
+                                        color: Colors.grey.shade700,
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
                                     Text(
                                       '${priceRange.end.round()} FCFA',
-                                      style: SDTypography.bodySmall.copyWith(
-                                        color: SDColors.neutral700,
+                                      style: TextStyle(
+                                        color: Colors.grey.shade700,
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
@@ -138,9 +139,9 @@ class FilterBottomSheet {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 12, vertical: 4),
                               decoration: BoxDecoration(
-                                color: SDColors.neutral50,
+                                color: Colors.grey.shade50,
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: SDColors.neutral300),
+                                border: Border.all(color: Colors.grey.shade300),
                               ),
                               child: DropdownButton<String>(
                                 value:
@@ -148,8 +149,8 @@ class FilterBottomSheet {
                                 hint: const Text('Toutes les marques'),
                                 isExpanded: true,
                                 underline: const SizedBox(),
-                                icon: const Icon(Icons.arrow_drop_down,
-                                    color: SDColors.primary600),
+                                icon: Icon(Icons.arrow_drop_down,
+                                    color: Colors.green),
                                 items: brands.map((String brand) {
                                   return DropdownMenuItem<String>(
                                     value: brand,
@@ -196,13 +197,13 @@ class FilterBottomSheet {
                             child: Container(
                               decoration: BoxDecoration(
                                 color: onlyInStock
-                                    ? SDColors.success100
-                                    : SDColors.neutral50,
+                                    ? Colors.green.shade50
+                                    : Colors.grey.shade50,
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
                                   color: onlyInStock
-                                      ? SDColors.success500
-                                      : SDColors.neutral300,
+                                      ? Colors.green.shade300
+                                      : Colors.grey.shade300,
                                 ),
                               ),
                               child: CheckboxListTile(
@@ -213,7 +214,7 @@ class FilterBottomSheet {
                                 subtitle: const Text(
                                     'Afficher seulement les produits disponibles'),
                                 value: onlyInStock,
-                                activeColor: SDColors.primary600,
+                                activeColor: Colors.green,
                                 onChanged: (value) {
                                   if (value != null) {
                                     setStateModal(() {
@@ -233,12 +234,12 @@ class FilterBottomSheet {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: SDColors.white,
-                      boxShadow: const [
+                      color: Colors.white,
+                      boxShadow: [
                         BoxShadow(
-                          color: SDColors.overlayLight,
+                          color: Colors.black.withOpacity(0.05),
                           blurRadius: 10,
-                          offset: Offset(0, -2),
+                          offset: const Offset(0, -2),
                         ),
                       ],
                     ),
@@ -248,8 +249,8 @@ class FilterBottomSheet {
                           child: OutlinedButton(
                             onPressed: () => Navigator.pop(context),
                             style: OutlinedButton.styleFrom(
-                              foregroundColor: SDColors.neutral700,
-                              side: const BorderSide(color: SDColors.neutral300),
+                              foregroundColor: Colors.grey.shade700,
+                              side: BorderSide(color: Colors.grey.shade300),
                               padding: const EdgeInsets.symmetric(vertical: 16),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
@@ -280,8 +281,8 @@ class FilterBottomSheet {
                               Navigator.pop(context);
                             },
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: SDColors.primary600,
-                              foregroundColor: SDColors.white,
+                              backgroundColor: Colors.green,
+                              foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(vertical: 16),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
@@ -335,16 +336,16 @@ class FilterBottomSheet {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         decoration: BoxDecoration(
-          color: isSelected ? SDColors.primary600 : SDColors.neutral100,
+          color: isSelected ? Colors.green.shade500 : Colors.grey.shade100,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? SDColors.primary300 : SDColors.neutral300,
+            color: isSelected ? Colors.green.shade300 : Colors.grey.shade300,
             width: isSelected ? 2 : 1,
           ),
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: SDColors.primary600.withOpacity(0.3),
+                    color: Colors.green.withOpacity(0.3),
                     blurRadius: 6,
                     offset: const Offset(0, 2),
                   ),
@@ -354,16 +355,12 @@ class FilterBottomSheet {
         child: Text(
           size,
           style: TextStyle(
-            color: isSelected ? SDColors.white : SDColors.neutral700,
+            color: isSelected ? Colors.white : Colors.grey.shade700,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
             fontSize: 14,
           ),
         ),
       ),
     );
-  }
-
-  static String _formatPrice(double value) {
-    return "${value.round().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]} ')} FCFA";
   }
 }
