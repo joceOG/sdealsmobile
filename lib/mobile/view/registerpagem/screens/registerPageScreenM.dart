@@ -37,23 +37,21 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.green.shade700,
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.green.shade700,
+        backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: const Icon(Icons.arrow_back, color: Colors.black87),
           onPressed: () {
-            context.pop(); // GoRouter pour revenir en arrière
+            context.pop();
           },
         ),
       ),
       body: BlocConsumer<RegisterPageBlocM, RegisterPageStateM>(
         listener: (context, state) {
           if (state.isSuccess) {
-            // ✅ CONNEXION AUTOMATIQUE APRÈS INSCRIPTION
             if (state.utilisateur != null && state.token != null) {
-              // Connecter l'utilisateur automatiquement
               context.read<AuthCubit>().setAuthenticated(
                     token: state.token!,
                     utilisateur: state.utilisateur!,
@@ -65,7 +63,9 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
                 const SnackBar(
                   content: Text(
                     "Inscription réussie ✅ Vous êtes maintenant connecté !",
+                    style: TextStyle(color: Colors.white),
                   ),
+                  backgroundColor: Colors.green,
                 ),
               );
             } else {
@@ -73,188 +73,257 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
                 const SnackBar(content: Text("Inscription réussie ✅")),
               );
             }
-            // Navigation avec GoRouter vers la page d'accueil
             WidgetsBinding.instance.addPostFrameCallback((_) {
               context.push("/homepage");
             });
           }
           if (state.errorMessage != null) {
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(SnackBar(content: Text(state.errorMessage!)));
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.errorMessage!),
+                backgroundColor: Colors.red,
+              ),
+            );
           }
         },
         builder: (context, state) {
           return SingleChildScrollView(
-            child: Column(
-              children: [
-                const SizedBox(height: 40),
-                Center(
-                  child: AnimatedBuilder(
-                    animation: _animationController,
-                    builder: (context, child) {
-                      return ScaleTransition(
-                        scale: Tween<double>(
-                          begin: 1.0,
-                          end: 1.2,
-                        ).animate(_animationController),
-                        child: child,
-                      );
-                    },
-                    child: Image.asset('assets/logo1.png', height: 100),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                   const SizedBox(height: 10),
+                  Center(
+                    child: AnimatedBuilder(
+                      animation: _animationController,
+                      builder: (context, child) {
+                        return ScaleTransition(
+                          scale: Tween<double>(
+                            begin: 1.0,
+                            end: 1.1,
+                          ).animate(_animationController),
+                          child: child,
+                        );
+                      },
+                      child: Image.asset('assets/logo1.png', height: 100),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 20),
-                const Text(
-                  "Bienvenue sur Soutrali Deals,\ncréez un compte pour commencer",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 16, color: Colors.white),
-                ),
-                const SizedBox(height: 30),
+                  const SizedBox(height: 30),
+                  const Text(
+                    "Créer un compte",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 28, 
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    "Rejoignez Soutrali Deals pour commencer",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 16, 
+                      color: Colors.grey.shade600
+                    ),
+                  ),
+                  const SizedBox(height: 30),
 
-                // Formulaire
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  margin: const EdgeInsets.symmetric(horizontal: 20),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(10),
+                  // Formulaire
+                  TextField(
+                    onChanged: (v) => context.read<RegisterPageBlocM>().add(
+                          RegisterFullNameChanged(v),
+                        ),
+                    decoration: InputDecoration(
+                      labelText: "Nom complet",
+                      hintText: "Entrez votre nom complet",
+                      prefixIcon: const Icon(Icons.person_outline),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(15),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(15),
+                        borderSide: const BorderSide(color: Colors.green, width: 2),
+                      ),
+                    ),
                   ),
-                  child: Column(
+                  const SizedBox(height: 16),
+                  TextField(
+                    onChanged: (v) => context.read<RegisterPageBlocM>().add(
+                          RegisterPhoneChanged(v),
+                        ),
+                    keyboardType: TextInputType.phone,
+                    decoration: InputDecoration(
+                      labelText: "Numéro de Téléphone",
+                      hintText: "Ex: 0102030405",
+                      prefixIcon: const Icon(Icons.phone_android),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(15),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(15),
+                        borderSide: const BorderSide(color: Colors.green, width: 2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    obscureText: obscurePassword,
+                    onChanged: (v) => context.read<RegisterPageBlocM>().add(
+                          RegisterPasswordChanged(v),
+                        ),
+                    decoration: InputDecoration(
+                      labelText: "Mot de passe",
+                      hintText: "Créez un mot de passe",
+                      prefixIcon: const Icon(Icons.lock_outline),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(15),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(15),
+                        borderSide: const BorderSide(color: Colors.green, width: 2),
+                      ),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          obscurePassword
+                              ? Icons.visibility_off
+                              : Icons.visibility,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            obscurePassword = !obscurePassword;
+                          });
+                        },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    obscureText: true,
+                    onChanged: (v) => context.read<RegisterPageBlocM>().add(
+                          RegisterConfirmPasswordChanged(v),
+                        ),
+                    decoration: InputDecoration(
+                      labelText: "Confirmez le mot de passe",
+                      hintText: "Répétez le mot de passe",
+                      prefixIcon: const Icon(Icons.lock_reset),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(15),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(15),
+                        borderSide: const BorderSide(color: Colors.green, width: 2),
+                      ),
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 12),
+                  Row(
                     children: [
-                      TextField(
-                        onChanged: (v) => context.read<RegisterPageBlocM>().add(
-                              RegisterFullNameChanged(v),
-                            ),
-                        decoration: const InputDecoration(
-                          labelText: "Nom complet",
-                          hintText: "Entrez votre nom complet",
-                          border: UnderlineInputBorder(),
+                      Checkbox(
+                        value: agreeToTerms,
+                        activeColor: Colors.green,
+                        onChanged: (value) {
+                          setState(() {
+                            agreeToTerms = value ?? false;
+                          });
+                        },
+                      ),
+                      Expanded(
+                        child: Text(
+                          "J'accepte les termes et conditions",
+                          style: TextStyle(fontSize: 14, color: Colors.grey.shade800),
                         ),
-                      ),
-                      const SizedBox(height: 20),
-                      TextField(
-                        onChanged: (v) => context.read<RegisterPageBlocM>().add(
-                              RegisterPhoneChanged(v),
-                            ),
-                        decoration: const InputDecoration(
-                          labelText: "Numéro de Téléphone",
-                          hintText: "Entrez votre Numéro de Téléphone",
-                          border: UnderlineInputBorder(),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      TextField(
-                        obscureText: obscurePassword,
-                        onChanged: (v) => context.read<RegisterPageBlocM>().add(
-                              RegisterPasswordChanged(v),
-                            ),
-                        decoration: InputDecoration(
-                          labelText: "Mot de passe",
-                          hintText: "Entrez votre mot de passe",
-                          border: const UnderlineInputBorder(),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              obscurePassword
-                                  ? Icons.visibility_off
-                                  : Icons.visibility,
-                            ),
-                            onPressed: () {
-                              setState(() {
-                                obscurePassword = !obscurePassword;
-                              });
-                            },
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      TextField(
-                        obscureText: true,
-                        onChanged: (v) => context.read<RegisterPageBlocM>().add(
-                              RegisterConfirmPasswordChanged(v),
-                            ),
-                        decoration: const InputDecoration(
-                          labelText: "Confirmez le mot de passe",
-                          hintText: "Confirmez votre mot de passe",
-                          border: UnderlineInputBorder(),
-                          suffixIcon: Icon(Icons.visibility_off),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          Checkbox(
-                            value: agreeToTerms,
-                            onChanged: (value) {
-                              setState(() {
-                                agreeToTerms = value ?? false;
-                              });
-                            },
-                          ),
-                          const Expanded(
-                            child: Text(
-                              "J'accepte les termes et conditions",
-                              style: TextStyle(fontSize: 14),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      ElevatedButton(
-                        onPressed: agreeToTerms && !state.isSubmitting
-                            ? () {
-                                context.read<RegisterPageBlocM>().add(
-                                      RegisterSubmitted(),
-                                    );
-                              }
-                            : null,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green.shade700,
-                          minimumSize: const Size(double.infinity, 50),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(25),
-                          ),
-                        ),
-                        child: state.isSubmitting
-                            ? const CircularProgressIndicator(
-                                color: Colors.white,
-                              )
-                            : const Text(
-                                "JE M'INSCRIS",
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.white,
-                                ),
-                              ),
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Flexible(
-                            child: Text('Vous avez déjà un compte ?'),
-                          ),
-                          TextButton(
-                            onPressed: () {
-                              context.go("/login"); // si tu as une route login
-                            },
-                            child: const Text(
-                              'Connectez-vous',
-                              style: TextStyle(color: Colors.green),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      const Text(
-                        "En vous inscrivant, vous acceptez nos conditions d'utilisation et notre politique de confidentialité.",
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 12, color: Colors.grey),
                       ),
                     ],
                   ),
-                ),
-              ],
+                  
+                  const SizedBox(height: 20),
+                  
+                  ElevatedButton(
+                    onPressed: agreeToTerms && !state.isSubmitting
+                        ? () {
+                            context.read<RegisterPageBlocM>().add(
+                                  RegisterSubmitted(),
+                                );
+                          }
+                        : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green.shade600,
+                      disabledBackgroundColor: Colors.grey.shade300,
+                      minimumSize: const Size(double.infinity, 56),
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: state.isSubmitting
+                        ? const CircularProgressIndicator(
+                            color: Colors.white,
+                          )
+                        : const Text(
+                            "CRÉER MON COMPTE",
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1.0,
+                              color: Colors.white,
+                            ),
+                          ),
+                  ),
+                  
+                  const SizedBox(height: 24),
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text(
+                        'Vous avez déjà un compte ?',
+                        style: TextStyle(color: Colors.grey.shade800),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          context.go("/login"); 
+                        },
+                        child: const Text(
+                          'Connectez-vous',
+                          style: TextStyle(
+                            color: Colors.green,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 20.0),
+                    child: Text(
+                      "En vous inscrivant, vous acceptez nos conditions d'utilisation et notre politique de confidentialité.",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                    ),
+                  ),
+                ],
+              ),
             ),
           );
         },

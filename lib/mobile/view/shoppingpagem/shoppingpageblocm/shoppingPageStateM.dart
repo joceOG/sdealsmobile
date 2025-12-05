@@ -55,6 +55,10 @@ class ShoppingPageStateM extends Equatable {
   final String? searchQuery; // Texte de recherche
   final String? selectedBrand; // Marque sélectionnée
   final RangeValues? priceRange; // Plage de prix sélectionnée
+  final double? minPrice; // Prix minimum
+  final double? maxPrice; // Prix maximum
+  final String? selectedSize; // Taille sélectionnée
+  final bool? onlyInStock; // En stock uniquement
   final String? selectedCondition; // État sélectionné (neuf, bon état, etc.)
   final String? selectedDelivery; // Type de livraison sélectionné
   final String? selectedLocation; // Localisation sélectionnée
@@ -82,6 +86,10 @@ class ShoppingPageStateM extends Equatable {
     this.searchQuery,
     this.selectedBrand,
     this.priceRange,
+    this.minPrice,
+    this.maxPrice,
+    this.selectedSize,
+    this.onlyInStock,
     this.selectedCondition,
     this.selectedDelivery,
     this.selectedLocation,
@@ -105,6 +113,10 @@ class ShoppingPageStateM extends Equatable {
       searchQuery: '',
       selectedBrand: null,
       priceRange: null,
+      minPrice: null,
+      maxPrice: null,
+      selectedSize: null,
+      onlyInStock: false,
       selectedCondition: null,
       selectedDelivery: null,
       selectedLocation: null,
@@ -128,6 +140,10 @@ class ShoppingPageStateM extends Equatable {
     String? searchQuery,
     String? selectedBrand,
     RangeValues? priceRange,
+    double? minPrice,
+    double? maxPrice,
+    String? selectedSize,
+    bool? onlyInStock,
     String? selectedCondition,
     String? selectedDelivery,
     String? selectedLocation,
@@ -154,6 +170,10 @@ class ShoppingPageStateM extends Equatable {
       searchQuery: searchQuery ?? this.searchQuery,
       selectedBrand: selectedBrand ?? this.selectedBrand,
       priceRange: priceRange ?? this.priceRange,
+      minPrice: minPrice ?? this.minPrice,
+      maxPrice: maxPrice ?? this.maxPrice,
+      selectedSize: selectedSize ?? this.selectedSize,
+      onlyInStock: onlyInStock ?? this.onlyInStock,
       selectedCondition: selectedCondition ?? this.selectedCondition,
       selectedDelivery: selectedDelivery ?? this.selectedDelivery,
       selectedLocation: selectedLocation ?? this.selectedLocation,
@@ -183,6 +203,10 @@ class ShoppingPageStateM extends Equatable {
         searchQuery,
         selectedBrand,
         priceRange,
+        minPrice,
+        maxPrice,
+        selectedSize,
+        onlyInStock,
         selectedCondition,
         selectedDelivery,
         selectedLocation,

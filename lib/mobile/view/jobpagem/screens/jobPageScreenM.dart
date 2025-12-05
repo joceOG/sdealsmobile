@@ -272,8 +272,7 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
           ..add(LoadServiceDataJobM()),
         child: Scaffold(
           backgroundColor: Colors.white,
-          // ✅ CTA Flottant
-          floatingActionButton: FloatingActionButton.extended(
+          floatingActionButton: FloatingActionButton(
             onPressed: () {
               final authState = context.read<AuthCubit>().state;
               if (authState is! AuthAuthenticated) {
@@ -295,27 +294,18 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                 ),
               );
             },
-            backgroundColor: const Color(0xFF2E7D32), // Vert SoutraLi principal
-            icon: const Icon(Icons.handyman, color: Colors.white),
-            label: const Text(
-              '🔧 Devenir Prestataire',
-              style:
-                  TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-            ),
+            backgroundColor: const Color(0xFF2E7D32),
+            child: const Icon(Icons.handyman, color: Colors.white),
+            tooltip: 'Devenir Prestataire',
           ),
-          // ✅ NOUVEAU : CustomScrollView pour performance optimale
           body: BlocListener<JobPageBlocM, JobPageStateM>(
             listener: (context, state) {
-              // Mettre à jour les marqueurs de la carte quand les prestataires changent
               if (state.nearbyProviders.isNotEmpty) {
                 _updateMapMarkers(state.nearbyProviders);
               }
             },
             child: CustomScrollView(
               slivers: [
-                // AppBar slim moderne
-                _buildModernSliverAppBar(),
-
                 // Banner promo sticky (si newbie)
                 _buildPromoStickyBanner(context),
 
@@ -325,27 +315,27 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                 // Contenu principal
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    padding: const EdgeInsets.symmetric(horizontal: 20.0), // Augmenté 16->20
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 32), // Augmenté 24->32
                         
-                        // 🎯 SECTION 1 : HERO SEARCH BAR (Nouveau)
+                        // 🎯 SECTION 1 : HERO SEARCH BAR
                         _buildHeroSearchBar(),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 32), // Standardisé à 32
                         
                         // 🚀 SECTION 2 : Quick Actions (optimisé)
                         _buildQuickActionsSection(),
-                        const SizedBox(height: 32),
+                        const SizedBox(height: 40), // Augmenté 32->40
                         
-                        // 🎯 SECTION 3 : RECOMMANDATIONS IA (Remonté - prioritaire)
+                        // 🎯 SECTION 3 : RECOMMANDATIONS IA
                         _buildPersonalizedRecommendationsSection(),
-                        const SizedBox(height: 32),
+                        const SizedBox(height: 40),
                         
-                        // 🔥 SECTION 4 : PROMOTIONS ACTIVES (Remonté - urgent)
+                        // 🔥 SECTION 4 : PROMOTIONS ACTIVES
                         _buildActivePromotionsSection(),
-                        const SizedBox(height: 32), // Standardisé
+                        const SizedBox(height: 40),
 
                         // 📂 SECTION 5 : TOP CATÉGORIES
                         Row(
@@ -934,50 +924,7 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
         ));
   }
 
-  // ✅ NOUVEAU : AppBar slim moderne avec Sliver
-  Widget _buildModernSliverAppBar() {
-    return SliverAppBar(
-      expandedHeight: 60,
-      floating: true,
-      pinned: false,
-      snap: true,
-      backgroundColor: const Color(0xFF2E7D32),
-      elevation: 0,
-      automaticallyImplyLeading: false,
-      flexibleSpace: FlexibleSpaceBar(
-        background: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [const Color(0xFF2E7D32), const Color(0xFF4CAF50)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
-          child: SafeArea(
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16.0),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Métiers',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  Icon(Icons.search, color: Colors.white, size: 20),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+
 
   // ✅ NOUVEAU : Banner promo sticky pour newbies
   Widget _buildPromoStickyBanner(BuildContext context) {
@@ -1218,7 +1165,7 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
     );
   }
 
-  // ✅ NOUVEAU : Carte d'action rapide moderne
+  // ✅ NOUVEAU : Carte d'action rapide moderne (Optimisée Compact)
   Widget _buildQuickActionCard({
     required IconData icon,
     required String title,
@@ -1229,8 +1176,8 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 90,
-        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+        width: 80, // Réduit 90->80
+        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6), // Réduit
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
@@ -1240,13 +1187,13 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
               color.withOpacity(0.05),
             ],
           ),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withOpacity(0.3), width: 2),
+          borderRadius: BorderRadius.circular(12), // Réduit radius
+          border: Border.all(color: color.withOpacity(0.3), width: 1.5),
           boxShadow: [
             BoxShadow(
-              color: color.withOpacity(0.15),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
+              color: color.withOpacity(0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
@@ -1255,7 +1202,7 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              padding: const EdgeInsets.all(5),
+              padding: const EdgeInsets.all(4), // Réduit
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
@@ -1265,26 +1212,19 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                     color.withOpacity(0.05),
                   ],
                 ),
-                borderRadius: BorderRadius.circular(10),
-                boxShadow: [
-                  BoxShadow(
-                    color: color.withOpacity(0.2),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+                borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
                 icon,
                 color: color,
-                size: 18,
+                size: 16, // Réduit 18->16
               ),
             ),
-            const SizedBox(height: 3),
+            const SizedBox(height: 2),
             Text(
               title,
               style: const TextStyle(
-                fontSize: 10,
+                fontSize: 9, // Réduit 10->9
                 fontWeight: FontWeight.bold,
                 color: Colors.black87,
               ),
@@ -1296,7 +1236,7 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
             Text(
               subtitle,
               style: TextStyle(
-                fontSize: 8,
+                fontSize: 7, // Réduit 8->7
                 color: Colors.grey.shade600,
                 fontWeight: FontWeight.w500,
               ),

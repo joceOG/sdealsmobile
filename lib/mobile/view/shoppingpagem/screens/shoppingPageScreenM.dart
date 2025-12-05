@@ -9,6 +9,8 @@ import 'productDetailsScreenM.dart';
 import 'panierProductScreenM.dart';
 import '../../seller_registration/screens/seller_registration_screen.dart';
 import 'package:sdealsmobile/data/models/vendeur.dart';
+import '../widgets/filter_bottom_sheet.dart';
+import '../widgets/product_card_m.dart';
 
 // Utilisation du modèle Product du BLoC
 typedef Product = bloc_model.Product;
@@ -231,7 +233,8 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
     return Scaffold(
       backgroundColor: Colors.white,
       // FloatingActionButton "Vendre sur Soutrali" (vert uniforme)
-      floatingActionButton: FloatingActionButton.extended(
+      // FloatingActionButton "Vendre" discret (icône seule)
+      floatingActionButton: FloatingActionButton(
         onPressed: () {
           final authState = context.read<AuthCubit>().state;
           if (authState is AuthAuthenticated) {
@@ -249,12 +252,9 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
             context.push('/login');
           }
         },
-        backgroundColor: Colors.green, // Vert uniforme
-        icon: const Icon(Icons.storefront, color: Colors.white),
-        label: const Text(
-          '🏪 Vendre sur Soutrali',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
+        backgroundColor: Colors.green,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: const Icon(Icons.storefront, color: Colors.white),
       ),
       body: BlocProvider(
         create: (_) => ShoppingPageBlocM()
@@ -265,8 +265,8 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
             // AppBar slim moderne
             _buildModernSliverAppBar(),
 
-            // Banner promo sticky
-            _buildPromoStickyBanner(context),
+            // Banner promo sticky SUPPRIMÉE pour plus de clarté
+            // _buildPromoStickyBanner(context),
 
             // Chips E-commerce spécialisées
             _buildEcommerceChipsSliver(context),
@@ -361,28 +361,6 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                     ),
                     const SizedBox(height: 12),
 
-                    // Barre de recherche avec intégration BLoC
-                    TextField(
-                      decoration: InputDecoration(
-                        hintText: 'Rechercher un produit...',
-                        prefixIcon: const Icon(Icons.search),
-                        suffixIcon: IconButton(
-                          icon: const Icon(Icons.filter_alt),
-                          onPressed: () => _showAdvancedFilterDialog(context),
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: Colors.grey),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(vertical: 0),
-                      ),
-                      onChanged: (value) {
-                        // Envoyer l'événement de recherche au BLoC
-                        context
-                            .read<ShoppingPageBlocM>()
-                            .add(SearchProductsEvent(value));
-                      },
-                    ),
                     const SizedBox(height: 12),
 
                     // Titre de la section produits
@@ -570,7 +548,8 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                               ),
                               itemBuilder: (context, index) {
                                 final product = displayProducts[index];
-                                return _buildProductCard(context, product);
+                                // ✅ PREMIUM : Utilisation de la nouvelle carte produit
+                                return ProductCardM(product: product);
                               },
                             );
                           }
@@ -780,9 +759,10 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
 
         return InkWell(
           onTap: () => Navigator.of(context).push(MaterialPageRoute(
-            builder: (_) => const ProductDetails(),
-            // Dans une version future, on pourrait passer les détails du produit
-            // via un constructeur modifié dans ProductDetails
+            builder: (_) => BlocProvider.value(
+              value: context.read<ShoppingPageBlocM>(),
+              child: ProductDetails(product: product),
+            ),
           )),
           child: Card(
             elevation: 2,
@@ -1148,156 +1128,32 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
     );
   }
 
-  /// Affiche une boîte de dialogue avec des filtres avancés
+  /// Affiche le ModalBottomSheet Premium avec filtres avancés
   void _showAdvancedFilterDialog(BuildContext context) {
-    // Variables pour stocker les valeurs des filtres temporairement
-    RangeValues _priceRange = const RangeValues(0, 1000);
-    String _selectedBrand = '';
-    String _selectedSize = '';
-    bool _onlyInStock = false;
-
-    // Liste des marques disponibles (exemple statique)
-    final brands = ['Nike', 'Adidas', 'Jordan', 'Puma', 'Reebok'];
-    // Liste des tailles disponibles (exemple statique)
-    final sizes = ['S', 'M', 'L', 'XL', 'XXL'];
-
-    // ✅ Capturer le BLoC avant d'ouvrir le dialog
-    final bloc = context.read<ShoppingPageBlocM>();
-
-    showDialog(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setStateDialog) => AlertDialog(
-          title: const Text('Filtres avancés'),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Filtre de prix avec slider
-                  const Text('Prix',
-                      style: TextStyle(fontWeight: FontWeight.bold)),
-                  RangeSlider(
-                    values: _priceRange,
-                    min: 0,
-                    max: 1000,
-                    divisions: 20,
-                    labels: RangeLabels(
-                      "${_priceRange.start.round()} €",
-                      "${_priceRange.end.round()} €",
-                    ),
-                    onChanged: (values) {
-                      setStateDialog(() {
-                        _priceRange = values;
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Filtre de marque avec dropdown
-                  const Text('Marque',
-                      style: TextStyle(fontWeight: FontWeight.bold)),
-                  DropdownButton<String>(
-                    value: _selectedBrand.isEmpty ? null : _selectedBrand,
-                    hint: const Text('Sélectionner une marque'),
-                    isExpanded: true,
-                    items: brands.map((String brand) {
-                      return DropdownMenuItem<String>(
-                        value: brand,
-                        child: Text(brand),
-                      );
-                    }).toList(),
-                    onChanged: (String? value) {
-                      if (value != null) {
-                        setStateDialog(() {
-                          _selectedBrand = value;
-                        });
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Filtre de taille avec chips
-                  const Text('Taille',
-                      style: TextStyle(fontWeight: FontWeight.bold)),
-                  Wrap(
-                    spacing: 8.0,
-                    children: sizes
-                        .map((size) => FilterChip(
-                              label: Text(size),
-                              selected: _selectedSize == size,
-                              onSelected: (selected) {
-                                setStateDialog(() {
-                                  _selectedSize = selected ? size : '';
-                                });
-                              },
-                            ))
-                        .toList(),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Option "En stock uniquement"
-                  CheckboxListTile(
-                    title: const Text('En stock uniquement'),
-                    value: _onlyInStock,
-                    onChanged: (value) {
-                      if (value != null) {
-                        setStateDialog(() {
-                          _onlyInStock = value;
-                        });
-                      }
-                    },
-                    controlAffinity: ListTileControlAffinity.leading,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              child: const Text('Annuler'),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-              child: const Text('Appliquer'),
-              onPressed: () {
-                // Appliquer les filtres via le BLoC
-                bloc.add(
-                  ApplyAdvancedFiltersEvent(
-                    minPrice: _priceRange.start,
-                    maxPrice: _priceRange.end,
-                    brand: _selectedBrand.isEmpty ? null : _selectedBrand,
-                    size: _selectedSize.isEmpty ? null : _selectedSize,
-                    onlyInStock: _onlyInStock,
-                  ),
-                );
-                Navigator.of(context).pop();
-              },
-            ),
-          ],
-        ),
-      ),
-    );
+    // Déléguer l'affichage au FilterBottomSheet moderne
+    FilterBottomSheet.show(context);
   }
 
-  // ✅ NOUVEAU : AppBar slim moderne avec Sliver
+
+  // ✅ PREMIUM : AppBar avec Glassmorphism +  Search Intégré
   Widget _buildModernSliverAppBar() {
     return SliverAppBar(
-      expandedHeight: 60,
+      expandedHeight: 150, // Hauteur réduite (180 -> 150)
       floating: true,
-      pinned: false,
-      snap: true,
-      backgroundColor: Colors.green,
+      pinned: true,
+      snap: false,
+      backgroundColor: Colors.transparent,
       elevation: 0,
       automaticallyImplyLeading: false,
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [Colors.green, Colors.green],
+              colors: [
+                Colors.green.shade600,
+                Colors.green.shade700,
+                Colors.green.shade800,
+              ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -1305,85 +1161,172 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
           child: SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Marketplace',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  const SizedBox(height: 12),
+                  // Top row: Actions uniquement (Alignées à droite)
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      // 🛒 Icône panier avec badge CLIQUABLE
-                      BlocBuilder<ShoppingPageBlocM,
-                          bloc_model.ShoppingPageStateM>(
-                        builder: (context, state) {
-                          final cartCount = state.cart?.totalItems ?? 0;
-                          return InkWell(
-                            onTap: () {
-                              // Navigation vers l'écran panier
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => BlocProvider.value(
-                                    value: context.read<ShoppingPageBlocM>(),
-                                    child: const PanierProductScreenM(),
+                      // Badge Marketplace supprimé pour éviter doublon avec tabs
+
+                      // Actions
+                      Row(
+                        children: [
+                          // Panier avec badge
+                          BlocBuilder<ShoppingPageBlocM,
+                              bloc_model.ShoppingPageStateM>(
+                            builder: (context, state) {
+                              final cartCount = state.cart?.totalItems ?? 0;
+                              return InkWell(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          BlocProvider.value(
+                                        value:
+                                            context.read<ShoppingPageBlocM>(),
+                                        child: const PanierProductScreenM(),
+                                      ),
+                                    ),
+                                  );
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.15),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: Colors.white.withOpacity(0.3),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Stack(
+                                    alignment: Alignment.topRight,
+                                    children: [
+                                      const Icon(Icons.shopping_cart,
+                                          color: Colors.white, size: 20),
+                                      if (cartCount > 0)
+                                        Positioned(
+                                          top: -4,
+                                          right: -4,
+                                          child: Container(
+                                            padding: const EdgeInsets.all(4),
+                                            constraints: const BoxConstraints(
+                                              minWidth: 16,
+                                              minHeight: 16,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: Colors.red,
+                                              shape: BoxShape.circle,
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: Colors.red
+                                                      .withOpacity(0.5),
+                                                  blurRadius: 4,
+                                                  spreadRadius: 1,
+                                                ),
+                                              ],
+                                            ),
+                                            child: Center(
+                                              child: Text(
+                                                cartCount > 99
+                                                    ? '99+'
+                                                    : cartCount.toString(),
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 8,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                    ],
                                   ),
                                 ),
                               );
                             },
-                            child: Stack(
-                              alignment: Alignment.topRight,
-                              children: [
-                                const Icon(Icons.shopping_cart,
-                                    color: Colors.white, size: 20),
-                                if (cartCount > 0)
-                                  Positioned(
-                                    top: -2,
-                                    right: -2,
-                                    child: Container(
-                                      padding: const EdgeInsets.all(4),
-                                      constraints: const BoxConstraints(
-                                        minWidth: 16,
-                                        minHeight: 16,
-                                      ),
-                                      decoration: const BoxDecoration(
-                                        color: Colors.red,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: Center(
-                                        child: Text(
-                                          cartCount > 99
-                                              ? '99+'
-                                              : cartCount.toString(),
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 8,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                              ],
+                          ),
+                          const SizedBox(width: 8),
+                          // Notifications
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.15),
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.3),
+                                width: 1,
+                              ),
                             ),
-                          );
-                        },
+                            child: const Icon(Icons.notifications_outlined,
+                                color: Colors.white, size: 20),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 12),
-                      const Icon(Icons.notifications_outlined,
-                          color: Colors.white, size: 20),
                     ],
                   ),
+                  const SizedBox(height: 16),
+                  // Barre de recherche avec Glassmorphism
+                  Container(
+                    height: 50,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(25),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.3),
+                        width: 1,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: TextField(
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        hintText: 'Rechercher un produit...',
+                        hintStyle: TextStyle(
+                          color: Colors.white.withOpacity(0.7),
+                          fontSize: 14,
+                        ),
+                        prefixIcon: Icon(
+                          Icons.search,
+                          color: Colors.white.withOpacity(0.9),
+                        ),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            Icons.filter_alt,
+                            color: Colors.white.withOpacity(0.9),
+                          ),
+                          onPressed: () =>
+                              _showAdvancedFilterDialog(context),
+                        ),
+                        border: InputBorder.none,
+                        contentPadding:
+                            const EdgeInsets.symmetric(vertical: 15),
+                      ),
+                      onChanged: (value) {
+                        context
+                            .read<ShoppingPageBlocM>()
+                            .add(SearchProductsEvent(value));
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                 ],
               ),
             ),
           ),
         ),
+        titlePadding: EdgeInsets.zero,
+        expandedTitleScale: 1,
       ),
     );
   }
@@ -1461,32 +1404,34 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
         child: BlocBuilder<ShoppingPageBlocM, bloc_model.ShoppingPageStateM>(
           builder: (context, state) {
-            return Row(
-              children: [
-                // ✅ NOUVEAU : Chip Navigation Produits
-                _buildNavigationChip(
-                  context,
-                  'Produits',
-                  Icons.shopping_bag_outlined,
-                  !(state.showVendeurs ?? false),
-                  () => context
-                      .read<ShoppingPageBlocM>()
-                      .add(const ToggleViewEvent(showVendeurs: false)),
-                ),
-                const SizedBox(width: 8),
+            return SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  // ✅ NOUVEAU : Chip Navigation Produits
+                  _buildNavigationChip(
+                    context,
+                    'Produits',
+                    Icons.shopping_bag_outlined,
+                    !(state.showVendeurs ?? false),
+                    () => context
+                        .read<ShoppingPageBlocM>()
+                        .add(const ToggleViewEvent(showVendeurs: false)),
+                  ),
+                  const SizedBox(width: 8),
 
-                // ✅ NOUVEAU : Chip Navigation Vendeurs
-                _buildNavigationChip(
-                  context,
-                  'Vendeurs',
-                  Icons.storefront_outlined,
-                  state.showVendeurs ?? false,
-                  () => context
-                      .read<ShoppingPageBlocM>()
-                      .add(const ToggleViewEvent(showVendeurs: true)),
-                ),
+                  // ✅ NOUVEAU : Chip Navigation Vendeurs
+                  _buildNavigationChip(
+                    context,
+                    'Vendeurs',
+                    Icons.storefront_outlined,
+                    state.showVendeurs ?? false,
+                    () => context
+                        .read<ShoppingPageBlocM>()
+                        .add(const ToggleViewEvent(showVendeurs: true)),
+                  ),
 
-                const Spacer(),
+                  const SizedBox(width: 16), // Espacement fixe au lieu de Spacer
 
                 // Chip SoutraPay (gardé en jaune pour différenciation e-commerce)
                 InkWell(
@@ -1632,15 +1577,16 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                     );
                   },
                 ),
-              ],
-            );
-          },
-        ),
+                  ],
+                ),
+              );
+            },
+          ),
       ),
     );
   }
 
-  // ✅ NOUVEAU : Widget pour les chips de navigation
+  // ✅ PREMIUM : Pills animées pour la navigation
   Widget _buildNavigationChip(
     BuildContext context,
     String label,
@@ -1648,58 +1594,106 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
     bool isSelected,
     VoidCallback onTap,
   ) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          gradient: isSelected
-              ? LinearGradient(
-                  colors: [Colors.green.shade100, Colors.green.shade200],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                )
-              : LinearGradient(
-                  colors: [Colors.grey.shade100, Colors.grey.shade50],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+    return TweenAnimationBuilder<double>(
+      duration: const Duration(milliseconds: 200),
+      tween: Tween(begin: 0.0, end: isSelected ? 1.0 : 0.0),
+      builder: (context, value, child) {
+        return Transform.scale(
+          scale: 1.0 - (value * 0.02), // Micro scale effect
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(25),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeOutCubic,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              decoration: BoxDecoration(
+                gradient: isSelected
+                    ? LinearGradient(
+                        colors: [
+                          Colors.green.shade500,
+                          Colors.green.shade600,
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      )
+                    : LinearGradient(
+                        colors: [
+                          Colors.grey.shade50,
+                          Colors.grey.shade100,
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                borderRadius: BorderRadius.circular(25),
+                border: Border.all(
+                  color: isSelected
+                      ? Colors.green.shade300
+                      : Colors.grey.shade300,
+                  width: isSelected ? 2 : 1,
                 ),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected ? Colors.green.shade400 : Colors.grey.shade300,
-            width: 1.2,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color:
-                  (isSelected ? Colors.green : Colors.grey).withOpacity(0.15),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              color: isSelected ? Colors.green.shade700 : Colors.grey.shade600,
-              size: 16,
-            ),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                color:
-                    isSelected ? Colors.green.shade800 : Colors.grey.shade700,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                fontSize: 13,
+                boxShadow: [
+                  BoxShadow(
+                    color: (isSelected ? Colors.green : Colors.grey)
+                        .withOpacity(isSelected ? 0.3 : 0.1),
+                    blurRadius: isSelected ? 8 : 4,
+                    offset: Offset(0, isSelected ? 4 : 2),
+                    spreadRadius: isSelected ? 1 : 0,
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    transform: Matrix4.identity()
+                      ..scale(isSelected ? 1.1 : 1.0),
+                    child: Icon(
+                      icon,
+                      color: isSelected ? Colors.white : Colors.grey.shade700,
+                      size: 18,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  AnimatedDefaultTextStyle(
+                    duration: const Duration(milliseconds: 200),
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : Colors.grey.shade800,
+                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                      fontSize: 14,
+                      letterSpacing: isSelected ? 0.5 : 0,
+                    ),
+                    child: Text(label),
+                  ),
+                  if (isSelected) ...[
+                    const SizedBox(width: 4),
+                    AnimatedOpacity(
+                      duration: const Duration(milliseconds: 200),
+                      opacity: isSelected ? 1.0 : 0.0,
+                      child: Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.white.withOpacity(0.5),
+                              blurRadius: 4,
+                              spreadRadius: 1,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
@@ -2058,3 +2052,5 @@ class _PromoStickyDelegate extends SliverPersistentHeaderDelegate {
     return child != oldDelegate.child;
   }
 }
+
+

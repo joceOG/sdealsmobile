@@ -11,6 +11,8 @@ class LoadCategorieDataM extends FreelancePageEventM {}
 
 class LoadFreelancersEvent extends FreelancePageEventM {}
 
+class LoadServicesEvent extends FreelancePageEventM {}
+
 class FilterByCategoryEvent extends FreelancePageEventM {
   final String? category;
 

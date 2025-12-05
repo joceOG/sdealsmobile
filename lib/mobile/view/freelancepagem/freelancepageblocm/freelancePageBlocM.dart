@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 import 'package:sdealsmobile/data/models/categorie.dart';
+import 'package:sdealsmobile/data/models/service.dart';
 import 'package:sdealsmobile/data/services/api_client.dart';
 
 class FreelancePageBlocM
@@ -16,6 +17,7 @@ class FreelancePageBlocM
   FreelancePageBlocM() : super(FreelancePageStateM.initial()) {
     on<LoadCategorieDataM>(_onLoadCategorieDataM);
     on<LoadFreelancersEvent>(_onLoadFreelancers);
+    on<LoadServicesEvent>(_onLoadServices);
     on<FilterByCategoryEvent>(_onFilterByCategory);
     on<SearchFreelancerEvent>(_onSearchFreelancer);
     on<ClearFiltersEvent>(_onClearFilters);
@@ -126,6 +128,35 @@ class FreelancePageBlocM
         }
         emit(state.copyWith(error: error.toString()));
       }
+    }
+  }
+
+  // ✅ Chargement des services
+  Future<void> _onLoadServices(
+    LoadServicesEvent event,
+    Emitter<FreelancePageStateM> emit,
+  ) async {
+    emit(state.copyWith(isLoadingServices: true));
+
+    try {
+      ApiClient apiClient = ApiClient();
+      var nomGroupe = "Freelance";
+      print("🛠️ Chargement des services pour le groupe: $nomGroupe");
+      
+      List<Service> services = await apiClient.fetchServices(nomGroupe);
+      
+      print("✅ Services chargés: ${services.length}");
+      emit(state.copyWith(
+        services: services,
+        isLoadingServices: false,
+        servicesError: '',
+      ));
+    } catch (error) {
+      print("❌ Erreur chargement services: $error");
+      emit(state.copyWith(
+        isLoadingServices: false,
+        servicesError: error.toString(),
+      ));
     }
   }
 
