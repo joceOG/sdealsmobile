@@ -19,12 +19,12 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
           return;
         }
 
-        final notifications = await _apiClient.getNotifications(
+        final notifications = await _apiClient.getUserNotifications(
           token: _currentToken!,
           userId: event.prestataireId,
         );
 
-        final unreadCount = await _apiClient.getUnreadNotificationCount(
+        final unreadCount = await _apiClient.getUserUnreadNotificationCount(
           token: _currentToken!,
           userId: event.prestataireId,
         );

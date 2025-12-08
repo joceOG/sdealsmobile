@@ -12,6 +12,7 @@ import 'mobile/view/loginpagem/loginpageblocm/loginPageBlocM.dart';
 import 'mobile/view/loginpagem/screens/loginPageScreenM.dart';
 import 'mobile/view/provider_dashboard/screens/provider_main_screen.dart';
 import 'mobile/view/provider_dashboard/screens/prestataire_finalization_screen.dart';
+import 'mobile/view/onboarding/onboarding_screen.dart';
 import 'mobile/view/registerpagem/registerpageblocm/registerPageBlocM.dart';
 import 'mobile/view/registerpagem/screens/registerPageScreenM.dart';
 import 'mobile/view/serviceproviderregistrationpagem/screens/serviceProviderRegistrationScreenM.dart';
@@ -52,6 +53,10 @@ class MyApp extends StatelessWidget {
       GoRoute(
         path: '/homepage',
         builder: (context, state) => const Home(),
+      ),
+      GoRoute(
+        path: '/onboarding',
+        builder: (context, state) => const OnboardingScreen(),
       ),
       GoRoute(
         path: '/register',
@@ -117,6 +122,84 @@ class MyApp extends StatelessWidget {
           return BlocProvider(
             create: (context) => SoutraWalletBloc(),
             child: const WalletPageScreenM(), // Ou créer un ProfileScreen dédié
+          );
+        },
+      ),
+      // 🎯 Route pour les détails de mission (depuis notifications)
+      GoRoute(
+        path: '/mission-details/:missionId',
+        name: 'mission-details',
+        builder: (context, state) {
+          final missionId = state.pathParameters['missionId'] ?? '';
+          // TODO: Créer MissionDetailsScreen
+          return Scaffold(
+            appBar: AppBar(
+              title: const Text('Détails Mission'),
+              backgroundColor: const Color(0xFF2E7D32),
+              foregroundColor: Colors.white,
+            ),
+            body: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.assignment, size: 64, color: Color(0xFF2E7D32)),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Écran Mission à implémenter',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Mission ID: $missionId',
+                    style: const TextStyle(color: Colors.grey),
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'TODO: Créer MissionDetailsScreen',
+                    style: TextStyle(fontSize: 14, fontStyle: FontStyle.italic),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+      // 💬 Route pour le chat (depuis notifications)
+      GoRoute(
+        path: '/chat/:conversationId',
+        name: 'chat',
+        builder: (context, state) {
+          final conversationId = state.pathParameters['conversationId'] ?? '';
+          // TODO: Créer ou utiliser ChatScreen existant
+          return Scaffold(
+            appBar: AppBar(
+              title: const Text('Conversation'),
+              backgroundColor: const Color(0xFF2E7D32),
+              foregroundColor: Colors.white,
+            ),
+            body: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.chat_bubble, size: 64, color: Color(0xFF2E7D32)),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Écran Chat à implémenter',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Conversation ID: $conversationId',
+                    style: const TextStyle(color: Colors.grey),
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'TODO: Utiliser ChatPageScreenM existant',
+                    style: TextStyle(fontSize: 14, fontStyle: FontStyle.italic),
+                  ),
+                ],
+              ),
+            ),
           );
         },
       ),

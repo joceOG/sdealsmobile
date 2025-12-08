@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:go_router/go_router.dart';
 import '../bloc/notification_bloc.dart';
 import '../bloc/notification_event.dart';
 import '../bloc/notification_state.dart';
@@ -17,6 +18,7 @@ class NotificationScreen extends StatefulWidget {
 class _NotificationScreenState extends State<NotificationScreen>
     with TickerProviderStateMixin {
   late TabController _tabController;
+  late ScrollController _scrollController;
   String? _userId;
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
@@ -26,6 +28,20 @@ class _NotificationScreenState extends State<NotificationScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _scrollController = ScrollController();
+
+    // Listener pour pagination
+    _scrollController.addListener(() {
+      if (_scrollController.position.pixels >=
+          _scrollController.position.maxScrollExtent - 200) {
+        // Charger plus quand on arrive à 200px de la fin
+        if (_userId != null) {
+          context.read<NotificationBloc>().add(
+            LoadMoreNotifications(_userId!),
+          );
+        }
+      }
+    });
 
     // Récupérer l'ID de l'utilisateur depuis AuthCubit
     final authState = context.read<AuthCubit>().state;
@@ -44,6 +60,7 @@ class _NotificationScreenState extends State<NotificationScreen>
   void dispose() {
     _tabController.dispose();
     _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -337,10 +354,54 @@ class _NotificationScreenState extends State<NotificationScreen>
             },
             color: const Color(0xFF2E7D32),
             child: ListView.builder(
+              controller: _scrollController,
               padding: const EdgeInsets.all(16),
               itemCount: notifications.length,
               itemBuilder: (context, index) {
-                return _buildNotificationCard(notifications[index]);
+                return Dismissible(
+                  key: Key(notifications[index]['_id'] ?? index.toString()),
+                  direction: DismissDirection.endToStart,
+                  background: Container(
+                    alignment: Alignment.centerRight,
+                    padding: const EdgeInsets.only(right: 20),
+                    color: Colors.red,
+                    child: const Icon(Icons.delete, color: Colors.white),
+                  ),
+                  confirmDismiss: (direction) async {
+                    return await showDialog<bool>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Supprimer cette notification ?'),
+                        content: const Text('Cette action est irréversible.'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: const Text('Annuler'),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            style: TextButton.styleFrom(
+                              foregroundColor: Colors.red,
+                            ),
+                            child: const Text('Supprimer'),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                  onDismissed: (direction) {
+                    context.read<NotificationBloc>().add(
+                      DeleteNotification(notifications[index]['_id'] ?? ''),
+                    );
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Notification supprimée'),
+                        backgroundColor: Color(0xFF2E7D32),
+                      ),
+                    );
+                  },
+                  child: _buildNotificationCard(notifications[index]),
+                );
               },
             ),
           );
@@ -576,18 +637,37 @@ class _NotificationScreenState extends State<NotificationScreen>
           );
     }
 
-    // Navigation selon le type de notification
+    // ✅ Navigation selon le type de notification
     final type = notification['type']?.toString() ?? '';
+    
     if (type.contains('MISSION')) {
-      // Naviguer vers les détails de la mission
-      // TODO: Implémenter la navigation vers les détails de mission
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Navigation vers les détails de mission'),
-          backgroundColor: Color(0xFF2E7D32),
-        ),
-      );
+      final missionId = notification['donnees']?['missionId']?.toString();
+      if (missionId != null) {
+        // ✅ Navigation vers MissionDetailsScreen
+        context.push('/mission-details/$missionId');
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('ID de mission manquant'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    } else if (type.contains('MESSAGE')) {
+      final conversationId = notification['donnees']?['conversationId']?.toString();
+      if (conversationId != null) {
+        // ✅ Navigation vers Chat
+        context.push('/chat/$conversationId');
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('ID de conversation manquant'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
     }
+    // Autres types: juste marquer comme lu (déjà fait)
   }
 
   void _markAllAsRead() {

@@ -31,6 +31,9 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
 
     // 📊 Charger le nombre de notifications non lues
     on<LoadUnreadCount>(_onLoadUnreadCount);
+
+    // 📄 Charger plus de notifications (pagination)
+    on<LoadMoreNotifications>(_onLoadMoreNotifications);
   }
 
   // 🔑 Définir le token d'authentification
@@ -51,7 +54,7 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
         return;
       }
 
-      final notifications = await _apiClient.getNotifications(
+      final notifications = await _apiClient.getUserNotifications(
         token: _currentToken!,
         userId: event.userId,
         statut: event.statut,
@@ -59,7 +62,7 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
         offset: event.offset,
       );
 
-      final unreadCount = await _apiClient.getUnreadNotificationCount(
+      final unreadCount = await _apiClient.getUserUnreadNotificationCount(
         token: _currentToken!,
         userId: event.userId,
       );
@@ -86,7 +89,7 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
         return;
       }
 
-      await _apiClient.markNotificationAsRead(
+      await _apiClient.markUserNotificationAsRead(
         token: _currentToken!,
         notificationId: event.notificationId,
       );
@@ -113,7 +116,7 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
         return;
       }
 
-      await _apiClient.markAllNotificationsAsRead(
+      await _apiClient.markAllUserNotificationsAsRead(
         token: _currentToken!,
         userId: event.userId,
       );
@@ -136,16 +139,26 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
         return;
       }
 
-      // Note: L'API de suppression n'est pas encore implémentée
-      // await _apiClient.deleteNotification(
-      //   token: _currentToken!,
-      //   notificationId: event.notificationId,
-      // );
+      // ✅ Appeler API pour supprimer
+      final success = await _apiClient.deleteNotification(
+        token: _currentToken!,
+        notificationId: event.notificationId,
+      );
 
-      // Pour l'instant, on recharge les notifications
-      final currentState = state;
-      if (currentState is NotificationLoaded) {
-        add(RefreshNotifications(''));
+      if (success) {
+        // Retirer localement
+        final currentState = state;
+        if (currentState is NotificationLoaded) {
+          final updatedNotifs = currentState.notifications
+              .where((n) => n['_id'] != event.notificationId)
+              .toList();
+
+          emit(currentState.copyWith(
+            notifications: updatedNotifs,
+          ));
+        }
+      } else {
+        emit(const NotificationError('Impossible de supprimer'));
       }
     } catch (e) {
       emit(NotificationError('Erreur lors de la suppression: $e'));
@@ -211,7 +224,7 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
         return;
       }
 
-      final unreadCount = await _apiClient.getUnreadNotificationCount(
+      final unreadCount = await _apiClient.getUserUnreadNotificationCount(
         token: _currentToken!,
         userId: event.userId,
       );
@@ -228,6 +241,51 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     } catch (e) {
       // Ne pas faire échouer l'état principal pour une erreur de comptage
       print('Erreur chargement compteur: $e');
+    }
+  }
+
+  // 📄 CHARGER PLUS DE NOTIFICATIONS (PAGINATION)
+  Future<void> _onLoadMoreNotifications(
+    LoadMoreNotifications event,
+    Emitter<NotificationState> emit,
+  ) async {
+    try {
+      final currentState = state;
+      if (currentState is! NotificationLoaded) return;
+      if (!currentState.hasMore) return; // Déjà tout chargé
+
+      if (_currentToken == null) return;
+
+      final currentOffset = currentState.notifications.length;
+
+      final moreNotifications = await _apiClient.getUserNotifications(
+        token: _currentToken!,
+        userId: event.userId,
+        statut: currentState.currentFilter,
+        limit: 50,
+        offset: currentOffset,
+      );
+
+      if (moreNotifications.isEmpty) {
+        // Plus de notifications
+        emit(currentState.copyWith(hasMore: false));
+        return;
+      }
+
+      final allNotifications = [
+        ...currentState.notifications,
+        ...moreNotifications,
+      ];
+
+      emit(NotificationLoaded(
+        notifications: allNotifications,
+        unreadCount: currentState.unreadCount,
+        currentFilter: currentState.currentFilter,
+        hasMore: moreNotifications.length >= 50,
+      ));
+    } catch (e) {
+      print('Erreur chargement pagination: $e');
+      // Ne pas fail, garder l'état actuel
     }
   }
 }

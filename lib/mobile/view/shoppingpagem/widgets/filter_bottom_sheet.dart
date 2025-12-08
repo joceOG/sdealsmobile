@@ -97,10 +97,10 @@ class FilterBottomSheet {
                                   max: 1000,
                                   divisions: 20,
                                   activeColor: Colors.green,
-                                  labels: RangeLabels(
-                                    "${priceRange.start.round()} FCFA",
-                                    "${priceRange.end.round()} FCFA",
-                                  ),
+                                    labels: RangeLabels(
+                                      "${priceRange.start.round().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]} ')} FCFA",
+                                      "${priceRange.end.round().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]} ')} FCFA",
+                                    ),
                                   onChanged: (values) {
                                     setStateModal(() {
                                       priceRange = values;
@@ -362,5 +362,9 @@ class FilterBottomSheet {
         ),
       ),
     );
+  }
+
+  static String _formatPrice(double value) {
+    return "${value.round().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]} ')} FCFA";
   }
 }

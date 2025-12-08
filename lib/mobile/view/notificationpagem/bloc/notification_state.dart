@@ -28,6 +28,20 @@ class NotificationLoaded extends NotificationState {
     this.hasMore = false,
   });
 
+  NotificationLoaded copyWith({
+    List<Map<String, dynamic>>? notifications,
+    int? unreadCount,
+    String? currentFilter,
+    bool? hasMore,
+  }) {
+    return NotificationLoaded(
+      notifications: notifications ?? this.notifications,
+      unreadCount: unreadCount ?? this.unreadCount,
+      currentFilter: currentFilter ?? this.currentFilter,
+      hasMore: hasMore ?? this.hasMore,
+    );
+  }
+
   @override
   List<Object?> get props =>
       [notifications, unreadCount, currentFilter, hasMore];

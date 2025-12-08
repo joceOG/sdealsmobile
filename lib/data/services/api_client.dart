@@ -439,7 +439,7 @@ class ApiClient {
         if (data["token"] == null) {
           throw Exception("Token manquant dans la réponse");
         }
-        
+
         // Sauvegarde du token si rememberMe activé
         if (rememberMe && data["token"] != null) {
           // Exemple: SharedPreferences
@@ -471,20 +471,52 @@ class ApiClient {
     }
   }
 
-  // ✅ NOUVELLE MÉTHODE : Récupérer tous les freelances
-  Future<List<Map<String, dynamic>>> fetchFreelances() async {
-    print('Récupération des freelances depuis le backend');
+  // ✅ NOUVELLE MÉTHODE : Récupérer tous les freelances (avec pagination)
+  Future<Map<String, dynamic>> fetchFreelances({
+    int page = 1,
+    int limit = 50,
+    String sortBy = 'rating',
+    String sortOrder = 'desc',
+  }) async {
+    print('Récupération des freelances depuis le backend (page $page)');
 
     try {
-      final response =
-          await http.get(Uri.parse('${dotenv.env['API_URL']}/freelance'));
+      final uri = Uri.parse('${dotenv.env['API_URL']}/freelance').replace(
+        queryParameters: {
+          'page': page.toString(),
+          'limit': limit.toString(),
+          'sortBy': sortBy,
+          'sortOrder': sortOrder,
+        },
+      );
+
+      final response = await http.get(uri);
 
       if (response.statusCode == 200) {
-        List<dynamic> freelancesJson = jsonDecode(response.body);
-        print('Freelances récupérés: ${freelancesJson.length}');
+        final Map<String, dynamic> responseData = jsonDecode(response.body);
 
-        // Retourner la liste de Map pour que le BLoC puisse la convertir
-        return freelancesJson.cast<Map<String, dynamic>>();
+        // ✅ Gestion de l'ancienne structure (array) et nouvelle (objet avec pagination)
+        if (responseData.containsKey('freelances')) {
+          // Nouvelle structure avec pagination
+          final List<dynamic> freelancesJson = responseData['freelances'];
+          print(
+              'Freelances récupérés: ${freelancesJson.length} (page ${responseData['pagination']['currentPage']}/${responseData['pagination']['totalPages']})');
+
+          return {
+            'freelances': freelancesJson.cast<Map<String, dynamic>>(),
+            'pagination': responseData['pagination'],
+          };
+        } else {
+          // Ancienne structure (array direct) - pour rétrocompatibilité
+          final List<dynamic> freelancesJson = responseData as List<dynamic>;
+          print(
+              'Freelances récupérés: ${freelancesJson.length} (format legacy)');
+
+          return {
+            'freelances': freelancesJson.cast<Map<String, dynamic>>(),
+            'pagination': null,
+          };
+        }
       } else {
         throw Exception(
             'Échec de récupération des freelances: ${response.statusCode}');
@@ -926,14 +958,23 @@ class ApiClient {
     }
   }
 
-  // ✅ NOUVELLE MÉTHODE : Récupérer freelances par catégorie
+  // ✅ NOUVELLE MÉTHODE : Récupérer freelances par catégorie avec options
   Future<List<Map<String, dynamic>>> getFreelancesByCategory(
-      String category) async {
+    String category, {
+    int limit = 10,
+    String sortBy = 'rating',
+  }) async {
     print('Récupération des freelances pour la catégorie: $category');
 
     try {
-      final response = await http.get(
-          Uri.parse('${dotenv.env['API_URL']}/freelances/category/$category'));
+      final uri =
+          Uri.parse('${dotenv.env['API_URL']}/freelances/category/$category')
+              .replace(queryParameters: {
+        'limit': limit.toString(),
+        'sortBy': sortBy,
+      });
+
+      final response = await http.get(uri);
 
       if (response.statusCode == 200) {
         List<dynamic> freelancesJson = jsonDecode(response.body);
@@ -946,6 +987,60 @@ class ApiClient {
     } catch (e) {
       print('Erreur dans getFreelancesByCategory: $e');
       throw Exception('Échec de chargement par catégorie: $e');
+    }
+  }
+
+  // ✅ NOUVEAU : Récupérer un freelance par ID
+  Future<Map<String, dynamic>> getFreelanceById(String id) async {
+    print('Récupération du freelance: $id');
+
+    try {
+      final response =
+          await http.get(Uri.parse('${dotenv.env['API_URL']}/freelance/$id'));
+
+      if (response.statusCode == 200) {
+        Map<String, dynamic> freelanceJson = jsonDecode(response.body);
+        print('Freelance récupéré: ${freelanceJson['name']}');
+        return freelanceJson;
+      } else {
+        throw Exception(
+            'Échec de récupération du freelance: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Erreur dans getFreelanceById: $e');
+      throw Exception('Échec de chargement du freelance: $e');
+    }
+  }
+
+  // ✅ NOUVEAU : Mettre à jour la note d'un freelance
+  Future<Map<String, dynamic>> updateFreelanceRating({
+    required String freelanceId,
+    required double rating,
+    required String clientId,
+  }) async {
+    print('Mise à jour de la note du freelance: $freelanceId');
+
+    try {
+      final response = await http.put(
+        Uri.parse('${dotenv.env['API_URL']}/freelance/$freelanceId/rating'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'rating': rating,
+          'clientId': clientId,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        Map<String, dynamic> result = jsonDecode(response.body);
+        print('Note mise à jour: ${result['newRating']}');
+        return result;
+      } else {
+        throw Exception(
+            'Échec de mise à jour de la note: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Erreur dans updateFreelanceRating: $e');
+      throw Exception('Échec de mise à jour de la note: $e');
     }
   }
 }
@@ -1148,6 +1243,687 @@ extension ServiceRequestsApi on ApiClient {
     });
     if (res.statusCode != 200) {
       throw Exception('Erreur markAllNotificationsAsRead: ${res.statusCode}');
+    }
+  }
+}
+
+/// 🛒 Extension pour la gestion du panier
+extension CartApi on ApiClient {
+  // ✅ Obtenir le panier d'un utilisateur
+  Future<Map<String, dynamic>> getCart(String userId) async {
+    final response = await get('/cart/user/$userId');
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception('Erreur récupération panier: ${response.statusCode}');
+  }
+
+  // ✅ Ajouter un article au panier
+  Future<Map<String, dynamic>> addToCart({
+    required String userId,
+    required String articleId,
+    required String vendeurId,
+    int quantite = 1,
+    Map<String, String>? variantes,
+  }) async {
+    final response = await post('/cart/add', body: {
+      'userId': userId,
+      'articleId': articleId,
+      'vendeurId': vendeurId,
+      'quantite': quantite,
+      if (variantes != null) 'variantes': variantes,
+    });
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception(
+        'Erreur ajout au panier: ${response.statusCode} ${response.body}');
+  }
+
+  // ✅ Modifier la quantité d'un article
+  Future<Map<String, dynamic>> updateCartItemQuantity({
+    required String userId,
+    required String itemId,
+    required int quantite,
+  }) async {
+    final response = await put('/cart/user/$userId/item/$itemId', body: {
+      'quantite': quantite,
+    });
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception('Erreur mise à jour quantité: ${response.statusCode}');
+  }
+
+  // ✅ Retirer un article du panier
+  Future<Map<String, dynamic>> removeFromCart({
+    required String userId,
+    required String itemId,
+  }) async {
+    final response = await delete('/cart/user/$userId/item/$itemId');
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception('Erreur retrait du panier: ${response.statusCode}');
+  }
+
+  // ✅ Vider le panier
+  Future<Map<String, dynamic>> clearCart(String userId) async {
+    final response = await delete('/cart/user/$userId/clear');
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception('Erreur vidage panier: ${response.statusCode}');
+  }
+
+  // ✅ Appliquer un code promo
+  Future<Map<String, dynamic>> applyPromoCode({
+    required String userId,
+    required String code,
+    required double reduction,
+    String typeReduction = 'MONTANT_FIXE',
+  }) async {
+    final response = await post('/cart/user/$userId/promo', body: {
+      'code': code,
+      'reduction': reduction,
+      'typeReduction': typeReduction,
+    });
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception('Erreur application code promo: ${response.statusCode}');
+  }
+
+  // ✅ Mettre à jour l'adresse de livraison
+  Future<Map<String, dynamic>> updateDeliveryAddress({
+    required String userId,
+    required String nom,
+    required String telephone,
+    required String adresse,
+    required String ville,
+    required String codePostal,
+    String pays = 'Côte d\'Ivoire',
+    String? instructions,
+  }) async {
+    final response = await put('/cart/user/$userId/address', body: {
+      'nom': nom,
+      'telephone': telephone,
+      'adresse': adresse,
+      'ville': ville,
+      'codePostal': codePostal,
+      'pays': pays,
+      if (instructions != null) 'instructions': instructions,
+    });
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception('Erreur mise à jour adresse: ${response.statusCode}');
+  }
+
+  // ✅ Checkout - Convertir le panier en commande
+  Future<Map<String, dynamic>> checkout({
+    required String userId,
+    String? moyenPaiement,
+    String? notesClient,
+  }) async {
+    final response = await post('/cart/user/$userId/checkout', body: {
+      if (moyenPaiement != null) 'moyenPaiement': moyenPaiement,
+      if (notesClient != null) 'notesClient': notesClient,
+    });
+
+    if (response.statusCode == 201) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception('Erreur checkout: ${response.statusCode} ${response.body}');
+  }
+}
+
+// 💬 MESSAGERIE API
+extension MessagerieApi on ApiClient {
+  // 📋 Récupérer les conversations d'un utilisateur
+  Future<List<Map<String, dynamic>>> getConversations(String userId,
+      {int page = 1, int limit = 50}) async {
+    try {
+      print('📋 Récupération conversations pour utilisateur: $userId');
+
+      final uri = Uri.parse('$apiUrl/messages/conversations/$userId').replace(
+        queryParameters: {
+          'page': page.toString(),
+          'limit': limit.toString(),
+        },
+      );
+
+      final response = await http.get(uri).timeout(const Duration(seconds: 30));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        // Gérer structure paginée ou array direct
+        if (data is Map && data.containsKey('conversations')) {
+          final List<dynamic> conversations = data['conversations'];
+          print('✅ ${conversations.length} conversations récupérées (paginé)');
+          return conversations.cast<Map<String, dynamic>>();
+        } else if (data is List) {
+          print('✅ ${data.length} conversations récupérées (array)');
+          return data.cast<Map<String, dynamic>>();
+        }
+
+        return [];
+      }
+
+      throw Exception('Erreur ${response.statusCode}: ${response.body}');
+    } catch (e) {
+      print('❌ Erreur getConversations: $e');
+      rethrow;
+    }
+  }
+
+  // 💬 Récupérer les messages d'une conversation
+  Future<List<Map<String, dynamic>>> getConversationMessages(
+    String conversationId, {
+    int page = 1,
+    int limit = 100,
+  }) async {
+    try {
+      print('💬 Récupération messages pour conversation: $conversationId');
+
+      final uri =
+          Uri.parse('$apiUrl/messages/conversation/$conversationId').replace(
+        queryParameters: {
+          'page': page.toString(),
+          'limit': limit.toString(),
+        },
+      );
+
+      final response = await http.get(uri).timeout(const Duration(seconds: 30));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        // Gérer structure paginée ou array direct
+        if (data is Map && data.containsKey('messages')) {
+          final List<dynamic> messages = data['messages'];
+          print('✅ ${messages.length} messages récupérés (paginé)');
+          return messages.cast<Map<String, dynamic>>();
+        } else if (data is List) {
+          print('✅ ${data.length} messages récupérés (array)');
+          return data.cast<Map<String, dynamic>>();
+        }
+
+        return [];
+      }
+
+      throw Exception('Erreur ${response.statusCode}: ${response.body}');
+    } catch (e) {
+      print('❌ Erreur getConversationMessages: $e');
+      rethrow;
+    }
+  }
+
+  // 📨 Envoyer un message
+  Future<Map<String, dynamic>> sendMessage({
+    required String expediteur,
+    required String destinataire,
+    required String contenu,
+    File? pieceJointe,
+    String? typePieceJointe,
+    String typeMessage = 'NORMAL',
+    String? referenceId,
+    String? referenceType,
+  }) async {
+    try {
+      print('📨 Envoi message de $expediteur à $destinataire');
+
+      if (pieceJointe != null) {
+        // Upload avec fichier (multipart/form-data)
+        var request =
+            http.MultipartRequest('POST', Uri.parse('$apiUrl/messages'));
+
+        request.fields['expediteur'] = expediteur;
+        request.fields['destinataire'] = destinataire;
+        request.fields['contenu'] = contenu;
+        request.fields['typeMessage'] = typeMessage;
+
+        if (typePieceJointe != null)
+          request.fields['typePieceJointe'] = typePieceJointe;
+        if (referenceId != null) request.fields['referenceId'] = referenceId;
+        if (referenceType != null)
+          request.fields['referenceType'] = referenceType;
+
+        request.files.add(
+            await http.MultipartFile.fromPath('pieceJointe', pieceJointe.path));
+
+        final streamedResponse =
+            await request.send().timeout(const Duration(seconds: 60));
+        final response = await http.Response.fromStream(streamedResponse);
+
+        if (response.statusCode == 201) {
+          print('✅ Message avec fichier envoyé');
+          return jsonDecode(response.body) as Map<String, dynamic>;
+        }
+
+        throw Exception('Erreur ${response.statusCode}: ${response.body}');
+      } else {
+        // Message texte simple (JSON)
+        final response = await post('/messages', body: {
+          'expediteur': expediteur,
+          'destinataire': destinataire,
+          'contenu': contenu,
+          'typeMessage': typeMessage,
+          if (referenceId != null) 'referenceId': referenceId,
+          if (referenceType != null) 'referenceType': referenceType,
+        });
+
+        if (response.statusCode == 201) {
+          print('✅ Message texte envoyé');
+          return jsonDecode(response.body) as Map<String, dynamic>;
+        }
+
+        throw Exception('Erreur ${response.statusCode}: ${response.body}');
+      }
+    } catch (e) {
+      print('❌ Erreur sendMessage: $e');
+      rethrow;
+    }
+  }
+
+  // ✅ Marquer les messages comme lus
+  Future<void> markMessagesAsRead(String conversationId, String userId) async {
+    try {
+      print('✅ Marquage messages comme lus: $conversationId');
+
+      final response = await patch('/messages/mark-read', body: {
+        'conversationId': conversationId,
+        'userId': userId,
+      });
+
+      if (response.statusCode == 200) {
+        print('✅ Messages marqués comme lus');
+        return;
+      }
+
+      throw Exception('Erreur ${response.statusCode}: ${response.body}');
+    } catch (e) {
+      print('❌ Erreur markMessagesAsRead: $e');
+      rethrow;
+    }
+  }
+
+  // 🗑️ Supprimer un message pour un utilisateur
+  Future<void> deleteMessageForUser(String messageId, String userId) async {
+    try {
+      print('🗑️ Suppression message: $messageId pour $userId');
+
+      final response = await delete('/messages/$messageId/user/$userId');
+
+      if (response.statusCode == 200) {
+        print('✅ Message supprimé');
+        return;
+      }
+
+      throw Exception('Erreur ${response.statusCode}: ${response.body}');
+    } catch (e) {
+      print('❌ Erreur deleteMessageForUser: $e');
+      rethrow;
+    }
+  }
+
+  // 🔍 Rechercher dans les messages
+  Future<List<Map<String, dynamic>>> searchMessages(
+    String userId,
+    String query, {
+    int page = 1,
+    int limit = 50,
+  }) async {
+    try {
+      print('🔍 Recherche messages: "$query"');
+
+      final uri = Uri.parse('$apiUrl/messages/search').replace(
+        queryParameters: {
+          'userId': userId,
+          'query': query,
+          'page': page.toString(),
+          'limit': limit.toString(),
+        },
+      );
+
+      final response = await http.get(uri).timeout(const Duration(seconds: 30));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        if (data is Map && data.containsKey('messages')) {
+          final List<dynamic> messages = data['messages'];
+          print('✅ ${messages.length} messages trouvés');
+          return messages.cast<Map<String, dynamic>>();
+        } else if (data is List) {
+          print('✅ ${data.length} messages trouvés');
+          return data.cast<Map<String, dynamic>>();
+        }
+
+        return [];
+      }
+
+      throw Exception('Erreur ${response.statusCode}: ${response.body}');
+    } catch (e) {
+      print('❌ Erreur searchMessages: $e');
+      rethrow;
+    }
+  }
+
+  // 📊 Statistiques des messages
+  Future<Map<String, dynamic>> getMessageStats(String userId) async {
+    try {
+      print('📊 Récupération statistiques messages');
+
+      final response = await get('/messages/stats/$userId');
+
+      if (response.statusCode == 200) {
+        print('✅ Statistiques récupérées');
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+
+      throw Exception('Erreur ${response.statusCode}: ${response.body}');
+    } catch (e) {
+      print('❌ Erreur getMessageStats: $e');
+      rethrow;
+    }
+  }
+
+  // 📬 Récupérer les messages non lus
+  Future<List<Map<String, dynamic>>> getUnreadMessages(String userId,
+      {int page = 1, int limit = 50}) async {
+    try {
+      print('📬 Récupération messages non lus');
+
+      final uri = Uri.parse('$apiUrl/messages/unread/$userId').replace(
+        queryParameters: {
+          'page': page.toString(),
+          'limit': limit.toString(),
+        },
+      );
+
+      final response = await http.get(uri).timeout(const Duration(seconds: 30));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        if (data is Map && data.containsKey('messages')) {
+          final List<dynamic> messages = data['messages'];
+          print('✅ ${messages.length} messages non lus');
+          return messages.cast<Map<String, dynamic>>();
+        } else if (data is List) {
+          print('✅ ${data.length} messages non lus');
+          return data.cast<Map<String, dynamic>>();
+        }
+
+        return [];
+      }
+
+      throw Exception('Erreur ${response.statusCode}: ${response.body}');
+    } catch (e) {
+      print('❌ Erreur getUnreadMessages: $e');
+      rethrow;
+    }
+  }
+
+  // ========================
+  // 🛒 COMMANDES API
+  // ========================
+
+  /// Récupère toutes les commandes avec filtres optionnels
+  Future<List<Map<String, dynamic>>> getCommandes({
+    String? status,
+    int page = 1,
+    int limit = 50,
+  }) async {
+    try {
+      final queryParams = <String, String>{
+        'page': page.toString(),
+        'limit': limit.toString(),
+      };
+      
+      if (status != null && status.isNotEmpty) {
+        queryParams['status'] = status;
+      }
+
+      final uri = Uri.parse('$apiUrl/commandes').replace(
+        queryParameters: queryParams,
+      );
+
+      final response = await http.get(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        // Le backend retourne: { commandes: [...], total: X, ... }
+        return List<Map<String, dynamic>>.from(data['commandes'] ?? []);
+      } else {
+        throw Exception('Erreur ${response.statusCode}: ${response.body}');
+      }
+    } catch (e) {
+      print('❌ Erreur getCommandes: $e');
+      rethrow;
+    }
+  }
+
+  /// Récupère une commande par ID
+  Future<Map<String, dynamic>> getCommandeById(String commandeId) async {
+    try {
+      final response = await get('/commande/$commandeId');
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else if (response.statusCode == 404) {
+        throw Exception('Commande non trouvée');
+      } else {
+        throw Exception('Erreur ${response.statusCode}');
+      }
+    } catch (e) {
+      print('❌ Erreur getCommandeById: $e');
+      rethrow;
+    }
+  }
+
+  /// Met à jour une commande (ex: noter, changer statut)
+  Future<Map<String, dynamic>> updateCommande({
+    required String commandeId,
+    required Map<String, dynamic> updates,
+  }) async {
+    try {
+      final response = await put(
+        '/commande/$commandeId',
+        body: updates,
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Erreur ${response.statusCode}');
+      }
+    } catch (e) {
+      print('❌ Erreur updateCommande: $e');
+      rethrow;
+    }
+  }
+
+  /// Annule une commande
+  Future<bool> cancelCommande(String commandeId) async {
+    try {
+      final response = await updateCommande(
+        commandeId: commandeId,
+        updates: {'statusCommande': 'Annulée'},
+      );
+      return response != null;
+    } catch (e) {
+      print('❌ Erreur cancelCommande: $e');
+      return false;
+    }
+  }
+
+  // ========================
+  // 🔔 NOTIFICATIONS API
+  // ========================
+
+  /// Récupère les notifications d'un utilisateur
+  Future<List<Map<String, dynamic>>> getUserNotifications({
+    required String token,
+    required String userId,
+    String? statut,
+    int limit = 50,
+    int offset = 0,
+  }) async {
+    try {
+      final queryParams = <String, String>{
+        'limit': limit.toString(),
+        'offset': offset.toString(),
+      };
+      
+      if (statut != null && statut.isNotEmpty) {
+        queryParams['statut'] = statut;
+      }
+
+      final uri = Uri.parse('$apiUrl/notification/user/$userId').replace(
+        queryParameters: queryParams,
+      );
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return List<Map<String, dynamic>>.from(data['notifications'] ?? []);
+      } else {
+        throw Exception('Erreur ${response.statusCode}: ${response.body}');
+      }
+    } catch (e) {
+      print('❌ Erreur getNotifications: $e');
+      rethrow;
+    }
+  }
+
+  /// Récupère le nombre de notifications non lues
+  Future<int> getUserUnreadNotificationCount({
+    required String token,
+    required String userId,
+  }) async {
+    try {
+      final uri = Uri.parse('$apiUrl/notification/user/$userId/unread-count');
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['count'] ?? 0;
+      } else {
+        throw Exception('Erreur ${response.statusCode}');
+      }
+    } catch (e) {
+      print('❌ Erreur getUnreadNotificationCount: $e');
+      return 0; // Retourner 0 au lieu de crash
+    }
+  }
+
+  /// Marque une notification comme lue
+  Future<bool> markUserNotificationAsRead({
+    required String token,
+    required String notificationId,
+  }) async {
+    try {
+      final uri = Uri.parse('$apiUrl/notification/$notificationId/read');
+
+      final response = await http.put(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        print('✅ Notification marquée comme lue');
+        return true;
+      } else {
+        return false;
+      }
+    } catch (e) {
+      print('❌ Erreur markNotificationAsRead: $e');
+      return false;
+    }
+  }
+
+  /// Marque toutes les notifications comme lues
+  Future<bool> markAllUserNotificationsAsRead({
+    required String token,
+    required String userId,
+  }) async {
+    try {
+      final uri = Uri.parse('$apiUrl/notification/user/$userId/read-all');
+
+      final response = await http.put(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        print('✅ Toutes les notifications marquées comme lues');
+        return true;
+      } else {
+        return false;
+      }
+    } catch (e) {
+      print('❌ Erreur markAllNotificationsAsRead: $e');
+      return false;
+    }
+  }
+
+  /// Supprime une notification
+  Future<bool> deleteNotification({
+    required String token,
+    required String notificationId,
+  }) async {
+    try {
+      final uri = Uri.parse('$apiUrl/notification/$notificationId');
+
+      final response = await http.delete(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        print('✅ Notification supprimée');
+        return true;
+      } else {
+        return false;
+      }
+    } catch (e) {
+      print('❌ Erreur deleteNotification: $e');
+      return false;
     }
   }
 }
