@@ -32,15 +32,15 @@ class CommandeBloc extends Bloc<CommandeEvent, CommandeState> {
   }
 
   Future<void> _onChargerCommandes(
-      ChargerCommandes event,
-      Emitter<CommandeState> emit,
-      ) async {
+    ChargerCommandes event,
+    Emitter<CommandeState> emit,
+  ) async {
     emit(state.copyWith(isLoading: true));
 
     try {
       // 🔄 Appel API backend
       print('📡 Chargement commandes depuis API...');
-
+      
       final commandesData = await _apiClient.getCommandes(
         limit: 50, // Charger 50 commandes max
       );
@@ -59,10 +59,10 @@ class CommandeBloc extends Bloc<CommandeEvent, CommandeState> {
       ));
     } catch (error) {
       print('⚠️ Erreur API, utilisation mock data: $error');
-
+      
       // 📦 Fallback sur mock data pour développement
       final mockCommandes = _getMockCommandes();
-
+      
       emit(state.copyWith(
         isLoading: false,
         commandes: mockCommandes,
@@ -99,24 +99,24 @@ class CommandeBloc extends Bloc<CommandeEvent, CommandeState> {
   }
 
   void _onFiltrerParStatus(
-      FiltrerParStatus event,
-      Emitter<CommandeState> emit,
-      ) {
+    FiltrerParStatus event,
+    Emitter<CommandeState> emit,
+  ) {
     emit(state.copyWith(filtreStatus: event.status));
   }
 
   void _onAjouterCommande(
-      AjouterCommande event,
-      Emitter<CommandeState> emit,
-      ) {
+    AjouterCommande event,
+    Emitter<CommandeState> emit,
+  ) {
     final updatedCommandes = [...state.commandes, event.commande];
     emit(state.copyWith(commandes: updatedCommandes));
   }
 
   void _onMettreAJourCommande(
-      MettreAJourCommande event,
-      Emitter<CommandeState> emit,
-      ) {
+    MettreAJourCommande event,
+    Emitter<CommandeState> emit,
+  ) {
     final updatedCommandes = state.commandes.map((commande) {
       if (commande.id == event.commande.id) {
         return event.commande;
@@ -128,13 +128,13 @@ class CommandeBloc extends Bloc<CommandeEvent, CommandeState> {
   }
 
   void _onNoterCommande(
-      NoterCommande event,
-      Emitter<CommandeState> emit,
-      ) async {
+    NoterCommande event,
+    Emitter<CommandeState> emit,
+  ) async {
     try {
       // 📡 Envoyer la note au backend
       print('📡 Envoi notation pour commande ${event.commandeId}');
-
+      
       await _apiClient.updateCommande(
         commandeId: event.commandeId,
         updates: {
@@ -168,25 +168,25 @@ class CommandeBloc extends Bloc<CommandeEvent, CommandeState> {
   }
 
   void _onRechercherCommandes(
-      RechercherCommandes event,
-      Emitter<CommandeState> emit,
-      ) {
+    RechercherCommandes event,
+    Emitter<CommandeState> emit,
+  ) {
     emit(state.copyWith(searchQuery: event.query));
   }
 
   void _onAnnulerCommande(
-      AnnulerCommande event,
-      Emitter<CommandeState> emit,
-      ) async {
+    AnnulerCommande event,
+    Emitter<CommandeState> emit,
+  ) async {
     try {
       // 📡 Annuler via API
       print('📡 Annulation commande ${event.commandeId}');
-
+      
       final success = await _apiClient.cancelCommande(event.commandeId);
-
+      
       if (success) {
         print('✅ Commande annulée avec succès');
-
+        
         // Mettre à jour localement
         final updatedCommandes = state.commandes.map((commande) {
           if (commande.id == event.commandeId) {
@@ -222,9 +222,9 @@ class CommandeBloc extends Bloc<CommandeEvent, CommandeState> {
 
   // 🔌 CONNEXION WEBSOCKET
   Future<void> _onConnectWebSocket(
-      ConnectWebSocket event,
-      Emitter<CommandeState> emit,
-      ) async {
+    ConnectWebSocket event,
+    Emitter<CommandeState> emit,
+  ) async {
     try {
       await _webSocketService.connect();
       emit(state.copyWith(isWebSocketConnected: true));
@@ -238,18 +238,18 @@ class CommandeBloc extends Bloc<CommandeEvent, CommandeState> {
 
   // 🔌 DÉCONNEXION WEBSOCKET
   Future<void> _onDisconnectWebSocket(
-      DisconnectWebSocket event,
-      Emitter<CommandeState> emit,
-      ) async {
+    DisconnectWebSocket event,
+    Emitter<CommandeState> emit,
+  ) async {
     _webSocketService.disconnect();
     emit(state.copyWith(isWebSocketConnected: false));
   }
 
   // 📦 MISE À JOUR STATUT COMMANDE VIA WEBSOCKET
   Future<void> _onOrderStatusUpdated(
-      OrderStatusUpdated event,
-      Emitter<CommandeState> emit,
-      ) async {
+    OrderStatusUpdated event,
+    Emitter<CommandeState> emit,
+  ) async {
     try {
       final orderData = event.orderData;
       final orderId = orderData['orderId']?.toString() ?? '';
@@ -294,9 +294,9 @@ class CommandeBloc extends Bloc<CommandeEvent, CommandeState> {
 
   // 🔔 ENVOYER NOTIFICATION PUSH
   Future<void> _onSendPushNotification(
-      SendPushNotification event,
-      Emitter<CommandeState> emit,
-      ) async {
+    SendPushNotification event,
+    Emitter<CommandeState> emit,
+  ) async {
     try {
       final success = await _notificationService.sendPushNotification(
         userId: event.userId,
@@ -323,9 +323,9 @@ class CommandeBloc extends Bloc<CommandeEvent, CommandeState> {
 
   // 🔔 NOTIFICATION REÇUE
   Future<void> _onNotificationReceived(
-      NotificationReceived event,
-      Emitter<CommandeState> emit,
-      ) async {
+    NotificationReceived event,
+    Emitter<CommandeState> emit,
+  ) async {
     try {
       final notificationData = event.notificationData;
       final type = notificationData['type']?.toString() ?? '';
@@ -353,9 +353,9 @@ class CommandeBloc extends Bloc<CommandeEvent, CommandeState> {
 
   // 📦 TRAITER NOTIFICATION STATUT COMMANDE
   void _handleOrderStatusNotification(
-      Map<String, dynamic> data,
-      Emitter<CommandeState> emit,
-      ) {
+    Map<String, dynamic> data,
+    Emitter<CommandeState> emit,
+  ) {
     final orderId = data['orderId']?.toString() ?? '';
     final status = data['status']?.toString() ?? '';
 
@@ -379,9 +379,9 @@ class CommandeBloc extends Bloc<CommandeEvent, CommandeState> {
 
   // 💰 TRAITER NOTIFICATION PAIEMENT
   void _handlePaymentNotification(
-      Map<String, dynamic> data,
-      Emitter<CommandeState> emit,
-      ) {
+    Map<String, dynamic> data,
+    Emitter<CommandeState> emit,
+  ) {
     final orderId = data['orderId']?.toString() ?? '';
     final amount = data['amount']?.toDouble() ?? 0.0;
 
@@ -405,9 +405,9 @@ class CommandeBloc extends Bloc<CommandeEvent, CommandeState> {
 
   // 🚚 TRAITER NOTIFICATION LIVRAISON
   void _handleDeliveryNotification(
-      Map<String, dynamic> data,
-      Emitter<CommandeState> emit,
-      ) {
+    Map<String, dynamic> data,
+    Emitter<CommandeState> emit,
+  ) {
     final orderId = data['orderId']?.toString() ?? '';
     final status = data['status']?.toString() ?? '';
 

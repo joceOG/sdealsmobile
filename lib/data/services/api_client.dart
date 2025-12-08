@@ -1023,6 +1023,260 @@ extension ServiceRequestsApi on ApiClient {
     }
     throw Exception('Erreur updatePrestation: ${res.statusCode} ${res.body}');
   }
+
+  // ========================
+  // 🛒 COMMANDES API
+  // ========================
+
+  /// Récupère toutes les commandes avec filtres optionnels
+  Future<List<Map<String, dynamic>>> getCommandes({
+    String? status,
+    int page = 1,
+    int limit = 50,
+  }) async {
+    try {
+      final queryParams = <String, String>{
+        'page': page.toString(),
+        'limit': limit.toString(),
+      };
+      
+      if (status != null && status.isNotEmpty) {
+        queryParams['status'] = status;
+      }
+
+      final uri = Uri.parse('$apiUrl/commandes').replace(
+        queryParameters: queryParams,
+      );
+
+      final response = await http.get(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        // Le backend retourne: { commandes: [...], total: X, ... }
+        return List<Map<String, dynamic>>.from(data['commandes'] ?? []);
+      } else {
+        throw Exception('Erreur ${response.statusCode}: ${response.body}');
+      }
+    } catch (e) {
+      print('❌ Erreur getCommandes: $e');
+      rethrow;
+    }
+  }
+
+  /// Récupère une commande par ID
+  Future<Map<String, dynamic>> getCommandeById(String commandeId) async {
+    try {
+      final response = await get('/commande/$commandeId');
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else if (response.statusCode == 404) {
+        throw Exception('Commande non trouvée');
+      } else {
+        throw Exception('Erreur ${response.statusCode}');
+      }
+    } catch (e) {
+      print('❌ Erreur getCommandeById: $e');
+      rethrow;
+    }
+  }
+
+  /// Met à jour une commande (ex: noter, changer statut)
+  Future<Map<String, dynamic>> updateCommande({
+    required String commandeId,
+    required Map<String, dynamic> updates,
+  }) async {
+    try {
+      final response = await put(
+        '/commande/$commandeId',
+        body: updates,
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Erreur ${response.statusCode}');
+      }
+    } catch (e) {
+      print('❌ Erreur updateCommande: $e');
+      rethrow;
+    }
+  }
+
+  /// Annule une commande
+  Future<bool> cancelCommande(String commandeId) async {
+    try {
+      final response = await updateCommande(
+        commandeId: commandeId,
+        updates: {'statusCommande': 'Annulée'},
+      );
+      return response != null;
+    } catch (e) {
+      print('❌ Erreur cancelCommande: $e');
+      return false;
+    }
+  }
+
+  // ========================
+  // 🔔 NOTIFICATIONS API
+  // ========================
+
+  /// Récupère les notifications d'un utilisateur
+  Future<List<Map<String, dynamic>>> getUserNotifications({
+    required String token,
+    required String userId,
+    String? statut,
+    int limit = 50,
+    int offset = 0,
+  }) async {
+    try {
+      final queryParams = <String, String>{
+        'limit': limit.toString(),
+        'offset': offset.toString(),
+      };
+      
+      if (statut != null && statut.isNotEmpty) {
+        queryParams['statut'] = statut;
+      }
+
+      final uri = Uri.parse('$apiUrl/notification/user/$userId').replace(
+        queryParameters: queryParams,
+      );
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return List<Map<String, dynamic>>.from(data['notifications'] ?? []);
+      } else {
+        throw Exception('Erreur ${response.statusCode}: ${response.body}');
+      }
+    } catch (e) {
+      print('❌ Erreur getNotifications: $e');
+      rethrow;
+    }
+  }
+
+  /// Récupère le nombre de notifications non lues
+  Future<int> getUserUnreadNotificationCount({
+    required String token,
+    required String userId,
+  }) async {
+    try {
+      final uri = Uri.parse('$apiUrl/notification/user/$userId/unread-count');
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['count'] ?? 0;
+      } else {
+        throw Exception('Erreur ${response.statusCode}');
+      }
+    } catch (e) {
+      print('❌ Erreur getUnreadNotificationCount: $e');
+      return 0; // Retourner 0 au lieu de crash
+    }
+  }
+
+  /// Marque une notification comme lue
+  Future<bool> markUserNotificationAsRead({
+    required String token,
+    required String notificationId,
+  }) async {
+    try {
+      final uri = Uri.parse('$apiUrl/notification/$notificationId/read');
+
+      final response = await http.put(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        print('✅ Notification marquée comme lue');
+        return true;
+      } else {
+        return false;
+      }
+    } catch (e) {
+      print('❌ Erreur markNotificationAsRead: $e');
+      return false;
+    }
+  }
+
+  /// Marque toutes les notifications comme lues
+  Future<bool> markAllUserNotificationsAsRead({
+    required String token,
+    required String userId,
+  }) async {
+    try {
+      final uri = Uri.parse('$apiUrl/notification/user/$userId/read-all');
+
+      final response = await http.put(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        print('✅ Toutes les notifications marquées comme lues');
+        return true;
+      } else {
+        return false;
+      }
+    } catch (e) {
+      print('❌ Erreur markAllNotificationsAsRead: $e');
+      return false;
+    }
+  }
+
+  /// Supprime une notification
+  Future<bool> deleteNotification({
+    required String token,
+    required String notificationId,
+  }) async {
+    try {
+      final uri = Uri.parse('$apiUrl/notification/$notificationId');
+
+      final response = await http.delete(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        print('✅ Notification supprimée');
+        return true;
+      } else {
+        return false;
+      }
+    } catch (e) {
+      print('❌ Erreur deleteNotification: $e');
+      return false;
+    }
+  }
 }
 
 // 180.149.197.115:3000/api/categorie

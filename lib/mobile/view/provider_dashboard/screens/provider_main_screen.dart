@@ -1186,6 +1186,7 @@ class _ProviderMainScreenState extends State<ProviderMainScreen> {
   // 🎯 MENU EXPERT
   Widget _buildExpertMenu(BuildContext context) {
     return PopupMenuButton<String>(
+      offset: const Offset(0, 50), // Afficher le menu EN DESSOUS
       icon: Container(
         width: 40,
         height: 40,
@@ -1414,7 +1415,7 @@ class _ProviderMainScreenState extends State<ProviderMainScreen> {
         });
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
         decoration: BoxDecoration(
           color: isActive ? Colors.white.withOpacity(0.2) : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
