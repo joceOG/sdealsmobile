@@ -496,14 +496,17 @@ class _PrestataireFinalizationScreenState
                 children: [
                   Row(
                     children: [
-                      Text(
-                        title,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: image != null
-                              ? Colors.green.shade700
-                              : Colors.grey.shade700,
+                      Flexible(
+                        child: Text(
+                          title,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: image != null
+                                ? Colors.green.shade700
+                                : Colors.grey.shade700,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       if (isRequired) ...[

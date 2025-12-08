@@ -21,6 +21,7 @@ class _ProviderMessagesScreenState extends State<ProviderMessagesScreen>
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
   String _selectedFilter = 'all'; // 'all', 'unread', 'prestation', 'support'
+  MessagesBloc? _messagesBloc; // Sauvegarder référence pour dispose
 
   @override
   void initState() {
@@ -41,9 +42,16 @@ class _ProviderMessagesScreenState extends State<ProviderMessagesScreen>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Sauvegarder référence au BLoC pour l'utiliser dans dispose
+    _messagesBloc ??= context.read<MessagesBloc>();
+  }
+
+  @override
   void dispose() {
-    // 🔌 Déconnecter le WebSocket
-    context.read<MessagesBloc>().add(DisconnectWebSocket());
+    // 🔌 Déconnecter le WebSocket en utilisant la référence sauvegardée
+    _messagesBloc?.add(DisconnectWebSocket());
 
     _tabController.dispose();
     _searchController.dispose();

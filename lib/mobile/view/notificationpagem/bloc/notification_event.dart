@@ -86,3 +86,13 @@ class LoadUnreadCount extends NotificationEvent {
   @override
   List<Object?> get props => [userId];
 }
+
+// 📄 Charger plus de notifications (pagination)
+class LoadMoreNotifications extends NotificationEvent {
+  final String userId;
+
+  const LoadMoreNotifications(this.userId);
+
+  @override
+  List<Object?> get props => [userId];
+}

@@ -130,12 +130,12 @@ class ProductCardM extends StatelessWidget {
                         child: Material(
                           color: Colors.transparent,
                           child: InkWell(
-                            borderRadius: BorderRadius.circular(20),
+                            borderRadius: BorderRadius.circular(30),
                             onTap: () {
                               // TODO: Implémenter ToggleFavoriteEvent
                             },
                             child: Padding(
-                              padding: const EdgeInsets.all(8.0),
+                              padding: const EdgeInsets.all(12.0), // Zone tactile agrandie
                               child: Icon(
                                 isFavorite
                                     ? Icons.favorite
@@ -143,7 +143,7 @@ class ProductCardM extends StatelessWidget {
                                 color: isFavorite
                                     ? Colors.red
                                     : Colors.grey.shade400,
-                                size: 20,
+                                size: 22,
                               ),
                             ),
                           ),

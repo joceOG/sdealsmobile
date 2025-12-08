@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../splashscreenblocm/splashscreenBlocM.dart';
 import '../splashscreenblocm/splashscreenStateM.dart';
@@ -11,9 +12,17 @@ class SplashScreenM extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocListener<SplashscreenBlocM, SplashscreenStateM>(
-      listener: (context, state) {
+      listener: (context, state) async {
         if (state is SplashLoadedM) {
-          context.go('/homepage'); // Naviguer vers HomeScreen
+          final prefs = await SharedPreferences.getInstance();
+          final bool onboardingCompleted =
+              prefs.getBool('onboarding_completed') ?? false;
+
+          if (onboardingCompleted) {
+            context.go('/homepage');
+          } else {
+            context.go('/onboarding');
+          }
         }
       },
       child: Scaffold(

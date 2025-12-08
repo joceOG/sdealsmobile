@@ -412,10 +412,8 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                     ),
                     const SizedBox(height: 8),
                     // Grille de produits scrollable avec BlocBuilder
-                    SizedBox(
-                      height: 400, // Hauteur fixe pour la grille de produits
-                      child: BlocBuilder<ShoppingPageBlocM,
-                          bloc_model.ShoppingPageStateM>(
+                    BlocBuilder<ShoppingPageBlocM,
+                        bloc_model.ShoppingPageStateM>(
                         builder: (context, state) {
                           if (state.isLoading ?? false) {
                             return const Center(
@@ -555,7 +553,6 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                           }
                         },
                       ),
-                    ),
                   ],
                 ),
               ),

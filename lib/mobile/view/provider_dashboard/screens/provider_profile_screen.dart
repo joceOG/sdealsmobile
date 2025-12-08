@@ -44,53 +44,23 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[50],
-      appBar: _buildProfileAppBar(),
       body: BlocBuilder<ProviderProfileBloc, ProviderProfileState>(
         builder: (context, state) {
-          return Column(
-            children: [
-              _buildProfileHeader(state),
-              _buildTabSelector(),
-              Expanded(
-                child: _buildProfileContent(state),
-              ),
-            ],
+          return NestedScrollView(
+            headerSliverBuilder: (context, innerBoxIsScrolled) {
+              return [
+                SliverToBoxAdapter(
+                  child: _buildProfileHeader(state),
+                ),
+                SliverToBoxAdapter(
+                  child: _buildTabSelector(),
+                ),
+              ];
+            },
+            body: _buildProfileContent(state),
           );
         },
       ),
-    );
-  }
-
-  // 🎨 APP BAR PROFIL
-  PreferredSizeWidget _buildProfileAppBar() {
-    return AppBar(
-      backgroundColor: Colors.green.shade600,
-      elevation: 0,
-      leading: IconButton(
-        onPressed: () => Navigator.pop(context),
-        icon: Icon(Icons.arrow_back, color: Colors.white),
-      ),
-      title: Row(
-        children: [
-          Icon(Icons.person, color: Colors.white),
-          const SizedBox(width: 8),
-          Text(
-            'Mon Profil',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-      actions: [
-        IconButton(
-          onPressed: () => _showEditProfile(),
-          icon: Icon(Icons.edit, color: Colors.white),
-        ),
-        const SizedBox(width: 8),
-      ],
     );
   }
 
@@ -568,7 +538,7 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen>
     Color color,
   ) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -587,43 +557,49 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen>
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
                   color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(icon, color: color, size: 20),
+                child: Icon(icon, color: color, size: 18),
               ),
               const Spacer(),
-              Icon(Icons.more_vert, color: Colors.grey[400], size: 20),
+              Icon(Icons.more_vert, color: Colors.grey[400], size: 18),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
             value,
             style: TextStyle(
-              fontSize: 18,
+              fontSize: 16,
               fontWeight: FontWeight.bold,
               color: Colors.grey[800],
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 2),
           Text(
             title,
             style: TextStyle(
-              fontSize: 13,
+              fontSize: 12,
               color: Colors.grey[600],
               fontWeight: FontWeight.w600,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 2),
           Text(
             subtitle,
             style: TextStyle(
-              fontSize: 11,
+              fontSize: 10,
               color: color,
               fontWeight: FontWeight.w500,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),

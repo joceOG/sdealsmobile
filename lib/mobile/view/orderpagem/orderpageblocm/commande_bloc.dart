@@ -2,6 +2,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:sdealsmobile/mobile/data/models/commande_model.dart';
 import '../../../../data/services/websocket_service.dart';
 import '../../../../data/services/notification_service.dart';
+import '../../../../data/services/api_client.dart';
 import 'commande_event.dart';
 import 'commande_state.dart';
 // NOTE: imports non utilisés pour le flux e-commerce actuel; le flux Prestation
@@ -10,6 +11,7 @@ import 'commande_state.dart';
 class CommandeBloc extends Bloc<CommandeEvent, CommandeState> {
   final WebSocketService _webSocketService = WebSocketService();
   final NotificationService _notificationService = NotificationService();
+  final ApiClient _apiClient = ApiClient();
 
   CommandeBloc() : super(CommandeState.initial()) {
     on<ChargerCommandes>(_onChargerCommandes);
@@ -36,21 +38,64 @@ class CommandeBloc extends Bloc<CommandeEvent, CommandeState> {
     emit(state.copyWith(isLoading: true));
 
     try {
-      // Ici, on utiliserait normalement une API pour récupérer les commandes
-      // Pour l'exemple, on utilise les données simulées
-      await Future.delayed(
-          const Duration(seconds: 1)); // Simulation de délai réseau
+      // 🔄 Appel API backend
+      print('📡 Chargement commandes depuis API...');
+      
+      final commandesData = await _apiClient.getCommandes(
+        limit: 50, // Charger 50 commandes max
+      );
+
+      // Convertir les data backend en CommandeModel
+      final commandes = commandesData
+          .map((data) => CommandeModel.fromBackend(data))
+          .toList();
+
+      print('✅ ${commandes.length} commandes chargées depuis API');
 
       emit(state.copyWith(
         isLoading: false,
-        commandes: [],
+        commandes: commandes,
+        error: null,
       ));
     } catch (error) {
+      print('⚠️ Erreur API, utilisation mock data: $error');
+      
+      // 📦 Fallback sur mock data pour développement
+      final mockCommandes = _getMockCommandes();
+      
       emit(state.copyWith(
         isLoading: false,
-        error: error.toString(),
+        commandes: mockCommandes,
+        error: 'API indisponible (mode offline)',
       ));
     }
+  }
+
+  // Mock data pour fallback
+  List<CommandeModel> _getMockCommandes() {
+    return [
+      CommandeModel(
+        id: 'mock_1',
+        prestataireId: 'P_MOCK_1',
+        prestataireName: 'Jean Dupont (Mock)',
+        prestataireImage: 'assets/profil.png',
+        typeService: 'Plomberie',
+        status: CommandeStatus.enCours,
+        montant: 25000,
+        dateCommande: DateTime.now().subtract(Duration(days: 2)),
+      ),
+      CommandeModel(
+        id: 'mock_2',
+        prestataireId: 'P_MOCK_2',
+        prestataireName: 'Marie Martin (Mock)',
+        prestataireImage: 'assets/profil.png',
+        typeService: 'Électricité',
+        status: CommandeStatus.terminee,
+        montant: 35000,
+        dateCommande: DateTime.now().subtract(Duration(days: 5)),
+        estNotee: false,
+      ),
+    ];
   }
 
   void _onFiltrerParStatus(
@@ -85,19 +130,41 @@ class CommandeBloc extends Bloc<CommandeEvent, CommandeState> {
   void _onNoterCommande(
     NoterCommande event,
     Emitter<CommandeState> emit,
-  ) {
-    final updatedCommandes = state.commandes.map((commande) {
-      if (commande.id == event.commandeId) {
-        return commande.copyWith(
-          estNotee: true,
-          note: event.note,
-          commentaire: event.commentaire,
-        );
-      }
-      return commande;
-    }).toList();
+  ) async {
+    try {
+      // 📡 Envoyer la note au backend
+      print('📡 Envoi notation pour commande ${event.commandeId}');
+      
+      await _apiClient.updateCommande(
+        commandeId: event.commandeId,
+        updates: {
+          'note': event.note,
+          'commentaire': event.commentaire,
+          'estNotee': true,
+        },
+      );
 
-    emit(state.copyWith(commandes: updatedCommandes));
+      print('✅ Notation envoyée avec succès');
+
+      // Mettre à jour localement
+      final updatedCommandes = state.commandes.map((commande) {
+        if (commande.id == event.commandeId) {
+          return commande.copyWith(
+            estNotee: true,
+            note: event.note,
+            commentaire: event.commentaire,
+          );
+        }
+        return commande;
+      }).toList();
+
+      emit(state.copyWith(commandes: updatedCommandes, error: null));
+    } catch (error) {
+      print('❌ Erreur notation: $error');
+      emit(state.copyWith(
+        error: 'Impossible d\'envoyer la note',
+      ));
+    }
   }
 
   void _onRechercherCommandes(
@@ -110,15 +177,32 @@ class CommandeBloc extends Bloc<CommandeEvent, CommandeState> {
   void _onAnnulerCommande(
     AnnulerCommande event,
     Emitter<CommandeState> emit,
-  ) {
-    final updatedCommandes = state.commandes.map((commande) {
-      if (commande.id == event.commandeId) {
-        return commande.copyWith(status: CommandeStatus.annulee);
-      }
-      return commande;
-    }).toList();
+  ) async {
+    try {
+      // 📡 Annuler via API
+      print('📡 Annulation commande ${event.commandeId}');
+      
+      final success = await _apiClient.cancelCommande(event.commandeId);
+      
+      if (success) {
+        print('✅ Commande annulée avec succès');
+        
+        // Mettre à jour localement
+        final updatedCommandes = state.commandes.map((commande) {
+          if (commande.id == event.commandeId) {
+            return commande.copyWith(status: CommandeStatus.annulee);
+          }
+          return commande;
+        }).toList();
 
-    emit(state.copyWith(commandes: updatedCommandes));
+        emit(state.copyWith(commandes: updatedCommandes, error: null));
+      } else {
+        emit(state.copyWith(error: 'Échec annulation'));
+      }
+    } catch (error) {
+      print('❌ Erreur annulation: $error');
+      emit(state.copyWith(error: 'Impossible d\'annuler'));
+    }
   }
 
   // 🔌 CONFIGURATION DES CALLBACKS WEBSOCKET
