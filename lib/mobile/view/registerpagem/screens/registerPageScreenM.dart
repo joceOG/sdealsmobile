@@ -6,6 +6,9 @@ import '../registerpageblocm/registerPageBlocM.dart';
 import '../registerpageblocm/registerPageEventM.dart';
 import '../registerpageblocm/registerPageStateM.dart';
 
+// ✅ Design System
+import '../../../../design_system/design_system.dart';
+
 class RegisterPageScreenM extends StatefulWidget {
   const RegisterPageScreenM({super.key});
 
@@ -37,36 +40,31 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
-          onPressed: () {
-            context.pop();
-          },
-        ),
+      backgroundColor: SDColors.white,
+      appBar: SDAppBar(
+        title: '',
+        useGradient: false,
+        backgroundColor: SDColors.white,
+        centerTitle: false,
       ),
       body: BlocConsumer<RegisterPageBlocM, RegisterPageStateM>(
         listener: (context, state) {
           if (state.isSuccess) {
-<<<<<<< HEAD
             if (state.utilisateur != null && state.token != null) {
               context.read<AuthCubit>().setAuthenticated(
-                    token: state.token!,
-                    utilisateur: state.utilisateur!,
-                    roles: [state.utilisateur!.role],
-                    activeRole: state.utilisateur!.role,
-                  );
+                token: state.token!,
+                utilisateur: state.utilisateur!,
+                roles: [state.utilisateur!.role],
+                activeRole: state.utilisateur!.role,
+              );
 
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
+                SnackBar(
                   content: Text(
                     "Inscription réussie ✅ Vous êtes maintenant connecté !",
-                    style: TextStyle(color: Colors.white),
+                    style: SDTypography.bodyMedium.copyWith(color: SDColors.white),
                   ),
-                  backgroundColor: Colors.green,
+                  backgroundColor: SDColors.success500,
                 ),
               );
             } else {
@@ -74,17 +72,6 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
                 const SnackBar(content: Text("Inscription réussie ✅")),
               );
             }
-=======
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text("Inscription réussie ✅")),
-            );
-
-            context.read<AuthCubit>().setAuthenticated(
-              token: state.token!,
-              utilisateur: state.utilisateur!,
-            );
-            // Navigation avec GoRouter vers la page d'accueil
->>>>>>> 94ba01a (MAJ SDEALS MOBILE BETA)
             WidgetsBinding.instance.addPostFrameCallback((_) {
               context.push("/homepage");
             });
@@ -92,8 +79,11 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
           if (state.errorMessage != null) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(state.errorMessage!),
-                backgroundColor: Colors.red,
+                content: Text(
+                  state.errorMessage!,
+                  style: SDTypography.bodyMedium.copyWith(color: SDColors.white),
+                ),
+                backgroundColor: SDColors.error500,
               ),
             );
           }
@@ -101,11 +91,11 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
         builder: (context, state) {
           return SingleChildScrollView(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              padding: EdgeInsets.symmetric(horizontal: SDSpacing.md),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                   const SizedBox(height: 10),
+                  SDSpacing.verticalSmallGap,
                   Center(
                     child: AnimatedBuilder(
                       animation: _animationController,
@@ -121,137 +111,70 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
                       child: Image.asset('assets/logo1.png', height: 100),
                     ),
                   ),
-                  const SizedBox(height: 30),
-                  const Text(
+                  SDSpacing.verticalLargeGap,
+                  Text(
                     "Créer un compte",
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 28, 
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87
+                    style: SDTypography.displayMedium.copyWith(
+                      color: SDColors.neutral900,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  SDSpacing.verticalTinyGap,
                   Text(
                     "Rejoignez Soutrali Deals pour commencer",
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 16, 
-                      color: Colors.grey.shade600
+                    style: SDTypography.bodyLarge.copyWith(
+                      color: SDColors.neutral600,
                     ),
                   ),
-                  const SizedBox(height: 30),
+                  SDSpacing.verticalLargeGap,
 
-                  // Formulaire
-                  TextField(
+                  // Design System Form
+                  SDInput(
+                    label: "Nom complet",
+                    hint: "Entrez votre nom complet",
+                    prefixIcon: Icons.person_outline,
                     onChanged: (v) => context.read<RegisterPageBlocM>().add(
-                          RegisterFullNameChanged(v),
-                        ),
-                    decoration: InputDecoration(
-                      labelText: "Nom complet",
-                      hintText: "Entrez votre nom complet",
-                      prefixIcon: const Icon(Icons.person_outline),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(15),
-                        borderSide: BorderSide(color: Colors.grey.shade300),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(15),
-                        borderSide: const BorderSide(color: Colors.green, width: 2),
-                      ),
+                      RegisterFullNameChanged(v),
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    onChanged: (v) => context.read<RegisterPageBlocM>().add(
-                          RegisterPhoneChanged(v),
-                        ),
+                  SDSpacing.verticalDefaultGap,
+                  SDInput(
+                    label: "Numéro de Téléphone",
+                    hint: "Ex: 0102030405",
                     keyboardType: TextInputType.phone,
-                    decoration: InputDecoration(
-                      labelText: "Numéro de Téléphone",
-                      hintText: "Ex: 0102030405",
-                      prefixIcon: const Icon(Icons.phone_android),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(15),
-                        borderSide: BorderSide(color: Colors.grey.shade300),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(15),
-                        borderSide: const BorderSide(color: Colors.green, width: 2),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    obscureText: obscurePassword,
+                    prefixIcon: Icons.phone_android,
                     onChanged: (v) => context.read<RegisterPageBlocM>().add(
-                          RegisterPasswordChanged(v),
-                        ),
-                    decoration: InputDecoration(
-                      labelText: "Mot de passe",
-                      hintText: "Créez un mot de passe",
-                      prefixIcon: const Icon(Icons.lock_outline),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(15),
-                        borderSide: BorderSide(color: Colors.grey.shade300),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(15),
-                        borderSide: const BorderSide(color: Colors.green, width: 2),
-                      ),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          obscurePassword
-                              ? Icons.visibility_off
-                              : Icons.visibility,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            obscurePassword = !obscurePassword;
-                          });
-                        },
-                      ),
+                      RegisterPhoneChanged(v),
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  TextField(
+                  SDSpacing.verticalDefaultGap,
+                  SDInput(
+                    label: "Mot de passe",
+                    hint: "Créez un mot de passe",
                     obscureText: true,
+                    prefixIcon: Icons.lock_outline,
                     onChanged: (v) => context.read<RegisterPageBlocM>().add(
-                          RegisterConfirmPasswordChanged(v),
-                        ),
-                    decoration: InputDecoration(
-                      labelText: "Confirmez le mot de passe",
-                      hintText: "Répétez le mot de passe",
-                      prefixIcon: const Icon(Icons.lock_reset),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(15),
-                        borderSide: BorderSide(color: Colors.grey.shade300),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(15),
-                        borderSide: const BorderSide(color: Colors.green, width: 2),
-                      ),
+                      RegisterPasswordChanged(v),
                     ),
                   ),
-                  
-                  const SizedBox(height: 12),
+                  SDSpacing.verticalDefaultGap,
+                  SDInput(
+                    label: "Confirmez le mot de passe",
+                    hint: "Répétez le mot de passe",
+                    obscureText: true,
+                    prefixIcon: Icons.lock_reset,
+                    onChanged: (v) => context.read<RegisterPageBlocM>().add(
+                      RegisterConfirmPasswordChanged(v),
+                    ),
+                  ),
+
+                  SDSpacing.verticalSmallGap,
                   Row(
                     children: [
                       Checkbox(
                         value: agreeToTerms,
-                        activeColor: Colors.green,
+                        activeColor: SDColors.primary600,
                         onChanged: (value) {
                           setState(() {
                             agreeToTerms = value ?? false;
@@ -261,162 +184,62 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
                       Expanded(
                         child: Text(
                           "J'accepte les termes et conditions",
-                          style: TextStyle(fontSize: 14, color: Colors.grey.shade800),
-                        ),
-                      ),
-<<<<<<< HEAD
-=======
-                      const SizedBox(height: 20),
-                      TextField(
-                        obscureText: true,
-                        onChanged: (v) => context
-                            .read<RegisterPageBlocM>()
-                            .add(RegisterConfirmPasswordChanged(v)),
-                        decoration: const InputDecoration(
-                          labelText: "Confirmez le mot de passe",
-                          hintText: "Confirmez votre mot de passe",
-                          border: UnderlineInputBorder(),
-                          suffixIcon: Icon(Icons.visibility_off),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          Checkbox(
-                            value: agreeToTerms,
-                            onChanged: (value) {
-                              setState(() {
-                                agreeToTerms = value ?? false;
-                              });
-                            },
-                          ),
-                          const Expanded(
-                            child: Text(
-                              "J'accepte les termes et conditions",
-                              style: TextStyle(fontSize: 14),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      ElevatedButton(
-                        onPressed: agreeToTerms && !state.isSubmitting
-                            ? () {
-                          context
-                              .read<RegisterPageBlocM>()
-                              .add(RegisterSubmitted());
-
-                        }
-                            : null,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green.shade700,
-                          minimumSize: const Size(double.infinity, 50),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(25),
+                          style: SDTypography.bodyMedium.copyWith(
+                            color: SDColors.neutral800,
                           ),
                         ),
-                        child: state.isSubmitting
-                            ? const CircularProgressIndicator(color: Colors.white)
-                            : const Text(
-                          "JE M'INSCRIS",
-                          style: TextStyle(
-                              fontSize: 16, color: Colors.white),
-                        ),
                       ),
-                      const SizedBox(height: 10),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Text('Vous avez déjà un compte ?'),
-                          TextButton(
-                            onPressed: () {
-                              context.go("/login"); // si tu as une route login
-                            },
-                            child: const Text('Connectez-vous',
-                                style: TextStyle(
-                                  color: Colors.green,
-                                )),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      const Text(
-                        "En vous inscrivant, vous acceptez nos conditions d'utilisation et notre politique de confidentialité.",
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
-                        ),
-                      ),
->>>>>>> 94ba01a (MAJ SDEALS MOBILE BETA)
                     ],
                   ),
-                  
-                  const SizedBox(height: 20),
-                  
-                  ElevatedButton(
+
+                  SDSpacing.verticalMediumGap,
+
+                  SDButton(
+                    text: "CRÉER MON COMPTE",
+                    fullWidth: true,
+                    isLoading: state.isSubmitting,
                     onPressed: agreeToTerms && !state.isSubmitting
                         ? () {
-                            context.read<RegisterPageBlocM>().add(
-                                  RegisterSubmitted(),
-                                );
-                          }
+                      context.read<RegisterPageBlocM>().add(
+                        RegisterSubmitted(),
+                      );
+                    }
                         : null,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green.shade600,
-                      disabledBackgroundColor: Colors.grey.shade300,
-                      minimumSize: const Size(double.infinity, 56),
-                      elevation: 2,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
-                    child: state.isSubmitting
-                        ? const CircularProgressIndicator(
-                            color: Colors.white,
-                          )
-                        : const Text(
-                            "CRÉER MON COMPTE",
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 1.0,
-                              color: Colors.white,
-                            ),
-                          ),
                   ),
-                  
-                  const SizedBox(height: 24),
+
+                  SDSpacing.verticalMediumGap,
                   Wrap(
                     alignment: WrapAlignment.center,
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       Text(
                         'Vous avez déjà un compte ?',
-                        style: TextStyle(color: Colors.grey.shade800),
+                        style: SDTypography.bodyMedium.copyWith(
+                          color: SDColors.neutral800,
+                        ),
                       ),
                       TextButton(
                         onPressed: () {
-                          context.go("/login"); 
+                          context.go("/login");
                         },
-                        child: const Text(
+                        child: Text(
                           'Connectez-vous',
-                          style: TextStyle(
-                            color: Colors.green,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16
+                          style: SDTypography.labelLarge.copyWith(
+                            color: SDColors.primary600,
                           ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 10),
+                  SDSpacing.verticalSmallGap,
                   Padding(
-                    padding: const EdgeInsets.only(bottom: 20.0),
+                    padding: EdgeInsets.only(bottom: SDSpacing.md),
                     child: Text(
                       "En vous inscrivant, vous acceptez nos conditions d'utilisation et notre politique de confidentialité.",
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                      style: SDTypography.bodySmall.copyWith(
+                        color: SDColors.neutral500,
+                      ),
                     ),
                   ),
                 ],
