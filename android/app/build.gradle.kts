@@ -7,8 +7,13 @@ plugins {
 
 android {
     namespace = "com.example.sdealsmobile"
+<<<<<<< HEAD
     compileSdk = 35
     ndkVersion = "28.0.12433566"
+=======
+    compileSdk = flutter.compileSdkVersion
+    ndkVersion = "27.0.12077973"
+>>>>>>> 9ff9523 (Fix: Configuration Android Build - NDK version et Google Maps API Key)
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
