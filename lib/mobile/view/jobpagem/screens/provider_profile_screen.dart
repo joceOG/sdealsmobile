@@ -10,6 +10,7 @@ import '../../../../data/services/authCubit.dart';
 import '../../loginpagem/screens/loginPageScreenM.dart';
 import '../widgets/mini_map_widget.dart';
 import '../../orderpagem/screens/service_request_summary_screen.dart';
+import '../../common/widgets/app_image.dart';
 
 /// 🎯 Page de profil complète d'un prestataire
 /// Affiche toutes les informations détaillées, services, avis, portfolio
@@ -251,10 +252,9 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen>
                 ),
                 child: ClipOval(
                   child: isUrl
-                      ? Image.network(
-                          photoUrl,
+                      ? AppImage(
+                          imageUrl: photoUrl,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => _buildDefaultAvatar(),
                         )
                       : _buildDefaultAvatar(),
                 ),

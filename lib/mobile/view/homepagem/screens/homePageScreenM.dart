@@ -359,24 +359,31 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
   Widget _buildSearchField() {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
-      child: TextField(
-        controller: _searchController,
-        decoration: InputDecoration(
-          hintText: 'Rechercher un service, un produit...',
-          prefixIcon: const Icon(Icons.search, color: Colors.white),
-          suffixIcon: IconButton(
-            icon: const Icon(Icons.close, color: Colors.white),
-            onPressed: () => setState(() => _isSearchVisible = false),
-          ),
-          filled: true,
-          fillColor: Colors.white.withOpacity(0.2),
-          border: OutlineInputBorder(
+      child: GestureDetector(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const SearchPageScreenM()),
+          );
+        },
+        child: Container(
+          height: 48,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.2),
             borderRadius: BorderRadius.circular(30),
-            borderSide: BorderSide.none,
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.search, color: Colors.white),
+              const SizedBox(width: 12),
+              Text(
+                'Rechercher un service, un produit...',
+                style: TextStyle(color: Colors.white.withOpacity(0.9)),
+              ),
+            ],
           ),
         ),
-        style: const TextStyle(color: Colors.white),
-        onSubmitted: (_) => _performSearch(),
       ),
     );
   }

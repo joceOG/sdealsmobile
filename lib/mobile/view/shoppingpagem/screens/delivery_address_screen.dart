@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
+import 'package:sdealsmobile/mobile/view/common/utils/app_snackbar.dart';
 import 'package:sdealsmobile/data/services/authCubit.dart';
 import 'package:sdealsmobile/data/models/cart_model.dart';
 import '../shoppingpageblocm/shoppingPageBlocM.dart';
@@ -135,12 +138,7 @@ class _DeliveryAddressScreenState extends State<DeliveryAddressScreen> {
       body: BlocListener<ShoppingPageBlocM, ShoppingPageStateM>(
         listener: (context, state) {
           if (state.cartError != null) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.cartError!),
-                backgroundColor: Colors.red,
-              ),
-            );
+            AppSnackBar.error(context, state.cartError!);
           }
         },
         child: SingleChildScrollView(

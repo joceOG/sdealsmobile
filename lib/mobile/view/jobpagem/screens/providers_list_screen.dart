@@ -5,6 +5,8 @@ import '../jobpageblocm/jobPageEventM.dart';
 import '../jobpageblocm/jobPageStateM.dart';
 import 'detailPageScreenM.dart';
 import '../utils/navigation_helper.dart';
+import '../../common/widgets/app_image.dart';
+import '../../common/widgets/skeleton_loader.dart';
 
 class ProvidersListScreen extends StatefulWidget {
   const ProvidersListScreen({super.key});
@@ -58,31 +60,14 @@ class _ProvidersListScreenState extends State<ProvidersListScreen> {
         body: BlocBuilder<JobPageBlocM, JobPageStateM>(
           builder: (context, state) {
             if (state.isMatchingLoading) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF2E7D32).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const CircularProgressIndicator(
-                        color: Color(0xFF2E7D32),
-                        strokeWidth: 3,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    const Text(
-                      'Chargement des prestataires...',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Color(0xFF2E7D32),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
+               return SkeletonGrid(
+                itemCount: 6,
+                crossAxisCount: 2,
+                childAspectRatio: 0.8,
+                itemTemplate: const SkeletonWidget.rounded(
+                  width: double.infinity,
+                  height: double.infinity,
+                  borderRadius: 16,
                 ),
               );
             }
@@ -221,16 +206,9 @@ class _ProvidersListScreenState extends State<ProvidersListScreen> {
                             child: provider.utilisateur?.photoProfil != null &&
                                     provider
                                         .utilisateur!.photoProfil!.isNotEmpty
-                                ? Image.network(
-                                    provider.utilisateur!.photoProfil!,
+                                ? AppImage(
+                                    imageUrl: provider.utilisateur!.photoProfil!,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) {
-                                      return Icon(
-                                        Icons.person,
-                                        size: 35,
-                                        color: const Color(0xFF2E7D32),
-                                      );
-                                    },
                                   )
                                 : Icon(
                                     Icons.person,

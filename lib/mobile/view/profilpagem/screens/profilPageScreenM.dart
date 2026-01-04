@@ -9,7 +9,7 @@ import '../profilpageblocm/profilPageBlocM.dart';
 import 'edit_profile_screen.dart';
 import '../../avispagem/screens/avisPageScreenM.dart';
 import '../../avispagem/avispageblocm/avisPageBlocM.dart';
-import '../../favorispagem/screens/favoritePageScreenM.dart';
+import '../../favorispagem/screens/favorite_page_screen_m.dart';
 import '../../favorispagem/favorispageblocm/favoritePageBlocM.dart';
 import '../../historypagem/screens/historyPageScreenM.dart';
 import '../../historypagem/historypageblocm/historyPageBlocM.dart';

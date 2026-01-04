@@ -6,6 +6,9 @@ import '../shoppingpageblocm/shoppingPageStateM.dart';
 import 'package:sdealsmobile/data/services/authCubit.dart';
 import 'confirmationCommandeScreenM.dart';
 import 'delivery_address_screen.dart';
+import 'package:sdealsmobile/mobile/view/common/utils/app_snackbar.dart';
+import '../../common/widgets/empty_state_widget.dart';
+import '../../common/widgets/app_image.dart';
 
 class PanierProductScreenM extends StatefulWidget {
   const PanierProductScreenM({super.key});
@@ -87,13 +90,7 @@ class _PanierProductScreenMState extends State<PanierProductScreenM> {
         listener: (context, state) {
           // Afficher les erreurs
           if (state.cartError != null && state.cartError!.isNotEmpty) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.cartError!),
-                backgroundColor: Colors.red,
-                duration: const Duration(seconds: 3),
-              ),
-            );
+            AppSnackBar.error(context, state.cartError!);
           }
         },
         builder: (context, state) {
@@ -113,48 +110,22 @@ class _PanierProductScreenMState extends State<PanierProductScreenM> {
 
           // Panier vide
           if (state.cart == null || state.cart!.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.shopping_cart_outlined,
-                    size: 100,
-                    color: Colors.grey[400],
+            return EmptyStateWidget(
+              imagePath: 'assets/panier_vide.png',
+              title: 'Votre panier est vide',
+              message: 'Ajoutez des produits pour commencer vos achats et profitez de nos offres !',
+              action: ElevatedButton.icon(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.shopping_bag),
+                label: const Text('Continuer mes achats'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2E7D32),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Votre panier est vide',
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: Colors.grey[600],
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Ajoutez des articles pour commencer',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[500],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  ElevatedButton(
-                    onPressed: () => Navigator.pop(context),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 32,
-                        vertical: 12,
-                      ),
-                    ),
-                    child: const Text(
-                      'Continuer mes achats',
-                      style: TextStyle(color: Colors.white),
-                    ),
-                  ),
-                ],
+                ),
               ),
             );
           }
@@ -211,21 +182,11 @@ class _PanierProductScreenMState extends State<PanierProductScreenM> {
                                 // Image du produit
                                 ClipRRect(
                                   borderRadius: BorderRadius.circular(8),
-                                  child: Image.network(
-                                    item.imageArticle,
+                                  child: AppImage(
+                                    imageUrl: item.imageArticle,
                                     width: 80,
                                     height: 80,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => Container(
-                                      width: 80,
-                                      height: 80,
-                                      color: Colors.grey[200],
-                                      child: const Icon(
-                                        Icons.image,
-                                        size: 40,
-                                        color: Colors.grey,
-                                      ),
-                                    ),
                                   ),
                                 ),
                                 const SizedBox(width: 12),

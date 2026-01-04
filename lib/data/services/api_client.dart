@@ -8,6 +8,7 @@ import 'package:diacritic/diacritic.dart';
 import '../models/article.dart';
 import '../models/groupe.dart';
 import '../models/service.dart';
+import 'cache_service.dart';
 
 // http://180.149.197.115:3000/
 
@@ -132,6 +133,46 @@ class ApiClient {
 
   Future<List<Categorie>> fetchCategorie(String nomGroupe) async {
     print('Récupération des catégories pour le groupe: $nomGroupe');
+    final cacheKey = 'categories_${removeDiacritics(nomGroupe).toLowerCase()}';
+
+    // 1️⃣ Tentative de récupération depuis le cache
+    try {
+      final cachedData = await CacheService().getCachedData(cacheKey);
+      if (cachedData != null) {
+        print('📦 Données récupérées du cache pour $cacheKey');
+        List<dynamic> categoriesJson = cachedData;
+        List<Categorie> allCategories = [];
+        for (var json in categoriesJson) {
+           try {
+             if (json['groupe'] is Map<String, dynamic>) {
+               var groupeJson = json['groupe'];
+               var jsonCopy = Map<String, dynamic>.from(json);
+               jsonCopy['groupe'] = {
+                 '_id': groupeJson['_id'] as String,
+                 'nomgroupe': groupeJson['nomgroupe'] as String
+               };
+               allCategories.add(Categorie.fromJson(jsonCopy));
+             } else {
+               allCategories.add(Categorie.fromJson(json));
+             }
+           } catch (e) {
+             print('Erreur parsing catégorie cache: $e');
+           }
+        }
+        // Filtrage local (redondant si la clé est spécifique, mais sécurisé)
+        final filteredCategories = allCategories.where((cat) {
+          final groupeNom = removeDiacritics(cat.groupe.nomgroupe.toLowerCase());
+          final targetNom = removeDiacritics(nomGroupe.toLowerCase());
+          return groupeNom == targetNom;
+        }).toList();
+        
+        if (filteredCategories.isNotEmpty) return filteredCategories;
+      }
+    } catch (e) {
+      print('Erreur cache categories: $e');
+    }
+
+    // 2️⃣ Appel API (si cache vide/expiré)
     try {
       final response = await http.get(Uri.parse('$apiUrl/categorie'));
       if (response.statusCode == 200) {
@@ -156,6 +197,18 @@ class ApiClient {
             print('Erreur parsing catégorie: $e pour ${json.toString()}');
           }
         }
+
+        // 3️⃣ Mise en cache et retour
+        // On sauvegarde tout le json reçu pour pouvoir le filtrer plus tard si besoin, 
+        // ou juste ce qu'on a reçu. Ici on a reçu TOUTES les catégories.
+        // On devrait peut-être cacher "toutes" les catégories sous une clé, ou filtrer avant.
+        // L'API renvoie TOUT. Donc on cache TOUT sous une clé générique ? 
+        // Non, fetchCategorie est appelé par nomGroupe.
+        // Mais l'endpoint est `/categorie` (ALL).
+        // Donc on devrait cacher sous 'all_categories'.
+        
+        await CacheService().cacheData('all_categories', categoriesJson);
+        await CacheService().cacheData(cacheKey, categoriesJson); // Aussi sous la clé spécifique pour simplifier mais c'est dupliqué
 
         // Filtrer les catégories par nom de groupe (insensible à casse et accents)
         final filteredCategories = allCategories.where((cat) {
@@ -270,6 +323,34 @@ class ApiClient {
 
   Future<List<Service>> fetchServices(String nomGroupe) async {
     print('Récupération des services pour le groupe: $nomGroupe');
+    final cacheKey = 'services_${removeDiacritics(nomGroupe).toLowerCase()}';
+
+    // 1️⃣ Cache
+    try {
+      final cachedData = await CacheService().getCachedData(cacheKey);
+      if (cachedData != null) {
+        print('📦 Services récupérés du cache');
+        List<dynamic> servicesJson = cachedData;
+        List<Service> allServices = servicesJson
+            .map((json) {
+              try { return Service.fromJson(json); } catch (e) { return null; }
+            })
+            .whereType<Service>()
+            .toList();
+            
+        List<Service> filteredServices = allServices.where((s) {
+          final cat = s.categorie;
+          final grp = cat == null ? null : cat.groupe;
+          final groupeNom = grp == null ? null : grp.nomgroupe;
+          return groupeNom != null &&
+              groupeNom.toLowerCase() == nomGroupe.toLowerCase();
+        }).toList();
+        
+        if (filteredServices.isNotEmpty) return filteredServices;
+      }
+    } catch (e) { print('Erreur cache services: $e'); }
+
+    // 2️⃣ API
 
     try {
       final response = await http.get(Uri.parse('$apiUrl/service'));
@@ -279,6 +360,9 @@ class ApiClient {
       if (response.statusCode == 200) {
         List<dynamic> servicesJson = jsonDecode(response.body);
         print('Nombre total de services reçus: ${servicesJson.length}');
+        
+        // 3️⃣ Save Cache
+        await CacheService().cacheData(cacheKey, servicesJson);
 
         List<Service> allServices = servicesJson
             .map((json) {
@@ -549,6 +633,18 @@ class ApiClient {
   Future<List<Map<String, dynamic>>> fetchPrestataires() async {
     print('🚀 Récupération des prestataires depuis le backend');
     print('🌐 URL complète: ${dotenv.env['API_URL']}/prestataire');
+    const cacheKey = 'all_prestataires';
+
+    // 1️⃣ Cache
+    try {
+       final cachedData = await CacheService().getCachedData(cacheKey);
+       if (cachedData != null) {
+         print('📦 Prestataires récupérés du cache');
+         return (cachedData as List).cast<Map<String, dynamic>>();
+       }
+    } catch(e) { print('Erreur cache prestataires: $e'); }
+
+    // 2️⃣ API
 
     // ✅ SUPPRIMÉ : Test de connectivité inutile qui causait le problème
 
@@ -567,7 +663,9 @@ class ApiClient {
         print('✅ Prestataires récupérés: ${prestatairesJson.length}');
 
         // Retourner la liste de Map pour que le BLoC puisse la convertir
-        return prestatairesJson.cast<Map<String, dynamic>>();
+        List<Map<String, dynamic>> result = prestatairesJson.cast<Map<String, dynamic>>();
+        await CacheService().cacheData(cacheKey, result);
+        return result;
       } else {
         print('❌ Erreur HTTP ${response.statusCode}: ${response.body}');
         throw Exception(
@@ -800,10 +898,66 @@ class ApiClient {
       }
       return null;
     } catch (e) {
-      print('Erreur géocodage API: $e');
+      print('Erreur geocodeAddress: $e');
       return null;
     }
   }
+
+  // ✅ NOUVELLE MÉTHODE : Recherche Globale
+  Future<Map<String, dynamic>> searchGlobal(
+    String query, {
+    int? minPrice, 
+    int? maxPrice, 
+    String? city
+  }) async {
+    print('🔍 Recherche globale pour: "$query" [Filtres: min=$minPrice, max=$maxPrice, city=$city]');
+    try {
+      final queryParams = {
+        'query': query,
+        if (minPrice != null) 'minPrice': minPrice.toString(),
+        if (maxPrice != null) 'maxPrice': maxPrice.toString(),
+        if (city != null) 'city': city,
+      };
+
+      final uri = Uri.parse('$apiUrl/search/global').replace(queryParameters: queryParams);
+
+      final response = await http.get(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        print('✅ Résultats trouvés: ${data['counts']}');
+        return data;
+      } else {
+        print('❌ Erreur recherche: ${response.statusCode}');
+        return {};
+      }
+    } catch (e) {
+      print('🔥 Exception recherche: $e');
+      return {};
+    }
+  }
+
+  // ✅ NOUVELLE MÉTHODE : Suggestions de recherche
+  Future<List<String>> getSuggestions(String query) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$apiUrl/search/suggestions?query=$query'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        List<dynamic> data = jsonDecode(response.body);
+        return data.cast<String>();
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
+  }
+
 
   // ✅ NOUVELLE MÉTHODE : Rechercher des lieux proches
   Future<List<Map<String, dynamic>>> searchNearbyPlaces({

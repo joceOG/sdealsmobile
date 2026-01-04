@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:sdealsmobile/mobile/view/freelancepagem/freelancepageblocm/freelancePageStateM.dart';
 import 'package:sdealsmobile/mobile/view/freelance_registration/screens/freelance_registration_screen.dart';
+import 'package:sdealsmobile/mobile/view/searchpagem/screens/searchPageScreenM.dart';
 import '../freelancepageblocm/freelancePageBlocM.dart';
 import '../freelancepageblocm/freelancePageEventM.dart';
 import '../models/freelance_model.dart';
@@ -958,7 +959,16 @@ class _FreelancePageScreenContentState
               ],
             ),
             child: TextField(
-              controller: _searchController,
+              readOnly: true, // ✅ Empêcher la saisie directe, navigation seulement
+              onTap: () {
+                // ✅ Navigation vers la Recherche Globale (Onglet "Pros" = Index 2)
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const SearchPageScreenM(initialIndex: 2),
+                  ),
+                );
+              },
               decoration: InputDecoration(
                 hintText: 'Rechercher (ex: Logo, Site Web...)',
                 hintStyle: TextStyle(color: Colors.grey.shade400),
@@ -967,10 +977,6 @@ class _FreelancePageScreenContentState
                 contentPadding: const EdgeInsets.symmetric(
                     horizontal: 16, vertical: 14),
               ),
-              onChanged: (value) {
-                final bloc = context.read<FreelancePageBlocM>();
-                bloc.add(SearchFreelancerEvent(value));
-              },
             ),
           ),
         ],
