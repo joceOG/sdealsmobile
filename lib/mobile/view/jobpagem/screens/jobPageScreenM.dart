@@ -1,6 +1,7 @@
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:sdealsmobile/mobile/view/searchpagem/screens/searchPageScreenM.dart';
 import 'package:sdealsmobile/data/services/authCubit.dart';
 import 'package:sdealsmobile/mobile/view/loginpagem/screens/loginPageScreenM.dart';
 import 'package:sdealsmobile/mobile/view/serviceproviderwelcomepagem/screens/serviceProviderWelcomeScreenM.dart';
@@ -16,6 +17,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:flutter/foundation.dart';
 import '../services/custom_marker_service.dart';
 import '../utils/navigation_helper.dart';
+import '../../common/widgets/app_image.dart';
 
 import '../../../../data/models/service.dart';
 // import '../../../../data/models/prestataire.dart'; // ✅ Import manquant - supprimé car non utilisé
@@ -496,22 +498,12 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                                                 left: Radius.circular(16),
                                               ),
                                               child: service.imageservice.isNotEmpty
-                                                  ? Image.network(
-                                                      service.imageservice,
+                                                  ? AppImage(
+                                                      imageUrl: service.imageservice,
                                                       width: 110,
                                                       height: 150,
                                                       fit: BoxFit.cover,
-                                                      errorBuilder: (context, error, stackTrace) =>
-                                                          Container(
-                                                            width: 110,
-                                                            height: 150,
-                                                            color: const Color(0xFF2E7D32).withOpacity(0.1),
-                                                            child: const Icon(
-                                                              Icons.image,
-                                                              size: 40,
-                                                              color: const Color(0xFF2E7D32),
-                                                            ),
-                                                          ),
+                                                      placeholderAsset: 'assets/products/default.png',
                                                     )
                                                   : Container(
                                                       width: 110,
@@ -745,20 +737,12 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                                               borderRadius:
                                                   BorderRadius.circular(14.0),
                                               child: imageUrl.isNotEmpty
-                                                  ? Image.network(
-                                                      imageUrl,
+                                                  ? AppImage(
+                                                      imageUrl: imageUrl,
                                                       fit: BoxFit.cover,
                                                       width: 90,
                                                       height: 130,
-                                                      errorBuilder: (context,
-                                                              error,
-                                                              stackTrace) =>
-                                                          Image.asset(
-                                                        'assets/profil.png',
-                                                        fit: BoxFit.cover,
-                                                        width: 90,
-                                                        height: 130,
-                                                      ),
+                                                      placeholderAsset: 'assets/profil.png',
                                                     )
                                                   : Image.asset(
                                                       'assets/profil.png',
@@ -1345,6 +1329,7 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
               ],
             ),
             child: TextField(
+              readOnly: true, // Empêcher le clavier de s'ouvrir
               decoration: InputDecoration(
                 hintText: 'Rechercher un service, prestataire...',
                 hintStyle: TextStyle(color: Colors.grey.shade400),
@@ -1364,12 +1349,8 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                 ),
               ),
               onTap: () {
-                // TODO: Navigation vers page de recherche
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Fonction de recherche bientôt disponible'),
-                    duration: Duration(seconds: 1),
-                  ),
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (context) => const SearchPageScreenM()),
                 );
               },
             ),
@@ -2246,13 +2227,12 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
         children: [
           if (imageUrl != null && imageUrl.isNotEmpty)
             ClipOval(
-              child: Image.network(
-                imageUrl,
+            child: AppImage(
+                imageUrl: imageUrl,
                 width: 60,
                 height: 60,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) =>
-                    Icon(fallbackIcon, color: Colors.green, size: 32),
+                // Error icon handled by AppImage
               ),
             )
           else
@@ -2830,29 +2810,9 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                                     ),
                                   ),
                                   child: rec['image'] != null && rec['image'].toString().isNotEmpty
-                                      ? Image.network(
-                                          rec['image'],
+                                      ? AppImage(
+                                          imageUrl: rec['image'],
                                           fit: BoxFit.cover,
-                                          loadingBuilder: (context, child, loadingProgress) {
-                                            if (loadingProgress == null) return child;
-                                            return Center(
-                                              child: CircularProgressIndicator(
-                                                value: loadingProgress.expectedTotalBytes != null
-                                                    ? loadingProgress.cumulativeBytesLoaded /
-                                                        loadingProgress.expectedTotalBytes!
-                                                    : null,
-                                                strokeWidth: 2,
-                                                color: const Color(0xFF2E7D32),
-                                              ),
-                                            );
-                                          },
-                                          errorBuilder: (_, __, ___) => Center(
-                                            child: Icon(
-                                              rec['icon'] ?? Icons.home_repair_service,
-                                              size: 50,
-                                              color: const Color(0xFF2E7D32),
-                                            ),
-                                          ),
                                         )
                                       : Center(
                                           child: Icon(

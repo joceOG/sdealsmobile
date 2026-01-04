@@ -5,6 +5,7 @@ import '../../../data/models/commande_model.dart';
 import '../orderpageblocm/commande_bloc.dart';
 import '../orderpageblocm/commande_event.dart';
 import '../orderpageblocm/commande_state.dart';
+import '../../common/widgets/empty_state_widget.dart';
 import '../widgets/commande_card.dart';
 import 'commande_details_screen.dart';
 
@@ -354,28 +355,11 @@ class _OrderPageScreenMState extends State<OrderPageScreenM>
     }
 
     if (state.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.shopping_bag_outlined,
-                size: 80, color: Colors.green.shade300),
-            const SizedBox(height: 16),
-            const Text(
-              'Aucune commande trouvée',
-              style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.green),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _getEmptyStateMessage(state.filtreStatus),
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey.shade600),
-            ),
-          ],
-        ),
+      return EmptyStateWidget(
+        imagePath: 'assets/commandes_vides.png',
+        title: 'Aucune commande',
+        message: 'Vous n\'avez pas encore passé de commande.\nCommencez vos achats dès maintenant !',
+        imageSize: 200,
       );
     }
 

@@ -6,11 +6,14 @@ import '../shoppingpageblocm/shoppingPageBlocM.dart';
 import '../shoppingpageblocm/shoppingPageEventM.dart';
 import '../shoppingpageblocm/shoppingPageStateM.dart' as bloc_model;
 import 'productDetailsScreenM.dart';
+import 'package:sdealsmobile/mobile/view/searchpagem/screens/searchPageScreenM.dart';
 import 'panierProductScreenM.dart';
 import '../../seller_registration/screens/seller_registration_screen.dart';
 import 'package:sdealsmobile/data/models/vendeur.dart';
 import '../widgets/filter_bottom_sheet.dart';
 import '../widgets/product_card_m.dart';
+import '../../common/widgets/app_image.dart';
+import '../../common/widgets/skeleton_loader.dart';
 
 // Utilisation du modèle Product du BLoC
 typedef Product = bloc_model.Product;
@@ -297,8 +300,22 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                         builder: (context, state) {
                           // Afficher message de chargement ou d'erreur si nécessaire
                           if (state?.isLoading == true) {
-                            return const Center(
-                                child: CircularProgressIndicator());
+                            return SizedBox(
+                              height: 100, // Hauteur approximative des catégories
+                              child: ListView.builder(
+                                scrollDirection: Axis.horizontal,
+                                itemCount: 5,
+                                padding: const EdgeInsets.symmetric(horizontal: 4),
+                                itemBuilder: (context, index) => const Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 8.0),
+                                  child: SkeletonWidget.rounded(
+                                    width: 100,
+                                    height: 100,
+                                    borderRadius: 12,
+                                  ),
+                                ),
+                              ),
+                            );
                           }
 
                           if (state?.error?.isNotEmpty == true) {
@@ -416,8 +433,16 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                         bloc_model.ShoppingPageStateM>(
                         builder: (context, state) {
                           if (state.isLoading ?? false) {
-                            return const Center(
-                                child: CircularProgressIndicator());
+                            return SkeletonGrid(
+                              itemCount: 6,
+                              crossAxisCount: 2,
+                              childAspectRatio: 0.72,
+                              itemTemplate: const SkeletonWidget.rounded(
+                                width: double.infinity,
+                                height: double.infinity,
+                                borderRadius: 12,
+                              ),
+                            );
                           }
 
                           // Affichage de débogage pour comprendre l'erreur
@@ -677,21 +702,13 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                           children: [
                             product.image.startsWith('http') ||
                                     product.image.startsWith('https')
-                                ? Image.network(
-                                    product.image,
-                                    height: 80,
-                                    errorBuilder: (context, error, stackTrace) {
-                                      return Container(
+                                    ? AppImage(
+                                        imageUrl: product.image,
                                         height: 80,
                                         width: 80,
-                                        color: Colors.grey[200],
-                                        child: const Center(
-                                          child: Icon(Icons.image_not_supported,
-                                              size: 30, color: Colors.grey),
-                                        ),
-                                      );
-                                    },
-                                  )
+                                        fit: BoxFit.contain,
+                                        placeholderAsset: 'assets/products/default.png',
+                                      )
                                 : Image.asset(
                                     product.image.isNotEmpty
                                         ? product.image
@@ -1286,6 +1303,7 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                       ],
                     ),
                     child: TextField(
+                      readOnly: true, // ✅ Empêcher la saisie directe, navigation seulement
                       style: const TextStyle(color: Colors.white),
                       decoration: InputDecoration(
                         hintText: 'Rechercher un produit...',
@@ -1309,10 +1327,14 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                         contentPadding:
                             const EdgeInsets.symmetric(vertical: 15),
                       ),
-                      onChanged: (value) {
-                        context
-                            .read<ShoppingPageBlocM>()
-                            .add(SearchProductsEvent(value));
+                      onTap: () {
+                        // ✅ Navigation vers la Recherche Globale (Onglet "Shop" = Index 3)
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const SearchPageScreenM(initialIndex: 3),
+                          ),
+                        );
                       },
                     ),
                   ),
@@ -1954,25 +1976,9 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
       if (vendeur.shopLogo != null && vendeur.shopLogo!.isNotEmpty) {
         return ClipRRect(
           borderRadius: BorderRadius.circular(12),
-          child: Image.network(
-            vendeur.shopLogo!,
+          child: AppImage(
+            imageUrl: vendeur.shopLogo!,
             fit: BoxFit.cover,
-            loadingBuilder: (context, child, loadingProgress) {
-              if (loadingProgress == null) return child;
-              return Center(
-                child: CircularProgressIndicator(
-                  value: loadingProgress.expectedTotalBytes != null
-                      ? loadingProgress.cumulativeBytesLoaded /
-                          loadingProgress.expectedTotalBytes!
-                      : null,
-                ),
-              );
-            },
-            errorBuilder: (context, error, stackTrace) {
-              print('Erreur chargement image vendeur: $error');
-              return Icon(Icons.storefront,
-                  color: Colors.grey.shade400, size: 30);
-            },
           ),
         );
       } else {

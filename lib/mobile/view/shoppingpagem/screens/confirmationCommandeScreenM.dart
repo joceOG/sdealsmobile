@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:sdealsmobile/data/services/authCubit.dart';
+import 'package:go_router/go_router.dart';
+import 'package:sdealsmobile/mobile/data/models/commande_model.dart';
+import '../../../../data/services/authCubit.dart';
 import '../shoppingpageblocm/shoppingPageBlocM.dart';
 import '../shoppingpageblocm/shoppingPageEventM.dart';
 import '../shoppingpageblocm/shoppingPageStateM.dart';
+import 'package:sdealsmobile/mobile/view/common/utils/app_snackbar.dart';
 import 'delivery_address_screen.dart';
 
 class ConfirmationCommandeScreen extends StatefulWidget {
@@ -56,22 +59,12 @@ class _ConfirmationCommandeScreenState
     final cart = state.cart;
 
     if (cart == null || cart.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Votre panier est vide'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      AppSnackBar.warning(context, 'Votre panier est vide');
       return;
     }
 
     if (!cart.hasDeliveryAddress) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Veuillez ajouter une adresse de livraison'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      AppSnackBar.warning(context, 'Veuillez ajouter une adresse de livraison');
       return;
     }
 

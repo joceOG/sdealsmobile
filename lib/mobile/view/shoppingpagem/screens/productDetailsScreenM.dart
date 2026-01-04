@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:sdealsmobile/mobile/view/common/utils/app_snackbar.dart';
+import '../../common/widgets/empty_state_widget.dart';
+import '../../common/widgets/app_image.dart';
 import '../shoppingpageblocm/shoppingPageStateM.dart' as bloc_model;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:sdealsmobile/data/services/authCubit.dart';
@@ -102,16 +105,11 @@ class _ProductDetailsState extends State<ProductDetails> {
                 context
                     .read<ShoppingPageBlocM>()
                     .add(ToggleFavoriteEvent(widget.product.id));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      isFavorite
-                          ? '${widget.product.name} retiré des favoris!'
-                          : '${widget.product.name} ajouté aux favoris!',
-                    ),
-                    duration: const Duration(seconds: 1),
-                  ),
-                );
+                if (isFavorite) {
+                  AppSnackBar.info(context, '${widget.product.name} retiré des favoris!');
+                } else {
+                  AppSnackBar.success(context, '${widget.product.name} ajouté aux favoris!');
+                }
               },
             );
           },
@@ -121,9 +119,7 @@ class _ProductDetailsState extends State<ProductDetails> {
           icon: const Icon(Icons.share, color: Colors.white),
           onPressed: () {
             // TODO: Implémenter le partage
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Fonctionnalité de partage à venir')),
-            );
+            AppSnackBar.info(context, 'Fonctionnalité de partage à venir');
           },
         ),
       ],
@@ -147,12 +143,10 @@ class _ProductDetailsState extends State<ProductDetails> {
           ? Stack(
               fit: StackFit.expand,
               children: [
-                Image.network(
-                  widget.product.image,
+                AppImage(
+                  imageUrl: widget.product.image,
                   fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return _buildDefaultImage();
-                  },
+                  placeholderAsset: 'assets/products/default.png',
                 ),
                 Container(
                   decoration: BoxDecoration(

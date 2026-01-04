@@ -6,6 +6,7 @@ import '../screens/productDetailsScreenM.dart';
 import 'package:sdealsmobile/data/services/authCubit.dart';
 import '../screens/panierProductScreenM.dart';
 import '../shoppingpageblocm/shoppingPageEventM.dart';
+import '../../common/widgets/app_image.dart';
 
 class ProductCardM extends StatelessWidget {
   final bloc_model.Product product;
@@ -63,28 +64,12 @@ class ProductCardM extends StatelessWidget {
                         child: Hero(
                           tag: 'product_image_${product.id}',
                           child: product.image.startsWith('http')
-                              ? Image.network(
-                                  product.image,
+                              ? AppImage(
+                                  imageUrl: product.image,
+                                  width: double.infinity,
+                                  height: double.infinity,
                                   fit: BoxFit.contain,
-                                  loadingBuilder:
-                                      (context, child, loadingProgress) {
-                                    if (loadingProgress == null) return child;
-                                    return Center(
-                                      child: CircularProgressIndicator(
-                                        value: loadingProgress
-                                                    .expectedTotalBytes !=
-                                                null
-                                            ? loadingProgress
-                                                    .cumulativeBytesLoaded /
-                                                loadingProgress
-                                                    .expectedTotalBytes!
-                                            : null,
-                                        strokeWidth: 2,
-                                      ),
-                                    );
-                                  },
-                                  errorBuilder: (_, __, ___) =>
-                                      const Icon(Icons.image_not_supported),
+                                  placeholderAsset: 'assets/products/default.png',
                                 )
                               : Image.asset(
                                   product.image.isNotEmpty

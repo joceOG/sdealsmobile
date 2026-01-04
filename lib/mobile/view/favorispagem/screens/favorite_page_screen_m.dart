@@ -6,6 +6,7 @@ import '../favorispageblocm/favoritePageStateM.dart';
 import 'package:sdealsmobile/data/models/favorite.dart';
 import 'favoriteDetailScreenM.dart';
 import 'addFavoriteScreenM.dart';
+import '../../common/widgets/empty_state_widget.dart';
 
 class FavoritePageScreenM extends StatefulWidget {
   const FavoritePageScreenM({super.key});
@@ -537,34 +538,11 @@ class _FavoritePageScreenMState extends State<FavoritePageScreenM>
 
   // 🚫 ÉTAT VIDE
   Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.favorite_border,
-            size: 64,
-            color: Colors.grey[400],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Aucun favori trouvé',
-            style: TextStyle(
-              fontSize: 18,
-              color: Colors.grey[600],
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Commencez par ajouter vos premiers favoris !',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[500],
-            ),
-          ),
-        ],
-      ),
+    return EmptyStateWidget(
+      imagePath: 'assets/favoris_vides.png',
+      title: 'Aucun favori',
+      message: 'Commencez par ajouter vos premiers favoris en explorant nos services et produits !',
+      imageSize: 180,
     );
   }
 

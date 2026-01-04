@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../../data/models/prestataire.dart';
 import '../screens/detailPageScreenM.dart';
 import '../utils/navigation_helper.dart';
+import '../../common/widgets/app_image.dart';
 
 class ProviderPopup extends StatelessWidget {
   final dynamic provider; // Peut être Prestataire ou Map
@@ -132,20 +133,9 @@ class ProviderPopup extends StatelessWidget {
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(30),
                               child: data['photoProfil'] != null
-                                  ? Image.network(
-                                      data['photoProfil'],
+                                  ? AppImage(
+                                      imageUrl: data['photoProfil'],
                                       fit: BoxFit.cover,
-                                      errorBuilder:
-                                          (context, error, stackTrace) {
-                                        return Container(
-                                          color: Colors.green.shade100,
-                                          child: Icon(
-                                            Icons.person,
-                                            color: Colors.green,
-                                            size: 30,
-                                          ),
-                                        );
-                                      },
                                     )
                                   : Container(
                                       color: Colors.green.shade100,

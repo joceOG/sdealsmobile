@@ -7,6 +7,7 @@ import '../../../data/models/message_model.dart';
 import '../chatpageblocm/chatPageBlocM.dart';
 import '../chatpageblocm/chatPageEventM.dart';
 import '../chatpageblocm/chatPageStateM.dart';
+import '../../common/widgets/empty_state_widget.dart';
 
 class ChatPageScreenM extends StatefulWidget {
   final String? conversationId;
@@ -474,8 +475,12 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
                                     ? const Center(
                                         child: CircularProgressIndicator())
                                     : state.conversations.isEmpty
-                                        ? Center(
-                                            child: Text('Aucune conversation'))
+                                        ? EmptyStateWidget(
+                                            imagePath: 'assets/messages_vides.png',
+                                            title: 'Aucune conversation',
+                                            message: 'Démarrez une nouvelle conversation en contactant un prestataire ou un vendeur',
+                                            imageSize: 180,
+                                          )
                                         : ListView.builder(
                                             itemCount:
                                                 state.conversations.length,
