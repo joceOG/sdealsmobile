@@ -9,14 +9,23 @@ import 'package:sdealsmobile/mobile/view/shoppingpagem/screens/shoppingPageScree
 import 'package:sdealsmobile/mobile/view/shoppingpagem/shoppingpageblocm/shoppingPageBlocM.dart';
 import 'package:sdealsmobile/mobile/view/notificationpagem/screens/notification_screen.dart';
 import 'package:sdealsmobile/mobile/view/notificationpagem/bloc/notification_bloc.dart';
+import 'package:sdealsmobile/mobile/view/notificationpagem/bloc/notification_event.dart';
+import 'package:sdealsmobile/mobile/view/notificationpagem/bloc/notification_state.dart';
+import 'package:sdealsmobile/mobile/view/common/widgets/nav_badge.dart';
 import '../../freelancepagem/screens/freelancePageScreen.dart';
 import '../../loginpagem/screens/loginPageScreenM.dart';
 import '../homepageblocm/homePageBlocM.dart';
 import '../homepageblocm/homePageEventM.dart';
 import '../homepageblocm/homePageStateM.dart';
 
+// ✅ Design System
+import '../../../../design_system/design_system.dart';
+
 class HomePageScreenM extends StatefulWidget {
-  const HomePageScreenM({super.key});
+  final Function(bool)? onScrollUpdate;
+  
+  const HomePageScreenM({super.key, this.onScrollUpdate});
+  
   @override
   State<HomePageScreenM> createState() => _HomePageScreenStateM();
 }
@@ -24,8 +33,8 @@ class HomePageScreenM extends StatefulWidget {
 class _HomePageScreenStateM extends State<HomePageScreenM>
     with TickerProviderStateMixin {
   late TabController _tabController;
-  final TextEditingController _searchController = TextEditingController();
-  bool _isSearchVisible = false;
+  // ✅ Scroll detection state
+  double _lastScrollOffset = 0;
 
   late List<Map<String, dynamic>> _tabsData;
 
@@ -82,7 +91,6 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
   void dispose() {
     _tabController.removeListener(() {});
     _tabController.dispose();
-    _searchController.dispose();
     super.dispose();
   }
 
@@ -97,23 +105,59 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => BlocProvider(
-          create: (context) => NotificationBloc(),
+          create: (context) => NotificationBloc()
+            ..add(LoadUserNotifications(
+              userId: (context.read<AuthCubit>().state as AuthAuthenticated).utilisateur.idutilisateur,
+            )),
           child: NotificationScreen(),
         ),
       ),
     );
   }
-
-  void _performSearch() {
-    final query = _searchController.text.trim();
-    if (query.isNotEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Recherche: $query')),
-      );
-    }
-    setState(() {
-      _isSearchVisible = false;
-    });
+  
+  // Badge de notifications dans l'AppBar
+  Widget _buildNotificationBadge() {
+    final isMetiersTab = _tabController.index == 0;
+    final iconColor = isMetiersTab ? SDColors.primary600 : SDColors.white;
+    
+    return BlocBuilder<AuthCubit, AuthState>(
+      builder: (context, authState) {
+        if (authState is! AuthAuthenticated) {
+          return IconButton(
+            padding: EdgeInsets.zero,
+            constraints: BoxConstraints(),
+            iconSize: 18,
+            icon: Icon(Icons.notifications_outlined, color: iconColor),
+            onPressed: _openNotifications,
+          );
+        }
+        
+        return BlocProvider(
+          create: (context) => NotificationBloc()
+            ..add(LoadUserNotifications(userId: authState.utilisateur.idutilisateur)),
+          child: BlocBuilder<NotificationBloc, NotificationState>(
+            builder: (context, state) {
+              int unreadCount = 0;
+              if (state is NotificationLoaded) {
+                unreadCount = state.unreadCount;
+              }
+              
+              return NavBadge(
+                count: unreadCount,
+                badgeColor: SDColors.error500,
+                child: IconButton(
+                  padding: EdgeInsets.zero,
+                  constraints: BoxConstraints(),
+                  iconSize: 18,
+                  icon: Icon(Icons.notifications_outlined, color: iconColor),
+                  onPressed: _openNotifications,
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -126,29 +170,50 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
       },
       builder: (context, state) {
         return Scaffold(
-          backgroundColor: Colors.white,
+          backgroundColor: SDColors.white,
           appBar: PreferredSize(
-            preferredSize: Size.fromHeight(_isSearchVisible ? 200 : 140),
+            preferredSize: const Size.fromHeight(150),
             child: AppBar(
-              backgroundColor: Colors.green,
+              backgroundColor: _tabController.index == 0 
+                  ? Colors.transparent // Transparente pour Métiers (bannière en dessous)
+                  : SDColors.primary600, // Verte pour les autres onglets
               elevation: 0,
               automaticallyImplyLeading: false,
               flexibleSpace: _buildAppBarContent(),
             ),
           ),
           body: state.isLoading == true && state.listItems == null
-              ? const Center(
-                  child: CircularProgressIndicator(color: Colors.green))
+              ? Center(
+                  child: CircularProgressIndicator(color: SDColors.primary600))
               : state.error != null && state.error!.isNotEmpty
                   ? _buildError(state.error!)
-                  : TabBarView(
-                      controller: _tabController,
-                      children: _tabsData
-                          .map<Widget>((tab) => tab["page"] != null
-                              ? tab["page"] as Widget
-                              : const Center(
-                                  child: Text("Chargement des données...")))
-                          .toList(),
+                  : NotificationListener<ScrollNotification>(
+                      onNotification: (scrollNotification) {
+                        if (scrollNotification is ScrollUpdateNotification) {
+                          final currentOffset = scrollNotification.metrics.pixels;
+                          final isScrollingDown = currentOffset > _lastScrollOffset;
+                          final isScrollingUp = currentOffset < _lastScrollOffset;
+                          
+                          // Hide bottom nav when scrolling down, show when scrolling up
+                          if (isScrollingDown && currentOffset > 50) {
+                            widget.onScrollUpdate?.call(false);
+                          } else if (isScrollingUp || currentOffset <= 50) {
+                            widget.onScrollUpdate?.call(true);
+                          }
+                          
+                          _lastScrollOffset = currentOffset;
+                        }
+                        return false;
+                      },
+                      child: TabBarView(
+                          controller: _tabController,
+                          children: _tabsData
+                              .map<Widget>((tab) => tab["page"] != null
+                                  ? tab["page"] as Widget
+                                  : const Center(
+                                      child: Text("Chargement des données...")))
+                              .toList(),
+                        ),
                     ),
         );
       },
@@ -156,46 +221,53 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
   }
 
   Widget _buildAppBarContent() {
+    final isMetiersTab = _tabController.index == 0;
+    
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.green,
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(32),
-          bottomRight: Radius.circular(32),
-        ),
+      decoration: BoxDecoration(
+        color: isMetiersTab 
+            ? Colors.white.withOpacity(0.95) // Blanc semi-transparent pour Métiers (par-dessus bannière)
+            : SDColors.primary600, // Verte pour les autres onglets
+        borderRadius: isMetiersTab 
+            ? null // Pas de border radius pour Métiers (pleine largeur)
+            : BorderRadius.only(
+                bottomLeft: Radius.circular(SDSpacing.xxxl),
+                bottomRight: Radius.circular(SDSpacing.xxxl),
+              ),
       ),
       child: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12.0),
+          padding: EdgeInsets.symmetric(horizontal: SDSpacing.sm),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              const SizedBox(height: kToolbarHeight - 30),
+              SizedBox(height: SDSpacing.xs),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Flexible(
+                  Flexible(
                     child: Text(
                       "SOUTRALI DEALS",
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
+                      style: SDTypography.titleMedium.copyWith(
+                        color: isMetiersTab ? SDColors.primary600 : SDColors.white,
                       ),
                     ),
                   ),
                   Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      _buildRoleSwitcher(),
-                      const SizedBox(width: 8),
-                      _buildAuthButtons(),
+                      Flexible(child: _buildRoleSwitcher()),
+                      SizedBox(width: SDSpacing.xxxs),
+                      _buildNotificationBadge(),
+                      SizedBox(width: SDSpacing.xxxs),
+                      Flexible(child: _buildAuthButtons()),
                     ],
                   ),
                 ],
               ),
-              if (_isSearchVisible) _buildSearchField(),
-              const SizedBox(height: 8),
               _buildTabBar(),
             ],
           ),
@@ -205,28 +277,39 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
   }
 
   Widget _buildRoleSwitcher() {
+    final isMetiersTab = _tabController.index == 0;
+    
     return BlocBuilder<AuthCubit, AuthState>(builder: (context, state) {
       if (state is! AuthAuthenticated) return const SizedBox.shrink();
       final roles = state.roles;
       if (roles.isEmpty) return const SizedBox.shrink();
       final active = state.activeRole ?? roles.first;
       return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        padding: EdgeInsets.symmetric(horizontal: SDSpacing.xs, vertical: SDSpacing.xxxs),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.15),
-          borderRadius: BorderRadius.circular(16),
+          color: isMetiersTab 
+              ? SDColors.primary50 // Fond vert clair pour Métiers
+              : SDColors.white.withOpacity(0.15), // Fond blanc transparent pour autres onglets
+          borderRadius: BorderRadius.circular(12),
         ),
         child: DropdownButtonHideUnderline(
           child: DropdownButton<String>(
-            dropdownColor: Colors.green,
+            dropdownColor: SDColors.primary600,
             value: active,
-            iconEnabledColor: Colors.white,
-            style: const TextStyle(color: Colors.white, fontSize: 12),
+            iconEnabledColor: isMetiersTab ? SDColors.primary600 : SDColors.white,
+            iconSize: 16,
+            style: SDTypography.labelSmall.copyWith(
+              color: isMetiersTab ? SDColors.primary600 : SDColors.white,
+              fontSize: 11,
+            ),
             items: roles
                 .map((r) => DropdownMenuItem(
                       value: r,
-                      child:
-                          Text(r, style: const TextStyle(color: Colors.white)),
+                      child: Text(
+                        r,
+                        style: TextStyle(color: SDColors.white, fontSize: 12),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ))
                 .toList(),
             onChanged: (val) {
@@ -241,6 +324,9 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
   }
 
   Widget _buildAuthButtons() {
+    final isMetiersTab = _tabController.index == 0;
+    final iconColor = isMetiersTab ? SDColors.primary600 : SDColors.white;
+    
     return BlocBuilder<AuthCubit, AuthState>(
       builder: (context, state) {
         if (state is AuthAuthenticated) {
@@ -252,93 +338,55 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
                   .toUpperCase()
               : '';
 
-          return Row(
+          return Wrap(
+            spacing: SDSpacing.xxxs,
+            runSpacing: SDSpacing.xxxs,
+            alignment: WrapAlignment.end,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               CircleAvatar(
-                backgroundColor: Colors.orange,
+                radius: 12,
+                backgroundColor: SDColors.warning500,
                 child: Text(
                   initials,
-                  style: const TextStyle(color: Colors.white),
+                  style: SDTypography.labelSmall.copyWith(
+                    color: SDColors.white,
+                    fontSize: 9,
+                  ),
                 ),
               ),
-              if (_hasAnyPendingRole(context)) ...[
-                const SizedBox(width: 6),
+              if (_hasAnyPendingRole(context))
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: EdgeInsets.symmetric(horizontal: 3, vertical: 1),
                   decoration: BoxDecoration(
-                    color: Colors.orangeAccent,
-                    borderRadius: BorderRadius.circular(10),
+                    color: SDColors.secondary600,
+                    borderRadius: BorderRadius.circular(4),
                   ),
-                  child: const Text(
-                    'PENDING',
-                    style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold),
+                  child: Text(
+                    'P',
+                    style: SDTypography.labelSmall.copyWith(
+                      color: SDColors.white,
+                      fontSize: 7,
+                    ),
                   ),
                 ),
-              ],
-              const SizedBox(width: 8),
               IconButton(
-                icon: const Icon(Icons.search, color: Colors.white, size: 20),
+                padding: EdgeInsets.zero,
+                constraints: BoxConstraints(),
+                iconSize: 18,
+                icon: Icon(Icons.search, color: iconColor),
                 onPressed: _toggleSearch,
-              ),
-              IconButton(
-                icon: const Icon(Icons.notifications,
-                    color: Colors.white, size: 20),
-                onPressed: _openNotifications,
               ),
             ],
           );
         } else {
-          return Row(
-            children: [
-              ElevatedButton(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const LoginPageScreenM()),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: Colors.green,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                  minimumSize: const Size(70, 30),
-                ),
-                child: const Text(
-                  'Se connecter',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                ),
-              ),
-              const SizedBox(width: 6),
-              OutlinedButton(
-                onPressed: () {
-                  context.push('/register');
-                },
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.white,
-                  side: const BorderSide(color: Colors.white),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                  minimumSize: const Size(70, 30),
-                ),
-                child: const Text(
-                  'S\'inscrire',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                ),
-              ),
-              const SizedBox(width: 4),
-              IconButton(
-                icon: const Icon(Icons.search, color: Colors.white, size: 20),
-                onPressed: _toggleSearch,
-              ),
-              IconButton(
-                icon: const Icon(Icons.notifications,
-                    color: Colors.white, size: 20),
-                onPressed: _openNotifications,
-              ),
-            ],
+          // Pas connecté : seulement recherche (notification déjà dans l'AppBar)
+          return IconButton(
+            padding: EdgeInsets.zero,
+            constraints: BoxConstraints(),
+            iconSize: 18,
+            icon: Icon(Icons.search, color: iconColor),
+            onPressed: _toggleSearch,
           );
         }
       },
@@ -356,58 +404,65 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
     return prestPending || freePending || vendPending;
   }
 
-  Widget _buildSearchField() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: GestureDetector(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const SearchPageScreenM()),
-          );
-        },
-        child: Container(
-          height: 48,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(30),
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.search, color: Colors.white),
-              const SizedBox(width: 12),
-              Text(
-                'Rechercher un service, un produit...',
-                style: TextStyle(color: Colors.white.withOpacity(0.9)),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildTabBar() {
-    return SizedBox(
-      height: 30,
+    final isMetiersTab = _tabController.index == 0;
+    
+    return Container(
+      height: 38,
+      margin: EdgeInsets.only(top: SDSpacing.xxxs, left: SDSpacing.xs, right: SDSpacing.xs),
+      padding: EdgeInsets.all(SDSpacing.xxxs),
+      decoration: BoxDecoration(
+        color: isMetiersTab 
+            ? SDColors.neutral100 // Fond gris clair pour Métiers (sur fond blanc)
+            : SDColors.white.withOpacity(0.15), // Fond blanc transparent pour autres onglets (sur fond vert)
+        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
+      ),
       child: TabBar(
         controller: _tabController,
-        isScrollable: true,
-        indicatorColor: Colors.transparent,
-        tabs: _tabsData
-            .map((tab) => Tab(
-                  child: OutlinedButton.icon(
-                    onPressed: () =>
-                        _tabController.animateTo(_tabsData.indexOf(tab)),
-                    icon: Icon(tab["icon"] as IconData,
-                        color: Colors.white, size: 16),
-                    label: Text(tab["label"] as String,
-                        style:
-                            const TextStyle(color: Colors.white, fontSize: 11)),
+        indicator: BoxDecoration(
+          color: SDColors.white,
+          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+          boxShadow: [
+            BoxShadow(
+              color: SDColors.black.withOpacity(0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        indicatorSize: TabBarIndicatorSize.tab,
+        dividerColor: Colors.transparent,
+        labelColor: SDColors.primary600,
+        unselectedLabelColor: isMetiersTab ? SDColors.neutral600 : SDColors.white,
+        labelStyle: SDTypography.labelMedium.copyWith(
+          fontWeight: FontWeight.w600,
+        ),
+        unselectedLabelStyle: SDTypography.labelMedium,
+        tabs: _tabsData.map((tab) {
+          final isSelected = _tabController.index == _tabsData.indexOf(tab);
+          return Tab(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  tab["icon"] as IconData,
+                  size: 16,
+                  color: isSelected 
+                      ? SDColors.primary600 
+                      : (isMetiersTab ? SDColors.neutral600 : SDColors.white),
+                ),
+                SizedBox(width: SDSpacing.xxxs),
+                Flexible(
+                  child: Text(
+                    tab["label"] as String,
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
                   ),
-                ))
-            .toList(),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
       ),
     );
   }
@@ -417,10 +472,10 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.error_outline, color: Colors.red, size: 48),
-          const SizedBox(height: 16),
-          Text('Erreur: $error', style: const TextStyle(color: Colors.red)),
-          const SizedBox(height: 16),
+          Icon(Icons.error_outline, color: SDColors.error500, size: 48),
+          SizedBox(height: SDSpacing.sm),
+          Text('Erreur: $error', style: SDTypography.bodyMedium.copyWith(color: SDColors.error500)),
+          SizedBox(height: SDSpacing.sm),
           ElevatedButton(
             onPressed: () => BlocProvider.of<HomePageBlocM>(context)
                 .add(LoadCategorieDataM()),

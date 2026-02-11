@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:sdealsmobile/data/models/vendeur.dart';
+// ✅ Design System
+import '../../../../design_system/design_system.dart';
 
 class VendorDetailsScreenM extends StatelessWidget {
   final Vendeur vendeur;
@@ -12,7 +14,7 @@ class VendorDetailsScreenM extends StatelessWidget {
     final bool isLargeScreen = screenSize.width > 600;
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: SDColors.neutral50,
       body: CustomScrollView(
         slivers: [
           // ✅ HERO HEADER avec image boutique
@@ -20,14 +22,14 @@ class VendorDetailsScreenM extends StatelessWidget {
             expandedHeight: 250.0,
             floating: false,
             pinned: true,
-            backgroundColor: Colors.green,
+            backgroundColor: SDColors.primary600,
             flexibleSpace: FlexibleSpaceBar(
               title: Text(
                 vendeur.shopName.isNotEmpty ? vendeur.shopName : 'Boutique',
-                style: const TextStyle(
-                  color: Colors.white,
+                style: SDTypography.titleMedium.copyWith(
+                  color: SDColors.white,
                   fontWeight: FontWeight.bold,
-                  shadows: [Shadow(blurRadius: 2, color: Colors.black54)],
+                  shadows: [Shadow(blurRadius: 2, color: SDColors.neutral900.withOpacity(0.54))],
                 ),
               ),
               background: Container(
@@ -36,8 +38,8 @@ class VendorDetailsScreenM extends StatelessWidget {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      Colors.green.shade600,
-                      Colors.green.shade800,
+                      SDColors.primary600,
+                      SDColors.primary800,
                     ],
                   ),
                 ),
@@ -59,7 +61,7 @@ class VendorDetailsScreenM extends StatelessWidget {
                                 end: Alignment.bottomCenter,
                                 colors: [
                                   Colors.transparent,
-                                  Colors.black.withOpacity(0.3),
+                                  SDColors.neutral900.withOpacity(0.3),
                                 ],
                               ),
                             ),
@@ -71,16 +73,17 @@ class VendorDetailsScreenM extends StatelessWidget {
             ),
             actions: [
               IconButton(
-                icon: const Icon(Icons.favorite_border, color: Colors.white),
+                icon: Icon(Icons.favorite_border, color: SDColors.white),
                 onPressed: () {
                   // TODO: Ajouter aux favoris
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Ajouté aux favoris !')),
+                    SnackBar(content: Text('Ajouté aux favoris !',
+                        style: SDTypography.bodyMedium)),
                   );
                 },
               ),
               IconButton(
-                icon: const Icon(Icons.share, color: Colors.white),
+                icon: Icon(Icons.share, color: SDColors.white),
                 onPressed: () {
                   // TODO: Partager vendeur
                 },
@@ -91,29 +94,29 @@ class VendorDetailsScreenM extends StatelessWidget {
           // ✅ CONTENU PRINCIPAL
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.all(16.0),
+              padding: EdgeInsets.all(SDSpacing.sm),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // 🏪 SECTION INFO BOUTIQUE
                   _buildShopInfoSection(context, isLargeScreen),
-                  const SizedBox(height: 24),
+                  SizedBox(height: SDSpacing.md),
 
                   // 👤 SECTION PROPRIÉTAIRE
                   _buildOwnerSection(context),
-                  const SizedBox(height: 24),
+                  SizedBox(height: SDSpacing.md),
 
                   // 📊 SECTION STATISTIQUES
                   _buildStatsSection(context),
-                  const SizedBox(height: 24),
+                  SizedBox(height: SDSpacing.md),
 
                   // 📍 SECTION LOCALISATION & LIVRAISON
                   _buildLocationSection(context),
-                  const SizedBox(height: 24),
+                  SizedBox(height: SDSpacing.md),
 
                   // 💳 SECTION PAIEMENTS & POLITIQUES
                   _buildPaymentSection(context),
-                  const SizedBox(height: 32),
+                  SizedBox(height: SDSpacing.lg),
 
                   // 🎯 BOUTONS D'ACTION
                   _buildActionButtons(context),
@@ -132,14 +135,14 @@ class VendorDetailsScreenM extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Colors.green.shade400, Colors.green.shade700],
+          colors: [SDColors.primary400, SDColors.primary700],
         ),
       ),
-      child: const Center(
+      child: Center(
         child: Icon(
           Icons.storefront,
           size: 80,
-          color: Colors.white70,
+          color: SDColors.white.withOpacity(0.7),
         ),
       ),
     );
@@ -148,9 +151,9 @@ class VendorDetailsScreenM extends StatelessWidget {
   Widget _buildShopInfoSection(BuildContext context, bool isLargeScreen) {
     return Card(
       elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge)),
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(SDSpacing.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -158,38 +161,36 @@ class VendorDetailsScreenM extends StatelessWidget {
               children: [
                 CircleAvatar(
                   radius: 25,
-                  backgroundColor: Colors.green.shade100,
+                  backgroundColor: SDColors.success100,
                   backgroundImage:
                       vendeur.shopLogo != null && vendeur.shopLogo!.isNotEmpty
                           ? NetworkImage(vendeur.shopLogo!)
                           : null,
                   child: vendeur.shopLogo == null || vendeur.shopLogo!.isEmpty
-                      ? Icon(Icons.storefront, color: Colors.green.shade600)
+                      ? Icon(Icons.storefront, color: SDColors.success600)
                       : null,
                 ),
-                const SizedBox(width: 16),
+                SizedBox(width: SDSpacing.sm),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         vendeur.shopName,
-                        style: const TextStyle(
-                          fontSize: 22,
+                        style: SDTypography.titleLarge.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      SizedBox(height: SDSpacing.xxxs),
                       Row(
                         children: [
                           Icon(Icons.business,
-                              size: 16, color: Colors.grey.shade600),
-                          const SizedBox(width: 4),
+                              size: 16, color: SDColors.neutral600),
+                          SizedBox(width: SDSpacing.xxxs),
                           Text(
                             vendeur.businessType,
-                            style: TextStyle(
-                              color: Colors.grey.shade600,
-                              fontSize: 14,
+                            style: SDTypography.bodySmall.copyWith(
+                              color: SDColors.neutral600,
                             ),
                           ),
                         ],
@@ -200,16 +201,16 @@ class VendorDetailsScreenM extends StatelessWidget {
                 // Badge de statut
                 Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      EdgeInsets.symmetric(horizontal: SDSpacing.xs, vertical: SDSpacing.xxxs),
                   decoration: BoxDecoration(
                     color: vendeur.accountStatus == 'Active'
-                        ? Colors.green.shade100
-                        : Colors.orange.shade100,
-                    borderRadius: BorderRadius.circular(20),
+                        ? SDColors.success100
+                        : SDColors.warning100,
+                    borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
                     border: Border.all(
                       color: vendeur.accountStatus == 'Active'
-                          ? Colors.green.shade300
-                          : Colors.orange.shade300,
+                          ? SDColors.success200
+                          : SDColors.warning200,
                     ),
                   ),
                   child: Row(
@@ -221,20 +222,19 @@ class VendorDetailsScreenM extends StatelessWidget {
                             : Icons.hourglass_empty,
                         size: 16,
                         color: vendeur.accountStatus == 'Active'
-                            ? Colors.green.shade700
-                            : Colors.orange.shade700,
+                            ? SDColors.success700
+                            : SDColors.warning700,
                       ),
-                      const SizedBox(width: 4),
+                      SizedBox(width: SDSpacing.xxxs),
                       Text(
                         vendeur.accountStatus == 'Active'
                             ? 'Actif'
                             : 'En attente',
-                        style: TextStyle(
+                        style: SDTypography.labelSmall.copyWith(
                           color: vendeur.accountStatus == 'Active'
-                              ? Colors.green.shade700
-                              : Colors.orange.shade700,
+                              ? SDColors.success700
+                              : SDColors.warning700,
                           fontWeight: FontWeight.w600,
-                          fontSize: 12,
                         ),
                       ),
                     ],
@@ -243,35 +243,33 @@ class VendorDetailsScreenM extends StatelessWidget {
               ],
             ),
             if (vendeur.shopDescription.isNotEmpty) ...[
-              const SizedBox(height: 16),
+              SizedBox(height: SDSpacing.sm),
               Text(
                 vendeur.shopDescription,
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey.shade700,
+                style: SDTypography.titleSmall.copyWith(
+                  color: SDColors.neutral700,
                   height: 1.5,
                 ),
               ),
             ],
             if (vendeur.businessCategories.isNotEmpty) ...[
-              const SizedBox(height: 16),
+              SizedBox(height: SDSpacing.sm),
               Wrap(
-                spacing: 8,
-                runSpacing: 8,
+                spacing: SDSpacing.xs,
+                runSpacing: SDSpacing.xs,
                 children: vendeur.businessCategories.map((category) {
                   return Container(
                     padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        EdgeInsets.symmetric(horizontal: SDSpacing.xs, vertical: SDSpacing.xxxs),
                     decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.blue.shade200),
+                      color: SDColors.info50,
+                      borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
+                      border: Border.all(color: SDColors.info200),
                     ),
                     child: Text(
                       category,
-                      style: TextStyle(
-                        color: Colors.blue.shade700,
-                        fontSize: 12,
+                      style: SDTypography.labelSmall.copyWith(
+                        color: SDColors.info700,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -286,78 +284,74 @@ class VendorDetailsScreenM extends StatelessWidget {
   }
 
   Widget _buildOwnerSection(BuildContext context) {
-    if (vendeur.utilisateur == null) return const SizedBox.shrink();
+    if (vendeur.utilisateur == null) return SizedBox.shrink();
 
     return Card(
       elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge)),
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(SDSpacing.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Propriétaire',
-              style: TextStyle(
-                fontSize: 18,
+              style: SDTypography.titleMedium.copyWith(
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: SDSpacing.sm),
             Row(
               children: [
                 CircleAvatar(
                   radius: 30,
-                  backgroundColor: Colors.grey.shade200,
+                  backgroundColor: SDColors.neutral200,
                   backgroundImage: vendeur.utilisateur!.photoProfil != null &&
                           vendeur.utilisateur!.photoProfil!.isNotEmpty
                       ? NetworkImage(vendeur.utilisateur!.photoProfil!)
                       : null,
                   child: vendeur.utilisateur!.photoProfil == null ||
                           vendeur.utilisateur!.photoProfil!.isEmpty
-                      ? Icon(Icons.person, color: Colors.grey.shade600)
+                      ? Icon(Icons.person, color: SDColors.neutral600)
                       : null,
                 ),
-                const SizedBox(width: 16),
+                SizedBox(width: SDSpacing.sm),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         vendeur.utilisateur!.fullName,
-                        style: const TextStyle(
-                          fontSize: 18,
+                        style: SDTypography.titleMedium.copyWith(
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      SizedBox(height: SDSpacing.xxxs),
                       if (vendeur.utilisateur!.email != null)
                         Row(
                           children: [
                             Icon(Icons.email,
-                                size: 16, color: Colors.grey.shade600),
-                            const SizedBox(width: 4),
+                                size: 16, color: SDColors.neutral600),
+                            SizedBox(width: SDSpacing.xxxs),
                             Text(
                               vendeur.utilisateur!.email!,
-                              style: TextStyle(
-                                color: Colors.grey.shade600,
-                                fontSize: 14,
+                              style: SDTypography.bodySmall.copyWith(
+                                color: SDColors.neutral600,
                               ),
                             ),
                           ],
                         ),
                       if (vendeur.utilisateur!.telephone != null) ...[
-                        const SizedBox(height: 2),
+                        SizedBox(height: SDSpacing.xxxs),
                         Row(
                           children: [
                             Icon(Icons.phone,
-                                size: 16, color: Colors.grey.shade600),
-                            const SizedBox(width: 4),
+                                size: 16, color: SDColors.neutral600),
+                            SizedBox(width: SDSpacing.xxxs),
                             Text(
                               vendeur.utilisateur!.telephone!,
-                              style: TextStyle(
-                                color: Colors.grey.shade600,
-                                fontSize: 14,
+                              style: SDTypography.bodySmall.copyWith(
+                                color: SDColors.neutral600,
                               ),
                             ),
                           ],
@@ -377,20 +371,19 @@ class VendorDetailsScreenM extends StatelessWidget {
   Widget _buildStatsSection(BuildContext context) {
     return Card(
       elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge)),
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(SDSpacing.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Statistiques',
-              style: TextStyle(
-                fontSize: 18,
+              style: SDTypography.titleMedium.copyWith(
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: SDSpacing.sm),
             Row(
               children: [
                 Expanded(
@@ -398,7 +391,7 @@ class VendorDetailsScreenM extends StatelessWidget {
                     Icons.star,
                     'Note',
                     '${vendeur.rating.toStringAsFixed(1)}/5',
-                    Colors.amber,
+                    SDColors.warning500,
                   ),
                 ),
                 Expanded(
@@ -406,12 +399,12 @@ class VendorDetailsScreenM extends StatelessWidget {
                     Icons.shopping_bag,
                     'Ventes',
                     '${vendeur.completedOrders}',
-                    Colors.green,
+                    SDColors.success500,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: SDSpacing.xs),
             Row(
               children: [
                 Expanded(
@@ -419,7 +412,7 @@ class VendorDetailsScreenM extends StatelessWidget {
                     Icons.schedule,
                     'Dernière activité',
                     _formatDate(vendeur.lastActive),
-                    Colors.blue,
+                    SDColors.info500,
                   ),
                 ),
                 if (vendeur.isTopRated)
@@ -428,7 +421,7 @@ class VendorDetailsScreenM extends StatelessWidget {
                       Icons.emoji_events,
                       'Top Vendeur',
                       '🏆',
-                      Colors.orange,
+                      SDColors.warning500,
                     ),
                   ),
               ],
@@ -442,30 +435,28 @@ class VendorDetailsScreenM extends StatelessWidget {
   Widget _buildStatItem(
       IconData icon, String label, String value, Color color) {
     return Container(
-      padding: const EdgeInsets.all(12),
-      margin: const EdgeInsets.only(right: 8),
+      padding: EdgeInsets.all(SDSpacing.xs),
+      margin: EdgeInsets.only(right: SDSpacing.xs),
       decoration: BoxDecoration(
         color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
         border: Border.all(color: color.withOpacity(0.3)),
       ),
       child: Column(
         children: [
           Icon(icon, color: color, size: 24),
-          const SizedBox(height: 8),
+          SizedBox(height: SDSpacing.xs),
           Text(
             value,
-            style: TextStyle(
-              fontSize: 16,
+            style: SDTypography.titleSmall.copyWith(
               fontWeight: FontWeight.bold,
               color: color,
             ),
           ),
           Text(
             label,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey.shade600,
+            style: SDTypography.labelSmall.copyWith(
+              color: SDColors.neutral600,
             ),
           ),
         ],
@@ -476,68 +467,66 @@ class VendorDetailsScreenM extends StatelessWidget {
   Widget _buildLocationSection(BuildContext context) {
     return Card(
       elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge)),
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(SDSpacing.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Localisation & Livraison',
-              style: TextStyle(
-                fontSize: 18,
+              style: SDTypography.titleMedium.copyWith(
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: SDSpacing.sm),
             if (vendeur.businessAddress != null) ...[
               Row(
                 children: [
-                  Icon(Icons.location_on, color: Colors.red.shade400),
-                  const SizedBox(width: 8),
+                  Icon(Icons.location_on, color: SDColors.error500),
+                  SizedBox(width: SDSpacing.xs),
                   Expanded(
                     child: Text(
                       '${vendeur.businessAddress!.street}, ${vendeur.businessAddress!.city}, ${vendeur.businessAddress!.country}',
-                      style: const TextStyle(fontSize: 16),
+                      style: SDTypography.titleSmall,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: SDSpacing.xs),
             ],
             if (vendeur.deliveryZones.isNotEmpty) ...[
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.local_shipping, color: Colors.blue.shade400),
-                  const SizedBox(width: 8),
+                  Icon(Icons.local_shipping, color: SDColors.info500),
+                  SizedBox(width: SDSpacing.xs),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'Zones de livraison :',
-                          style: TextStyle(fontWeight: FontWeight.w600),
+                          style: SDTypography.bodyMedium.copyWith(fontWeight: FontWeight.w600),
                         ),
-                        const SizedBox(height: 4),
+                        SizedBox(height: SDSpacing.xxxs),
                         Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
+                          spacing: SDSpacing.xxxs,
+                          runSpacing: SDSpacing.xxxs,
                           children: vendeur.deliveryZones.map((zone) {
                             return Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 4),
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: SDSpacing.xs, vertical: SDSpacing.xxxs),
                               decoration: BoxDecoration(
-                                color: Colors.green.shade50,
-                                borderRadius: BorderRadius.circular(12),
+                                color: SDColors.success50,
+                                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
                                 border:
-                                    Border.all(color: Colors.green.shade300),
+                                    Border.all(color: SDColors.success200),
                               ),
                               child: Text(
                                 zone,
-                                style: TextStyle(
-                                  color: Colors.green.shade700,
-                                  fontSize: 12,
+                                style: SDTypography.labelSmall.copyWith(
+                                  color: SDColors.success700,
                                 ),
                               ),
                             );
@@ -558,53 +547,51 @@ class VendorDetailsScreenM extends StatelessWidget {
   Widget _buildPaymentSection(BuildContext context) {
     return Card(
       elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge)),
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(SDSpacing.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Paiements & Politiques',
-              style: TextStyle(
-                fontSize: 18,
+              style: SDTypography.titleMedium.copyWith(
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: SDSpacing.sm),
             if (vendeur.paymentMethods.isNotEmpty) ...[
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.payment, color: Colors.purple.shade400),
-                  const SizedBox(width: 8),
+                  Icon(Icons.payment, color: SDColors.secondary500),
+                  SizedBox(width: SDSpacing.xs),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'Méthodes de paiement :',
-                          style: TextStyle(fontWeight: FontWeight.w600),
+                          style: SDTypography.bodyMedium.copyWith(fontWeight: FontWeight.w600),
                         ),
-                        const SizedBox(height: 4),
+                        SizedBox(height: SDSpacing.xxxs),
                         Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
+                          spacing: SDSpacing.xxxs,
+                          runSpacing: SDSpacing.xxxs,
                           children: vendeur.paymentMethods.map((method) {
                             return Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 4),
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: SDSpacing.xs, vertical: SDSpacing.xxxs),
                               decoration: BoxDecoration(
-                                color: Colors.purple.shade50,
-                                borderRadius: BorderRadius.circular(12),
+                                color: SDColors.secondary50,
+                                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
                                 border:
-                                    Border.all(color: Colors.purple.shade300),
+                                    Border.all(color: SDColors.secondary200),
                               ),
                               child: Text(
                                 method,
-                                style: TextStyle(
-                                  color: Colors.purple.shade700,
-                                  fontSize: 12,
+                                style: SDTypography.labelSmall.copyWith(
+                                  color: SDColors.secondary700,
                                 ),
                               ),
                             );
@@ -615,28 +602,27 @@ class VendorDetailsScreenM extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: SDSpacing.xs),
             ],
             if (vendeur.returnPolicy.isNotEmpty) ...[
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.assignment_return, color: Colors.orange.shade400),
-                  const SizedBox(width: 8),
+                  Icon(Icons.assignment_return, color: SDColors.warning500),
+                  SizedBox(width: SDSpacing.xs),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'Politique de retour :',
-                          style: TextStyle(fontWeight: FontWeight.w600),
+                          style: SDTypography.bodyMedium.copyWith(fontWeight: FontWeight.w600),
                         ),
-                        const SizedBox(height: 4),
+                        SizedBox(height: SDSpacing.xxxs),
                         Text(
                           vendeur.returnPolicy,
-                          style: TextStyle(
-                            color: Colors.grey.shade700,
-                            fontSize: 14,
+                          style: SDTypography.bodySmall.copyWith(
+                            color: SDColors.neutral700,
                           ),
                         ),
                       ],
@@ -659,39 +645,43 @@ class VendorDetailsScreenM extends StatelessWidget {
             onPressed: () {
               // TODO: Contacter le vendeur
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                    content: Text('Fonctionnalité de contact à venir')),
+                SnackBar(
+                    content: Text('Fonctionnalité de contact à venir',
+                        style: SDTypography.bodyMedium)),
               );
             },
-            icon: const Icon(Icons.phone),
-            label: const Text('Contacter'),
+            icon: Icon(Icons.phone, color: SDColors.white),
+            label: Text('Contacter',
+                style: SDTypography.labelMedium.copyWith(color: SDColors.white)),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 16),
+              backgroundColor: SDColors.success500,
+              foregroundColor: SDColors.white,
+              padding: EdgeInsets.symmetric(vertical: SDSpacing.sm),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
               ),
             ),
           ),
         ),
-        const SizedBox(width: 12),
+        SizedBox(width: SDSpacing.xs),
         Expanded(
           child: ElevatedButton.icon(
             onPressed: () {
               // TODO: Voir les produits du vendeur
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Produits du vendeur à venir')),
+                SnackBar(content: Text('Produits du vendeur à venir',
+                    style: SDTypography.bodyMedium)),
               );
             },
-            icon: const Icon(Icons.shopping_cart),
-            label: const Text('Voir produits'),
+            icon: Icon(Icons.shopping_cart, color: SDColors.white),
+            label: Text('Voir produits',
+                style: SDTypography.labelMedium.copyWith(color: SDColors.white)),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 16),
+              backgroundColor: SDColors.info500,
+              foregroundColor: SDColors.white,
+              padding: EdgeInsets.symmetric(vertical: SDSpacing.sm),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
               ),
             ),
           ),

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
 import 'package:sdealsmobile/data/services/api_client.dart';
 import 'package:sdealsmobile/data/services/authCubit.dart';
+// ✅ Design System
+import '../../../../design_system/design_system.dart';
 
 class ProviderMissionsScreen extends StatefulWidget {
   const ProviderMissionsScreen({Key? key}) : super(key: key);
@@ -15,10 +18,12 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen>
   late TabController _tabController;
   final ApiClient _apiClient = ApiClient();
 
-  // 🔍 VARIABLES DE RECHERCHE
+  // 🔍 VARIABLES DE RECHERCHE ET FILTRES
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-
+  String? _selectedCityFilter;
+  String? _selectedDateFilter; // 'today', 'week', 'month', 'all'
+  
   // 📊 DONNÉES RÉELLES (remplace les données simulées)
   List<Map<String, dynamic>> _availableMissions = [];
   List<Map<String, dynamic>> _ongoingMissions = [];
@@ -140,9 +145,13 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen>
         );
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Mission acceptée !'),
-            backgroundColor: Colors.green,
+          SnackBar(
+            content: Text('Mission acceptée !', style: SDTypography.bodyMedium.copyWith(color: SDColors.white)),
+            backgroundColor: SDColors.success500,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+            ),
           ),
         );
 
@@ -171,9 +180,13 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen>
         );
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Mission refusée'),
-            backgroundColor: Colors.orange,
+          SnackBar(
+            content: Text('Mission refusée', style: SDTypography.bodyMedium.copyWith(color: SDColors.white)),
+            backgroundColor: SDColors.warning500,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+            ),
           ),
         );
 
@@ -202,9 +215,13 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen>
         );
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Mission terminée !'),
-            backgroundColor: Colors.green,
+          SnackBar(
+            content: Text('Mission terminée !', style: SDTypography.bodyMedium.copyWith(color: SDColors.white)),
+            backgroundColor: SDColors.success500,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+            ),
           ),
         );
 
@@ -229,27 +246,75 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen>
           // 🔍 EN-TÊTE DE RECHERCHE
           _buildSearchHeader(),
 
-          // Barre de filtres avec TabBar
+          // Barre de filtres avec TabBar - AMÉLIORÉ AVEC DESIGN SYSTEM
           Container(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: SDColors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.grey.withOpacity(0.2),
+                  color: SDColors.neutral200.withOpacity(0.3),
                   blurRadius: 4,
-                  offset: const Offset(0, 2),
+                  offset: Offset(0, 2),
                 ),
               ],
             ),
             child: TabBar(
               controller: _tabController,
-              labelColor: const Color(0xFF2E7D32),
-              unselectedLabelColor: Colors.grey,
-              indicatorColor: const Color(0xFF2E7D32),
+              labelColor: SDColors.primary600,
+              unselectedLabelColor: SDColors.neutral500,
+              indicatorColor: SDColors.primary600,
               indicatorWeight: 3,
-              tabs: const [
-                Tab(text: 'Disponibles'),
-                Tab(text: 'En cours'),
+              labelStyle: SDTypography.labelMedium.copyWith(fontWeight: FontWeight.bold),
+              unselectedLabelStyle: SDTypography.labelMedium,
+              tabs: [
+                Tab(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text('Disponibles'),
+                      if (_availableMissions.isNotEmpty)
+                        Container(
+                          margin: EdgeInsets.only(left: SDSpacing.xxxs),
+                          padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: SDColors.warning500,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            '${_availableMissions.length}',
+                            style: SDTypography.labelSmall.copyWith(
+                              color: SDColors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                Tab(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text('En cours'),
+                      if (_ongoingMissions.isNotEmpty)
+                        Container(
+                          margin: EdgeInsets.only(left: SDSpacing.xxxs),
+                          padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: SDColors.info500,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            '${_ongoingMissions.length}',
+                            style: SDTypography.labelSmall.copyWith(
+                              color: SDColors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
                 Tab(text: 'Terminées'),
               ],
             ),
@@ -271,24 +336,24 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen>
     );
   }
 
-  // 🔍 EN-TÊTE DE RECHERCHE
+  // 🔍 EN-TÊTE DE RECHERCHE - AMÉLIORÉ AVEC DESIGN SYSTEM ET FILTRES
   Widget _buildSearchHeader() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(SDSpacing.md),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            Colors.green.shade50,
-            Colors.green.shade100,
+            SDColors.primary50,
+            SDColors.success50,
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.green.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
+            color: SDColors.primary200.withOpacity(0.3),
+            blurRadius: 8,
+            offset: Offset(0, 2),
           ),
         ],
       ),
@@ -297,13 +362,13 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen>
           // Barre de recherche principale
           Container(
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(25),
+              color: SDColors.white,
+              borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
+                  color: SDColors.neutral200.withOpacity(0.5),
                   blurRadius: 8,
-                  offset: const Offset(0, 2),
+                  offset: Offset(0, 2),
                 ),
               ],
             ),
@@ -314,9 +379,11 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen>
                   _searchQuery = value;
                 });
               },
+              style: SDTypography.bodyMedium,
               decoration: InputDecoration(
-                hintText: '🔍 Rechercher une mission...',
-                prefixIcon: Icon(Icons.search, color: Colors.green.shade600),
+                hintText: 'Rechercher une mission...',
+                hintStyle: SDTypography.bodyMedium.copyWith(color: SDColors.neutral400),
+                prefixIcon: Icon(Icons.search, color: SDColors.primary600),
                 suffixIcon: _searchQuery.isNotEmpty
                     ? IconButton(
                         onPressed: () {
@@ -325,37 +392,62 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen>
                             _searchQuery = '';
                           });
                         },
-                        icon: Icon(Icons.clear, color: Colors.grey[600]),
+                        icon: Icon(Icons.clear, color: SDColors.neutral500),
                       )
                     : IconButton(
                         onPressed: () => _loadMissions(),
-                        icon: Icon(Icons.refresh, color: Colors.green.shade600),
+                        icon: Icon(Icons.refresh, color: SDColors.primary600),
                       ),
                 border: InputBorder.none,
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                contentPadding: EdgeInsets.symmetric(horizontal: SDSpacing.md, vertical: SDSpacing.sm),
               ),
             ),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: SDSpacing.sm),
+          
+          // Filtres rapides
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildFilterChip('Toutes', _selectedDateFilter == null, () {
+                  setState(() => _selectedDateFilter = null);
+                }),
+                SizedBox(width: SDSpacing.xs),
+                _buildFilterChip('Aujourd\'hui', _selectedDateFilter == 'today', () {
+                  setState(() => _selectedDateFilter = 'today');
+                }),
+                SizedBox(width: SDSpacing.xs),
+                _buildFilterChip('Cette semaine', _selectedDateFilter == 'week', () {
+                  setState(() => _selectedDateFilter = 'week');
+                }),
+                SizedBox(width: SDSpacing.xs),
+                _buildFilterChip('Ce mois', _selectedDateFilter == 'month', () {
+                  setState(() => _selectedDateFilter = 'month');
+                }),
+              ],
+            ),
+          ),
+          
+          SizedBox(height: SDSpacing.sm),
 
-          // Bouton de rafraîchissement
+          // Compteur et bouton de rafraîchissement
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '${_availableMissions.length} missions disponibles',
-                style: TextStyle(
-                  color: Colors.green.shade700,
+                '${_filterMissions(_availableMissions).length} missions trouvées',
+                style: SDTypography.bodySmall.copyWith(
+                  color: SDColors.primary700,
                   fontWeight: FontWeight.bold,
                 ),
               ),
               TextButton.icon(
                 onPressed: _loadMissions,
-                icon: Icon(Icons.refresh, color: Colors.green.shade600),
+                icon: Icon(Icons.refresh, color: SDColors.primary600, size: 18),
                 label: Text(
                   'Actualiser',
-                  style: TextStyle(color: Colors.green.shade600),
+                  style: SDTypography.labelMedium.copyWith(color: SDColors.primary600),
                 ),
               ),
             ],
@@ -364,79 +456,257 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen>
       ),
     );
   }
+  
+  Widget _buildFilterChip(String label, bool isSelected, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: SDSpacing.sm, vertical: SDSpacing.xs),
+        decoration: BoxDecoration(
+          color: isSelected ? SDColors.primary600 : SDColors.white,
+          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+          border: Border.all(
+            color: isSelected ? SDColors.primary600 : SDColors.neutral300,
+            width: 1,
+          ),
+        ),
+        child: Text(
+          label,
+          style: SDTypography.labelSmall.copyWith(
+            color: isSelected ? SDColors.white : SDColors.neutral700,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+      ),
+    );
+  }
 
   // 📋 ONGLET MISSIONS DISPONIBLES
   Widget _buildAvailableMissionsTab() {
     if (_isLoading) {
-      return const Center(
+      return Center(
         child: CircularProgressIndicator(
-          color: Color(0xFF2E7D32),
+          color: SDColors.primary600,
         ),
       );
     }
 
     if (_errorMessage != null) {
       return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error_outline, size: 64, color: Colors.red.shade300),
-            const SizedBox(height: 16),
-            Text(
-              _errorMessage!,
-              style: const TextStyle(fontSize: 16),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _loadMissions,
-              child: const Text('Réessayer'),
-            ),
-          ],
+        child: Padding(
+          padding: EdgeInsets.all(SDSpacing.lg),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error_outline, size: 64, color: SDColors.error500),
+              SizedBox(height: SDSpacing.md),
+              Text(
+                _errorMessage!,
+                style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral700),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: SDSpacing.md),
+              ElevatedButton(
+                onPressed: _loadMissions,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: SDColors.primary600,
+                  foregroundColor: SDColors.white,
+                ),
+                child: Text('Réessayer', style: SDTypography.labelMedium),
+              ),
+            ],
+          ),
         ),
       );
     }
 
-    if (_availableMissions.isEmpty) {
+    final filteredMissions = _filterMissions(_availableMissions);
+    
+    if (filteredMissions.isEmpty) {
       return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.assignment_outlined,
-                size: 64, color: Colors.grey.shade400),
-            const SizedBox(height: 16),
-            Text(
-              'Aucune mission disponible',
-              style: TextStyle(
-                fontSize: 18,
-                color: Colors.grey.shade600,
-                fontWeight: FontWeight.bold,
+        child: Padding(
+          padding: EdgeInsets.all(SDSpacing.lg),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.assignment_outlined, size: 64, color: SDColors.neutral300),
+              SizedBox(height: SDSpacing.md),
+              Text(
+                _availableMissions.isEmpty 
+                    ? 'Aucune mission disponible'
+                    : 'Aucune mission ne correspond aux filtres',
+                style: SDTypography.titleSmall.copyWith(
+                  color: SDColors.neutral600,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Les nouvelles missions apparaîtront ici',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey.shade500,
+              SizedBox(height: SDSpacing.xs),
+              Text(
+                _availableMissions.isEmpty
+                    ? 'Les nouvelles missions apparaîtront ici'
+                    : 'Essayez de modifier vos filtres de recherche',
+                style: SDTypography.bodySmall.copyWith(
+                  color: SDColors.neutral500,
+                ),
+                textAlign: TextAlign.center,
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       );
     }
-
+    
     return RefreshIndicator(
       onRefresh: _loadMissions,
+      color: SDColors.primary600,
       child: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: _availableMissions.length,
+        padding: EdgeInsets.all(SDSpacing.md),
+        itemCount: filteredMissions.length,
         itemBuilder: (context, index) {
-          final mission = _availableMissions[index];
-          return _buildMissionCard(mission, 'available');
+          final mission = filteredMissions[index];
+          return _buildMissionCardWithSwipe(mission, 'available');
         },
       ),
     );
+  }
+  
+  // Filtrer les missions selon les critères
+  List<Map<String, dynamic>> _filterMissions(List<Map<String, dynamic>> missions) {
+    var filtered = missions;
+    
+    // Filtre par recherche
+    if (_searchQuery.isNotEmpty) {
+      filtered = filtered.where((mission) {
+        final client = mission['utilisateur'] ?? {};
+        final clientName = '${client['nom'] ?? ''} ${client['prenom'] ?? ''}'.trim().toLowerCase();
+        final adresse = (mission['adresse'] ?? '').toString().toLowerCase();
+        final ville = (mission['ville'] ?? '').toString().toLowerCase();
+        final query = _searchQuery.toLowerCase();
+        return clientName.contains(query) || adresse.contains(query) || ville.contains(query);
+      }).toList();
+    }
+    
+    // Filtre par ville
+    if (_selectedCityFilter != null && _selectedCityFilter!.isNotEmpty) {
+      filtered = filtered.where((mission) {
+        return (mission['ville'] ?? '').toString() == _selectedCityFilter;
+      }).toList();
+    }
+    
+    // Filtre par date
+    if (_selectedDateFilter != null && _selectedDateFilter != 'all') {
+      final now = DateTime.now();
+      filtered = filtered.where((mission) {
+        final dateStr = mission['datePrestation']?.toString();
+        if (dateStr == null || dateStr.isEmpty) return false;
+        try {
+          final date = DateTime.parse(dateStr);
+          switch (_selectedDateFilter) {
+            case 'today':
+              return date.year == now.year && date.month == now.month && date.day == now.day;
+            case 'week':
+              final weekStart = now.subtract(Duration(days: now.weekday - 1));
+              return date.isAfter(weekStart.subtract(Duration(days: 1)));
+            case 'month':
+              return date.year == now.year && date.month == now.month;
+            default:
+              return true;
+          }
+        } catch (e) {
+          return false;
+        }
+      }).toList();
+    }
+    
+    return filtered;
+  }
+  
+  // Card avec actions swipe
+  Widget _buildMissionCardWithSwipe(Map<String, dynamic> mission, String type) {
+    if (type == 'available') {
+      return Dismissible(
+        key: Key(mission['_id']?.toString() ?? UniqueKey().toString()),
+        direction: DismissDirection.horizontal,
+        background: Container(
+          alignment: Alignment.centerLeft,
+          padding: EdgeInsets.only(left: SDSpacing.md),
+          decoration: BoxDecoration(
+            color: SDColors.success500,
+            borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.check_circle, color: SDColors.white, size: 32),
+              SizedBox(width: SDSpacing.sm),
+              Text(
+                'Accepter',
+                style: SDTypography.titleSmall.copyWith(
+                  color: SDColors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+        secondaryBackground: Container(
+          alignment: Alignment.centerRight,
+          padding: EdgeInsets.only(right: SDSpacing.md),
+          decoration: BoxDecoration(
+            color: SDColors.error500,
+            borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Text(
+                'Refuser',
+                style: SDTypography.titleSmall.copyWith(
+                  color: SDColors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              SizedBox(width: SDSpacing.sm),
+              Icon(Icons.cancel, color: SDColors.white, size: 32),
+            ],
+          ),
+        ),
+        confirmDismiss: (direction) async {
+          if (direction == DismissDirection.startToEnd) {
+            // Accepter
+            await _acceptMission(mission);
+            return false; // Ne pas supprimer de la liste, le refresh le fera
+          } else {
+            // Refuser
+            return await showDialog<bool>(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: Text('Refuser cette mission ?', style: SDTypography.titleMedium),
+                content: Text('Cette action est irréversible.', style: SDTypography.bodyMedium),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: Text('Annuler', style: SDTypography.labelMedium),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.pop(context, true);
+                      _rejectMission(mission);
+                    },
+                    style: TextButton.styleFrom(
+                      foregroundColor: SDColors.error500,
+                    ),
+                    child: Text('Refuser', style: SDTypography.labelMedium.copyWith(color: SDColors.error500)),
+                  ),
+                ],
+              ),
+            ) ?? false;
+          }
+        },
+        child: _buildMissionCard(mission, type),
+      );
+    }
+    return _buildMissionCard(mission, type);
   }
 
   // 🚀 ONGLET MISSIONS EN COURS
@@ -552,52 +822,80 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen>
     final notes = mission['notesClient'] ?? '';
     final datePrestation = mission['datePrestation'] ?? '';
     final montant = mission['montantTotal'] ?? 0;
+    final priorite = mission['priorite']?.toString() ?? 'NORMALE';
+    final historiqueStatuts = mission['historiqueStatuts'] as List<dynamic>? ?? [];
+    final isNew = historiqueStatuts.isEmpty || historiqueStatuts.length == 1;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: EdgeInsets.only(bottom: SDSpacing.md),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        color: SDColors.white,
+        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
+        border: isNew ? Border.all(color: SDColors.primary200, width: 2) : null,
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: SDColors.neutral200.withOpacity(0.5),
+            blurRadius: 8,
+            offset: Offset(0, 2),
           ),
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(SDSpacing.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // En-tête avec nom client et statut
+            // En-tête avec nom client, statut et badges
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        clientName.isNotEmpty ? clientName : 'Client anonyme',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
                       Row(
                         children: [
-                          Icon(Icons.location_on,
-                              size: 16, color: Colors.grey.shade600),
-                          const SizedBox(width: 4),
-                          Text(
-                            '$ville, $adresse',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey.shade600,
+                          Expanded(
+                            child: Text(
+                              clientName.isNotEmpty ? clientName : 'Client anonyme',
+                              style: SDTypography.titleSmall.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: SDColors.neutral900,
+                              ),
+                            ),
+                          ),
+                          if (isNew)
+                            Container(
+                              margin: EdgeInsets.only(left: SDSpacing.xs),
+                              padding: EdgeInsets.symmetric(horizontal: SDSpacing.xs, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: SDColors.primary600,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                'NOUVEAU',
+                                style: SDTypography.labelSmall.copyWith(
+                                  color: SDColors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      SizedBox(height: SDSpacing.xxxs),
+                      Row(
+                        children: [
+                          Icon(Icons.location_on, size: 16, color: SDColors.neutral500),
+                          SizedBox(width: SDSpacing.xxxs),
+                          Expanded(
+                            child: Text(
+                              '$ville, $adresse',
+                              style: SDTypography.bodySmall.copyWith(
+                                color: SDColors.neutral600,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ],
@@ -605,76 +903,116 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen>
                     ],
                   ),
                 ),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: _getStatusColor(type),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    _getStatusText(type),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
+                SizedBox(width: SDSpacing.xs),
+                Column(
+                  children: [
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: SDSpacing.sm, vertical: SDSpacing.xs),
+                      decoration: BoxDecoration(
+                        color: _getStatusColor(type),
+                        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
+                      ),
+                      child: Text(
+                        _getStatusText(type),
+                        style: SDTypography.labelSmall.copyWith(
+                          color: SDColors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
-                  ),
+                    if (priorite == 'HAUTE')
+                      Container(
+                        margin: EdgeInsets.only(top: SDSpacing.xxxs),
+                        padding: EdgeInsets.symmetric(horizontal: SDSpacing.xs, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: SDColors.error500,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          'URGENT',
+                          style: SDTypography.labelSmall.copyWith(
+                            color: SDColors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ],
             ),
 
-            const SizedBox(height: 12),
+            SizedBox(height: SDSpacing.sm),
 
             // Détails de la mission
             if (datePrestation.isNotEmpty) ...[
               Row(
                 children: [
-                  Icon(Icons.calendar_today,
-                      size: 16, color: Colors.grey.shade600),
-                  const SizedBox(width: 8),
+                  Icon(Icons.calendar_today, size: 16, color: SDColors.neutral500),
+                  SizedBox(width: SDSpacing.xs),
                   Text(
-                    'Date: ${DateTime.parse(datePrestation).toLocal().toString().split(' ')[0]}',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey.shade700,
+                    'Date: ${DateFormat('dd/MM/yyyy').format(DateTime.parse(datePrestation))}',
+                    style: SDTypography.bodySmall.copyWith(
+                      color: SDColors.neutral700,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: SDSpacing.xs),
             ],
 
-            if (montant > 0) ...[
-              Row(
+            // Message GRATUIT au lieu du montant
+            Container(
+              padding: EdgeInsets.all(SDSpacing.xs),
+              decoration: BoxDecoration(
+                color: SDColors.success50,
+                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
+                border: Border.all(color: SDColors.success200),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.monetization_on,
-                      size: 16, color: Colors.green.shade600),
-                  const SizedBox(width: 8),
+                  Icon(Icons.check_circle, size: 14, color: SDColors.success600),
+                  SizedBox(width: SDSpacing.xxxs),
                   Text(
-                    'Montant: ${montant.toString()} FCFA',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.green.shade700,
-                      fontWeight: FontWeight.bold,
+                    'Service 100% GRATUIT',
+                    style: SDTypography.bodySmall.copyWith(
+                      color: SDColors.success700,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
-            ],
+            ),
 
             if (notes.isNotEmpty) ...[
-              Text(
-                'Notes: $notes',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey.shade700,
-                  fontStyle: FontStyle.italic,
+              SizedBox(height: SDSpacing.sm),
+              Container(
+                padding: EdgeInsets.all(SDSpacing.xs),
+                decoration: BoxDecoration(
+                  color: SDColors.neutral50,
+                  borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.note, size: 16, color: SDColors.neutral500),
+                    SizedBox(width: SDSpacing.xs),
+                    Expanded(
+                      child: Text(
+                        notes,
+                        style: SDTypography.bodySmall.copyWith(
+                          color: SDColors.neutral700,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 12),
             ],
+
+            SizedBox(height: SDSpacing.sm),
 
             // Boutons d'action selon le type
             _buildActionButtons(mission, type),
@@ -684,7 +1022,7 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen>
     );
   }
 
-  // 🎯 BOUTONS D'ACTION
+  // 🎯 BOUTONS D'ACTION - AMÉLIORÉS AVEC DESIGN SYSTEM
   Widget _buildActionButtons(Map<String, dynamic> mission, String type) {
     switch (type) {
       case 'available':
@@ -694,23 +1032,31 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen>
               child: ElevatedButton.icon(
                 onPressed: () => _acceptMission(mission),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  foregroundColor: Colors.white,
+                  backgroundColor: SDColors.success500,
+                  foregroundColor: SDColors.white,
+                  padding: EdgeInsets.symmetric(vertical: SDSpacing.sm),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                  ),
                 ),
-                icon: const Icon(Icons.check),
-                label: const Text('Accepter'),
+                icon: Icon(Icons.check, size: 20),
+                label: Text('Accepter', style: SDTypography.labelMedium.copyWith(color: SDColors.white)),
               ),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: SDSpacing.sm),
             Expanded(
-              child: ElevatedButton.icon(
+              child: OutlinedButton.icon(
                 onPressed: () => _rejectMission(mission),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  foregroundColor: Colors.white,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: SDColors.error500,
+                  side: BorderSide(color: SDColors.error500),
+                  padding: EdgeInsets.symmetric(vertical: SDSpacing.sm),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                  ),
                 ),
-                icon: const Icon(Icons.close),
-                label: const Text('Refuser'),
+                icon: Icon(Icons.close, size: 20),
+                label: Text('Refuser', style: SDTypography.labelMedium.copyWith(color: SDColors.error500)),
               ),
             ),
           ],
@@ -722,30 +1068,34 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen>
           child: ElevatedButton.icon(
             onPressed: () => _completeMission(mission),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
-              foregroundColor: Colors.white,
+              backgroundColor: SDColors.info500,
+              foregroundColor: SDColors.white,
+              padding: EdgeInsets.symmetric(vertical: SDSpacing.sm),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+              ),
             ),
-            icon: const Icon(Icons.check_circle),
-            label: const Text('Marquer comme terminée'),
+            icon: Icon(Icons.check_circle, size: 20),
+            label: Text('Marquer comme terminée', style: SDTypography.labelMedium.copyWith(color: SDColors.white)),
           ),
         );
 
       case 'completed':
         return Container(
-          padding: const EdgeInsets.all(12),
+          padding: EdgeInsets.all(SDSpacing.sm),
           decoration: BoxDecoration(
-            color: Colors.green.shade50,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.green.shade200),
+            color: SDColors.success50,
+            borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+            border: Border.all(color: SDColors.success200),
           ),
           child: Row(
             children: [
-              Icon(Icons.check_circle, color: Colors.green.shade600),
-              const SizedBox(width: 8),
+              Icon(Icons.check_circle, color: SDColors.success600, size: 20),
+              SizedBox(width: SDSpacing.xs),
               Text(
                 'Mission terminée avec succès',
-                style: TextStyle(
-                  color: Colors.green.shade700,
+                style: SDTypography.bodySmall.copyWith(
+                  color: SDColors.success700,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -754,21 +1104,21 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen>
         );
 
       default:
-        return const SizedBox.shrink();
+        return SizedBox.shrink();
     }
   }
 
-  // 🎨 COULEUR PAR STATUT
+  // 🎨 COULEUR PAR STATUT - AVEC DESIGN SYSTEM
   Color _getStatusColor(String type) {
     switch (type) {
       case 'available':
-        return Colors.orange;
+        return SDColors.warning500;
       case 'ongoing':
-        return Colors.blue;
+        return SDColors.info500;
       case 'completed':
-        return Colors.green;
+        return SDColors.success500;
       default:
-        return Colors.grey;
+        return SDColors.neutral500;
     }
   }
 

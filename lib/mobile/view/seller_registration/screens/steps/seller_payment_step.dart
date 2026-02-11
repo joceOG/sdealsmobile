@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../../../design_system/colors.dart';
+import '../../../../../design_system/typography.dart';
 
 class SellerPaymentStep extends StatefulWidget {
   final Map<String, dynamic> formData;
@@ -141,10 +143,7 @@ class _SellerPaymentStepState extends State<SellerPaymentStep> {
           const SizedBox(height: 24),
           const Text(
             'Méthode de paiement préférée *',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+            style: SDTypography.titleLarge,
           ),
           const SizedBox(height: 16),
           _buildPaymentMethodsGrid(),
@@ -153,11 +152,11 @@ class _SellerPaymentStepState extends State<SellerPaymentStep> {
           if (_isCardSelected) _buildCardFields(),
           if (_isOtherSelected) _buildOtherPaymentFields(),
           const SizedBox(height: 20),
-          const Text(
+          Text(
             'Note: Vous pourrez ajouter d\'autres méthodes de paiement plus tard dans votre tableau de bord vendeur.',
-            style: TextStyle(
+            style: SDTypography.bodySmall.copyWith(
               fontStyle: FontStyle.italic,
-              color: Colors.grey,
+              color: SDColors.neutral500,
             ),
           ),
         ],
@@ -169,9 +168,9 @@ class _SellerPaymentStepState extends State<SellerPaymentStep> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.amber.shade50,
+        color: SDColors.secondary50,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.amber.shade200),
+        border: Border.all(color: SDColors.secondary200),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -180,15 +179,12 @@ class _SellerPaymentStepState extends State<SellerPaymentStep> {
             children: [
               Icon(
                 Icons.account_balance_wallet,
-                color: Colors.amber.shade700,
+                color: SDColors.secondary700,
               ),
               const SizedBox(width: 8),
               const Text(
                 'Informations de paiement',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
+                style: SDTypography.titleMedium,
               ),
             ],
           ),
@@ -228,10 +224,10 @@ class _SellerPaymentStepState extends State<SellerPaymentStep> {
           },
           child: Container(
             decoration: BoxDecoration(
-              color: isSelected ? (method['color'] as Color).withOpacity(0.1) : Colors.white,
+              color: isSelected ? (method['color'] as Color).withOpacity(0.1) : SDColors.white,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: isSelected ? method['color'] as Color : Colors.grey.shade300,
+                color: isSelected ? method['color'] as Color : SDColors.neutral300,
                 width: isSelected ? 2 : 1,
               ),
             ),
@@ -248,7 +244,7 @@ class _SellerPaymentStepState extends State<SellerPaymentStep> {
                   method['name'] as String,
                   style: TextStyle(
                     fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                    color: isSelected ? method['color'] as Color : Colors.black,
+                    color: isSelected ? method['color'] as Color : SDColors.neutral900,
                   ),
                 ),
               ],
@@ -265,10 +261,7 @@ class _SellerPaymentStepState extends State<SellerPaymentStep> {
       children: [
         Text(
           'Informations ${_getSelectedPaymentMethodName()}',
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
+          style: SDTypography.titleMedium,
         ),
         const SizedBox(height: 16),
         TextFormField(
@@ -316,10 +309,7 @@ class _SellerPaymentStepState extends State<SellerPaymentStep> {
       children: [
         Text(
           'Informations ${_getSelectedPaymentMethodName()}',
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
+          style: SDTypography.titleMedium,
         ),
         const SizedBox(height: 16),
         TextFormField(
@@ -364,10 +354,7 @@ class _SellerPaymentStepState extends State<SellerPaymentStep> {
       children: [
         Text(
           'Autre méthode de paiement',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
+          style: SDTypography.titleMedium,
         ),
         SizedBox(height: 16),
         Text(

@@ -15,6 +15,11 @@ import '../widgets/product_card_m.dart';
 import '../../common/widgets/app_image.dart';
 import '../../common/widgets/skeleton_loader.dart';
 
+// Design System
+import '../../../../design_system/colors.dart';
+import '../../../../design_system/typography.dart';
+import '../../../../design_system/spacing.dart';
+
 // Utilisation du modèle Product du BLoC
 typedef Product = bloc_model.Product;
 
@@ -234,7 +239,7 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: SDColors.white,
       // FloatingActionButton "Vendre sur Soutrali" (vert uniforme)
       // FloatingActionButton "Vendre" discret (icône seule)
       floatingActionButton: FloatingActionButton(
@@ -249,15 +254,16 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
             );
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                  content: Text('Veuillez vous connecter pour continuer')),
+              SnackBar(
+                  content: Text('Veuillez vous connecter pour continuer',
+                      style: SDTypography.bodyMedium.copyWith(color: SDColors.white))),
             );
             context.push('/login');
           }
         },
-        backgroundColor: Colors.green,
+        backgroundColor: SDColors.primary600,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: const Icon(Icons.storefront, color: Colors.white),
+        child: const Icon(Icons.storefront, color: SDColors.white),
       ),
       body: BlocProvider(
         create: (_) => ShoppingPageBlocM()
@@ -277,18 +283,19 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
             // Contenu principal
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                padding: EdgeInsets.symmetric(horizontal: SDSpacing.sm),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(height: 16),
+                    SizedBox(height: SDSpacing.sm),
                     // Titre des catégories avec style
-                    const Padding(
-                      padding: EdgeInsets.only(left: 4, bottom: 10),
+                    Padding(
+                      padding: EdgeInsets.only(left: SDSpacing.xxxs, bottom: SDSpacing.xs),
                       child: Text(
                         'Catégories populaires',
-                        style: TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold),
+                        style: SDTypography.titleMedium.copyWith(
+                          color: SDColors.neutral900,
+                        ),
                       ),
                     ),
 
@@ -305,9 +312,9 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                               child: ListView.builder(
                                 scrollDirection: Axis.horizontal,
                                 itemCount: 5,
-                                padding: const EdgeInsets.symmetric(horizontal: 4),
-                                itemBuilder: (context, index) => const Padding(
-                                  padding: EdgeInsets.symmetric(horizontal: 8.0),
+                                padding: EdgeInsets.symmetric(horizontal: SDSpacing.xxxs),
+                                itemBuilder: (context, index) => Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: SDSpacing.xxs),
                                   child: SkeletonWidget.rounded(
                                     width: 100,
                                     height: 100,
@@ -321,7 +328,7 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                           if (state?.error?.isNotEmpty == true) {
                             return Center(
                                 child: Text('Erreur: ${state!.error}',
-                                    style: const TextStyle(color: Colors.red)));
+                                    style: SDTypography.bodyMedium.copyWith(color: SDColors.error500)));
                           }
 
                           final categories = state?.listItems;
@@ -333,7 +340,7 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                           // Générer des couleurs et icônes pour les catégories
                           return ListView.builder(
                             scrollDirection: Axis.horizontal,
-                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            padding: EdgeInsets.symmetric(horizontal: SDSpacing.xxxs),
                             itemCount: categories.length,
                             itemBuilder: (context, index) {
                               final category = categories[index];
@@ -344,7 +351,7 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
 
                               return Padding(
                                 padding:
-                                    const EdgeInsets.symmetric(horizontal: 8.0),
+                                    EdgeInsets.symmetric(horizontal: SDSpacing.xxs),
                                 child: _buildCategoryCard(name, icon),
                               );
                             },
@@ -352,15 +359,16 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                         },
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    SizedBox(height: SDSpacing.sm),
 
                     // 3. Filtres avancés
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 8.0),
+                    Padding(
+                      padding: EdgeInsets.symmetric(vertical: SDSpacing.xxs),
                       child: Text(
                         'Filtres avancés',
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 16),
+                        style: SDTypography.titleSmall.copyWith(
+                          color: SDColors.neutral900,
+                        ),
                       ),
                     ),
                     SizedBox(
@@ -376,19 +384,18 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    SizedBox(height: SDSpacing.sm),
 
-                    const SizedBox(height: 12),
+                    SizedBox(height: SDSpacing.sm),
 
                     // Titre de la section produits
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
+                        Text(
                           'Articles populaires',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
+                          style: SDTypography.titleMedium.copyWith(
+                            color: SDColors.neutral900,
                           ),
                         ),
                         BlocBuilder<ShoppingPageBlocM,
@@ -406,20 +413,22 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                                       context, state.productsToCompare!);
                                 } else {
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
+                                    SnackBar(
                                       content: Text(
-                                          'Sélectionnez des produits à comparer (max. 4)'),
+                                          'Sélectionnez des produits à comparer (max. 4)',
+                                          style: SDTypography.bodyMedium.copyWith(color: SDColors.white)),
                                       duration: Duration(seconds: 2),
                                     ),
                                   );
                                 }
                               },
-                              icon: const Icon(Icons.compare_arrows, size: 18),
+                              icon: Icon(Icons.compare_arrows, size: 18, color: SDColors.primary600),
                               label: Text(
                                 'Comparer ${state.productsToCompare?.length ?? 0}/4',
+                                style: SDTypography.labelMedium.copyWith(color: SDColors.primary600),
                               ),
                               style: TextButton.styleFrom(
-                                foregroundColor: Colors.green,
+                                foregroundColor: SDColors.primary600,
                                 padding: EdgeInsets.zero,
                               ),
                             );
@@ -427,7 +436,7 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: SDSpacing.xxs),
                     // Grille de produits scrollable avec BlocBuilder
                     BlocBuilder<ShoppingPageBlocM,
                         bloc_model.ShoppingPageStateM>(
@@ -457,31 +466,31 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                           if (state.error != null &&
                               (state.products == null ||
                                   state.products!.isEmpty)) {
-                            return Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  const Icon(Icons.error_outline,
-                                      size: 50, color: Colors.red),
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    'Erreur: ${state.error}',
-                                    style: const TextStyle(color: Colors.red),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                  const SizedBox(height: 16),
-                                  ElevatedButton(
-                                    onPressed: () {
-                                      // Recharger les produits
-                                      context
-                                          .read<ShoppingPageBlocM>()
-                                          .add(LoadProductsEvent());
-                                    },
-                                    child: const Text('Recharger'),
-                                  ),
-                                ],
-                              ),
-                            );
+                              return Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.error_outline,
+                                        size: 50, color: SDColors.error500),
+                                    SizedBox(height: SDSpacing.sm),
+                                    Text(
+                                      'Erreur: ${state.error}',
+                                      style: SDTypography.bodyMedium.copyWith(color: SDColors.error500),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                    SizedBox(height: SDSpacing.sm),
+                                    ElevatedButton(
+                                      onPressed: () {
+                                        // Recharger les produits
+                                        context
+                                            .read<ShoppingPageBlocM>()
+                                            .add(LoadProductsEvent());
+                                      },
+                                      child: Text('Recharger', style: SDTypography.labelMedium),
+                                    ),
+                                  ],
+                                ),
+                              );
                           }
 
                           // ✅ AFFICHAGE CONDITIONNEL : Vendeurs ou Produits
@@ -496,29 +505,27 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     Icon(Icons.error_outline,
-                                        size: 64, color: Colors.red.shade300),
-                                    const SizedBox(height: 16),
+                                        size: 64, color: SDColors.error200),
+                                    SizedBox(height: SDSpacing.sm),
                                     Text(
                                       'Erreur de chargement',
-                                      style: TextStyle(
-                                          fontSize: 18,
-                                          color: Colors.red.shade600),
+                                      style: SDTypography.titleMedium.copyWith(
+                                          color: SDColors.error600),
                                     ),
-                                    const SizedBox(height: 8),
+                                    SizedBox(height: SDSpacing.xxs),
                                     Text(
                                       state.error!,
-                                      style: TextStyle(
-                                          fontSize: 14,
-                                          color: Colors.grey.shade600),
+                                      style: SDTypography.bodyMedium.copyWith(
+                                          color: SDColors.neutral600),
                                       textAlign: TextAlign.center,
                                     ),
-                                    const SizedBox(height: 16),
+                                    SizedBox(height: SDSpacing.sm),
                                     ElevatedButton.icon(
                                       onPressed: () => context
                                           .read<ShoppingPageBlocM>()
                                           .add(LoadVendeursEvent()),
-                                      icon: const Icon(Icons.refresh),
-                                      label: const Text('Réessayer'),
+                                      icon: Icon(Icons.refresh, color: SDColors.white),
+                                      label: Text('Réessayer', style: SDTypography.labelMedium.copyWith(color: SDColors.white)),
                                     ),
                                   ],
                                 ),
@@ -534,23 +541,23 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                                 state.filteredProducts ?? state.products ?? [];
 
                             if (displayProducts.isEmpty) {
-                              return const Center(
+                              return Center(
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     Icon(Icons.shopping_bag_outlined,
-                                        size: 64, color: Colors.grey),
-                                    SizedBox(height: 16),
+                                        size: 64, color: SDColors.neutral400),
+                                    SizedBox(height: SDSpacing.sm),
                                     Text(
                                       'Aucun produit trouvé',
-                                      style: TextStyle(
-                                          fontSize: 18, color: Colors.grey),
+                                      style: SDTypography.titleMedium.copyWith(
+                                          color: SDColors.neutral500),
                                     ),
-                                    SizedBox(height: 8),
+                                    SizedBox(height: SDSpacing.xxs),
                                     Text(
                                       'Essayez de modifier vos critères de recherche',
-                                      style: TextStyle(
-                                          fontSize: 14, color: Colors.grey),
+                                      style: SDTypography.bodyMedium.copyWith(
+                                          color: SDColors.neutral500),
                                     ),
                                   ],
                                 ),
@@ -609,12 +616,12 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
         children: [
           // Badge pour l'icône avec effet de gradient
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: EdgeInsets.all(SDSpacing.sm),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  Colors.green[300]!,
-                  Colors.green[600]!,
+                  SDColors.primary300,
+                  SDColors.primary600,
                 ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -624,22 +631,20 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
             child: Icon(
               icon,
               size: 30,
-              color: Colors.white,
+              color: SDColors.white,
             ),
           ),
-          const SizedBox(height: 10),
+          SizedBox(height: SDSpacing.xs),
           // Texte de la catégorie avec style amélioré
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
+            padding: EdgeInsets.symmetric(horizontal: SDSpacing.xxxs),
             child: Text(
               categoryName,
               textAlign: TextAlign.center,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                height: 1.2,
+              style: SDTypography.labelSmall.copyWith(
+                color: SDColors.neutral900,
               ),
             ),
           ),
@@ -655,14 +660,13 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
         bool isSelected = state.selectedFilter == label;
 
         return Container(
-          margin: const EdgeInsets.only(right: 8),
+          margin: EdgeInsets.only(right: SDSpacing.xxs),
           child: FilterChip(
             avatar: Icon(icon,
-                size: 16, color: isSelected ? Colors.white : Colors.green),
-            label: Text(label),
-            labelStyle: TextStyle(
-              color: isSelected ? Colors.white : Colors.black,
-              fontSize: 12,
+                size: 16, color: isSelected ? SDColors.white : SDColors.primary600),
+            label: Text(label, style: SDTypography.labelSmall),
+            labelStyle: SDTypography.labelSmall.copyWith(
+              color: isSelected ? SDColors.white : SDColors.neutral900,
             ),
             selected: isSelected,
             onSelected: (selected) {
@@ -671,8 +675,8 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                   .read<ShoppingPageBlocM>()
                   .add(ApplyFilterEvent(selected ? label : ''));
             },
-            backgroundColor: Colors.grey.shade200,
-            selectedColor: Colors.green,
+            backgroundColor: SDColors.neutral200,
+            selectedColor: SDColors.primary600,
           ),
         );
       },
@@ -862,18 +866,16 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: Colors.green,
-                          borderRadius: const BorderRadius.only(
-                            topLeft: Radius.circular(15),
-                            bottomRight: Radius.circular(10),
+                          color: SDColors.primary600,
+                          borderRadius: BorderRadius.only(
+                            topLeft: Radius.circular(SDSpacing.borderRadiusMedium),
+                            bottomRight: Radius.circular(SDSpacing.borderRadiusSmall),
                           ),
                         ),
                         child: Text(
                           product.brand,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
+                          style: SDTypography.labelSmall.copyWith(
+                            color: SDColors.white,
                           ),
                         ),
                       ),
@@ -885,7 +887,7 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                       child: IconButton(
                         icon: Icon(
                           isFavorite ? Icons.favorite : Icons.favorite_border,
-                          color: isFavorite ? Colors.red : Colors.grey,
+                          color: isFavorite ? SDColors.error500 : SDColors.neutral400,
                         ),
                         onPressed: () {
                           // Utiliser le BLoC pour ajouter/retirer des favoris
@@ -926,58 +928,56 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                   ],
                 ),
                 Padding(
-                  padding: const EdgeInsets.all(8.0),
+                  padding: SDSpacing.cardPadding,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Nom du produit
                       Text(
                         product.name,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 14),
+                        style: SDTypography.bodyMedium.copyWith(
+                            color: SDColors.neutral900),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 4),
+                      SizedBox(height: SDSpacing.xxxs),
                       // Taille du produit
                       Text(
-                        product.size,
-                        style:
-                            const TextStyle(fontSize: 12, color: Colors.grey),
-                      ),
-                      const SizedBox(height: 4),
-                      // Évaluation
-                      Row(
-                        children: [
-                          ...List.generate(
-                            5,
+                      product.size,
+                      style: SDTypography.bodySmall.copyWith(
+                          color: SDColors.neutral500),
+                    ),
+                    SizedBox(height: SDSpacing.xxxs),
+                    // Évaluation
+                    Row(
+                      children: [
+                        ...List.generate(
+                          5,
                             (index) => Icon(
                               index < product.rating.floor()
                                   ? Icons.star
                                   : Icons.star_border,
-                              color: Colors.amber,
+                              color: SDColors.warning500,
                               size: 14,
                             ),
                           ),
-                          const SizedBox(width: 4),
+                          SizedBox(width: SDSpacing.xxxs),
                           Text(
                             product.rating.toString(),
-                            style: const TextStyle(
-                                fontSize: 12, color: Colors.grey),
+                            style: SDTypography.bodySmall.copyWith(
+                                color: SDColors.neutral500),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 4),
+                      SizedBox(height: SDSpacing.xxxs),
                       // Prix
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
                             product.price,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.green,
-                              fontSize: 16,
+                            style: SDTypography.titleSmall.copyWith(
+                              color: SDColors.primary600,
                             ),
                           ),
                           // Rangée de boutons
@@ -1014,17 +1014,17 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                                       );
                                     }
                                   },
-                                  child: Container(
-                                    padding: const EdgeInsets.all(4),
-                                    decoration: BoxDecoration(
-                                      color: isInCompare
-                                          ? Colors.blue
-                                          : Colors.grey.shade400,
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: const Icon(Icons.compare_arrows,
-                                        color: Colors.white, size: 16),
-                                  ),
+                          child: Container(
+                            padding: EdgeInsets.all(SDSpacing.xxxs),
+                            decoration: BoxDecoration(
+                              color: isInCompare
+                                  ? SDColors.info500
+                                  : SDColors.neutral400,
+                              borderRadius: BorderRadius.circular(SDSpacing.xxxs),
+                            ),
+                            child: Icon(Icons.compare_arrows,
+                                color: SDColors.white, size: 16),
+                          ),
                                 ),
                               ),
                               // 🛒 Bouton ajouter au panier CONNECTÉ AU BLOC
@@ -1103,12 +1103,12 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                                   builder: (context, state) {
                                     final isAdding = state.isAddingToCart;
                                     return Container(
-                                      padding: const EdgeInsets.all(4),
+                                      padding: EdgeInsets.all(SDSpacing.xxxs),
                                       decoration: BoxDecoration(
                                         color: isAdding
-                                            ? Colors.grey
-                                            : Colors.green,
-                                        borderRadius: BorderRadius.circular(4),
+                                            ? SDColors.neutral400
+                                            : SDColors.primary600,
+                                        borderRadius: BorderRadius.circular(SDSpacing.xxxs),
                                       ),
                                       child: isAdding
                                           ? const SizedBox(
@@ -1121,8 +1121,8 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                                                         Color>(Colors.white),
                                               ),
                                             )
-                                          : const Icon(Icons.add_shopping_cart,
-                                              color: Colors.white, size: 16),
+                                          : Icon(Icons.add_shopping_cart,
+                                              color: SDColors.white, size: 16),
                                     );
                                   },
                                 ),
@@ -1164,9 +1164,9 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                Colors.green.shade600,
-                Colors.green.shade700,
-                Colors.green.shade800,
+                SDColors.primary600,
+                SDColors.primary700,
+                SDColors.primary800,
               ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
@@ -1174,11 +1174,11 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
           ),
           child: SafeArea(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              padding: EdgeInsets.symmetric(horizontal: SDSpacing.sm),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SizedBox(height: 12),
+                  SizedBox(height: SDSpacing.sm),
                   // Top row: Actions uniquement (Alignées à droite)
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
@@ -1208,36 +1208,36 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                                   );
                                 },
                                 child: Container(
-                                  padding: const EdgeInsets.all(8),
+                                  padding: EdgeInsets.all(SDSpacing.xxs),
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.15),
+                                    color: SDColors.white.withOpacity(0.15),
                                     shape: BoxShape.circle,
                                     border: Border.all(
-                                      color: Colors.white.withOpacity(0.3),
+                                      color: SDColors.white.withOpacity(0.3),
                                       width: 1,
                                     ),
                                   ),
                                   child: Stack(
                                     alignment: Alignment.topRight,
                                     children: [
-                                      const Icon(Icons.shopping_cart,
-                                          color: Colors.white, size: 20),
+                                      Icon(Icons.shopping_cart,
+                                          color: SDColors.white, size: 20),
                                       if (cartCount > 0)
                                         Positioned(
                                           top: -4,
                                           right: -4,
                                           child: Container(
-                                            padding: const EdgeInsets.all(4),
-                                            constraints: const BoxConstraints(
+                                            padding: EdgeInsets.all(SDSpacing.xxxs),
+                                            constraints: BoxConstraints(
                                               minWidth: 16,
                                               minHeight: 16,
                                             ),
                                             decoration: BoxDecoration(
-                                              color: Colors.red,
+                                              color: SDColors.error500,
                                               shape: BoxShape.circle,
                                               boxShadow: [
                                                 BoxShadow(
-                                                  color: Colors.red
+                                                  color: SDColors.error500
                                                       .withOpacity(0.5),
                                                   blurRadius: 4,
                                                   spreadRadius: 1,
@@ -1249,10 +1249,8 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                                                 cartCount > 99
                                                     ? '99+'
                                                     : cartCount.toString(),
-                                                style: const TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 8,
-                                                  fontWeight: FontWeight.bold,
+                                                style: SDTypography.labelSmall.copyWith(
+                                                  color: SDColors.white,
                                                 ),
                                               ),
                                             ),
@@ -1264,71 +1262,69 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                               );
                             },
                           ),
-                          const SizedBox(width: 8),
+                          SizedBox(width: SDSpacing.xxs),
                           // Notifications
                           Container(
-                            padding: const EdgeInsets.all(8),
+                            padding: EdgeInsets.all(SDSpacing.xxs),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.15),
+                              color: SDColors.white.withOpacity(0.15),
                               shape: BoxShape.circle,
                               border: Border.all(
-                                color: Colors.white.withOpacity(0.3),
+                                color: SDColors.white.withOpacity(0.3),
                                 width: 1,
                               ),
                             ),
-                            child: const Icon(Icons.notifications_outlined,
-                                color: Colors.white, size: 20),
+                            child: Icon(Icons.notifications_outlined,
+                                color: SDColors.white, size: 20),
                           ),
                         ],
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: SDSpacing.sm),
                   // Barre de recherche avec Glassmorphism
                   Container(
                     height: 50,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
+                      color: SDColors.white.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(25),
                       border: Border.all(
-                        color: Colors.white.withOpacity(0.3),
+                        color: SDColors.white.withOpacity(0.3),
                         width: 1,
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
+                          color: SDColors.neutral900.withOpacity(0.1),
                           blurRadius: 10,
-                          offset: const Offset(0, 4),
+                          offset: Offset(0, 4),
                         ),
                       ],
                     ),
                     child: TextField(
-                      readOnly: true, // ✅ Empêcher la saisie directe, navigation seulement
-                      style: const TextStyle(color: Colors.white),
+                      readOnly: true,
+                      style: TextStyle(color: SDColors.white),
                       decoration: InputDecoration(
                         hintText: 'Rechercher un produit...',
-                        hintStyle: TextStyle(
-                          color: Colors.white.withOpacity(0.7),
-                          fontSize: 14,
+                        hintStyle: SDTypography.bodyMedium.copyWith(
+                          color: SDColors.white.withOpacity(0.7),
                         ),
                         prefixIcon: Icon(
                           Icons.search,
-                          color: Colors.white.withOpacity(0.9),
+                          color: SDColors.white.withOpacity(0.9),
                         ),
                         suffixIcon: IconButton(
                           icon: Icon(
                             Icons.filter_alt,
-                            color: Colors.white.withOpacity(0.9),
+                            color: SDColors.white.withOpacity(0.9),
                           ),
                           onPressed: () =>
                               _showAdvancedFilterDialog(context),
                         ),
                         border: InputBorder.none,
                         contentPadding:
-                            const EdgeInsets.symmetric(vertical: 15),
+                            EdgeInsets.symmetric(vertical: 15),
                       ),
                       onTap: () {
-                        // ✅ Navigation vers la Recherche Globale (Onglet "Shop" = Index 3)
                         Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -1338,7 +1334,7 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                       },
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: SDSpacing.sm),
                 ],
               ),
             ),
@@ -1359,44 +1355,42 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                Colors.green.withOpacity(0.1),
-                Colors.green.withOpacity(0.15),
+                SDColors.primary600.withOpacity(0.1),
+                SDColors.primary600.withOpacity(0.15),
               ],
               begin: Alignment.centerLeft,
               end: Alignment.centerRight,
             ),
             border: Border(
               bottom:
-                  BorderSide(color: Colors.green.withOpacity(0.3), width: 1),
+                  BorderSide(color: SDColors.primary600.withOpacity(0.3), width: 1),
             ),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          padding: EdgeInsets.symmetric(horizontal: SDSpacing.sm, vertical: SDSpacing.xs),
           child: Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(4),
+                padding: EdgeInsets.all(SDSpacing.xxxs),
                 decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
+                  color: SDColors.primary600.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
                 ),
-                child: Icon(Icons.local_offer, color: Colors.green, size: 16),
+                child: Icon(Icons.local_offer, color: SDColors.primary600, size: 16),
               ),
-              const SizedBox(width: 10),
+              SizedBox(width: SDSpacing.xs),
               Expanded(
                 child: Text(
                   '🛒 Découvre nos meilleures offres et promotions !',
-                  style: TextStyle(
-                    color: Colors.green.withOpacity(0.9),
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
+                  style: SDTypography.labelSmall.copyWith(
+                    color: SDColors.primary600.withOpacity(0.9),
                   ),
                 ),
               ),
               Container(
-                padding: const EdgeInsets.all(2),
+                padding: EdgeInsets.all(SDSpacing.xxxs),
                 decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(10),
+                  color: SDColors.primary600.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
                 ),
                 child: InkWell(
                   onTap: () {
@@ -1404,7 +1398,7 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                   },
                   child: Icon(
                     Icons.close,
-                    color: Colors.green,
+                    color: SDColors.primary600,
                     size: 14,
                   ),
                 ),
@@ -1420,7 +1414,7 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
   Widget _buildEcommerceChipsSliver(BuildContext context) {
     return SliverToBoxAdapter(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+        padding: EdgeInsets.fromLTRB(SDSpacing.sm, SDSpacing.sm, SDSpacing.sm, SDSpacing.xxs),
         child: BlocBuilder<ShoppingPageBlocM, bloc_model.ShoppingPageStateM>(
           builder: (context, state) {
             return SingleChildScrollView(
@@ -1437,7 +1431,7 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                         .read<ShoppingPageBlocM>()
                         .add(const ToggleViewEvent(showVendeurs: false)),
                   ),
-                  const SizedBox(width: 8),
+                  SizedBox(width: SDSpacing.xxs),
 
                   // ✅ NOUVEAU : Chip Navigation Vendeurs
                   _buildNavigationChip(
@@ -1450,7 +1444,7 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                         .add(const ToggleViewEvent(showVendeurs: true)),
                   ),
 
-                  const SizedBox(width: 16), // Espacement fixe au lieu de Spacer
+                  SizedBox(width: SDSpacing.sm),
 
                 // Chip SoutraPay (gardé en jaune pour différenciation e-commerce)
                 InkWell(
@@ -1458,21 +1452,21 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                   borderRadius: BorderRadius.circular(20),
                   child: Container(
                     padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        EdgeInsets.symmetric(horizontal: SDSpacing.sm, vertical: SDSpacing.xxxs),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [Colors.amber.shade100, Colors.amber.shade200],
+                        colors: [SDColors.warning100, SDColors.warning200],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
                       borderRadius: BorderRadius.circular(20),
                       border:
-                          Border.all(color: Colors.amber.shade400, width: 1.2),
+                          Border.all(color: SDColors.warning500, width: 1.2),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.amber.withOpacity(0.15),
+                          color: SDColors.warning500.withOpacity(0.15),
                           blurRadius: 4,
-                          offset: const Offset(0, 2),
+                          offset: Offset(0, 2),
                         ),
                       ],
                     ),
@@ -1480,33 +1474,31 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(Icons.account_balance_wallet,
-                            color: Colors.amber.shade700, size: 16),
-                        const SizedBox(width: 4),
+                            color: SDColors.warning700, size: 16),
+                        SizedBox(width: SDSpacing.xxxs),
                         Text(
                           '💳 SoutraPay',
-                          style: TextStyle(
-                              color: Colors.amber.shade800,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 12),
+                          style: SDTypography.labelSmall.copyWith(
+                              color: SDColors.warning700),
                         ),
                         // Badge conditionnel si solde disponible
                         if (hasSoutraPayBalance)
                           Container(
-                            margin: const EdgeInsets.only(left: 4),
-                            padding: const EdgeInsets.all(2),
-                            decoration: const BoxDecoration(
-                              color: Colors.red,
+                            margin: EdgeInsets.only(left: SDSpacing.xxxs),
+                            padding: EdgeInsets.all(SDSpacing.xxxs),
+                            decoration: BoxDecoration(
+                              color: SDColors.error500,
                               shape: BoxShape.circle,
                             ),
-                            child: const Text('!',
-                                style: TextStyle(
-                                    color: Colors.white, fontSize: 8)),
+                            child: Text('!',
+                                style: SDTypography.labelSmall.copyWith(
+                                    color: SDColors.white)),
                           ),
                       ],
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: SDSpacing.xxs),
                 // 🛒 Chip Panier avec badge connecté au BLoC
                 BlocBuilder<ShoppingPageBlocM, bloc_model.ShoppingPageStateM>(
                   builder: (context, state) {
@@ -1523,25 +1515,25 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                       },
                       borderRadius: BorderRadius.circular(20),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6),
+                        padding: EdgeInsets.symmetric(
+                            horizontal: SDSpacing.sm, vertical: SDSpacing.xxxs),
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: [
-                              Colors.green.withOpacity(0.1),
-                              Colors.green.withOpacity(0.15)
+                              SDColors.primary600.withOpacity(0.1),
+                              SDColors.primary600.withOpacity(0.15)
                             ],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                              color: Colors.green.withOpacity(0.4), width: 1.2),
+                              color: SDColors.primary600.withOpacity(0.4), width: 1.2),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.green.withOpacity(0.15),
+                              color: SDColors.primary600.withOpacity(0.15),
                               blurRadius: 4,
-                              offset: const Offset(0, 2),
+                              offset: Offset(0, 2),
                             ),
                           ],
                         ),
@@ -1551,19 +1543,19 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                             Stack(
                               children: [
                                 Icon(Icons.shopping_cart,
-                                    color: Colors.green, size: 16),
+                                    color: SDColors.primary600, size: 16),
                                 if (cartCount > 0)
                                   Positioned(
                                     top: -2,
                                     right: -2,
                                     child: Container(
-                                      padding: const EdgeInsets.all(2),
-                                      constraints: const BoxConstraints(
+                                      padding: EdgeInsets.all(SDSpacing.xxxs),
+                                      constraints: BoxConstraints(
                                         minWidth: 12,
                                         minHeight: 12,
                                       ),
-                                      decoration: const BoxDecoration(
-                                        color: Colors.red,
+                                      decoration: BoxDecoration(
+                                        color: SDColors.error500,
                                         shape: BoxShape.circle,
                                       ),
                                       child: Center(
@@ -1571,10 +1563,8 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                                           cartCount > 9
                                               ? '9+'
                                               : cartCount.toString(),
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 6,
-                                            fontWeight: FontWeight.bold,
+                                          style: SDTypography.labelSmall.copyWith(
+                                            color: SDColors.white,
                                           ),
                                         ),
                                       ),
@@ -1582,13 +1572,11 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                                   ),
                               ],
                             ),
-                            const SizedBox(width: 4),
-                            const Text(
+                            SizedBox(width: SDSpacing.xxxs),
+                            Text(
                               '🛒 Panier',
-                              style: TextStyle(
-                                  color: Colors.green,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 12),
+                              style: SDTypography.labelSmall.copyWith(
+                                  color: SDColors.primary600),
                             ),
                           ],
                         ),
@@ -1625,21 +1613,21 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 250),
               curve: Curves.easeOutCubic,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              padding: EdgeInsets.symmetric(horizontal: SDSpacing.md, vertical: SDSpacing.xs),
               decoration: BoxDecoration(
                 gradient: isSelected
                     ? LinearGradient(
                         colors: [
-                          Colors.green.shade500,
-                          Colors.green.shade600,
+                          SDColors.primary500,
+                          SDColors.primary600,
                         ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       )
                     : LinearGradient(
                         colors: [
-                          Colors.grey.shade50,
-                          Colors.grey.shade100,
+                          SDColors.neutral50,
+                          SDColors.neutral100,
                         ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
@@ -1647,13 +1635,13 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                 borderRadius: BorderRadius.circular(25),
                 border: Border.all(
                   color: isSelected
-                      ? Colors.green.shade300
-                      : Colors.grey.shade300,
+                      ? SDColors.primary300
+                      : SDColors.neutral300,
                   width: isSelected ? 2 : 1,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: (isSelected ? Colors.green : Colors.grey)
+                    color: (isSelected ? SDColors.primary600 : SDColors.neutral500)
                         .withOpacity(isSelected ? 0.3 : 0.1),
                     blurRadius: isSelected ? 8 : 4,
                     offset: Offset(0, isSelected ? 4 : 2),
@@ -1670,23 +1658,22 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                       ..scale(isSelected ? 1.1 : 1.0),
                     child: Icon(
                       icon,
-                      color: isSelected ? Colors.white : Colors.grey.shade700,
+                      color: isSelected ? SDColors.white : SDColors.neutral700,
                       size: 18,
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  SizedBox(width: SDSpacing.xxs),
                   AnimatedDefaultTextStyle(
                     duration: const Duration(milliseconds: 200),
-                    style: TextStyle(
-                      color: isSelected ? Colors.white : Colors.grey.shade800,
+                    style: SDTypography.bodyMedium.copyWith(
+                      color: isSelected ? SDColors.white : SDColors.neutral800,
                       fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
-                      fontSize: 14,
                       letterSpacing: isSelected ? 0.5 : 0,
                     ),
                     child: Text(label),
                   ),
                   if (isSelected) ...[
-                    const SizedBox(width: 4),
+                    SizedBox(width: SDSpacing.xxxs),
                     AnimatedOpacity(
                       duration: const Duration(milliseconds: 200),
                       opacity: isSelected ? 1.0 : 0.0,
@@ -1719,20 +1706,20 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
   // ✅ NOUVEAU : Widget pour afficher la grille des vendeurs
   Widget _buildVendeursGrid(BuildContext context, List<Vendeur> vendeurs) {
     if (vendeurs.isEmpty) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.storefront_outlined, size: 64, color: Colors.grey),
-            SizedBox(height: 16),
+            Icon(Icons.storefront_outlined, size: 64, color: SDColors.neutral400),
+            SizedBox(height: SDSpacing.sm),
             Text(
               'Aucun vendeur trouvé',
-              style: TextStyle(fontSize: 18, color: Colors.grey),
+              style: SDTypography.titleMedium.copyWith(color: SDColors.neutral500),
             ),
-            SizedBox(height: 8),
+            SizedBox(height: SDSpacing.xxs),
             Text(
               'Essayez de modifier vos critères de recherche',
-              style: TextStyle(fontSize: 14, color: Colors.grey),
+              style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral500),
             ),
           ],
         ),
@@ -1782,7 +1769,7 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
           }
         },
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: SDSpacing.cardPadding,
           child: Row(
             children: [
               // Logo/Avatar du vendeur
@@ -1790,12 +1777,12 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                 width: 60,
                 height: 60,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                  color: SDColors.neutral100,
                 ),
                 child: _buildVendeurAvatar(vendeur),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: SDSpacing.sm),
 
               // Informations du vendeur
               Expanded(
@@ -1806,112 +1793,108 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                     // Nom de la boutique
                     _buildSafeText(
                       vendeur.shopName,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                      style: SDTypography.titleSmall.copyWith(
+                        color: SDColors.neutral900,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 4),
+                    SizedBox(height: SDSpacing.xxxs),
 
                     // Propriétaire
                     if (vendeur.utilisateur != null)
                       _buildSafeText(
                         'Par ${vendeur.utilisateur!.fullName}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade600,
+                        style: SDTypography.bodySmall.copyWith(
+                          color: SDColors.neutral600,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                    const SizedBox(height: 6),
+                    SizedBox(height: SDSpacing.xxxs),
 
                     // Rating et badges
                     Row(
                       children: [
-                        Icon(Icons.star, color: Colors.amber, size: 16),
-                        const SizedBox(width: 2),
+                        Icon(Icons.star, color: SDColors.warning500, size: 16),
+                        SizedBox(width: SDSpacing.xxxs),
                         Text(
                           vendeur.rating.toStringAsFixed(1),
-                          style: const TextStyle(
-                              fontSize: 13, fontWeight: FontWeight.w500),
+                          style: SDTypography.bodyMedium.copyWith(
+                              color: SDColors.warning500),
                         ),
-                        const SizedBox(width: 8),
+                        SizedBox(width: SDSpacing.xxs),
                         _buildSafeText(
                           '${vendeur.completedOrders} ventes',
-                          style: TextStyle(
-                              fontSize: 12, color: Colors.grey.shade600),
+                          style: SDTypography.bodySmall.copyWith(
+                              color: SDColors.neutral600),
                         ),
-                        const SizedBox(width: 8),
+                        SizedBox(width: SDSpacing.xxs),
 
                         // Badges
                         if (vendeur.isTopRated)
                           Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
+                            padding: EdgeInsets.symmetric(
+                                horizontal: SDSpacing.xxxs, vertical: SDSpacing.xxxs),
                             decoration: BoxDecoration(
-                              color: Colors.orange.shade100,
-                              borderRadius: BorderRadius.circular(8),
+                              color: SDColors.warning100,
+                              borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
                             ),
                             child: Text(
                               '👑',
-                              style: TextStyle(fontSize: 10),
+                              style: SDTypography.labelSmall,
                             ),
                           ),
                         if (vendeur.isFeatured)
                           Container(
-                            margin: const EdgeInsets.only(left: 4),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
+                            margin: EdgeInsets.only(left: SDSpacing.xxxs),
+                            padding: EdgeInsets.symmetric(
+                                horizontal: SDSpacing.xxxs, vertical: SDSpacing.xxxs),
                             decoration: BoxDecoration(
-                              color: Colors.blue.shade100,
-                              borderRadius: BorderRadius.circular(8),
+                              color: SDColors.info100,
+                              borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
                             ),
                             child: Text(
                               '⭐',
-                              style: TextStyle(fontSize: 10),
+                              style: SDTypography.labelSmall,
                             ),
                           ),
                       ],
                     ),
-                    const SizedBox(height: 4),
+                    SizedBox(height: SDSpacing.xxxs),
 
                     // Localisation et livraison
                     Row(
                       children: [
                         Icon(Icons.location_on_outlined,
-                            size: 14, color: Colors.grey.shade500),
-                        const SizedBox(width: 2),
+                            size: 14, color: SDColors.neutral500),
+                        SizedBox(width: SDSpacing.xxxs),
                         Expanded(
                           child: _buildSafeText(
                             vendeur.businessAddress?.city ??
                                 (vendeur.deliveryZones.isNotEmpty
                                     ? vendeur.deliveryZones.first
                                     : 'Non spécifié'),
-                            style: TextStyle(
-                                fontSize: 12, color: Colors.grey.shade600),
+                            style: SDTypography.bodySmall.copyWith(
+                                color: SDColors.neutral600),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         if (vendeur.shippingMethods.isNotEmpty)
                           Container(
-                            margin: const EdgeInsets.only(left: 8),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
+                            margin: EdgeInsets.only(left: SDSpacing.xxs),
+                            padding: EdgeInsets.symmetric(
+                                horizontal: SDSpacing.xxxs, vertical: SDSpacing.xxxs),
                             decoration: BoxDecoration(
-                              color: Colors.green.shade50,
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: Colors.green.shade200),
+                              color: SDColors.success50,
+                              borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
+                              border: Border.all(color: SDColors.success200),
                             ),
                             child: _buildSafeText(
                               '🚚 ${vendeur.shippingMethods.first}',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: Colors.green.shade700,
-                                fontWeight: FontWeight.w500,
+                              style: SDTypography.labelSmall.copyWith(
+                                color: SDColors.success700,
                               ),
                             ),
                           ),
@@ -1933,7 +1916,7 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                     },
                     icon: Icon(
                       isFavorite ? Icons.favorite : Icons.favorite_border,
-                      color: isFavorite ? Colors.red : Colors.grey,
+                      color: isFavorite ? SDColors.error500 : SDColors.neutral400,
                       size: 20,
                     ),
                   ),
@@ -1941,23 +1924,21 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                   // Indicateur de statut
                   Container(
                     padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        EdgeInsets.symmetric(horizontal: SDSpacing.xxxs, vertical: SDSpacing.xxxs),
                     decoration: BoxDecoration(
                       color: vendeur.accountStatus == 'Active'
-                          ? Colors.green.shade50
-                          : Colors.orange.shade50,
-                      borderRadius: BorderRadius.circular(6),
+                          ? SDColors.success50
+                          : SDColors.warning50,
+                      borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
                     ),
                     child: _buildSafeText(
                       vendeur.accountStatus == 'Active'
                           ? 'Actif'
                           : 'En attente',
-                      style: TextStyle(
-                        fontSize: 10,
+                      style: SDTypography.labelSmall.copyWith(
                         color: vendeur.accountStatus == 'Active'
-                            ? Colors.green.shade700
-                            : Colors.orange.shade700,
-                        fontWeight: FontWeight.w500,
+                            ? SDColors.success700
+                            : SDColors.warning700,
                       ),
                     ),
                   ),

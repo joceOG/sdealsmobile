@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../../design_system/design_system.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({Key? key}) : super(key: key);
@@ -19,40 +20,41 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       subtitle:
           "Cartographie intelligente. Découvrez produits et services dans votre zone en temps réel.",
       image: "assets/onboarding/geo.png",
-      color: Color(0xFF4CAF50), // Green Soutrali
+      color: SDColors.primary600, // ✅ Green Soutrali
     ),
     OnboardingContent(
       title: "300+ Métiers à votre service",
       subtitle:
           "Plombiers, menuisiers, designers, développeurs... Trouvez l'expert qu'il vous faut.",
       image: "assets/onboarding/pros.png",
-      color: Color(0xFFFF9800), // Orange Pro
+      color: SDColors.warning, // ✅ Orange Pro
     ),
     OnboardingContent(
       title: "Achetez ce que vous voulez",
       subtitle:
           "Des milliers de produits. Électronique, mode, maison. Livraison rapide partout à Abidjan.",
       image: "assets/onboarding/shop.png",
-      color: Color(0xFF9C27B0), // Purple Shop
+      color: SDColors.secondary, // ✅ Purple Shop
     ),
     OnboardingContent(
       title: "Un compte, tout les possibles",
       subtitle:
           "Client, Prestataire, Freelance, Vendeur. Changez de rôle en un clic selon vos besoins.",
       image: "assets/onboarding/roles.png",
-      color: Color(0xFF2196F3), // Blue Roles
+      color: SDColors.info, // ✅ Blue Roles
     ),
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: SDColors.white,
       body: Stack(
         children: [
           // Background Animation
           AnimatedContainer(
-            duration: Duration(milliseconds: 500),
-            color: Colors.white,
+            duration: const Duration(milliseconds: 500),
+            color: SDColors.white,
             child: PageView.builder(
               controller: _pageController,
               onPageChanged: (value) {
@@ -73,16 +75,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             left: 0,
             right: 0,
             child: Container(
-              padding: EdgeInsets.all(24),
+              padding: EdgeInsets.all(SDSpacing.lg),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.bottomCenter,
                   end: Alignment.topCenter,
                   colors: [
-                    Colors.white,
-                    Colors.white.withOpacity(0.0),
+                    SDColors.white,
+                    SDColors.white.withOpacity(0.0),
                   ],
-                  stops: [0.6, 1.0],
+                  stops: const [0.6, 1.0],
                 ),
               ),
               child: Column(
@@ -94,20 +96,20 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     children: List.generate(
                       _contents.length,
                       (index) => AnimatedContainer(
-                        duration: Duration(milliseconds: 300),
-                        margin: EdgeInsets.symmetric(horizontal: 4),
+                        duration: const Duration(milliseconds: 300),
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
                         height: 8,
                         width: _currentPage == index ? 24 : 8,
                         decoration: BoxDecoration(
                           color: _currentPage == index
                               ? _contents[_currentPage].color
-                              : Colors.grey.shade300,
+                              : SDColors.neutral300,
                           borderRadius: BorderRadius.circular(4),
                         ),
                       ),
                     ),
                   ),
-                  SizedBox(height: 32),
+                  SizedBox(height: SDSpacing.xl),
 
                   // Buttons
                   Row(
@@ -119,14 +121,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           onPressed: _completeOnboarding,
                           child: Text(
                             "Passer",
-                            style: TextStyle(
-                              color: Colors.grey.shade600,
-                              fontSize: 16,
+                            style: SDTypography.bodyLarge.copyWith(
+                              color: SDColors.neutral600,
                             ),
                           ),
                         )
                       else
-                        SizedBox(width: 60), // Spacer
+                        const SizedBox(width: 60), // Spacer
 
                       // Next / Start Button
                       ElevatedButton(
@@ -135,17 +136,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             _completeOnboarding();
                           } else {
                             _pageController.nextPage(
-                              duration: Duration(milliseconds: 300),
+                              duration: const Duration(milliseconds: 300),
                               curve: Curves.easeInOut,
                             );
                           }
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: _contents[_currentPage].color,
-                          foregroundColor: Colors.white,
+                          foregroundColor: SDColors.white,
                           padding: EdgeInsets.symmetric(
-                            horizontal: 32,
-                            vertical: 16,
+                            horizontal: SDSpacing.xl,
+                            vertical: SDSpacing.md,
                           ),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(30),
@@ -156,15 +157,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           _currentPage == _contents.length - 1
                               ? "C'est parti !"
                               : "Suivant",
-                          style: TextStyle(
-                            fontSize: 16,
+                          style: SDTypography.labelLarge.copyWith(
+                            color: SDColors.white,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
                     ],
                   ),
-                  SizedBox(height: 20),
+                  SizedBox(height: SDSpacing.md),
                 ],
               ),
             ),
@@ -205,7 +206,7 @@ class OnboardingPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(24.0),
+      padding: EdgeInsets.all(SDSpacing.lg),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -218,7 +219,7 @@ class OnboardingPage extends StatelessWidget {
                   BoxShadow(
                     color: content.color.withOpacity(0.2),
                     blurRadius: 20,
-                    offset: Offset(0, 10),
+                    offset: const Offset(0, 10),
                   ),
                 ],
               ),
@@ -231,7 +232,7 @@ class OnboardingPage extends StatelessWidget {
               ),
             ),
           ),
-          SizedBox(height: 48),
+          SizedBox(height: SDSpacing.xxl),
           Expanded(
             flex: 3,
             child: Column(
@@ -239,20 +240,18 @@ class OnboardingPage extends StatelessWidget {
                 Text(
                   content.title,
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 28,
+                  style: SDTypography.headlineMedium.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: Colors.grey.shade900,
+                    color: SDColors.neutral900,
                     height: 1.2,
                   ),
                 ),
-                SizedBox(height: 16),
+                SizedBox(height: SDSpacing.md),
                 Text(
                   content.subtitle,
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey.shade600,
+                  style: SDTypography.bodyLarge.copyWith(
+                    color: SDColors.neutral600,
                     height: 1.5,
                   ),
                 ),

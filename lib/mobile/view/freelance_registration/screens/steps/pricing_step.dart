@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../../../../design_system/colors.dart';
+import '../../../../../design_system/typography.dart';
 
 class PricingStep extends StatefulWidget {
   final Map<String, dynamic> formData;
@@ -45,10 +47,7 @@ class _PricingStepState extends State<PricingStep> {
         children: [
           const Text(
             '💰 Tarification',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+            style: SDTypography.titleLarge,
           ),
           const SizedBox(height: 24),
           
@@ -183,23 +182,20 @@ class _PricingStepState extends State<PricingStep> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.amber.shade50,
+              color: SDColors.warning50,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.amber.shade200),
+              border: Border.all(color: SDColors.warning200),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    Icon(Icons.lightbulb_outline, color: Colors.amber.shade800),
+                    const Icon(Icons.lightbulb_outline, color: SDColors.warning700),
                     const SizedBox(width: 8),
                     const Text(
                       'Guide de tarification',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
+                      style: SDTypography.titleMedium,
                     ),
                   ],
                 ),
@@ -232,12 +228,12 @@ class _PricingStepState extends State<PricingStep> {
           Container(
             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
             decoration: BoxDecoration(
-              color: Colors.grey.shade100,
+              color: SDColors.neutral100,
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
               children: [
-                Icon(Icons.info_outline, color: Colors.grey.shade600),
+                const Icon(Icons.info_outline, color: SDColors.neutral600),
                 const SizedBox(width: 12),
                 const Expanded(
                   child: Text(

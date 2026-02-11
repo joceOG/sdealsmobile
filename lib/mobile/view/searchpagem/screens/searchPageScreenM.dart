@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../design_system/design_system.dart'; // ✅ Import DS
 import '../../jobpagem/screens/detailPageScreenM.dart';
 import '../../jobpagem/screens/provider_profile_screen.dart';
 import '../../shoppingpagem/screens/productDetailsScreenM.dart';
@@ -93,7 +94,7 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50], // Light grey background like Facebook/Telegram
+      backgroundColor: SDColors.neutral50, // Light grey background like Facebook/Telegram
       appBar: _buildAppBar(),
       body: BlocBuilder<SearchPageBlocM, SearchPageStateM>(
         builder: (context, state) {
@@ -158,34 +159,34 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
     return PreferredSize(
       preferredSize: const Size.fromHeight(80),
       child: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFF4CAF50), Color(0xFF2E7D32)], // ✅ Standard Theme Gradient
+            colors: [SDColors.primary500, SDColors.primary700], // ✅ Standard Theme Gradient
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
-          borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
-          boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))],
+          borderRadius: BorderRadius.vertical(bottom: Radius.circular(SDSpacing.borderRadiusLarge)),
+          boxShadow: [BoxShadow(color: SDColors.neutral900.withOpacity(0.12), blurRadius: 4, offset: Offset(0, 2))],
         ),
         child: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: EdgeInsets.symmetric(horizontal: SDSpacing.sm, vertical: SDSpacing.xs),
             child: Row(
               children: [
                 // Back Button (if navigation allows, otherwise Menu)
                 GestureDetector(
                   onTap: () => Navigator.of(context).pop(), // Or open drawer
-                  child: const Icon(Icons.arrow_back_ios, color: Colors.white, size: 20),
+                  child: Icon(Icons.arrow_back_ios, color: SDColors.white, size: 20),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: SDSpacing.xs),
                 
                 // Search Bar
                 Expanded(
                   child: Container(
                     height: 40,
                     decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
+                      color: SDColors.white,
+                      borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
                     ),
                     child: TextField(
                       controller: _searchController,
@@ -199,37 +200,37 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
                       },
                       decoration: InputDecoration(
                         hintText: 'Rechercher services, produits...',
-                        hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
-                        prefixIcon: const Icon(Icons.search, color: Color(0xFF2E7D32), size: 20), // ✅ Standard Green
+                        hintStyle: SDTypography.bodyMedium.copyWith(color: SDColors.neutral400),
+                        prefixIcon: Icon(Icons.search, color: SDColors.primary600, size: 20), // ✅ Standard Green
                         suffixIcon: _searchController.text.isNotEmpty 
                           ? GestureDetector(
                               onTap: () {
                                 _searchController.clear();
                                 _onSearchChanged('');
                               },
-                              child: const Icon(Icons.close, color: Colors.grey, size: 18),
+                              child: Icon(Icons.close, color: SDColors.neutral500, size: 18),
                             )
                           : null,
                         isDense: true,
                       ),
-                      style: const TextStyle(fontSize: 14),
+                      style: SDTypography.bodyMedium,
                       textInputAction: TextInputAction.search,
                     ),
                   ),
                 ),
                 
                 // 🎛️ BUTTON FILTRE
-                const SizedBox(width: 12),
+                SizedBox(width: SDSpacing.xs),
                 GestureDetector(
                   onTap: () => _showFilterModal(context),
                   child: Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: EdgeInsets.all(SDSpacing.xs),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: SDColors.white,
                       shape: BoxShape.circle,
-                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4)],
+                      boxShadow: [BoxShadow(color: SDColors.neutral900.withOpacity(0.1), blurRadius: 4)],
                     ),
-                    child: const Icon(Icons.tune, color: Color(0xFF2E7D32), size: 20),
+                    child: Icon(Icons.tune, color: SDColors.primary600, size: 20),
                   ),
                 ),
               ],
@@ -271,13 +272,13 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
     return StatefulBuilder(
       builder: (context, setModalState) {
         return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          decoration: BoxDecoration(
+            color: SDColors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(SDSpacing.borderRadiusLarge)),
           ),
           padding: EdgeInsets.only(
-            left: 20, right: 20, top: 20,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 20
+            left: SDSpacing.md, right: SDSpacing.md, top: SDSpacing.md,
+            bottom: MediaQuery.of(context).viewInsets.bottom + SDSpacing.md
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -287,24 +288,24 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Filtres', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  Text('Filtres', style: SDTypography.titleMedium.copyWith(fontWeight: FontWeight.bold)),
                   IconButton(
-                    icon: const Icon(Icons.close),
+                    icon: Icon(Icons.close, color: SDColors.neutral900),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ],
               ),
-              const Divider(),
+              Divider(color: SDColors.neutral200),
               
               // 1. Prix
-              const Text('Prix (FCFA)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              Text('Prix (FCFA)', style: SDTypography.titleSmall.copyWith(fontWeight: FontWeight.bold)),
               RangeSlider(
                 values: RangeValues(localMin, localMax),
                 min: 0,
                 max: 1000000,
                 divisions: 20,
                 labels: RangeLabels('${localMin.round()}', '${localMax.round()}'),
-                activeColor: const Color(0xFF2E7D32),
+                activeColor: SDColors.primary600,
                 onChanged: (values) {
                   setModalState(() {
                     localMin = values.start;
@@ -315,25 +316,25 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('${localMin.round()} FCFA', style: TextStyle(color: Colors.grey[600])),
-                  Text('${localMax.round()} FCFA', style: TextStyle(color: Colors.grey[600])),
+                  Text('${localMin.round()} FCFA', style: SDTypography.bodySmall.copyWith(color: SDColors.neutral600)),
+                  Text('${localMax.round()} FCFA', style: SDTypography.bodySmall.copyWith(color: SDColors.neutral600)),
                 ],
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: SDSpacing.sm),
 
               // 2. Ville
-              const Text('Ville / Commune', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-              const SizedBox(height: 8),
+              Text('Ville / Commune', style: SDTypography.titleSmall.copyWith(fontWeight: FontWeight.bold)),
+              SizedBox(height: SDSpacing.xs),
               TextField(
                 controller: cityCtrl,
                 decoration: InputDecoration(
                   hintText: 'Ex: Cocody, Abidjan...',
-                  prefixIcon: const Icon(Icons.location_on, color: Colors.grey),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                  prefixIcon: Icon(Icons.location_on, color: SDColors.neutral500),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium)),
+                  contentPadding: EdgeInsets.symmetric(horizontal: SDSpacing.sm, vertical: 0),
                 ),
               ),
-              const SizedBox(height: 20),
+              SizedBox(height: SDSpacing.md),
 
               // Actions
               Row(
@@ -347,13 +348,13 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
                         Navigator.pop(context);
                       },
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.grey,
-                        side: const BorderSide(color: Colors.grey),
+                        foregroundColor: SDColors.neutral600,
+                        side: BorderSide(color: SDColors.neutral400),
                       ),
-                      child: const Text('Réinitialiser'),
+                      child: Text('Réinitialiser', style: SDTypography.labelMedium),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: SDSpacing.xs),
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () {
@@ -368,10 +369,10 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
                         Navigator.pop(context);
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2E7D32),
-                        foregroundColor: Colors.white,
+                        backgroundColor: SDColors.primary600,
+                        foregroundColor: SDColors.white,
                       ),
-                      child: const Text('Appliquer'),
+                      child: Text('Appliquer', style: SDTypography.labelMedium.copyWith(color: SDColors.white)),
                     ),
                   ),
                 ],
@@ -385,14 +386,14 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
 
   Widget _buildTabBar(Map<String, int> counts) {
     return Container(
-      color: Colors.white,
+      color: SDColors.white,
       child: TabBar(
         controller: _tabController,
-        labelColor: const Color(0xFF2E7D32), // ✅ Standard Green
-        unselectedLabelColor: Colors.grey,
-        indicatorColor: const Color(0xFF2E7D32), // ✅ Standard Green
+        labelColor: SDColors.primary600, // ✅ Standard Green
+        unselectedLabelColor: SDColors.neutral500,
+        indicatorColor: SDColors.primary600, // ✅ Standard Green
         indicatorWeight: 3,
-        labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+        labelStyle: SDTypography.labelMedium.copyWith(fontWeight: FontWeight.bold),
         tabs: [
           const Tab(text: 'Tout'),
           Tab(text: 'Services (${counts['services']})'),
@@ -406,21 +407,21 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
 
   Widget _buildHistoryList(List<String> history) {
     return Container(
-      color: Colors.white,
+      color: SDColors.white,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            padding: EdgeInsets.fromLTRB(SDSpacing.sm, SDSpacing.xs, SDSpacing.sm, SDSpacing.xs),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text("Récents", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+                Text("Récents", style: SDTypography.titleSmall.copyWith(fontWeight: FontWeight.bold, color: SDColors.neutral500)),
                 GestureDetector(
                   onTap: () {
                      context.read<SearchPageBlocM>().add(ClearHistory());
                   },
-                  child: const Text("Effacer", style: TextStyle(color: Colors.red, fontSize: 13)),
+                  child: Text("Effacer", style: SDTypography.bodySmall.copyWith(color: SDColors.error500)),
                 )
               ],
             ),
@@ -428,13 +429,13 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
           Expanded(
             child: ListView.separated(
               itemCount: history.length,
-              separatorBuilder: (_, __) => const Divider(height: 1, indent: 16),
+              separatorBuilder: (_, __) => Divider(height: 1, indent: SDSpacing.sm, color: SDColors.neutral200),
               itemBuilder: (context, index) {
                 final item = history[index];
                 return ListTile(
-                  leading: const Icon(Icons.history, color: Colors.grey, size: 20),
-                  title: Text(item),
-                  trailing: const Icon(Icons.north_west, size: 16, color: Colors.grey),
+                  leading: Icon(Icons.history, color: SDColors.neutral500, size: 20),
+                  title: Text(item, style: SDTypography.bodyMedium),
+                  trailing: Icon(Icons.north_west, size: 16, color: SDColors.neutral500),
                   onTap: () => _onSuggestionTap(item),
                 );
               },
@@ -447,15 +448,15 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
 
   Widget _buildSuggestionsList(List<String> suggestions) {
     return Container(
-      color: Colors.white,
+      color: SDColors.white,
       child: ListView.separated(
         itemCount: suggestions.length,
-        separatorBuilder: (_, __) => const Divider(height: 1, indent: 16),
+        separatorBuilder: (_, __) => Divider(height: 1, indent: SDSpacing.sm, color: SDColors.neutral200),
         itemBuilder: (context, index) {
           final suggestion = suggestions[index];
           return ListTile(
-            leading: const Icon(Icons.search, color: Color(0xFF2E7D32), size: 20), // 🔍 for active search
-            title: Text(suggestion),
+            leading: Icon(Icons.search, color: SDColors.primary700, size: 20), // 🔍 for active search
+            title: Text(suggestion, style: SDTypography.bodyMedium),
             onTap: () => _onSuggestionTap(suggestion),
           );
         },
@@ -476,12 +477,12 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
   // --- TAB: TOUT (Summary) ---
   Widget _buildAllTab(SearchPageStateM state) {
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(SDSpacing.sm),
       children: [
         if (state.services.isNotEmpty) ...[
           _buildSectionHeader('Services', 1, state.counts['services'] ?? 0),
           ...state.services.take(2).map((s) => _buildServiceCard(s)).toList(),
-          const SizedBox(height: 16),
+          SizedBox(height: SDSpacing.sm),
         ],
         
         if (state.freelances.isNotEmpty) ...[
@@ -489,7 +490,7 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
           _buildHorizontalScroll(
             state.freelances.take(5).map((f) => _buildFreelanceSquare(f)).toList()
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: SDSpacing.sm),
         ],
 
         if (state.prestataires.isNotEmpty) ...[
@@ -497,7 +498,7 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
           _buildHorizontalScroll(
             state.prestataires.take(5).map((p) => _buildFreelanceSquare(p)).toList() 
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: SDSpacing.sm),
         ],
 
         if (state.articles.isNotEmpty) ...[
@@ -510,9 +511,9 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
 
   // --- TAB: SERVICES ---
   Widget _buildServicesTab(SearchPageStateM state) {
-    if (state.services.isEmpty) return const Center(child: Text("Aucun service trouvé"));
+    if (state.services.isEmpty) return Center(child: Text("Aucun service trouvé", style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral600)));
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(SDSpacing.sm),
       itemCount: state.services.length,
       itemBuilder: (context, index) => _buildServiceCard(state.services[index]),
     );
@@ -520,9 +521,9 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
 
   // --- TAB: FREELANCES ---
   Widget _buildFreelancesTab(SearchPageStateM state) {
-    if (state.freelances.isEmpty) return const Center(child: Text("Aucun freelance trouvé"));
+    if (state.freelances.isEmpty) return Center(child: Text("Aucun freelance trouvé", style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral600)));
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(SDSpacing.sm),
       itemCount: state.freelances.length,
       itemBuilder: (context, index) => _buildFreelanceCard(state.freelances[index]),
     );
@@ -530,9 +531,9 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
 
   // --- TAB: PRESTATAIRES ---
   Widget _buildPrestatairesTab(SearchPageStateM state) {
-    if (state.prestataires.isEmpty) return const Center(child: Text("Aucun prestataire trouvé"));
+    if (state.prestataires.isEmpty) return Center(child: Text("Aucun prestataire trouvé", style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral600)));
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(SDSpacing.sm),
       itemCount: state.prestataires.length,
       itemBuilder: (context, index) => _buildFreelanceCard(state.prestataires[index]), // Reuse Card
     );
@@ -540,14 +541,14 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
 
   // --- TAB: ARTICLES ---
   Widget _buildShopTab(SearchPageStateM state) {
-    if (state.articles.isEmpty) return const Center(child: Text("Aucun article trouvé"));
+    if (state.articles.isEmpty) return Center(child: Text("Aucun article trouvé", style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral600)));
     return GridView.builder(
-      padding: const EdgeInsets.all(16),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+      padding: EdgeInsets.all(SDSpacing.sm),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
         childAspectRatio: 0.75,
-        mainAxisSpacing: 10,
-        crossAxisSpacing: 10,
+        mainAxisSpacing: SDSpacing.sm,
+        crossAxisSpacing: SDSpacing.sm,
       ),
       itemCount: state.articles.length,
       itemBuilder: (context, index) => _buildArticleCard(state.articles[index]),
@@ -557,16 +558,18 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
   // --- WIDGET HELPER METHODS ---
 
   Widget _buildSectionHeader(String title, int tabIndex, int count) {
-    if (count == 0) return const SizedBox();
+    if (count == 0) return SizedBox();
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: EdgeInsets.only(bottom: SDSpacing.xs),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+          Text(title, style: SDTypography.titleMedium.copyWith(fontWeight: FontWeight.bold)),
           GestureDetector(
             onTap: () => _tabController.animateTo(tabIndex),
-            child: const Text('Voir tout', style: TextStyle(color: Color(0xFF2E7D32), fontWeight: FontWeight.bold)), // ✅ Standard Green
+            child: Text('Voir tout', 
+              style: SDTypography.labelMedium.copyWith(color: SDColors.primary600, fontWeight: FontWeight.bold)
+            ), 
           ),
         ],
       ),
@@ -576,18 +579,18 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
   Widget _buildHorizontalScroll(List<Widget> children) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      child: Row(children: children.map((c) => Padding(padding: const EdgeInsets.only(right: 12), child: c)).toList()),
+      child: Row(children: children.map((c) => Padding(padding: EdgeInsets.only(right: SDSpacing.xs), child: c)).toList()),
     );
   }
 
   Widget _buildArticleGrid(List<dynamic> articles) {
     return GridView.count(
       shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
+      physics: NeverScrollableScrollPhysics(),
       crossAxisCount: 2,
       childAspectRatio: 0.75,
-      mainAxisSpacing: 10,
-      crossAxisSpacing: 10,
+      mainAxisSpacing: SDSpacing.sm,
+      crossAxisSpacing: SDSpacing.sm,
       children: articles.map((a) => _buildArticleCard(a)).toList(),
     );
   }
@@ -601,16 +604,16 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
     final int price = int.tryParse(service['prixmoyen']?.toString() ?? '0') ?? 0;
     
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: EdgeInsets.only(bottom: SDSpacing.xs),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4)],
+        color: SDColors.white,
+        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+        boxShadow: [BoxShadow(color: SDColors.neutral900.withOpacity(0.05), blurRadius: 4)],
       ),
       child: ListTile(
-        contentPadding: const EdgeInsets.all(8),
+        contentPadding: EdgeInsets.all(SDSpacing.xs),
         leading: ClipRRect(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
           child: AppImage(
             imageUrl: image,
             width: 60,
@@ -618,9 +621,9 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
             fit: BoxFit.cover,
           ),
         ),
-        title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text('À partir de $price FCFA', style: TextStyle(color: Colors.green[700])),
-        trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
+        title: Text(name, style: SDTypography.titleSmall),
+        subtitle: Text('À partir de $price FCFA', style: SDTypography.bodySmall.copyWith(color: SDColors.success500)),
+        trailing: Icon(Icons.arrow_forward_ios, size: 14, color: SDColors.neutral500),
         onTap: () {
           Navigator.push(
             context,
@@ -643,24 +646,24 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
 
     return Container(
       width: 100,
-      padding: const EdgeInsets.all(8),
+      padding: EdgeInsets.all(SDSpacing.xs),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4)],
+        color: SDColors.white,
+        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+        boxShadow: [BoxShadow(color: SDColors.neutral900.withOpacity(0.05), blurRadius: 4)],
       ),
       child: Column(
         children: [
           CircleAvatar(
             radius: 30,
             backgroundImage: image.isNotEmpty ? CachedNetworkImageProvider(image) : null,
-            child: image.isEmpty ? const Icon(Icons.person) : null,
+            child: image.isEmpty ? Icon(Icons.person, color: SDColors.neutral400) : null,
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: SDSpacing.xs),
           Text(name, maxLines: 1, overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              style: SDTypography.bodySmall.copyWith(fontWeight: FontWeight.bold)),
           Text(job, maxLines: 1, overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 11, color: Colors.grey)),
+              style: SDTypography.labelSmall.copyWith(color: SDColors.neutral500)),
         ],
       ),
     );
@@ -673,25 +676,25 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
     final dynamic rating = freelance['rating'] ?? 0.0;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: EdgeInsets.only(bottom: SDSpacing.xs),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4)],
+        color: SDColors.white,
+        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+        boxShadow: [BoxShadow(color: SDColors.neutral900.withOpacity(0.05), blurRadius: 4)],
       ),
       child: ListTile(
         leading: CircleAvatar(
           radius: 25,
           backgroundImage: image.isNotEmpty ? CachedNetworkImageProvider(image) : null,
-          child: image.isEmpty ? const Icon(Icons.person) : null,
+          child: image.isEmpty ? Icon(Icons.person, color: SDColors.neutral400) : null,
         ),
-        title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
+        title: Text(name, style: SDTypography.titleSmall.copyWith(fontWeight: FontWeight.bold)),
         subtitle: Row(
           children: [
-            Text(job),
-            const SizedBox(width: 8),
-            const Icon(Icons.star, size: 14, color: Colors.amber),
-            Text(' $rating'),
+            Text(job, style: SDTypography.bodySmall),
+            SizedBox(width: SDSpacing.xs),
+            Icon(Icons.star, size: 14, color: SDColors.warning500),
+            Text(' $rating', style: SDTypography.bodySmall),
           ],
         ),
         onTap: () {
@@ -737,36 +740,36 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
       },
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4)],
+          color: SDColors.white,
+          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+          boxShadow: [BoxShadow(color: SDColors.neutral900.withOpacity(0.05), blurRadius: 4)],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
               child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(SDSpacing.borderRadiusMedium)),
                 child: Image.network(
                   image, 
                   width: double.infinity, 
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(color: Colors.grey[200], child: const Icon(Icons.shopping_bag)),
+                  errorBuilder: (_, __, ___) => Container(color: SDColors.neutral200, child: Icon(Icons.shopping_bag, color: SDColors.neutral400)),
                 ),
               ),
             ),
             Padding(
-              padding: const EdgeInsets.all(8.0),
+              padding: EdgeInsets.all(SDSpacing.xs),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(name, 
                     maxLines: 2, 
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)
+                    style: SDTypography.bodySmall.copyWith(fontWeight: FontWeight.bold)
                   ),
                   Text('$price FCFA', 
-                    style: const TextStyle(color: Color(0xFF2E7D32), fontWeight: FontWeight.bold, fontSize: 13) // ✅ Standard Green
+                    style: SDTypography.labelMedium.copyWith(color: SDColors.primary600, fontWeight: FontWeight.bold) // ✅ Standard Green
                   ),
                 ],
               ),

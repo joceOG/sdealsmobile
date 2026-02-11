@@ -10,7 +10,6 @@ import 'package:sdealsmobile/mobile/view/jobpagem/screens/fullMapScreenM.dart';
 import 'package:sdealsmobile/mobile/view/jobpagem/screens/categories_list_screen.dart';
 import 'package:sdealsmobile/mobile/view/jobpagem/screens/services_list_screen.dart';
 import 'package:sdealsmobile/mobile/view/jobpagem/screens/providers_list_screen.dart';
-import 'package:sdealsmobile/mobile/view/common/screens/ai_assistant_chat_screen.dart';
 import 'package:sdealsmobile/mobile/view/common/widgets/ai_price_estimator_widget.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
@@ -24,6 +23,11 @@ import '../../../../data/models/service.dart';
 import '../jobpageblocm/jobPageBlocM.dart';
 import '../jobpageblocm/jobPageStateM.dart';
 import '../jobpageblocm/jobPageEventM.dart';
+
+// Design System
+import '../../../../design_system/colors.dart';
+import '../../../../design_system/typography.dart';
+import '../../../../design_system/spacing.dart';
 
 class JobPageScreenM extends StatefulWidget {
   final List<dynamic> categories;
@@ -61,36 +65,29 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
       "icon": Icons.flash_on,
       "title": "Urgence",
       "subtitle": "24h/24",
-      "color": Colors.red,
+      "color": SDColors.error500,
       "action": "urgent"
     },
     {
       "icon": Icons.star,
       "title": "Top Rated",
       "subtitle": "Les meilleurs",
-      "color": Colors.amber,
+      "color": SDColors.warning500,
       "action": "toprated"
     },
     {
       "icon": Icons.location_on,
       "title": "Proche",
       "subtitle": "À proximité",
-      "color": Colors.blue,
+      "color": SDColors.info500,
       "action": "nearby"
     },
     {
       "icon": Icons.savings,
       "title": "Promo",
       "subtitle": "Économisez",
-      "color": const Color(0xFF2E7D32),
+      "color": SDColors.primary600,
       "action": "promo"
-    },
-    {
-      "icon": Icons.smart_toy,
-      "title": "IA Conseil",
-      "subtitle": "Assistant",
-      "color": Colors.purple,
-      "action": "ai"
     },
   ];
 
@@ -273,7 +270,7 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
           ..add(LoadCategorieDataJobM())
           ..add(LoadServiceDataJobM()),
         child: Scaffold(
-          backgroundColor: Colors.white,
+          backgroundColor: SDColors.white,
           floatingActionButton: FloatingActionButton(
             onPressed: () {
               final authState = context.read<AuthCubit>().state;
@@ -296,8 +293,8 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                 ),
               );
             },
-            backgroundColor: const Color(0xFF2E7D32),
-            child: const Icon(Icons.handyman, color: Colors.white),
+            backgroundColor: SDColors.primary600,
+            child: const Icon(Icons.handyman, color: SDColors.white),
             tooltip: 'Devenir Prestataire',
           ),
           body: BlocListener<JobPageBlocM, JobPageStateM>(
@@ -311,45 +308,31 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                 // Banner promo sticky (si newbie)
                 _buildPromoStickyBanner(context),
 
-                // Chips SoutraPay + IA
-                _buildToolChipsSliver(context),
+                // Bannière (remplace SoutraPay + IA)
+                _buildHomeBannerSliver(context),
 
                 // Contenu principal
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20.0), // Augmenté 16->20
+                    padding: EdgeInsets.symmetric(horizontal: SDSpacing.md),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const SizedBox(height: 32), // Augmenté 24->32
+                        SizedBox(height: SDSpacing.lg),
                         
                         // 🎯 SECTION 1 : HERO SEARCH BAR
                         _buildHeroSearchBar(),
-                        const SizedBox(height: 32), // Standardisé à 32
-                        
-                        // 🚀 SECTION 2 : Quick Actions (optimisé)
-                        _buildQuickActionsSection(),
-                        const SizedBox(height: 40), // Augmenté 32->40
-                        
-                        // 🎯 SECTION 3 : RECOMMANDATIONS IA
-                        _buildPersonalizedRecommendationsSection(),
-                        const SizedBox(height: 40),
-                        
-                        // 🔥 SECTION 4 : PROMOTIONS ACTIVES
-                        _buildActivePromotionsSection(),
-                        const SizedBox(height: 40),
+                        SizedBox(height: SDSpacing.md),
 
-                        // 📂 SECTION 5 : TOP CATÉGORIES
+                        // Catégories (en avant)
                         Row(
                           children: [
-                            const Expanded(
+                            Icon(Icons.category, color: SDColors.primary600, size: 22),
+                            SizedBox(width: SDSpacing.xs),
+                            Expanded(
                               child: Text(
-                                '📂 Catégories',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 18,
-                                  color: Colors.black,
-                                ),
+                                'Catégories',
+                                style: SDTypography.titleLarge.copyWith(color: SDColors.neutral900),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
@@ -363,16 +346,16 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                                 );
                               },
                               icon: const Icon(Icons.arrow_forward, size: 14),
-                              label: const Text('Tout', style: TextStyle(fontSize: 13)),
+                              label: Text('Tout', style: SDTypography.labelSmall),
                               style: TextButton.styleFrom(
-                                foregroundColor: const Color(0xFF2E7D32),
-                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                                foregroundColor: SDColors.primary600,
+                                padding: SDSpacing.chipPadding,
                                 minimumSize: const Size(0, 32),
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 16),
+                        SizedBox(height: SDSpacing.sm),
                         
                         BlocBuilder<JobPageBlocM, JobPageStateM>(
                           builder: (context, state) {
@@ -391,7 +374,7 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                               child: ListView.separated(
                                 scrollDirection: Axis.horizontal,
                                 itemCount: state.listItems.length,
-                                separatorBuilder: (_, __) => const SizedBox(width: 16),
+                                separatorBuilder: (_, __) => SizedBox(width: SDSpacing.sm),
                                 itemBuilder: (context, index) {
                                   final cat = state.listItems[index];
                                   return _buildCategoryCardWithImage(
@@ -404,19 +387,17 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                             );
                           },
                         ),
-                        const SizedBox(height: 32),
+                        SizedBox(height: SDSpacing.lg),
                         
-                        // 🛠️ SECTION 6 : TOP SERVICES
+                        // Services populaires
                         Row(
                           children: [
-                            const Expanded(
+                            Icon(Icons.build, color: SDColors.primary600, size: 22),
+                            SizedBox(width: SDSpacing.xs),
+                            Expanded(
                               child: Text(
-                                '🛠️ Services populaires',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 18,
-                                  color: Colors.black,
-                                ),
+                                'Services populaires',
+                                style: SDTypography.titleLarge.copyWith(color: SDColors.neutral900),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
@@ -430,16 +411,16 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                                 );
                               },
                               icon: const Icon(Icons.arrow_forward, size: 14),
-                              label: const Text('Tout', style: TextStyle(fontSize: 13)),
+                              label: Text('Tout', style: SDTypography.labelSmall),
                               style: TextButton.styleFrom(
-                                foregroundColor: const Color(0xFF2E7D32),
-                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                                foregroundColor: SDColors.primary600,
+                                padding: SDSpacing.chipPadding,
                                 minimumSize: const Size(0, 32),
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 16),
+                        SizedBox(height: SDSpacing.sm),
                         
                         // Carrousel Services
                         BlocBuilder<JobPageBlocM, JobPageStateM>(
@@ -456,7 +437,7 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                               child: ListView.separated(
                                 scrollDirection: Axis.horizontal,
                                 itemCount: state.listItems2.length,
-                                separatorBuilder: (_, __) => const SizedBox(width: 16),
+                                separatorBuilder: (_, __) => SizedBox(width: SDSpacing.sm),
                                 itemBuilder: (context, index) {
                                   final service = state.listItems2[index];
                                   
@@ -519,7 +500,7 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                                             // Contenu
                                             Expanded(
                                               child: Padding(
-                                                padding: const EdgeInsets.all(10),
+                                                padding: SDSpacing.cardPadding,
                                                 child: Column(
                                                   crossAxisAlignment: CrossAxisAlignment.start,
                                                   mainAxisAlignment: MainAxisAlignment.center,
@@ -527,21 +508,18 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                                                   children: [
                                                     Text(
                                                       service.nomservice,
-                                                      style: const TextStyle(
-                                                        fontWeight: FontWeight.bold,
-                                                        fontSize: 15,
-                                                        color: Colors.black87,
+                                                      style: SDTypography.titleSmall.copyWith(
+                                                        color: SDColors.neutral900,
                                                       ),
                                                       maxLines: 2,
                                                       overflow: TextOverflow.ellipsis,
                                                     ),
-                                                    const SizedBox(height: 4),
+                                                    SizedBox(height: SDSpacing.xxxs),
                                                     if (service.categorie?.nomcategorie != null)
                                                       Text(
                                                         service.categorie!.nomcategorie,
-                                                        style: TextStyle(
-                                                          fontSize: 12,
-                                                          color: Colors.grey.shade600,
+                                                        style: SDTypography.bodySmall.copyWith(
+                                                          color: SDColors.neutral500,
                                                         ),
                                                         maxLines: 1,
                                                         overflow: TextOverflow.ellipsis,
@@ -552,26 +530,24 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                                                         Expanded(
                                                           child: Text(
                                                             '${service.prixmoyen} FCFA/h',
-                                                            style: const TextStyle(
-                                                              color: const Color(0xFF2E7D32),
-                                                              fontSize: 13,
-                                                              fontWeight: FontWeight.bold,
+                                                            style: SDTypography.labelMedium.copyWith(
+                                                              color: SDColors.primary600,
                                                             ),
                                                             overflow: TextOverflow.ellipsis,
                                                           ),
                                                         ),
                                                         Container(
-                                                          padding: const EdgeInsets.symmetric(
-                                                            horizontal: 6,
-                                                            vertical: 2,
+                                                          padding: EdgeInsets.symmetric(
+                                                            horizontal: SDSpacing.xxxs,
+                                                            vertical: SDSpacing.xxxs,
                                                           ),
                                                           decoration: BoxDecoration(
-                                                            color: const Color(0xFF2E7D32),
-                                                            borderRadius: BorderRadius.circular(8),
+                                                            color: SDColors.primary600,
+                                                            borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
                                                           ),
-                                                          child: const Icon(
+                                                          child: Icon(
                                                             Icons.arrow_forward,
-                                                            color: Colors.white,
+                                                            color: SDColors.white,
                                                             size: 14,
                                                           ),
                                                         ),
@@ -591,19 +567,17 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                             );
                           },
                         ),
-                        const SizedBox(height: 32),
+                        SizedBox(height: SDSpacing.lg),
 
-                        // ⭐ SECTION 7 : TOP PRESTATAIRES
+                        // Prestataires
                         Row(
                           children: [
-                            const Expanded(
+                            Icon(Icons.people, color: SDColors.primary600, size: 22),
+                            SizedBox(width: SDSpacing.xs),
+                            Expanded(
                               child: Text(
-                                '⭐ Prestataires',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 18,
-                                  color: Colors.black,
-                                ),
+                                'Prestataires',
+                                style: SDTypography.titleLarge.copyWith(color: SDColors.neutral900),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
@@ -617,16 +591,16 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                                 );
                               },
                               icon: const Icon(Icons.arrow_forward, size: 14),
-                              label: const Text('Tout', style: TextStyle(fontSize: 13)),
+                              label: Text('Tout', style: SDTypography.labelSmall),
                               style: TextButton.styleFrom(
-                                foregroundColor: const Color(0xFF2E7D32),
-                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                                foregroundColor: SDColors.primary600,
+                                padding: SDSpacing.chipPadding,
                                 minimumSize: const Size(0, 32),
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 16),
+                        SizedBox(height: SDSpacing.sm),
 
                         // Carrousel Top Prestataires (vraies données)
                         BlocBuilder<JobPageBlocM, JobPageStateM>(
@@ -665,11 +639,11 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                               );
                             }
                             
-                            return const SizedBox(
+                            return SizedBox(
                               height: 150,
                               child: Center(
                                 child: Text('Aucun prestataire trouvé',
-                                    style: TextStyle(color: Colors.grey)),
+                                    style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral500)),
                               ),
                             );
                           }
@@ -727,7 +701,7 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                                   ),
                                   color: Colors.white,
                                   child: Padding(
-                                    padding: const EdgeInsets.all(12.0),
+                                    padding: SDSpacing.cardPadding,
                                     child: Row(
                                       children: [
                                         // Image du prestataire
@@ -758,11 +732,11 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                                                 right: 8,
                                                 child: Container(
                                                   padding:
-                                                      const EdgeInsets.all(2),
+                                                      EdgeInsets.all(SDSpacing.xxxs),
                                                   decoration:
-                                                      const BoxDecoration(
+                                                      BoxDecoration(
                                                     color:
-                                                        const Color(0xFF2E7D32),
+                                                        SDColors.primary600,
                                                     shape: BoxShape.circle,
                                                   ),
                                                   child: const Icon(
@@ -774,7 +748,7 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                                               ),
                                           ],
                                         ),
-                                        const SizedBox(width: 16),
+                                        SizedBox(width: SDSpacing.sm),
                                         // Infos du prestataire
                                         Expanded(
                                           child: Column(
@@ -788,11 +762,8 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                                                   Expanded(
                                                     child: Text(
                                                       providerName,
-                                                      style: const TextStyle(
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                        fontSize: 15.0,
-                                                        color: Colors.black87,
+                                                      style: SDTypography.titleSmall.copyWith(
+                                                        color: SDColors.neutral900,
                                                       ),
                                                       overflow:
                                                           TextOverflow.ellipsis,
@@ -800,51 +771,45 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                                                   ),
                                                 ],
                                               ),
-                                              const SizedBox(height: 2),
+                                              SizedBox(height: SDSpacing.xxxs),
                                               Text(
                                                 serviceName,
-                                                style: const TextStyle(
-                                                  fontSize: 12.0,
-                                                  color: Colors.black54,
+                                                style: SDTypography.bodySmall.copyWith(
+                                                  color: SDColors.neutral600,
                                                 ),
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
                                               ),
-                                              const SizedBox(height: 6),
+                                              SizedBox(height: SDSpacing.xxs),
                                               Row(
                                                 children: [
-                                                  const Icon(Icons.location_on,
+                                                  Icon(Icons.location_on,
                                                       size: 14,
-                                                      color: Colors.green),
-                                                  const SizedBox(width: 3),
+                                                      color: SDColors.primary600),
+                                                  SizedBox(width: SDSpacing.xxxs),
                                                   Expanded(
                                                     flex: 3,
                                                     child: Text(
                                                       location,
-                                                      style: const TextStyle(
-                                                        fontSize: 12,
-                                                        color: const Color(
-                                                            0xFF2E7D32),
+                                                      style: SDTypography.bodySmall.copyWith(
+                                                        color: SDColors.primary600,
                                                       ),
                                                       maxLines: 1,
                                                       overflow:
                                                           TextOverflow.ellipsis,
                                                     ),
                                                   ),
-                                                  const SizedBox(width: 4),
-                                                  const Icon(Icons.star,
+                                                  SizedBox(width: SDSpacing.xxxs),
+                                                  Icon(Icons.star,
                                                       size: 14,
-                                                      color: Colors.amber),
-                                                  const SizedBox(width: 2),
+                                                      color: SDColors.warning500),
+                                                  SizedBox(width: SDSpacing.xxxs),
                                                   Flexible(
                                                     flex: 1,
                                                     child: Text(
                                                       rating,
-                                                      style: const TextStyle(
-                                                        fontSize: 12,
-                                                        color: Colors.amber,
-                                                        fontWeight:
-                                                            FontWeight.w600,
+                                                      style: SDTypography.labelSmall.copyWith(
+                                                        color: SDColors.warning500,
                                                       ),
                                                       maxLines: 1,
                                                       overflow: TextOverflow.ellipsis,
@@ -852,7 +817,7 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                                                   ),
                                                 ],
                                               ),
-                                              const SizedBox(height: 4),
+                                              SizedBox(height: SDSpacing.xxxs),
                                               SizedBox(
                                                 height: 28,
                                                 child: ElevatedButton(
@@ -862,23 +827,19 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                                                   style:
                                                       ElevatedButton.styleFrom(
                                                     backgroundColor:
-                                                        const Color(0xFF2E7D32),
+                                                        SDColors.primary600,
                                                     foregroundColor:
-                                                        Colors.white,
-                                                    padding: const EdgeInsets
-                                                        .symmetric(
-                                                        horizontal: 8,
-                                                        vertical: 2),
+                                                        SDColors.white,
+                                                    padding: SDSpacing.chipPadding,
                                                     shape:
                                                         RoundedRectangleBorder(
                                                       borderRadius:
                                                           BorderRadius.circular(
-                                                              14),
+                                                              SDSpacing.borderRadiusMedium),
                                                     ),
                                                   ),
-                                                  child: const Text('Contacter',
-                                                      style: TextStyle(
-                                                          fontSize: 11)),
+                                                  child: Text('Contacter',
+                                                      style: SDTypography.labelSmall),
                                                 ),
                                               ),
                                             ],
@@ -892,12 +853,20 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                             },
                           );
                         }),
-                        const SizedBox(height: 32),
+                        SizedBox(height: SDSpacing.lg),
                         
-                        // 📍 SECTION 8 : AUTOUR DE MOI (Carte interactive + liste)
+                        // 📍 AUTOUR DE MOI (Carte interactive + liste)
                         _buildAroundMeSection(),
+                        SizedBox(height: SDSpacing.xl),
+
+                        // 🔥 Promotions
+                        _buildActivePromotionsSection(),
+                        SizedBox(height: SDSpacing.xl),
+
+                        // Actions rapides (en dernier)
+                        _buildQuickActionsSection(),
                         
-                        const SizedBox(height: 60), // Espacement final pour FAB
+                        SizedBox(height: SDSpacing.xxl), // Espacement final pour FAB
                       ],
                     ),
                   ),
@@ -919,7 +888,7 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
 
     // Affichage du banner promo pour tous les utilisateurs (peut être conditionné plus tard)
     return SliverPersistentHeader(
-      pinned: true,
+      floating: true,
       delegate: _PromoStickyDelegate(
         child: Container(
           decoration: BoxDecoration(
@@ -937,34 +906,32 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                   color: const Color(0xFF2E7D32).withOpacity(0.3), width: 1),
             ),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          padding: EdgeInsets.symmetric(horizontal: SDSpacing.sm, vertical: SDSpacing.xs),
           child: Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(4),
+                padding: EdgeInsets.all(SDSpacing.xxxs),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF2E7D32).withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
+                  color: SDColors.primary600.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
                 ),
                 child: Icon(Icons.verified_user,
-                    color: const Color(0xFF2E7D32), size: 16),
+                    color: SDColors.primary600, size: 16),
               ),
-              const SizedBox(width: 10),
+              SizedBox(width: SDSpacing.xs),
               Expanded(
                 child: Text(
                   '✨ Bienvenue ! Découvre nos prestataires vérifiés',
-                  style: TextStyle(
-                    color: const Color(0xFF2E7D32).withOpacity(0.9),
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
+                  style: SDTypography.labelSmall.copyWith(
+                    color: SDColors.primary600.withOpacity(0.9),
                   ),
                 ),
               ),
               Container(
-                padding: const EdgeInsets.all(2),
+                padding: EdgeInsets.all(SDSpacing.xxxs),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF2E7D32).withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(10),
+                  color: SDColors.primary600.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
                 ),
                 child: InkWell(
                   onTap: () {
@@ -986,106 +953,45 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
     );
   }
 
-  // ✅ NOUVEAU : Chips horizontales SoutraPay + IA
-  Widget _buildToolChipsSliver(BuildContext context) {
+  // Bannière Métiers : carousel avec 3 bannières PNG (~25% de l'écran pour plus d'espace)
+  Widget _buildHomeBannerSliver(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final bannerHeight = screenHeight * 0.25; // ~25% de la hauteur de l'écran (réduit de 40%)
+    
+    final List<String> bannerImages = [
+      'assets/banner/metiers/banner1.png',
+      'assets/banner/metiers/banner2.png',
+      'assets/banner/metiers/banner3.png',
+    ];
+    
     return SliverToBoxAdapter(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            // Chip SoutraPay
-            InkWell(
-              onTap: () => Navigator.pushNamed(context, '/wallet'),
-              borderRadius: BorderRadius.circular(20),
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Colors.green.withOpacity(0.1),
-                      Colors.green.withOpacity(0.15),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                      color: Colors.green.withOpacity(0.4), width: 1.2),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.green.withOpacity(0.15),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.account_balance_wallet,
-                        color: const Color(0xFF2E7D32), size: 16),
-                    const SizedBox(width: 4),
-                    Text(
-                      '💳 SoutraPay',
-                      style: TextStyle(
-                          color: const Color(0xFF2E7D32),
-                          fontWeight: FontWeight.w600,
-                          fontSize: 12),
-                    ),
-                  ],
-                ),
+      child: SizedBox(
+        height: bannerHeight,
+        width: double.infinity,
+        child: CarouselSlider.builder(
+          itemCount: bannerImages.length,
+          options: CarouselOptions(
+            height: bannerHeight,
+            viewportFraction: 1.0,
+            autoPlay: true,
+            autoPlayInterval: const Duration(seconds: 4),
+            autoPlayAnimationDuration: const Duration(milliseconds: 800),
+            autoPlayCurve: Curves.fastOutSlowIn,
+            enlargeCenterPage: false,
+            scrollDirection: Axis.horizontal,
+          ),
+          itemBuilder: (context, index, realIndex) {
+            return Image.asset(
+              bannerImages[index],
+              fit: BoxFit.cover,
+              width: double.infinity,
+              errorBuilder: (_, __, ___) => Container(
+                color: SDColors.primary50,
+                alignment: Alignment.center,
+                child: Icon(Icons.image_not_supported, color: SDColors.primary600, size: 40),
               ),
-            ),
-            const SizedBox(width: 8),
-            // Chip IA Assistant
-            InkWell(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) => const AIAssistantChatScreen()),
-                );
-              },
-              borderRadius: BorderRadius.circular(20),
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Colors.blue.shade50, Colors.blue.shade100],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.blue.shade300, width: 1.2),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.blue.withOpacity(0.15),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.smart_toy,
-                        color: Colors.blue.shade700, size: 16),
-                    const SizedBox(width: 4),
-                    Text(
-                      '🤖 IA Assistant',
-                      style: TextStyle(
-                          color: Colors.blue.shade800,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
+            );
+          },
         ),
       ),
     );
@@ -1098,13 +1004,11 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
       children: [
         Row(
           children: [
-            const Expanded(
+            Expanded(
               child: Text(
                 'Actions rapides',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                  color: Colors.black,
+                style: SDTypography.titleMedium.copyWith(
+                  color: SDColors.neutral900,
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
@@ -1113,18 +1017,16 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
               onTap: () {
                 // TODO: Navigation vers la page complète des actions rapides
               },
-              child: const Text(
+              child: Text(
                 'Voir tout',
-                style: TextStyle(
-                  color: const Color(0xFF2E7D32),
-                  fontWeight: FontWeight.w600,
-                  fontSize: 15,
+                style: SDTypography.labelMedium.copyWith(
+                  color: SDColors.primary600,
                 ),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: SDSpacing.sm),
         SizedBox(
           height: 95, // Augmenté de 90 à 95 pour éviter l'overflow
           child: ListView.builder(
@@ -1133,7 +1035,7 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
             itemBuilder: (context, index) {
               final action = quickActions[index];
               return Padding(
-                padding: const EdgeInsets.only(right: 16), // Standardisé
+                padding: EdgeInsets.only(right: SDSpacing.sm),
                 child: _buildQuickActionCard(
                   icon: action['icon'],
                   title: action['title'],
@@ -1160,18 +1062,18 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 80, // Réduit 90->80
-        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6), // Réduit
+        width: 80,
+        padding: EdgeInsets.symmetric(vertical: SDSpacing.xxxs, horizontal: SDSpacing.xxs),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Colors.white,
+              SDColors.white,
               color.withOpacity(0.05),
             ],
           ),
-          borderRadius: BorderRadius.circular(12), // Réduit radius
+          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
           border: Border.all(color: color.withOpacity(0.3), width: 1.5),
           boxShadow: [
             BoxShadow(
@@ -1186,7 +1088,7 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              padding: const EdgeInsets.all(4), // Réduit
+              padding: EdgeInsets.all(SDSpacing.xxxs),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
@@ -1196,33 +1098,29 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                     color.withOpacity(0.05),
                   ],
                 ),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
               ),
               child: Icon(
                 icon,
                 color: color,
-                size: 16, // Réduit 18->16
+                size: 16,
               ),
             ),
-            const SizedBox(height: 2),
+            SizedBox(height: SDSpacing.xxxs),
             Text(
               title,
-              style: const TextStyle(
-                fontSize: 9, // Réduit 10->9
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
+              style: SDTypography.labelSmall.copyWith(
+                color: SDColors.neutral900,
               ),
               textAlign: TextAlign.center,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
-            const SizedBox(height: 1),
+            SizedBox(height: SDSpacing.xxxs),
             Text(
               subtitle,
-              style: TextStyle(
-                fontSize: 7, // Réduit 8->7
-                color: Colors.grey.shade600,
-                fontWeight: FontWeight.w500,
+              style: SDTypography.bodySmall.copyWith(
+                color: SDColors.neutral500,
               ),
               textAlign: TextAlign.center,
               maxLines: 1,
@@ -1265,116 +1163,58 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
         // TODO: Afficher promotions actives
         print('💰 Affichage promotions');
         break;
-      case 'ai':
-        // TODO: Ouvrir assistant IA
-        print('🤖 Ouverture assistant IA');
-        break;
     }
   }
 
-  // 🎯 NOUVEAU : Hero Search Bar
+  // 🎯 Hero Search Bar — réduit pour laisser place à la bannière
   Widget _buildHeroSearchBar() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.symmetric(horizontal: SDSpacing.md, vertical: SDSpacing.sm),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            const Color(0xFF2E7D32),
-            const Color(0xFF4CAF50),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(20),
+        color: SDColors.white,
+        borderRadius: BorderRadius.circular(SDSpacing.lg),
+        border: Border.all(color: SDColors.primary100, width: 1),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF2E7D32).withOpacity(0.3),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            color: SDColors.neutral900.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          const Text(
-            '👋 Bonjour !',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'De quoi avez-vous besoin ?',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 20),
-          // Search Bar
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: TextField(
-              readOnly: true, // Empêcher le clavier de s'ouvrir
-              decoration: InputDecoration(
-                hintText: 'Rechercher un service, prestataire...',
-                hintStyle: TextStyle(color: Colors.grey.shade400),
-                prefixIcon: const Icon(Icons.search, color: Color(0xFF2E7D32)),
-                suffixIcon: Container(
-                  margin: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF2E7D32),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.tune, color: Colors.white, size: 20),
-                ),
-                border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 16,
-                ),
-              ),
+          Icon(Icons.search, color: SDColors.primary600, size: 22),
+          SizedBox(width: SDSpacing.sm),
+          Expanded(
+            child: GestureDetector(
               onTap: () {
                 Navigator.of(context).push(
                   MaterialPageRoute(builder: (context) => const SearchPageScreenM()),
                 );
               },
+              child: Text(
+                'Rechercher un service, prestataire...',
+                style: SDTypography.bodyMedium.copyWith(
+                  color: SDColors.neutral400,
+                ),
+              ),
             ),
           ),
-          const SizedBox(height: 16),
-          // Stats rapides
-          Row(
-            children: [
-              Expanded(
-                child: _buildStatChip(
-                  icon: Icons.person,
-                  label: '${_markers.length} prestataires',
-                  color: Colors.white70,
-                ),
+          GestureDetector(
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (context) => const SearchPageScreenM()),
+              );
+            },
+            child: Container(
+              padding: EdgeInsets.all(SDSpacing.xs),
+              decoration: BoxDecoration(
+                color: SDColors.primary600,
+                borderRadius: BorderRadius.circular(SDSpacing.sm),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildStatChip(
-                  icon: Icons.location_on,
-                  label: 'À proximité',
-                  color: Colors.white70,
-                ),
-              ),
-            ],
+              child: Icon(Icons.tune, color: SDColors.white, size: 20),
+            ),
           ),
         ],
       ),
@@ -1387,22 +1227,22 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
     required Color color,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: EdgeInsets.symmetric(horizontal: SDSpacing.sm, vertical: SDSpacing.sm),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(8),
+        color: SDColors.primary50,
+        borderRadius: BorderRadius.circular(SDSpacing.sm),
+        border: Border.all(color: SDColors.primary100),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, size: 16, color: color),
-          const SizedBox(width: 6),
+          SizedBox(width: 6),
           Flexible(
             child: Text(
               label,
-              style: TextStyle(
+              style: SDTypography.labelSmall.copyWith(
                 color: color,
-                fontSize: 12,
                 fontWeight: FontWeight.w600,
               ),
               overflow: TextOverflow.ellipsis,
@@ -1420,7 +1260,7 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: count,
-        separatorBuilder: (_, __) => const SizedBox(width: 16),
+        separatorBuilder: (_, __) => SizedBox(width: SDSpacing.sm),
         itemBuilder: (_, __) => Container(
           width: 160,
           decoration: BoxDecoration(
@@ -1441,20 +1281,20 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
   // ⚠️ NOUVEAU : Error Card
   Widget _buildErrorCard(String error) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: SDSpacing.cardPadding,
       decoration: BoxDecoration(
-        color: Colors.red.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.red.shade200),
+        color: SDColors.error50,
+        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+        border: Border.all(color: SDColors.error200),
       ),
       child: Row(
         children: [
-          Icon(Icons.error_outline, color: Colors.red.shade700),
-          const SizedBox(width: 12),
+          Icon(Icons.error_outline, color: SDColors.error600),
+          SizedBox(width: SDSpacing.sm),
           Expanded(
             child: Text(
               error,
-              style: TextStyle(color: Colors.red.shade700),
+              style: SDTypography.bodyMedium.copyWith(color: SDColors.error600),
             ),
           ),
         ],
@@ -1465,16 +1305,15 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
   // 🔍 NOUVEAU : Empty State
   Widget _buildEmptyState(String message) {
     return Container(
-      padding: const EdgeInsets.all(32),
+      padding: EdgeInsets.all(SDSpacing.lg),
       child: Column(
         children: [
-          Icon(Icons.inbox_outlined, size: 64, color: Colors.grey.shade300),
-          const SizedBox(height: 16),
+          Icon(Icons.inbox_outlined, size: 64, color: SDColors.neutral300),
+          SizedBox(height: SDSpacing.sm),
           Text(
             message,
-            style: TextStyle(
-              color: Colors.grey.shade600,
-              fontSize: 16,
+            style: SDTypography.bodyLarge.copyWith(
+              color: SDColors.neutral500,
             ),
             textAlign: TextAlign.center,
           ),
@@ -1500,15 +1339,20 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  '📍 Autour de moi',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18, // Standardisé
-                    color: Colors.black,
-                  ),
+                Row(
+                  children: [
+                    Icon(Icons.location_on, color: SDColors.primary600, size: 22),
+                    SizedBox(width: SDSpacing.xs),
+                    Text(
+                      'Autour de moi',
+                      style: SDTypography.titleLarge.copyWith(
+                        color: SDColors.neutral900,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: SDSpacing.xxs),
                 // Contrôles sur une ligne séparée
                 Row(
                   children: [
@@ -1517,15 +1361,15 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                       flex: 3,
                       child: Row(
                         children: [
-                          const Icon(Icons.radio_button_unchecked, size: 14),
-                          const SizedBox(width: 4),
+                          Icon(Icons.radio_button_unchecked, size: 14, color: SDColors.primary600),
+                          SizedBox(width: SDSpacing.xxxs),
                           Expanded(
                             child: Slider(
                               value: _searchRadius,
                               min: 1.0,
                               max: 20.0,
                               divisions: 19,
-                              activeColor: Colors.green,
+                              activeColor: SDColors.primary600,
                               onChanged: (value) {
                                 setState(() {
                                   _searchRadius = value;
@@ -1549,7 +1393,7 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                             ),
                           ),
                           Text('${_searchRadius.toInt()}km',
-                              style: const TextStyle(fontSize: 11)),
+                              style: SDTypography.labelSmall),
                         ],
                       ),
                     ),
@@ -1573,8 +1417,8 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                               ));
                         }
                       },
-                      icon: const Icon(Icons.refresh,
-                          color: Colors.green, size: 20),
+                      icon: Icon(Icons.refresh,
+                          color: SDColors.primary600, size: 20),
                     ),
                     IconButton(
                       constraints:
@@ -1600,15 +1444,15 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                           );
                         }
                       },
-                      icon: const Icon(Icons.zoom_out_map,
-                          color: Colors.blue, size: 20),
+                      icon: Icon(Icons.zoom_out_map,
+                          color: SDColors.info500, size: 20),
                       tooltip: 'Voir carte complète',
                     ),
                   ],
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: SDSpacing.sm),
 
             // Carte Google Maps
             Container(
@@ -1632,27 +1476,25 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                           if (kIsWeb) {
                             return Container(
                               decoration: BoxDecoration(
-                                color: Colors.grey.shade100,
-                                borderRadius: BorderRadius.circular(16),
+                                color: SDColors.neutral100,
+                                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
                               ),
-                              child: const Center(
+                              child: Center(
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     Icon(Icons.map,
-                                        size: 48, color: Colors.green),
-                                    SizedBox(height: 8),
+                                        size: 48, color: SDColors.primary600),
+                                    SizedBox(height: SDSpacing.xxs),
                                     Text('Carte disponible sur mobile',
-                                        style: TextStyle(
-                                          color: const Color(0xFF2E7D32),
-                                          fontWeight: FontWeight.bold,
+                                        style: SDTypography.titleSmall.copyWith(
+                                          color: SDColors.primary600,
                                         )),
-                                    SizedBox(height: 4),
+                                    SizedBox(height: SDSpacing.xxxs),
                                     Text(
                                         'Utilisez l\'application mobile pour voir la carte',
-                                        style: TextStyle(
-                                          color: Colors.grey,
-                                          fontSize: 12,
+                                        style: SDTypography.bodySmall.copyWith(
+                                          color: SDColors.neutral500,
                                         )),
                                   ],
                                 ),
@@ -1675,79 +1517,75 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                             );
                           } catch (e) {
                             print('Erreur Google Maps: $e');
-                            return const Center(
+                            return Center(
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Icon(Icons.error_outline,
-                                      size: 48, color: Colors.red),
+                                      size: 48, color: SDColors.error500),
                                   SizedBox(height: 8),
                                   Text('Erreur de chargement de la carte',
-                                      style: TextStyle(color: Colors.red)),
+                                      style: SDTypography.bodyMedium.copyWith(color: SDColors.error500)),
                                 ],
                               ),
                             );
                           }
                         },
                       )
-                    : const Center(
+                    : Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(Icons.location_off,
-                                size: 48, color: Colors.grey),
-                            SizedBox(height: 8),
+                                size: 48, color: SDColors.neutral400),
+                            SizedBox(height: SDSpacing.xxs),
                             Text('Position non disponible',
-                                style: TextStyle(color: Colors.grey)),
+                                style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral500)),
                           ],
                         ),
                       ),
               ),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: SDSpacing.sm),
 
             // Filtres de catégorie et service
             _buildFiltersRow(state),
-            const SizedBox(height: 16),
+            SizedBox(height: SDSpacing.sm),
 
             // Compteur de prestataires trouvés
             if (state.nearbyProviders.isNotEmpty)
               Container(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                margin: const EdgeInsets.only(bottom: 8),
+                    EdgeInsets.symmetric(horizontal: SDSpacing.sm, vertical: SDSpacing.xxs),
+                margin: EdgeInsets.only(bottom: SDSpacing.xxs),
                 decoration: BoxDecoration(
-                  color: Colors.green.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.green.shade200),
+                  color: SDColors.success50,
+                  borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
+                  border: Border.all(color: SDColors.success200),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.location_on, color: Colors.green, size: 16),
-                    const SizedBox(width: 8),
+                    Icon(Icons.location_on, color: SDColors.primary600, size: 16),
+                    SizedBox(width: SDSpacing.xxs),
                     Text(
                       '${state.nearbyProviders.length} prestataire(s) trouvé(s)',
-                      style: TextStyle(
-                        color: Colors.green.shade700,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
+                      style: SDTypography.bodyMedium.copyWith(
+                        color: SDColors.success700,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                     const Spacer(),
                     if (_selectedCategory.isNotEmpty)
                       Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
+                        padding: SDSpacing.chipPadding,
                         decoration: BoxDecoration(
-                          color: const Color(0xFF2E7D32),
-                          borderRadius: BorderRadius.circular(12),
+                          color: SDColors.primary600,
+                          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
                         ),
                         child: Text(
                           _selectedCategory,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
+                          style: SDTypography.labelSmall.copyWith(
+                            color: SDColors.white,
                           ),
                         ),
                       ),
@@ -1757,29 +1595,29 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
 
             // Liste des prestataires à proximité
             if (state.isNearbyLoading)
-              const Center(
-                  child: CircularProgressIndicator(color: Colors.green))
+              Center(
+                  child: CircularProgressIndicator(color: SDColors.primary600))
             else if (state.nearbyError.isNotEmpty)
               Center(
                 child: Column(
                   children: [
-                    const Icon(Icons.error_outline,
-                        size: 48, color: Colors.red),
-                    const SizedBox(height: 8),
+                    Icon(Icons.error_outline,
+                        size: 48, color: SDColors.error500),
+                    SizedBox(height: SDSpacing.xxs),
                     Text('Erreur: ${state.nearbyError}',
-                        style: const TextStyle(color: Colors.red)),
+                        style: SDTypography.bodyMedium.copyWith(color: SDColors.error500)),
                   ],
                 ),
               )
             else if (state.nearbyProviders.isEmpty)
-              const Center(
+              Center(
                 child: Column(
                   children: [
                     Icon(Icons.location_searching,
-                        size: 48, color: Colors.grey),
-                    SizedBox(height: 8),
+                        size: 48, color: SDColors.neutral400),
+                    SizedBox(height: SDSpacing.xxs),
                     Text('Aucun prestataire à proximité',
-                        style: TextStyle(color: Colors.grey)),
+                        style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral500)),
                   ],
                 ),
               )
@@ -1803,11 +1641,10 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
               flex: 1,
               child: DropdownButtonFormField<String>(
                 value: _selectedCategory.isEmpty ? null : _selectedCategory,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Catégorie',
                   border: OutlineInputBorder(),
-                  contentPadding:
-                      EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  contentPadding: SDSpacing.inputPadding,
                   isDense: true,
                 ),
                 isExpanded: true,
@@ -1843,17 +1680,16 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                 },
               ),
             ),
-            const SizedBox(width: 8),
+            SizedBox(width: SDSpacing.xxs),
             // Filtre par service
             Expanded(
               flex: 1,
               child: DropdownButtonFormField<String>(
                 value: _selectedService.isEmpty ? null : _selectedService,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Service',
                   border: OutlineInputBorder(),
-                  contentPadding:
-                      EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  contentPadding: EdgeInsets.symmetric(horizontal: SDSpacing.xxs, vertical: SDSpacing.xxxs),
                   isDense: true,
                 ),
                 isExpanded: true,
@@ -1902,12 +1738,11 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
       children: [
         Text(
           'Prestataires à proximité (${providers.length})',
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 16,
+          style: SDTypography.titleSmall.copyWith(
+            color: SDColors.neutral900,
           ),
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: SDSpacing.sm),
         SizedBox(
           height: 200,
           child: ListView.builder(
@@ -1927,13 +1762,13 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
   Widget _buildNearbyProviderCard(dynamic provider, int index) {
     return Container(
       width: 280,
-      margin: const EdgeInsets.only(right: 12),
+      margin: EdgeInsets.only(right: SDSpacing.sm),
       child: Card(
-        elevation: 4, // Standardisé
+        elevation: 4,
         shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16)), // Standardisé
+            borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge)),
         child: InkWell(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
           onTap: () {
             // ✅ Navigation vers le profil complet du prestataire
             NavigationHelper.navigateToProviderProfile(
@@ -1943,7 +1778,7 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
             );
           },
           child: Padding(
-            padding: const EdgeInsets.all(12),
+            padding: SDSpacing.cardPadding,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1955,25 +1790,24 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                       backgroundImage: AssetImage(
                           'assets/categories/Image${(index % 5) + 1}.png'),
                     ),
-                    const SizedBox(width: 8),
+                    SizedBox(width: SDSpacing.xxs),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             provider.utilisateur?.fullName ?? 'Prestataire',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
+                            style: SDTypography.bodyMedium.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: SDColors.neutral900,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                           Text(
                             provider.service?.nomservice ?? 'Service',
-                            style: const TextStyle(
-                              color: Colors.grey,
-                              fontSize: 12,
+                            style: SDTypography.bodySmall.copyWith(
+                              color: SDColors.neutral500,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -1982,54 +1816,54 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                       ),
                     ),
                     if (provider.verifier)
-                      const Icon(Icons.verified, color: Colors.green, size: 16),
+                      Icon(Icons.verified, color: SDColors.primary600, size: 16),
                   ],
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: SDSpacing.xxs),
 
                 // Note et distance
                 Row(
                   children: [
-                    const Icon(Icons.star, color: Colors.amber, size: 14),
-                    const SizedBox(width: 3),
+                    Icon(Icons.star, color: SDColors.warning500, size: 14),
+                    SizedBox(width: SDSpacing.xxxs),
                     Flexible(
                       flex: 2,
                       child: Text(
                         provider.note ?? 'N/A',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
+                        style: SDTypography.labelSmall.copyWith(
+                          color: SDColors.warning500,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    const Icon(Icons.location_on,
-                        color: const Color(0xFF2E7D32), size: 14),
-                    const SizedBox(width: 3),
+                    SizedBox(width: SDSpacing.xxs),
+                    Icon(Icons.location_on,
+                        color: SDColors.primary600, size: 14),
+                    SizedBox(width: SDSpacing.xxxs),
                     Flexible(
                       flex: 3,
                       child: Text(
                         '${(index + 1) * 0.5} km',
-                        style: const TextStyle(
-                          color: Colors.green,
-                          fontSize: 11,
+                        style: SDTypography.labelSmall.copyWith(
+                          color: SDColors.primary600,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: SDSpacing.xxs),
 
                 // Description
                 Text(
                   provider.description ?? 'Prestataire professionnel',
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  style: SDTypography.bodySmall.copyWith(
+                    color: SDColors.neutral500,
+                  ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: SDSpacing.xxs),
 
                 // Bouton d'action
                 SizedBox(
@@ -2039,14 +1873,13 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                       // Action contacter
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2E7D32),
-                      foregroundColor: Colors.white,
+                      backgroundColor: SDColors.primary600,
+                      foregroundColor: SDColors.white,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
                       ),
                     ),
-                    child:
-                        const Text('Contacter', style: TextStyle(fontSize: 12)),
+                    child: Text('Contacter', style: SDTypography.labelSmall),
                   ),
                 ),
               ],
@@ -2138,11 +1971,11 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: SDSpacing.sm),
         Container(
           height: 180,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
             image: const DecorationImage(
               image: AssetImage('assets/categories/Image3.png'),
               fit: BoxFit.cover,
@@ -2152,51 +1985,45 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
             children: [
               Container(
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [Colors.transparent, Colors.black.withOpacity(0.7)],
+                    colors: [Colors.transparent, SDColors.neutral900.withOpacity(0.7)],
                   ),
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.all(16),
+                padding: SDSpacing.cardPadding,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
+                      padding: SDSpacing.chipPadding,
                       decoration: BoxDecoration(
-                        color: Colors.amber,
-                        borderRadius: BorderRadius.circular(4),
+                        color: SDColors.warning500,
+                        borderRadius: BorderRadius.circular(SDSpacing.xxxs),
                       ),
-                      child: const Text(
+                      child: Text(
                         'POPULAIRE',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
+                        style: SDTypography.labelSmall.copyWith(
+                          color: SDColors.white,
                         ),
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    const Text(
+                    SizedBox(height: SDSpacing.xxs),
+                    Text(
                       'Amadou K. - Plombier Professionnel',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
+                      style: SDTypography.titleMedium.copyWith(
+                        color: SDColors.white,
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    const Text(
+                    SizedBox(height: SDSpacing.xxxs),
+                    Text(
                       '15 ans d\'expérience - Disponible 24/7',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
+                      style: SDTypography.bodyMedium.copyWith(
+                        color: SDColors.white,
                       ),
                     ),
                   ],
@@ -2214,12 +2041,12 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
       String name, String? imageUrl, IconData fallbackIcon) {
     return Container(
       width: 100,
-      margin: const EdgeInsets.symmetric(vertical: 4),
+      margin: EdgeInsets.symmetric(vertical: SDSpacing.xxxs),
       decoration: BoxDecoration(
-        color: Colors.green.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(16),
+        color: SDColors.primary50,
+        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4)
+          BoxShadow(color: SDColors.neutral900.withOpacity(0.05), blurRadius: 4)
         ],
       ),
       child: Column(
@@ -2236,13 +2063,12 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
               ),
             )
           else
-            Icon(fallbackIcon, color: Colors.green, size: 40),
-          const SizedBox(height: 8),
+            Icon(fallbackIcon, color: SDColors.primary600, size: 40),
+          SizedBox(height: SDSpacing.xxs),
           Text(
             name,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 13,
+            style: SDTypography.labelSmall.copyWith(
+              color: SDColors.neutral900,
             ),
             textAlign: TextAlign.center,
             maxLines: 1,
@@ -2292,21 +2118,17 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
         Row(
           children: [
             // Supprime spaceBetween
-            const Expanded(
-              // Wrap avec Expanded
+            Expanded(
               child: Row(
                 children: [
                   Icon(Icons.local_offer,
-                      color: Colors.red, size: 22), // Réduit de 24 à 22
-                  SizedBox(width: 6), // Réduit de 8 à 6
+                      color: SDColors.error500, size: 22),
+                  SizedBox(width: SDSpacing.xxxs),
                   Flexible(
-                    // Wrap text avec Flexible
                     child: Text(
                       '🎁 Promotions du moment',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18, // Réduit de 20 à 18
-                        color: Colors.black,
+                      style: SDTypography.titleMedium.copyWith(
+                        color: SDColors.neutral900,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -2318,17 +2140,16 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
               onPressed: () {
                 // TODO: Navigation vers la page complète des promotions
               },
-              child: const Text(
+              child: Text(
                 'Voir toutes',
-                style: TextStyle(
-                  color: const Color(0xFF2E7D32),
-                  fontWeight: FontWeight.w600,
+                style: SDTypography.labelMedium.copyWith(
+                  color: SDColors.primary600,
                 ),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: SDSpacing.sm),
         SizedBox(
           height: 180, // Augmenté de 160 à 180
           child: ListView.builder(
@@ -2338,15 +2159,15 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
               final promo = activePromotions[index];
               return Container(
                 width: 280,
-                margin: const EdgeInsets.only(right: 16),
+                margin: EdgeInsets.only(right: SDSpacing.sm),
                 child: Card(
-                  elevation: 4, // Standardisé
+                  elevation: 4,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16), // Standardisé
+                    borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
                   ),
                   child: Container(
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
                       gradient: LinearGradient(
                         colors: [
                           promo['color'].withOpacity(0.1),
@@ -2356,7 +2177,7 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                         end: Alignment.bottomRight,
                       ),
                     ),
-                    padding: const EdgeInsets.all(10),
+                    padding: SDSpacing.cardPadding,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
@@ -2366,76 +2187,66 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                             Expanded(
                               child: Text(
                                 promo['title'],
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 15,
-                                  color: Colors.black87,
+                                style: SDTypography.titleSmall.copyWith(
+                                  color: SDColors.neutral900,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            const SizedBox(width: 8),
+                            SizedBox(width: SDSpacing.xxs),
                             Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
+                              padding: SDSpacing.chipPadding,
                               decoration: BoxDecoration(
                                 color: promo['color'],
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
                               ),
                               child: Text(
                                 promo['discount'],
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
+                                style: SDTypography.bodyMedium.copyWith(
+                                  color: SDColors.white,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 6),
+                        SizedBox(height: SDSpacing.xxxs),
                         Text(
                           promo['description'],
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.black54,
+                          style: SDTypography.bodySmall.copyWith(
+                            color: SDColors.neutral600,
                           ),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 6),
+                        SizedBox(height: SDSpacing.xxxs),
                         Row(
                           children: [
                             Icon(Icons.code, size: 14, color: promo['color']),
-                            const SizedBox(width: 4),
+                            SizedBox(width: SDSpacing.xxxs),
                             Text(
                               promo['code'],
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
+                              style: SDTypography.labelSmall.copyWith(
                                 color: promo['color'],
-                                fontSize: 11,
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 6),
+                        SizedBox(height: SDSpacing.xxxs),
                         Row(
                           children: [
                             Expanded(
                               flex: 3,
                               child: Text(
                                 'Expire le ${promo['expiry']}',
-                                style: const TextStyle(
-                                  fontSize: 9,
-                                  color: Colors.grey,
+                                style: SDTypography.bodySmall.copyWith(
+                                  color: SDColors.neutral500,
                                 ),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            const SizedBox(width: 6),
+                            SizedBox(width: SDSpacing.xxxs),
                             Flexible(
                               flex: 2,
                               child: ElevatedButton(
@@ -2451,19 +2262,19 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                                 },
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: promo['color'],
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 3,
+                                  foregroundColor: SDColors.white,
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: SDSpacing.xxxs,
+                                    vertical: SDSpacing.xxxs,
                                   ),
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(6),
+                                    borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
                                   ),
                                   minimumSize: const Size(0, 24),
                                 ),
-                                child: const Text(
+                                child: Text(
                                   'Utiliser',
-                                  style: TextStyle(fontSize: 9),
+                                  style: SDTypography.labelSmall,
                                 ),
                               ),
                             ),
@@ -2562,7 +2373,7 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: SDSpacing.sm),
         SizedBox(
           height: 200,
           child: ListView.builder(
@@ -2571,15 +2382,15 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
             itemBuilder: (context, index) {
               final review = reviews[index];
               return Container(
-                width: 280, // Réduit de 300 à 280
-                margin: const EdgeInsets.only(right: 12), // Réduit de 16 à 12
+                width: 280,
+                margin: EdgeInsets.only(right: SDSpacing.sm),
                 child: Card(
-                  elevation: 4, // Standardisé
+                  elevation: 4,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16), // Standardisé
+                    borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.all(10),
+                    padding: SDSpacing.cardPadding,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
@@ -2594,7 +2405,7 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                                   ? const Icon(Icons.person, size: 18)
                                   : null,
                             ),
-                            const SizedBox(width: 10),
+                            SizedBox(width: SDSpacing.xs),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -2602,17 +2413,15 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                                 children: [
                                   Text(
                                     review['name'],
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 13,
+                                    style: SDTypography.labelSmall.copyWith(
+                                      color: SDColors.neutral900,
                                     ),
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                   Text(
                                     review['service'],
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      color: Colors.grey,
+                                    style: SDTypography.labelSmall.copyWith(
+                                      color: SDColors.neutral500,
                                     ),
                                     overflow: TextOverflow.ellipsis,
                                   ),
@@ -2626,46 +2435,42 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                                   starIndex < review['rating']
                                       ? Icons.star
                                       : Icons.star_border,
-                                  color: Colors.amber,
+                                  color: SDColors.warning500,
                                   size: 14,
                                 );
                               }),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 6),
+                        SizedBox(height: SDSpacing.xxxs),
                         Flexible(
                           child: Text(
                             review['comment'],
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: Colors.black87,
+                            style: SDTypography.labelSmall.copyWith(
+                              color: SDColors.neutral900,
                               height: 1.3,
                             ),
                             maxLines: 3,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        const SizedBox(height: 6),
+                        SizedBox(height: SDSpacing.xxxs),
                         Row(
                           children: [
                             Expanded(
                               child: Text(
                                 'Par ${review['provider']}',
-                                style: const TextStyle(
-                                  fontSize: 9,
-                                  color: const Color(0xFF2E7D32),
-                                  fontWeight: FontWeight.w500,
+                                style: SDTypography.labelSmall.copyWith(
+                                  color: SDColors.primary600,
                                 ),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            const SizedBox(width: 6),
+                            SizedBox(width: SDSpacing.xxxs),
                             Text(
                               review['date'],
-                              style: const TextStyle(
-                                fontSize: 9,
-                                color: Colors.grey,
+                              style: SDTypography.bodySmall.copyWith(
+                                color: SDColors.neutral500,
                               ),
                             ),
                           ],
@@ -2732,21 +2537,17 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
             Row(
               children: [
                 // Supprime spaceBetween
-                const Expanded(
-                  // Wrap avec Expanded
+                Expanded(
                   child: Row(
                     children: [
                       Icon(Icons.recommend,
-                          color: Colors.blue, size: 22), // Réduit de 24 à 22
-                      SizedBox(width: 6), // Réduit de 8 à 6
+                          color: SDColors.info500, size: 22),
+                      SizedBox(width: SDSpacing.xxxs),
                       Flexible(
-                        // Wrap text avec Flexible
                         child: Text(
                           '🎯 Recommandé pour vous',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 18, // Réduit de 20 à 18
-                            color: Colors.black,
+                          style: SDTypography.titleMedium.copyWith(
+                            color: SDColors.neutral900,
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -2758,9 +2559,9 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                   onPressed: () {
                     // TODO: Navigation vers la page complète des recommandations
                   },
-                  child: const Text(
+                  child: Text(
                     'Tout voir',
-                    style: TextStyle(
+                    style: SDTypography.labelMedium.copyWith(
                       color: const Color(0xFF2E7D32),
                       fontWeight: FontWeight.w600,
                     ),
@@ -2768,22 +2569,21 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: SDSpacing.sm),
             SizedBox(
-              height: 220, // Optimisé pour meilleur UX
+              height: 220,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 itemCount: recommendations.length,
                 itemBuilder: (context, index) {
                   final rec = recommendations[index];
                   return Container(
-                    width: 300, // Réduit de 320 à 300
-                    margin:
-                        const EdgeInsets.only(right: 12), // Réduit de 16 à 12
+                    width: 300,
+                    margin: EdgeInsets.only(right: SDSpacing.sm),
                     child: Card(
-                      elevation: 4, // Standardisé
+                      elevation: 4,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16), // Standardisé
+                        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2793,8 +2593,8 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                           Stack(
                             children: [
                               ClipRRect(
-                                borderRadius: const BorderRadius.vertical(
-                                  top: Radius.circular(16),
+                                borderRadius: BorderRadius.vertical(
+                                  top: Radius.circular(SDSpacing.borderRadiusLarge),
                                 ),
                                 child: Container(
                                   height: 100,
@@ -2804,8 +2604,8 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                                       begin: Alignment.topLeft,
                                       end: Alignment.bottomRight,
                                       colors: [
-                                        const Color(0xFF2E7D32).withOpacity(0.1),
-                                        const Color(0xFF2E7D32).withOpacity(0.05),
+                                        SDColors.primary600.withOpacity(0.1),
+                                        SDColors.primary600.withOpacity(0.05),
                                       ],
                                     ),
                                   ),
@@ -2849,7 +2649,7 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                                           ),
                                         ),
                                       ),
-                                    const SizedBox(width: 4),
+                                    SizedBox(width: SDSpacing.xxxs),
                                     if (rec['discount'] != null)
                                       Container(
                                         padding: const EdgeInsets.symmetric(
@@ -2857,16 +2657,14 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                                           vertical: 2,
                                         ),
                                         decoration: BoxDecoration(
-                                          color: const Color(0xFF2E7D32),
+                                          color: SDColors.primary600,
                                           borderRadius:
-                                              BorderRadius.circular(8),
+                                              BorderRadius.circular(SDSpacing.borderRadiusSmall),
                                         ),
                                         child: Text(
                                           '-${rec['discount']}',
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.bold,
+                                          style: SDTypography.labelSmall.copyWith(
+                                            color: SDColors.white,
                                           ),
                                         ),
                                       ),
@@ -2878,77 +2676,70 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                           // Contenu
                           Flexible(
                             child: Padding(
-                              padding: const EdgeInsets.all(4),
+                              padding: EdgeInsets.all(SDSpacing.xxxs),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(
                                     rec['title'],
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                      color: Colors.black87,
+                                    style: SDTypography.bodyMedium.copyWith(
+                                      color: SDColors.neutral900,
                                     ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
-                                  const SizedBox(height: 2),
+                                  SizedBox(height: SDSpacing.xxxs),
                                   Text(
                                     rec['reason'],
-                                    style: const TextStyle(
-                                      fontSize: 9,
-                                      color: Colors.blue,
+                                    style: SDTypography.labelSmall.copyWith(
+                                      color: SDColors.info500,
                                       fontStyle: FontStyle.italic,
                                     ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
-                                  const SizedBox(height: 2),
+                                  SizedBox(height: SDSpacing.xxxs),
                                   Row(
                                     children: [
                                       Expanded(
                                         child: Text(
                                           rec['provider'],
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w500,
+                                          style: SDTypography.labelSmall.copyWith(
+                                            color: SDColors.neutral900,
                                           ),
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
-                                      const SizedBox(width: 6),
-                                      const Icon(
+                                      SizedBox(width: SDSpacing.xxxs),
+                                      Icon(
                                         Icons.star,
-                                        color: Colors.amber,
+                                        color: SDColors.warning500,
                                         size: 12,
                                       ),
-                                      const SizedBox(width: 2),
+                                      SizedBox(width: SDSpacing.xxxs),
                                       Text(
                                         rec['rating'].toString(),
-                                        style: const TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w500,
+                                        style: SDTypography.labelSmall.copyWith(
+                                          color: SDColors.warning500,
                                         ),
                                       ),
                                     ],
                                   ),
-                                  const SizedBox(height: 2),
+                                  SizedBox(height: SDSpacing.xxxs),
                                   Row(
                                     children: [
                                       Expanded(
                                         flex: 3,
                                         child: Text(
                                           rec['price'],
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
-                                            color: const Color(0xFF2E7D32),
+                                          style: SDTypography.labelSmall.copyWith(
+                                            color: SDColors.primary600,
                                           ),
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
-                                      const SizedBox(width: 4),
+                                      SizedBox(width: SDSpacing.xxxs),
                                       Flexible(
                                         flex: 2,
                                         child: ElevatedButton(
@@ -2956,22 +2747,21 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                                             // TODO: Navigation vers les détails du service
                                           },
                                           style: ElevatedButton.styleFrom(
-                                            backgroundColor:
-                                                const Color(0xFF2E7D32),
-                                            foregroundColor: Colors.white,
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 4,
-                                              vertical: 2,
+                                            backgroundColor: SDColors.primary600,
+                                            foregroundColor: SDColors.white,
+                                            padding: EdgeInsets.symmetric(
+                                              horizontal: SDSpacing.xxxs,
+                                              vertical: SDSpacing.xxxs,
                                             ),
                                             shape: RoundedRectangleBorder(
                                               borderRadius:
-                                                  BorderRadius.circular(6),
+                                                  BorderRadius.circular(SDSpacing.borderRadiusSmall),
                                             ),
                                             minimumSize: const Size(0, 24),
                                           ),
-                                          child: const Text(
+                                          child: Text(
                                             'Voir',
-                                            style: TextStyle(fontSize: 9),
+                                            style: SDTypography.labelSmall,
                                           ),
                                         ),
                                       ),

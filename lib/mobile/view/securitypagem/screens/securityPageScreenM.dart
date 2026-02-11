@@ -7,6 +7,9 @@ import '../securitypageblocm/securityPageStateM.dart';
 import 'twoFactorSetupScreenM.dart';
 import 'securitySettingsScreenM.dart';
 
+// ✅ Design System
+import '../../../../design_system/design_system.dart';
+
 class SecurityPageScreenM extends StatefulWidget {
   const SecurityPageScreenM({Key? key}) : super(key: key);
 
@@ -44,14 +47,20 @@ class _SecurityPageScreenMState extends State<SecurityPageScreenM>
       ),
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Sécurité du compte'),
-          backgroundColor: Colors.green[600],
-          foregroundColor: Colors.white,
+          title: Text(
+            'Sécurité du compte',
+            style: SDTypography.titleLarge.copyWith(color: SDColors.white),
+          ),
+          backgroundColor: SDColors.primary600,
+          foregroundColor: SDColors.white,
+          leading: const BackButton(color: SDColors.white),
           bottom: TabBar(
             controller: _tabController,
-            indicatorColor: Colors.white,
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.white70,
+            indicatorColor: SDColors.white,
+            labelColor: SDColors.white,
+            unselectedLabelColor: SDColors.white.withOpacity(0.7),
+            labelStyle: SDTypography.labelMedium.copyWith(fontWeight: FontWeight.bold),
+            unselectedLabelStyle: SDTypography.labelMedium,
             tabs: const [
               Tab(icon: Icon(Icons.security), text: 'Général'),
               Tab(icon: Icon(Icons.phone_android), text: 'Sessions'),
@@ -66,14 +75,14 @@ class _SecurityPageScreenMState extends State<SecurityPageScreenM>
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(state.message),
-                  backgroundColor: Colors.red,
+                  backgroundColor: SDColors.error500,
                 ),
               );
             } else if (state is SecurityPageSuccessStateM) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(state.message),
-                  backgroundColor: Colors.green,
+                  backgroundColor: SDColors.success500,
                 ),
               );
             }
@@ -110,54 +119,56 @@ class _SecurityPageScreenMState extends State<SecurityPageScreenM>
   // 🔐 ONGLET GÉNÉRAL
   Widget _buildGeneralTab(SecurityPageStateM state) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(SDSpacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Carte de sécurité générale
           Card(
+            color: SDColors.white,
+            elevation: 2,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium)),
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.all(SDSpacing.md),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.security, color: Colors.teal),
-                      const SizedBox(width: 8),
-                      const Text(
+                      Icon(Icons.security, color: SDColors.primary600),
+                      SizedBox(width: SDSpacing.xs),
+                      Text(
                         'Sécurité générale',
-                        style: TextStyle(
-                          fontSize: 18,
+                        style: SDTypography.titleMedium.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: SDSpacing.md),
                   if (state is SecurityPageLoadedStateM) ...[
                     _buildSecurityItem(
                       'Authentification à deux facteurs',
                       state.twoFactorEnabled ? 'Activée' : 'Désactivée',
-                      state.twoFactorEnabled ? Colors.green : Colors.orange,
+                      state.twoFactorEnabled ? SDColors.success500 : SDColors.warning500,
                       Icons.phone_android,
                     ),
                     _buildSecurityItem(
                       'Sessions actives',
                       '${state.sessions.length}',
-                      Colors.blue,
+                      SDColors.info500,
                       Icons.devices,
                     ),
                     _buildSecurityItem(
                       'Alertes non lues',
                       '${state.alerts.where((a) => !a.isRead).length}',
-                      Colors.red,
+                      SDColors.error500,
                       Icons.notifications,
                     ),
                     _buildSecurityItem(
                       'Appareils de confiance',
                       '${state.trustedDevices.length}',
-                      Colors.purple,
+                      SDColors.secondary500,
                       Icons.verified_user,
                     ),
                   ],
@@ -166,23 +177,25 @@ class _SecurityPageScreenMState extends State<SecurityPageScreenM>
             ),
           ),
 
-          const SizedBox(height: 16),
+          SizedBox(height: SDSpacing.md),
 
           // Actions rapides
           Card(
+            color: SDColors.white,
+            elevation: 2,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium)),
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.all(SDSpacing.md),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                   Text(
                     'Actions rapides',
-                    style: TextStyle(
-                      fontSize: 16,
+                    style: SDTypography.titleMedium.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: SDSpacing.md),
                   Row(
                     children: [
                       Expanded(
@@ -199,12 +212,13 @@ class _SecurityPageScreenMState extends State<SecurityPageScreenM>
                           icon: const Icon(Icons.phone_android),
                           label: const Text('2FA'),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.teal,
-                            foregroundColor: Colors.white,
+                            backgroundColor: SDColors.primary600,
+                            foregroundColor: SDColors.white,
+                            padding: EdgeInsets.symmetric(vertical: SDSpacing.sm),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      SizedBox(width: SDSpacing.xs),
                       Expanded(
                         child: ElevatedButton.icon(
                           onPressed: () {
@@ -219,8 +233,9 @@ class _SecurityPageScreenMState extends State<SecurityPageScreenM>
                           icon: const Icon(Icons.settings),
                           label: const Text('Paramètres'),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue,
-                            foregroundColor: Colors.white,
+                            backgroundColor: SDColors.info600,
+                            foregroundColor: SDColors.white,
+                            padding: EdgeInsets.symmetric(vertical: SDSpacing.sm),
                           ),
                         ),
                       ),
@@ -241,7 +256,7 @@ class _SecurityPageScreenMState extends State<SecurityPageScreenM>
       children: [
         // Barre d'actions
         Padding(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(SDSpacing.md),
           child: Row(
             children: [
               Expanded(
@@ -251,9 +266,14 @@ class _SecurityPageScreenMState extends State<SecurityPageScreenM>
                   },
                   icon: const Icon(Icons.refresh),
                   label: const Text('Actualiser'),
+                  style: ElevatedButton.styleFrom(
+                    padding: EdgeInsets.symmetric(vertical: SDSpacing.sm),
+                    backgroundColor: SDColors.primary600,
+                    foregroundColor: SDColors.white,
+                  ),
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: SDSpacing.sm),
               ElevatedButton.icon(
                 onPressed: () {
                   _showTerminateAllDialog();
@@ -261,8 +281,9 @@ class _SecurityPageScreenMState extends State<SecurityPageScreenM>
                 icon: const Icon(Icons.logout),
                 label: const Text('Tout fermer'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  foregroundColor: Colors.white,
+                  backgroundColor: SDColors.error600,
+                  foregroundColor: SDColors.white,
+                  padding: EdgeInsets.symmetric(vertical: SDSpacing.sm, horizontal: SDSpacing.md),
                 ),
               ),
             ],
@@ -290,9 +311,10 @@ class _SecurityPageScreenMState extends State<SecurityPageScreenM>
                 controller: _searchController,
                 decoration: InputDecoration(
                   hintText: 'Rechercher des alertes...',
-                  prefixIcon: const Icon(Icons.search),
+                  hintStyle: SDTypography.bodyMedium.copyWith(color: SDColors.neutral500),
+                  prefixIcon: const Icon(Icons.search, color: SDColors.neutral500),
                   suffixIcon: IconButton(
-                    icon: const Icon(Icons.clear),
+                    icon: const Icon(Icons.clear, color: SDColors.neutral500),
                     onPressed: () {
                       _searchController.clear();
                       context
@@ -301,7 +323,16 @@ class _SecurityPageScreenMState extends State<SecurityPageScreenM>
                     },
                   ),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                    borderSide: BorderSide(color: SDColors.neutral300),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                    borderSide: BorderSide(color: SDColors.neutral300),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                    borderSide: BorderSide(color: SDColors.primary600),
                   ),
                 ),
                 onChanged: (value) {
@@ -318,9 +349,14 @@ class _SecurityPageScreenMState extends State<SecurityPageScreenM>
                   Expanded(
                     child: DropdownButtonFormField<String>(
                       value: _selectedFilter,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Filtrer par',
-                        border: OutlineInputBorder(),
+                        labelStyle: SDTypography.bodyMedium.copyWith(color: SDColors.neutral600),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                          borderSide: BorderSide(color: SDColors.neutral300),
+                        ),
+                        contentPadding: EdgeInsets.symmetric(horizontal: SDSpacing.sm, vertical: SDSpacing.sm),
                       ),
                       items: const [
                         DropdownMenuItem(value: 'all', child: Text('Toutes')),
@@ -372,24 +408,26 @@ class _SecurityPageScreenMState extends State<SecurityPageScreenM>
   // ⚙️ ONGLET PARAMÈTRES
   Widget _buildSettingsTab(SecurityPageStateM state) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(SDSpacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Card(
+            color: SDColors.white,
+            elevation: 2,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium)),
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.all(SDSpacing.md),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Paramètres de sécurité',
-                    style: TextStyle(
-                      fontSize: 18,
+                    style: SDTypography.titleMedium.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: SDSpacing.md),
                   if (state is SecurityPageLoadedStateM) ...[
                     _buildSettingItem(
                       'Notifications de connexion',
@@ -449,23 +487,23 @@ class _SecurityPageScreenMState extends State<SecurityPageScreenM>
   Widget _buildSecurityItem(
       String title, String value, Color color, IconData icon) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: EdgeInsets.symmetric(vertical: SDSpacing.sm),
       child: Row(
         children: [
           Icon(icon, color: color, size: 20),
-          const SizedBox(width: 12),
+          SizedBox(width: SDSpacing.sm),
           Expanded(
-            child: Text(title),
+            child: Text(title, style: SDTypography.bodyMedium),
           ),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            padding: EdgeInsets.symmetric(horizontal: SDSpacing.sm, vertical: SDSpacing.xxs),
             decoration: BoxDecoration(
               color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
             ),
             child: Text(
               value,
-              style: TextStyle(
+              style: SDTypography.labelSmall.copyWith(
                 color: color,
                 fontWeight: FontWeight.bold,
               ),
@@ -478,10 +516,11 @@ class _SecurityPageScreenMState extends State<SecurityPageScreenM>
 
   Widget _buildSettingItem(String title, bool value, Function(bool) onChanged) {
     return SwitchListTile(
-      title: Text(title),
+      title: Text(title, style: SDTypography.bodyMedium),
       value: value,
       onChanged: onChanged,
-      activeColor: Colors.teal,
+      activeColor: SDColors.primary600,
+      contentPadding: EdgeInsets.zero,
     );
   }
 
@@ -500,33 +539,38 @@ class _SecurityPageScreenMState extends State<SecurityPageScreenM>
         itemBuilder: (context, index) {
           final session = sessions[index];
           return Card(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            margin: EdgeInsets.symmetric(horizontal: SDSpacing.md, vertical: SDSpacing.xxs),
+            color: SDColors.white,
+            elevation: 1,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium)),
             child: ListTile(
               leading: Icon(
                 _getDeviceIcon(session.deviceType),
-                color: session.isActive ? Colors.green : Colors.grey,
+                color: session.isActive ? SDColors.success500 : SDColors.neutral400,
               ),
-              title: Text(session.deviceName),
+              title: Text(session.deviceName, style: SDTypography.bodyLarge.copyWith(fontWeight: FontWeight.bold)),
               subtitle: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('${session.deviceType} • ${session.location}'),
-                  Text('IP: ${session.ipAddress}'),
+                  Text('${session.deviceType} • ${session.location}', style: SDTypography.bodySmall),
+                  Text('IP: ${session.ipAddress}', style: SDTypography.bodySmall),
                   if (session.lastActivity != null)
                     Text(
-                        'Dernière activité: ${_formatDate(session.lastActivity!)}'),
+                        'Dernière activité: ${_formatDate(session.lastActivity!)}',
+                        style: SDTypography.bodySmall,
+                    ),
                 ],
               ),
               trailing: session.isActive
                   ? IconButton(
-                      icon: const Icon(Icons.logout, color: Colors.red),
+                      icon: const Icon(Icons.logout, color: SDColors.error500),
                       onPressed: () {
                         context.read<SecurityPageBlocM>().add(
                               TerminateSessionEventM(sessionId: session.id!),
                             );
                       },
                     )
-                  : const Icon(Icons.check_circle, color: Colors.grey),
+                  : const Icon(Icons.check_circle, color: SDColors.neutral400),
             ),
           );
         },
@@ -625,13 +669,13 @@ class _SecurityPageScreenMState extends State<SecurityPageScreenM>
   Color _getAlertColor(String severity) {
     switch (severity.toLowerCase()) {
       case 'high':
-        return Colors.red;
+        return SDColors.error500;
       case 'medium':
-        return Colors.orange;
+        return SDColors.warning500;
       case 'low':
-        return Colors.green;
+        return SDColors.success500;
       default:
-        return Colors.blue;
+        return SDColors.info500;
     }
   }
 
@@ -660,9 +704,9 @@ class _SecurityPageScreenMState extends State<SecurityPageScreenM>
                   .read<SecurityPageBlocM>()
                   .add(TerminateAllOtherSessionsEventM());
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(backgroundColor: SDColors.error600),
             child:
-                const Text('Terminer', style: TextStyle(color: Colors.white)),
+                Text('Terminer', style: SDTypography.labelLarge.copyWith(color: SDColors.white)),
           ),
         ],
       ),

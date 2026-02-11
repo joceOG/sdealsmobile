@@ -4,6 +4,7 @@ import '../favorispageblocm/favoritePageBlocM.dart';
 import '../favorispageblocm/favoritePageEventM.dart';
 import '../favorispageblocm/favoritePageStateM.dart';
 import 'package:sdealsmobile/data/models/favorite.dart';
+import '../../../../design_system/design_system.dart'; // ✅ Import DS
 import 'favoriteDetailScreenM.dart';
 import 'addFavoriteScreenM.dart';
 import '../../common/widgets/empty_state_widget.dart';
@@ -38,10 +39,15 @@ class _FavoritePageScreenMState extends State<FavoritePageScreenM>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: SDColors.neutral50,
       appBar: AppBar(
-        backgroundColor: Colors.green,
-        title: const Text('Mes Favoris'),
+        backgroundColor: SDColors.primary600,
+        title: Text(
+          'Mes Favoris',
+          style: SDTypography.titleMedium.copyWith(color: SDColors.white),
+        ),
         centerTitle: true,
+        iconTheme: IconThemeData(color: SDColors.white),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -52,6 +58,9 @@ class _FavoritePageScreenMState extends State<FavoritePageScreenM>
         ],
         bottom: TabBar(
           controller: _tabController,
+          labelColor: SDColors.white,
+          unselectedLabelColor: SDColors.white.withOpacity(0.7),
+          indicatorColor: SDColors.white,
           tabs: const [
             Tab(text: 'Tous', icon: Icon(Icons.favorite)),
             Tab(text: 'Actifs', icon: Icon(Icons.check_circle)),
@@ -65,7 +74,7 @@ class _FavoritePageScreenMState extends State<FavoritePageScreenM>
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(state.error ?? 'Erreur inconnue'),
-                backgroundColor: Colors.red,
+                backgroundColor: SDColors.error,
               ),
             );
           }
@@ -100,8 +109,8 @@ class _FavoritePageScreenMState extends State<FavoritePageScreenM>
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showAddFavoriteDialog(),
-        backgroundColor: Colors.green,
-        child: const Icon(Icons.add, color: Colors.white),
+        backgroundColor: SDColors.primary600,
+        child: Icon(Icons.add, color: SDColors.white),
       ),
     );
   }
@@ -111,9 +120,9 @@ class _FavoritePageScreenMState extends State<FavoritePageScreenM>
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.grey[50],
+        color: SDColors.neutral50,
         border: Border(
-          bottom: BorderSide(color: Colors.grey[300]!),
+          bottom: BorderSide(color: SDColors.neutral300),
         ),
       ),
       child: Column(
@@ -135,9 +144,18 @@ class _FavoritePageScreenMState extends State<FavoritePageScreenM>
               ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(25),
+                borderSide: BorderSide(color: SDColors.neutral300),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(25),
+                borderSide: BorderSide(color: SDColors.neutral300),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(25),
+                borderSide: BorderSide(color: SDColors.primary600),
               ),
               filled: true,
-              fillColor: Colors.white,
+              fillColor: SDColors.white,
             ),
             onSubmitted: (value) {
               context
@@ -259,7 +277,16 @@ class _FavoritePageScreenMState extends State<FavoritePageScreenM>
         value: value.isEmpty ? null : value,
         decoration: InputDecoration(
           labelText: label,
-          border: const OutlineInputBorder(),
+          labelStyle: SDTypography.bodySmall.copyWith(color: SDColors.neutral600),
+          border: OutlineInputBorder(
+            borderSide: BorderSide(color: SDColors.neutral300),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderSide: BorderSide(color: SDColors.neutral300),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderSide: BorderSide(color: SDColors.primary600),
+          ),
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         ),
@@ -284,9 +311,9 @@ class _FavoritePageScreenMState extends State<FavoritePageScreenM>
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.green[50],
+        color: SDColors.primary50,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.green[200]!),
+        border: Border.all(color: SDColors.primary200),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -307,15 +334,15 @@ class _FavoritePageScreenMState extends State<FavoritePageScreenM>
   Widget _buildStatItem(String label, String value, IconData icon) {
     return Column(
       children: [
-        Icon(icon, color: Colors.green, size: 24),
+        Icon(icon, color: SDColors.primary600, size: 24),
         const SizedBox(height: 4),
         Text(
           value,
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          style: SDTypography.headlineSmall.copyWith(fontWeight: FontWeight.bold, fontSize: 18),
         ),
         Text(
           label,
-          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+          style: SDTypography.bodySmall.copyWith(color: SDColors.neutral600),
         ),
       ],
     );
@@ -341,7 +368,12 @@ class _FavoritePageScreenMState extends State<FavoritePageScreenM>
   Widget _buildFavoriteCard(Favorite favorite) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      elevation: 2,
+      elevation: 0, // Design system preference for flat/subtle cards
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: BorderSide(color: SDColors.neutral200),
+      ),
+      color: SDColors.white,
       child: InkWell(
         onTap: () => _navigateToDetail(favorite),
         borderRadius: BorderRadius.circular(8),

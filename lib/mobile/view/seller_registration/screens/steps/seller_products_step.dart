@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../../../design_system/colors.dart';
+import '../../../../../design_system/typography.dart';
 
 class SellerProductsStep extends StatefulWidget {
   final Map<String, dynamic> formData;
@@ -156,10 +158,7 @@ class _SellerProductsStepState extends State<SellerProductsStep> {
         children: [
           const Text(
             'Adresse Physique',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+            style: SDTypography.titleLarge,
           ),
           const SizedBox(height: 16),
           TextFormField(
@@ -221,17 +220,13 @@ class _SellerProductsStepState extends State<SellerProductsStep> {
           const SizedBox(height: 16),
           const Text(
             'Zones de livraison',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+            style: SDTypography.titleLarge,
           ),
           const SizedBox(height: 8),
-          const Text(
-            'Ajoutez les zones où vous pouvez livrer et les frais associés',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey,
+          Text(
+            'Définissez les zones où vous pouvez livrer vos produits',
+            style: SDTypography.bodyMedium.copyWith(
+              color: SDColors.neutral500,
             ),
           ),
           const SizedBox(height: 16),
@@ -264,7 +259,7 @@ class _SellerProductsStepState extends State<SellerProductsStep> {
               IconButton(
                 onPressed: _addDeliveryZone,
                 icon: const Icon(Icons.add_circle),
-                color: Colors.amber.shade700,
+                color: SDColors.secondary700,
                 iconSize: 32,
               ),
             ],
@@ -278,7 +273,7 @@ class _SellerProductsStepState extends State<SellerProductsStep> {
                       'Aucune zone de livraison ajoutée',
                       style: TextStyle(
                         fontStyle: FontStyle.italic,
-                        color: Colors.grey,
+                        color: SDColors.neutral500,
                       ),
                     ),
                   ),
@@ -295,7 +290,7 @@ class _SellerProductsStepState extends State<SellerProductsStep> {
                       title: Text(zoneName),
                       subtitle: Text('$zoneFee FCFA'),
                       trailing: IconButton(
-                        icon: const Icon(Icons.delete_outline, color: Colors.red),
+                        icon: const Icon(Icons.delete_outline, color: SDColors.error500),
                         onPressed: () => _removeDeliveryZone(zoneName),
                       ),
                     );
@@ -306,18 +301,12 @@ class _SellerProductsStepState extends State<SellerProductsStep> {
           const SizedBox(height: 16),
           const Text(
             'Logistique',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+            style: SDTypography.titleLarge,
           ),
           const SizedBox(height: 16),
           const Text(
             'Délai de préparation *',
-            style: TextStyle(
-              fontWeight: FontWeight.w500,
-              fontSize: 16,
-            ),
+            style: SDTypography.titleMedium,
           ),
           const SizedBox(height: 8),
           Wrap(
@@ -335,10 +324,10 @@ class _SellerProductsStepState extends State<SellerProductsStep> {
                     'preparationTime': time,
                   });
                 },
-                backgroundColor: Colors.grey.shade100,
-                selectedColor: Colors.amber.shade100,
+                backgroundColor: SDColors.neutral100,
+                selectedColor: SDColors.secondary100,
                 labelStyle: TextStyle(
-                  color: isSelected ? Colors.amber.shade800 : Colors.black,
+                  color: isSelected ? SDColors.secondary700 : SDColors.neutral900,
                 ),
               );
             }).toList(),
@@ -346,10 +335,7 @@ class _SellerProductsStepState extends State<SellerProductsStep> {
           const SizedBox(height: 24),
           const Text(
             'Modes de livraison *',
-            style: TextStyle(
-              fontWeight: FontWeight.w500,
-              fontSize: 16,
-            ),
+            style: SDTypography.titleMedium,
           ),
           const SizedBox(height: 8),
           Column(
@@ -357,7 +343,7 @@ class _SellerProductsStepState extends State<SellerProductsStep> {
               return CheckboxListTile(
                 title: Text(entry.key),
                 value: entry.value,
-                activeColor: Colors.amber.shade700,
+                activeColor: SDColors.secondary700,
                 onChanged: (bool? value) {
                   if (value != null) {
                     setState(() {
@@ -374,10 +360,7 @@ class _SellerProductsStepState extends State<SellerProductsStep> {
           const SizedBox(height: 24),
           const Text(
             'Politique de retour *',
-            style: TextStyle(
-              fontWeight: FontWeight.w500,
-              fontSize: 16,
-            ),
+            style: SDTypography.titleMedium,
           ),
           const SizedBox(height: 8),
           Wrap(
@@ -396,10 +379,10 @@ class _SellerProductsStepState extends State<SellerProductsStep> {
                     'returnPolicy': policy,
                   });
                 },
-                backgroundColor: Colors.grey.shade100,
-                selectedColor: Colors.amber.shade100,
+                backgroundColor: SDColors.neutral100,
+                selectedColor: SDColors.secondary100,
                 labelStyle: TextStyle(
-                  color: isSelected ? Colors.amber.shade800 : Colors.black,
+                  color: isSelected ? SDColors.secondary700 : SDColors.neutral900,
                 ),
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               );
@@ -408,10 +391,7 @@ class _SellerProductsStepState extends State<SellerProductsStep> {
           const SizedBox(height: 24),
           const Text(
             'Horaires service client *',
-            style: TextStyle(
-              fontWeight: FontWeight.w500,
-              fontSize: 16,
-            ),
+            style: SDTypography.titleMedium,
           ),
           const SizedBox(height: 8),
           TextFormField(
@@ -433,7 +413,7 @@ class _SellerProductsStepState extends State<SellerProductsStep> {
               'Période pendant laquelle vous êtes joignable',
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.grey.shade600,
+                color: SDColors.neutral600,
                 fontStyle: FontStyle.italic,
               ),
             ),

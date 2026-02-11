@@ -11,6 +11,11 @@ import 'package:sdealsmobile/data/models/categorie.dart';
 
 import '../../../../data/models/prestataire.dart';
 
+// Design System
+import '../../../../design_system/colors.dart';
+import '../../../../design_system/typography.dart';
+import '../../../../design_system/spacing.dart';
+
 class ProviderDashboardScreen extends StatefulWidget {
   final Utilisateur utilisateur; // ✅ ajout
 
@@ -79,11 +84,11 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.error_outline, size: 48, color: Colors.red),
+          Icon(Icons.error_outline, size: 48, color: SDColors.error500),
           const SizedBox(height: 16),
           Text(
             'Erreur de chargement',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            style: SDTypography.titleMedium,
           ),
           const SizedBox(height: 8),
           Text(message),
@@ -162,17 +167,13 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
               // Titre de bienvenue
               Text(
                 'Bonjour, $providerName!',
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: SDTypography.displaySmall,
               ),
               const SizedBox(height: 4),
               Text(
                 'Voici votre activité ce mois-ci',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[600],
+                style: SDTypography.bodyMedium.copyWith(
+                  color: SDColors.neutral600,
                 ),
               ),
               const SizedBox(height: 24),
@@ -180,10 +181,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
               // Statistiques du mois
               const Text(
                 '📊 Statistiques du mois',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: SDTypography.titleMedium,
               ),
               const SizedBox(height: 12),
               Row(
@@ -237,10 +235,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
                 children: [
                   const Text(
                     '🎯 Missions disponibles près de vous',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: SDTypography.titleMedium,
                   ),
                   Text(
                     '(${nearbyMissions.length})',
@@ -279,10 +274,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
               // Actions rapides
               const Text(
                 '⚡ Actions rapides',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: SDTypography.titleMedium,
               ),
               const SizedBox(height: 12),
               Row(
@@ -322,10 +314,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
               // Performance
               const Text(
                 '📈 Performance ce mois',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: SDTypography.titleMedium,
               ),
               const SizedBox(height: 12),
               _buildPerformanceItem(
@@ -386,10 +375,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
                 const SizedBox(width: 8),
                 const Text(
                   'Insights IA - Analyse de Marché',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: SDTypography.titleSmall,
                 ),
               ],
             ),
@@ -428,7 +414,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
         width: 100,
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: Colors.grey[100],
+          color: SDColors.neutral100,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
@@ -486,20 +472,20 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: Colors.amber.withOpacity(0.2),
+                color: SDColors.warning100,
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.amber),
+                border: Border.all(color: SDColors.warning500),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: const [
-                  Icon(Icons.emoji_events, color: Colors.amber),
+                  Icon(Icons.emoji_events, color: SDColors.warning500),
                   SizedBox(width: 8),
                   Text(
                     'Top Prestataire du mois',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      color: Colors.amber,
+                      color: SDColors.warning600,
                     ),
                   ),
                 ],
@@ -518,7 +504,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
               child: LinearProgressIndicator(
                 value: 12 / 15, // 12 missions sur 15
                 minHeight: 10,
-                backgroundColor: Colors.grey[300],
+                backgroundColor: SDColors.neutral300,
                 valueColor: AlwaysStoppedAnimation<Color>(
                   Theme.of(context).primaryColor,
                 ),
@@ -529,14 +515,14 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
               '12/15 complétées',
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.grey[600],
+                color: SDColors.neutral600,
               ),
             ),
             const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.blue.withOpacity(0.1),
+                color: SDColors.info100,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(

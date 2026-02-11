@@ -8,6 +8,11 @@ import '../freelancepageblocm/freelancePageEventM.dart';
 import '../models/freelance_model.dart';
 import 'freelance_details_screen.dart';
 
+// Design System
+import '../../../../design_system/colors.dart';
+import '../../../../design_system/typography.dart';
+import '../../../../design_system/spacing.dart';
+
 // Widget wrapper qui fournit le BLoC à toute la page
 class FreelancePageScreen extends StatelessWidget {
   final List<dynamic> categories;
@@ -45,18 +50,18 @@ class _FreelancePageScreenContentState
 
   // Couleurs pour les catégories dynamiques
   final List<Color> _categoryColors = [
-    Colors.blue,
-    Colors.indigo,
-    Colors.purple,
-    Colors.green,
-    Colors.green,
-    Colors.red,
-    Colors.teal,
-    Colors.amber,
-    Colors.pink,
-    Colors.cyan,
-    Colors.brown,
-    Colors.lime,
+    SDColors.info500,
+    SDColors.info600,
+    SDColors.secondary500,
+    SDColors.primary600,
+    SDColors.primary500,
+    SDColors.error500,
+    SDColors.success500,
+    SDColors.warning500,
+    SDColors.secondary400,
+    SDColors.info500,
+    SDColors.neutral700,
+    SDColors.success600,
   ];
 
   // Icônes pour les catégories dynamiques
@@ -92,16 +97,14 @@ class _FreelancePageScreenContentState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 16),
+        SizedBox(height: SDSpacing.sm),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
+            Text(
               'Filtrer par catégorie',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-                color: Colors.black87,
+              style: SDTypography.titleSmall.copyWith(
+                color: SDColors.neutral900,
               ),
             ),
             // Bouton pour réinitialiser les filtres
@@ -111,13 +114,13 @@ class _FreelancePageScreenContentState
                   _searchController.clear();
                   bloc.add(ClearFiltersEvent());
                 },
-                icon: const Icon(Icons.refresh, size: 16),
-                label: const Text('Réinitialiser'),
-                style: TextButton.styleFrom(foregroundColor: Colors.grey),
+                icon: Icon(Icons.refresh, size: 16, color: SDColors.neutral500),
+                label: Text('Réinitialiser', style: SDTypography.labelMedium.copyWith(color: SDColors.neutral500)),
+                style: TextButton.styleFrom(foregroundColor: SDColors.neutral500),
               ),
           ],
         ),
-        const SizedBox(height: 10),
+        SizedBox(height: SDSpacing.xs),
         SizedBox(
           height: 40,
           child: BlocBuilder<FreelancePageBlocM, FreelancePageStateM>(
@@ -155,11 +158,11 @@ class _FreelancePageScreenContentState
                     },
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 300),
-                      margin: const EdgeInsets.only(right: 8),
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      margin: EdgeInsets.only(right: SDSpacing.xxs),
+                      padding: EdgeInsets.symmetric(horizontal: SDSpacing.sm),
                       decoration: BoxDecoration(
                         color:
-                            isSelected ? categoryColor : Colors.grey.shade200,
+                            isSelected ? categoryColor : SDColors.neutral200,
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
                           color:
@@ -171,7 +174,7 @@ class _FreelancePageScreenContentState
                                 BoxShadow(
                                   color: categoryColor.withOpacity(0.4),
                                   blurRadius: 8,
-                                  offset: const Offset(0, 4),
+                                  offset: Offset(0, 4),
                                 )
                               ]
                             : [],
@@ -182,15 +185,15 @@ class _FreelancePageScreenContentState
                           Icon(
                             categoryIcon,
                             size: 16,
-                            color: isSelected ? Colors.white : categoryColor,
+                            color: isSelected ? SDColors.white : categoryColor,
                           ),
-                          const SizedBox(width: 6),
+                          SizedBox(width: SDSpacing.xxxs),
                           Text(
                             categoryName,
-                            style: TextStyle(
-                              color: isSelected ? Colors.white : Colors.black87,
+                            style: SDTypography.labelSmall.copyWith(
+                              color: isSelected ? SDColors.white : SDColors.neutral900,
                               fontWeight: isSelected
-                                  ? FontWeight.bold
+                                  ? FontWeight.w600
                                   : FontWeight.normal,
                             ),
                           ),
@@ -217,16 +220,16 @@ class _FreelancePageScreenContentState
       // Afficher un message si aucun résultat
       if (filteredFreelancers.isEmpty) {
         return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 32.0),
+          padding: EdgeInsets.symmetric(vertical: SDSpacing.lg),
           child: Center(
             child: Column(
               children: [
-                const Icon(Icons.search_off, size: 64, color: Colors.grey),
-                const SizedBox(height: 16),
+                Icon(Icons.search_off, size: 64, color: SDColors.neutral400),
+                SizedBox(height: SDSpacing.sm),
                 Text(
                   'Aucun freelance trouvé pour "${state.searchQuery}"${state.selectedCategory != null ? ' dans ${state.selectedCategory}' : ''}',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 16, color: Colors.grey),
+                  style: SDTypography.bodyLarge.copyWith(color: SDColors.neutral500),
                 ),
               ],
             ),
@@ -238,30 +241,29 @@ class _FreelancePageScreenContentState
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: 20),
+          SizedBox(height: SDSpacing.md),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
                 'Résultats (${filteredFreelancers.length})',
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
+                style: SDTypography.titleMedium.copyWith(
+                  color: SDColors.neutral900,
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.swap_vert),
+                icon: Icon(Icons.swap_vert, color: SDColors.neutral700),
                 onPressed: () {
                   // Ici on pourrait ajouter une fonction de tri
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Tri non implémenté')),
+                    SnackBar(content: Text('Tri non implémenté', style: SDTypography.bodyMedium.copyWith(color: SDColors.white))),
                   );
                 },
                 tooltip: 'Trier les résultats',
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: SDSpacing.sm),
           _buildFilteredFreelancersList(filteredFreelancers),
         ],
       );
@@ -411,27 +413,29 @@ class _FreelancePageScreenContentState
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child:
-                              Text(skill, style: const TextStyle(fontSize: 12)),
+                              Text(skill, style: SDTypography.labelSmall),
                         );
                       }).toList(),
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: SDSpacing.xxs),
                     // Note et nombre de projets
                     Row(
                       children: [
-                        Icon(Icons.star, size: 16, color: Colors.amber[700]),
-                        const SizedBox(width: 4),
+                        Icon(Icons.star, size: 16, color: SDColors.warning700),
+                        SizedBox(width: SDSpacing.xxxs),
                         Text(
                           freelancer.rating.toString(),
-                          style: const TextStyle(fontWeight: FontWeight.bold),
+                          style: SDTypography.labelSmall.copyWith(
+                            color: SDColors.warning700,
+                          ),
                         ),
-                        const SizedBox(width: 12),
+                        SizedBox(width: SDSpacing.sm),
                         Icon(Icons.check_circle_outline,
-                            size: 16, color: Colors.green[700]),
-                        const SizedBox(width: 4),
+                            size: 16, color: SDColors.success700),
+                        SizedBox(width: SDSpacing.xxxs),
                         Text(
                           '${freelancer.completedJobs} projets',
-                          style: const TextStyle(fontSize: 13),
+                          style: SDTypography.labelSmall,
                         ),
                       ],
                     ),
@@ -448,7 +452,7 @@ class _FreelancePageScreenContentState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: SDColors.white,
       floatingActionButton: FloatingActionButton(
         onPressed: () {
             Navigator.of(context).push(
@@ -462,15 +466,15 @@ class _FreelancePageScreenContentState
               ),
             );
         },
-        backgroundColor: Colors.green,
-        child: const Icon(Icons.person_add, color: Colors.white),
+        backgroundColor: SDColors.primary600,
+        child: Icon(Icons.person_add, color: SDColors.white),
         tooltip: 'Devenir Freelance',
       ),
       body: BlocBuilder<FreelancePageBlocM, FreelancePageStateM>(
         builder: (context, state) {
           if (state.isLoading == true) {
-            return const Center(
-                child: CircularProgressIndicator(color: Colors.green));
+            return Center(
+                child: CircularProgressIndicator(color: SDColors.primary600));
           }
 
           return CustomScrollView(
@@ -484,11 +488,11 @@ class _FreelancePageScreenContentState
               // Contenu principal
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20.0), // 16 -> 20
+                  padding: EdgeInsets.symmetric(horizontal: SDSpacing.md),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SizedBox(height: 32),
+                      SizedBox(height: SDSpacing.lg),
                       // Hero Search Bar (Nouveau)
                       _buildHeroSearchBar(),
 
@@ -498,33 +502,29 @@ class _FreelancePageScreenContentState
                       // Résultats filtrés - nouvelle section
                       _buildFilterResultsSection(state),
 
-                      const SizedBox(height: 40), // 24 -> 40
+                      SizedBox(height: SDSpacing.xl),
                       // Liste horizontale de freelances
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text(
+                          Text(
                             'Freelances populaires',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
-                              color: Colors.black,
+                            style: SDTypography.titleMedium.copyWith(
+                              color: SDColors.neutral900,
                             ),
                           ),
                           GestureDetector(
                             onTap: () {},
-                            child: const Text(
+                            child: Text(
                               'Voir plus',
-                              style: TextStyle(
-                                color: Colors.green,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 15,
+                              style: SDTypography.bodyMedium.copyWith(
+                                color: SDColors.primary600,
                               ),
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: SDSpacing.sm),
                       SizedBox(
                         height: 200,
                         child: ListView.builder(
@@ -620,11 +620,11 @@ class _FreelancePageScreenContentState
                             onPressed: () {
                               // TODO: Navigation vers liste complète
                             },
-                            icon: const Icon(Icons.arrow_forward, size: 14),
-                            label: const Text('Tout', style: TextStyle(fontSize: 13)),
+                            icon: Icon(Icons.arrow_forward, size: 14, color: SDColors.primary600),
+                            label: Text('Tout', style: SDTypography.labelSmall),
                             style: TextButton.styleFrom(
-                              foregroundColor: Colors.green,
-                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                              foregroundColor: SDColors.primary600,
+                              padding: SDSpacing.chipPadding,
                             ),
                           ),
                         ],
@@ -905,63 +905,58 @@ class _FreelancePageScreenContentState
   // 🎯 NOUVEAU : Hero Search Bar (Adapté de JobPage)
   Widget _buildHeroSearchBar() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: SDSpacing.cardPadding,
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            const Color(0xFF2E7D32),
-            const Color(0xFF4CAF50),
+            SDColors.primary600,
+            SDColors.primary500,
           ],
         ),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF2E7D32).withOpacity(0.3),
+            color: SDColors.primary600.withOpacity(0.3),
             blurRadius: 12,
-            offset: const Offset(0, 4),
+            offset: Offset(0, 4),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             '👨‍💻 Talents Freelance',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
+            style: SDTypography.titleSmall.copyWith(
+              color: SDColors.white,
             ),
           ),
-          const SizedBox(height: 8),
-          const Text(
+          SizedBox(height: SDSpacing.xxs),
+          Text(
             'Trouvez l\'expert idéal',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
+            style: SDTypography.displaySmall.copyWith(
+              color: SDColors.white,
             ),
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: SDSpacing.md),
           // Search Bar
           Container(
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
+              color: SDColors.white,
+              borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: SDColors.neutral900.withOpacity(0.1),
                   blurRadius: 8,
-                  offset: const Offset(0, 2),
+                  offset: Offset(0, 2),
                 ),
               ],
             ),
             child: TextField(
-              readOnly: true, // ✅ Empêcher la saisie directe, navigation seulement
+              readOnly: true,
               onTap: () {
-                // ✅ Navigation vers la Recherche Globale (Onglet "Pros" = Index 2)
                 Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -971,11 +966,11 @@ class _FreelancePageScreenContentState
               },
               decoration: InputDecoration(
                 hintText: 'Rechercher (ex: Logo, Site Web...)',
-                hintStyle: TextStyle(color: Colors.grey.shade400),
-                prefixIcon: Icon(Icons.search, color: Colors.green.shade600),
+                hintStyle: SDTypography.bodyMedium.copyWith(color: SDColors.neutral400),
+                prefixIcon: Icon(Icons.search, color: SDColors.primary600),
                 border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 14),
+                contentPadding: EdgeInsets.symmetric(
+                    horizontal: SDSpacing.sm, vertical: SDSpacing.sm),
               ),
             ),
           ),
@@ -1391,18 +1386,26 @@ class _FreelancePageScreenContentState
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
+        children: [
           Text('✔️ Flexibilité et réactivité',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-          SizedBox(height: 8),
+              style: SDTypography.bodyMedium.copyWith(
+                color: SDColors.neutral900,
+              )),
+          SizedBox(height: SDSpacing.xxs),
           Text('✔️ Tarifs compétitifs',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-          SizedBox(height: 8),
+              style: SDTypography.bodyMedium.copyWith(
+                color: SDColors.neutral900,
+              )),
+          SizedBox(height: SDSpacing.xxs),
           Text('✔️ Accès à des talents variés',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-          SizedBox(height: 8),
+              style: SDTypography.bodyMedium.copyWith(
+                color: SDColors.neutral900,
+              )),
+          SizedBox(height: SDSpacing.xxs),
           Text('✔️ Collaboration directe et rapide',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+              style: SDTypography.bodyMedium.copyWith(
+                color: SDColors.neutral900,
+              )),
         ],
       ),
     );
@@ -1483,14 +1486,17 @@ class _FreelancePageScreenContentState
                     ),
                   ),
                 ),
-                const Text('Filtrer les freelances',
-                    style:
-                        TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                const SizedBox(height: 18),
+                Text('Filtrer les freelances',
+                    style: SDTypography.titleMedium.copyWith(
+                      color: SDColors.neutral900,
+                    )),
+                SizedBox(height: SDSpacing.md),
                 // Métier/catégorie
-                const Text('Catégorie',
-                    style: TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
+                Text('Catégorie',
+                    style: SDTypography.titleSmall.copyWith(
+                      color: SDColors.neutral900,
+                    )),
+                SizedBox(height: SDSpacing.xxs),
                 DropdownButton<String>(
                   value: selectedCategory,
                   isExpanded: true,
@@ -1850,9 +1856,9 @@ class _FreelancePageScreenContentState
   // 🏷️ Helper : Skill Chip
   Widget _buildSkillChip(String label) {
     return Chip(
-      label: Text(label, style: const TextStyle(fontSize: 12, color: Colors.green)),
-      backgroundColor: Colors.green.withOpacity(0.08),
-      side: BorderSide(color: Colors.green.withOpacity(0.2)),
+      label: Text(label, style: SDTypography.labelSmall.copyWith(color: SDColors.primary600)),
+      backgroundColor: SDColors.primary50,
+      side: BorderSide(color: SDColors.primary200),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
     );
   }
@@ -1908,12 +1914,14 @@ class _FreelancePageScreenContentState
                   ),
               ],
             ),
-            const SizedBox(height: 10),
+            SizedBox(height: SDSpacing.xs),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+              padding: EdgeInsets.symmetric(horizontal: SDSpacing.xxs),
               child: Text(
                 freelance.name,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                style: SDTypography.labelSmall.copyWith(
+                  color: SDColors.neutral900,
+                ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
@@ -1921,7 +1929,7 @@ class _FreelancePageScreenContentState
             ),
             Text(
               freelance.job,
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 11),
+              style: SDTypography.labelSmall.copyWith(color: SDColors.neutral600),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,

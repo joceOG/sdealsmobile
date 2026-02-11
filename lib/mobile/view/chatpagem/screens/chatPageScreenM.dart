@@ -9,6 +9,9 @@ import '../chatpageblocm/chatPageEventM.dart';
 import '../chatpageblocm/chatPageStateM.dart';
 import '../../common/widgets/empty_state_widget.dart';
 
+// ✅ Design System
+import '../../../../design_system/design_system.dart';
+
 class ChatPageScreenM extends StatefulWidget {
   final String? conversationId;
   final String? participantId;
@@ -47,11 +50,11 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
   Color _getConversationColor(ConversationType type) {
     switch (type) {
       case ConversationType.prestataire:
-        return Colors.green.shade600;
+        return SDColors.primary600;
       case ConversationType.vendeur:
-        return Colors.green.shade700;
+        return SDColors.primary700;
       case ConversationType.freelance:
-        return Colors.green.shade500;
+        return SDColors.primary500;
     }
   }
 
@@ -182,7 +185,7 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
   Widget build(BuildContext context) {
     return Scaffold(
       key: _scaffoldKey,
-      backgroundColor: Colors.white,
+      backgroundColor: SDColors.white,
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(120),
         child: AppBar(
@@ -197,16 +200,16 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
             ),
           ),
           flexibleSpace: Container(
-            decoration: const BoxDecoration(
-              color: Colors.green,
+            decoration: BoxDecoration(
+              color: SDColors.primary600,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black26,
+                  color: SDColors.neutral900.withOpacity(0.15),
                   blurRadius: 18,
-                  offset: Offset(0, 8),
+                  offset: const Offset(0, 8),
                 ),
               ],
-              borderRadius: BorderRadius.only(
+              borderRadius: const BorderRadius.only(
                 bottomLeft: Radius.circular(44),
                 bottomRight: Radius.circular(44),
               ),
@@ -216,7 +219,7 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const SizedBox(height: 4),
+                  SizedBox(height: SDSpacing.xxxs),
                   Row(
                     children: [
                       BlocBuilder<ChatPageBlocM, ChatPageStateM>(
@@ -227,8 +230,8 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
                               isMobile && state.selectedConversation != null;
 
                           return IconButton(
-                            icon: const Icon(Icons.arrow_back_ios_new,
-                                color: Colors.white),
+                            icon: Icon(Icons.arrow_back_ios_new,
+                                color: SDColors.white),
                             onPressed: () {
                               // Si on est sur mobile et une conversation est sélectionnée, retourner à la liste
                               if (showBackButton) {
@@ -268,20 +271,19 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
                                     ? Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          // Badge selon type de conversation
                                           Container(
-                                            padding: const EdgeInsets.symmetric(
-                                                horizontal: 8, vertical: 3),
+                                            padding: EdgeInsets.symmetric(
+                                                horizontal: SDSpacing.xxs, vertical: SDSpacing.xxxs),
                                             margin:
-                                                const EdgeInsets.only(right: 8),
+                                                EdgeInsets.only(right: SDSpacing.xxs),
                                             decoration: BoxDecoration(
                                               color: _getConversationColor(state
                                                   .selectedConversation!.type),
                                               borderRadius:
-                                                  BorderRadius.circular(12),
+                                                  BorderRadius.circular(SDSpacing.borderRadiusMedium),
                                               boxShadow: [
                                                 BoxShadow(
-                                                  color: Colors.black
+                                                  color: SDColors.neutral900
                                                       .withOpacity(0.1),
                                                   blurRadius: 4,
                                                   offset: const Offset(0, 2),
@@ -291,9 +293,8 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
                                             child: Text(
                                               _getConversationLabel(state
                                                   .selectedConversation!.type),
-                                              style: const TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 12,
+                                              style: SDTypography.labelSmall.copyWith(
+                                                color: SDColors.white,
                                                 fontWeight: FontWeight.bold,
                                               ),
                                             ),
@@ -302,9 +303,8 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
                                           Flexible(
                                             child: Text(
                                               title,
-                                              style: const TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 20,
+                                              style: SDTypography.titleLarge.copyWith(
+                                                color: SDColors.white,
                                                 fontWeight: FontWeight.bold,
                                                 letterSpacing: 0.8,
                                               ),
@@ -318,17 +318,17 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
                                             Container(
                                               width: 12,
                                               height: 12,
-                                              margin: const EdgeInsets.only(
-                                                  left: 8),
+                                              margin: EdgeInsets.only(
+                                                  left: SDSpacing.xxs),
                                               decoration: BoxDecoration(
-                                                color: Colors.green,
+                                                color: SDColors.success500,
                                                 shape: BoxShape.circle,
                                                 border: Border.all(
-                                                    color: Colors.white,
+                                                    color: SDColors.white,
                                                     width: 2),
                                                 boxShadow: [
                                                   BoxShadow(
-                                                    color: Colors.green
+                                                    color: SDColors.success500
                                                         .withOpacity(0.4),
                                                     blurRadius: 4,
                                                     spreadRadius: 1,
@@ -340,9 +340,8 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
                                       )
                                     : Text(
                                         title,
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 22,
+                                        style: SDTypography.titleLarge.copyWith(
+                                          color: SDColors.white,
                                           fontWeight: FontWeight.bold,
                                           letterSpacing: 1.2,
                                         ),
@@ -355,19 +354,33 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
                         ),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.search, color: Colors.white),
+                        icon: Icon(Icons.search, color: SDColors.white),
                         onPressed: () {
                           setState(() {
                             _isSearching = !_isSearching;
                           });
                         },
                       ),
+                      BlocBuilder<ChatPageBlocM, ChatPageStateM>(
+                        builder: (context, state) {
+                          if (state.selectedConversation != null) {
+                            return IconButton(
+                              icon:
+                                  Icon(Icons.more_vert, color: SDColors.white),
+                              onPressed: () {
+                                // Actions supplémentaires (bloquer, archiver, etc.)
+                              },
+                            );
+                          }
+                          return const SizedBox.shrink();
+                        },
+                      ),
                     ],
                   ),
                   if (_isSearching)
                     Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 20.0, vertical: 8.0),
+                      padding: EdgeInsets.symmetric(
+                          horizontal: SDSpacing.lg, vertical: SDSpacing.xxs),
                       child: TextField(
                         onChanged: (value) {
                           setState(() {
@@ -381,18 +394,18 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
                         },
                         decoration: InputDecoration(
                           hintText: 'Rechercher une conversation...',
-                          hintStyle: TextStyle(color: Colors.white70),
+                          hintStyle: SDTypography.bodyMedium.copyWith(color: SDColors.white.withOpacity(0.7)),
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(30),
+                            borderRadius: BorderRadius.circular(SDSpacing.borderRadiusXLarge),
                             borderSide: BorderSide.none,
                           ),
                           filled: true,
-                          fillColor: Colors.white.withOpacity(0.2),
-                          prefixIcon: Icon(Icons.search, color: Colors.white70),
+                          fillColor: SDColors.white.withOpacity(0.2),
+                          prefixIcon: Icon(Icons.search, color: SDColors.white.withOpacity(0.7)),
                           contentPadding:
-                              const EdgeInsets.symmetric(vertical: 10),
+                              EdgeInsets.symmetric(vertical: SDSpacing.xs),
                         ),
-                        style: const TextStyle(color: Colors.white),
+                        style: SDTypography.bodyMedium.copyWith(color: SDColors.white),
                       ),
                     ),
                 ],
@@ -445,11 +458,11 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
                         flex: 3,
                         child: Container(
                           decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(24),
+                            color: SDColors.white,
+                            borderRadius: BorderRadius.circular(SDSpacing.borderRadiusXLarge),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.05),
+                                color: SDColors.neutral900.withOpacity(0.05),
                                 blurRadius: 10,
                                 offset: const Offset(0, 4),
                               ),
@@ -459,13 +472,12 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
                             children: [
                               // En-tête de la liste des conversations
                               Padding(
-                                padding: const EdgeInsets.symmetric(
-                                    vertical: 8.0, horizontal: 12.0),
+                                padding: EdgeInsets.symmetric(
+                                    vertical: SDSpacing.xxs, horizontal: SDSpacing.xs),
                                 child: Text(
                                   'Conversations',
-                                  style: TextStyle(
+                                  style: SDTypography.titleSmall.copyWith(
                                     fontWeight: FontWeight.bold,
-                                    fontSize: 16,
                                   ),
                                 ),
                               ),
@@ -499,26 +511,25 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
                                                           conversation));
                                                 },
                                                 child: Container(
-                                                  padding: const EdgeInsets
+                                                  padding: EdgeInsets
                                                       .symmetric(
-                                                      vertical: 12.0,
-                                                      horizontal: 8.0),
+                                                      vertical: SDSpacing.xs,
+                                                      horizontal: SDSpacing.xxs),
                                                   decoration: BoxDecoration(
                                                     color: isSelected
-                                                        ? Colors.green
+                                                        ? SDColors.primary600
                                                             .withOpacity(0.1)
                                                         : null,
                                                     border: Border(
                                                       bottom: BorderSide(
-                                                        color: Colors.grey
-                                                            .withOpacity(0.2),
+                                                        color: SDColors.neutral300
+                                                            .withOpacity(0.3),
                                                         width: 1,
                                                       ),
                                                     ),
                                                   ),
                                                   child: Row(
                                                     children: [
-                                                      // Avatar
                                                       Container(
                                                         width: 40,
                                                         height: 40,
@@ -526,8 +537,7 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
                                                             BoxDecoration(
                                                           shape:
                                                               BoxShape.circle,
-                                                          color: Colors
-                                                              .grey.shade300,
+                                                          color: SDColors.neutral300,
                                                           image: conversation
                                                                   .participantImage
                                                                   .isNotEmpty
@@ -550,9 +560,8 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
                                                                           0]
                                                                       .toUpperCase(),
                                                                   style:
-                                                                      TextStyle(
-                                                                    color: Colors
-                                                                        .white,
+                                                                      SDTypography.labelMedium.copyWith(
+                                                                    color: SDColors.white,
                                                                     fontWeight:
                                                                         FontWeight
                                                                             .bold,
@@ -565,10 +574,10 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
                                                       Expanded(
                                                         child: Padding(
                                                           padding:
-                                                              const EdgeInsets
+                                                              EdgeInsets
                                                                   .symmetric(
                                                                   horizontal:
-                                                                      8.0),
+                                                                      SDSpacing.xxs),
                                                           child: Column(
                                                             crossAxisAlignment:
                                                                 CrossAxisAlignment
@@ -578,19 +587,18 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
                                                                 conversation
                                                                     .participantName,
                                                                 style:
-                                                                    TextStyle(
+                                                                    SDTypography.titleSmall.copyWith(
                                                                   fontWeight:
                                                                       FontWeight
                                                                           .bold,
-                                                                  fontSize: 16,
                                                                 ),
                                                                 maxLines: 1,
                                                                 overflow:
                                                                     TextOverflow
                                                                         .ellipsis,
                                                               ),
-                                                              const SizedBox(
-                                                                  height: 4),
+                                                              SizedBox(
+                                                                  height: SDSpacing.xxxs),
                                                               Text(
                                                                 conversation.lastMessage !=
                                                                         null
@@ -599,11 +607,8 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
                                                                         .content
                                                                     : '',
                                                                 style:
-                                                                    TextStyle(
-                                                                  color: Colors
-                                                                      .grey
-                                                                      .shade600,
-                                                                  fontSize: 14,
+                                                                    SDTypography.bodySmall.copyWith(
+                                                                  color: SDColors.neutral500,
                                                                 ),
                                                                 maxLines: 1,
                                                                 overflow:
@@ -623,34 +628,30 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
                                                           Text(
                                                             // Format lastUpdated as a time string (e.g. '14:30')
                                                             "${conversation.lastUpdated.hour.toString().padLeft(2, '0')}:${conversation.lastUpdated.minute.toString().padLeft(2, '0')}",
-                                                            style: TextStyle(
-                                                              color: Colors.grey
-                                                                  .shade600,
-                                                              fontSize: 12,
+                                                            style: SDTypography.labelSmall.copyWith(
+                                                              color: SDColors.neutral500,
                                                             ),
                                                           ),
-                                                          const SizedBox(
-                                                              height: 4),
+                                                          SizedBox(
+                                                              height: SDSpacing.xxxs),
                                                           if (conversation
                                                                   .unreadCount >
                                                               0)
                                                             Container(
                                                               padding:
-                                                                  const EdgeInsets
-                                                                      .all(6),
+                                                                  EdgeInsets
+                                                                      .all(SDSpacing.xxs),
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: Colors
-                                                                    .green,
+                                                                color: SDColors.primary600,
                                                                 shape: BoxShape
                                                                     .circle,
                                                               ),
                                                               child: Text(
                                                                 '${conversation.unreadCount}',
                                                                 style:
-                                                                    TextStyle(
-                                                                  color: Colors
-                                                                      .white,
+                                                                    SDTypography.labelSmall.copyWith(
+                                                                  color: SDColors.white,
                                                                   fontSize: 10,
                                                                   fontWeight:
                                                                       FontWeight
@@ -676,14 +677,14 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
                       Flexible(
                         flex: 7,
                         child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 300),
+                          duration: SDAnimations.medium,
                           curve: Curves.easeInOut,
                           decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
+                            color: SDColors.white,
+                            borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.05),
+                                color: SDColors.neutral900.withOpacity(0.05),
                                 blurRadius: 8,
                                 offset: const Offset(0, 2),
                               ),

@@ -4,6 +4,8 @@ import '../jobpageblocm/jobPageBlocM.dart';
 import '../jobpageblocm/jobPageEventM.dart';
 import '../jobpageblocm/jobPageStateM.dart';
 import 'detailPageScreenM.dart';
+// ✅ Design System
+import '../../../../design_system/design_system.dart';
 
 class ServicesListScreen extends StatefulWidget {
   const ServicesListScreen({super.key});
@@ -24,26 +26,25 @@ class _ServicesListScreenState extends State<ServicesListScreen> {
     return BlocProvider(
       create: (_) => JobPageBlocM()..add(LoadServiceDataJobM()),
       child: Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: SDColors.white,
         appBar: AppBar(
-          title: const Text(
+          title: Text(
             'Tous les Services',
-            style: TextStyle(
+            style: SDTypography.titleMedium.copyWith(
               fontWeight: FontWeight.bold,
-              fontSize: 18,
-              color: Colors.white,
+              color: SDColors.white,
             ),
           ),
-          backgroundColor: const Color(0xFF2E7D32),
+          backgroundColor: SDColors.primary700,
           elevation: 0,
-          iconTheme: const IconThemeData(color: Colors.white),
+          iconTheme: IconThemeData(color: SDColors.white),
         ),
         body: BlocBuilder<JobPageBlocM, JobPageStateM>(
           builder: (context, state) {
             if (state.isLoading2) {
-              return const Center(
+              return Center(
                 child: CircularProgressIndicator(
-                  color: Color(0xFF2E7D32),
+                  color: SDColors.primary700,
                 ),
               );
             }
@@ -56,36 +57,34 @@ class _ServicesListScreenState extends State<ServicesListScreen> {
                     Icon(
                       Icons.error_outline,
                       size: 64,
-                      color: Colors.red.shade300,
+                      color: SDColors.error200,
                     ),
-                    const SizedBox(height: 16),
+                    SizedBox(height: SDSpacing.sm),
                     Text(
                       'Erreur de chargement',
-                      style: TextStyle(
-                        fontSize: 18,
+                      style: SDTypography.titleMedium.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: Colors.grey.shade700,
+                        color: SDColors.neutral700,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: SDSpacing.xs),
                     Text(
                       state.error2,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey.shade600,
+                      style: SDTypography.bodySmall.copyWith(
+                        color: SDColors.neutral600,
                       ),
                       textAlign: TextAlign.center,
                     ),
-                    const SizedBox(height: 24),
+                    SizedBox(height: SDSpacing.md),
                     ElevatedButton(
                       onPressed: () {
                         context.read<JobPageBlocM>().add(LoadServiceDataJobM());
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2E7D32),
-                        foregroundColor: Colors.white,
+                        backgroundColor: SDColors.primary700,
+                        foregroundColor: SDColors.white,
                       ),
-                      child: const Text('Réessayer'),
+                      child: Text('Réessayer', style: SDTypography.labelMedium),
                     ),
                   ],
                 ),
@@ -100,15 +99,14 @@ class _ServicesListScreenState extends State<ServicesListScreen> {
                     Icon(
                       Icons.build_outlined,
                       size: 64,
-                      color: Colors.grey.shade300,
+                      color: SDColors.neutral300,
                     ),
-                    const SizedBox(height: 16),
+                    SizedBox(height: SDSpacing.sm),
                     Text(
                       'Aucun service disponible',
-                      style: TextStyle(
-                        fontSize: 18,
+                      style: SDTypography.titleMedium.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: Colors.grey.shade700,
+                        color: SDColors.neutral700,
                       ),
                     ),
                   ],
@@ -117,7 +115,7 @@ class _ServicesListScreenState extends State<ServicesListScreen> {
             }
 
             return ListView.builder(
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.all(SDSpacing.sm),
               itemCount: state.listItems2.length,
               itemBuilder: (context, index) {
                 final service = state.listItems2[index];
@@ -134,11 +132,11 @@ class _ServicesListScreenState extends State<ServicesListScreen> {
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
       ),
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: EdgeInsets.only(bottom: SDSpacing.sm),
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
         onTap: () {
           // Navigation vers les détails du service
           Navigator.push(
@@ -155,20 +153,20 @@ class _ServicesListScreenState extends State<ServicesListScreen> {
         },
         child: Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            color: const Color(0xFF2E7D32).withOpacity(0.05),
+            borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
+            color: SDColors.primary700.withOpacity(0.05),
           ),
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(SDSpacing.sm),
             child: Row(
               children: [
                 // Image du service
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
                   child: Container(
                     width: 80,
                     height: 80,
-                    color: const Color(0xFF2E7D32).withOpacity(0.1),
+                    color: SDColors.primary700.withOpacity(0.1),
                     child: service.imageservice.isNotEmpty
                         ? Image.network(
                             service.imageservice,
@@ -182,32 +180,32 @@ class _ServicesListScreenState extends State<ServicesListScreen> {
                                           loadingProgress.expectedTotalBytes!
                                       : null,
                                   strokeWidth: 2,
-                                  color: const Color(0xFF2E7D32),
+                                  color: SDColors.primary700,
                                 ),
                               );
                             },
                             errorBuilder: (context, error, stackTrace) {
                               return Container(
-                                color: const Color(0xFF2E7D32).withOpacity(0.1),
+                                color: SDColors.primary700.withOpacity(0.1),
                                 child: Icon(
                                   _getServiceIcon(service.nomservice),
                                   size: 40,
-                                  color: const Color(0xFF2E7D32),
+                                  color: SDColors.primary700,
                                 ),
                               );
                             },
                           )
                         : Container(
-                            color: const Color(0xFF2E7D32).withOpacity(0.1),
+                            color: SDColors.primary700.withOpacity(0.1),
                             child: Icon(
                               _getServiceIcon(service.nomservice),
                               size: 40,
-                              color: const Color(0xFF2E7D32),
+                              color: SDColors.primary700,
                             ),
                           ),
                   ),
                 ),
-                const SizedBox(width: 16),
+                SizedBox(width: SDSpacing.sm),
                 // Informations du service
                 Expanded(
                   child: Column(
@@ -216,50 +214,47 @@ class _ServicesListScreenState extends State<ServicesListScreen> {
                       // Nom du service
                       Text(
                         service.nomservice,
-                        style: const TextStyle(
-                          fontSize: 18,
+                        style: SDTypography.titleMedium.copyWith(
                           fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+                          color: SDColors.neutral900,
                         ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 8),
+                      SizedBox(height: SDSpacing.xs),
                       // Catégorie
                       if (service.categorie?.nomcategorie != null)
                         Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 4),
+                          padding: EdgeInsets.symmetric(
+                              horizontal: SDSpacing.xs, vertical: SDSpacing.xxxs),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF2E7D32).withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(12),
+                            color: SDColors.primary700.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
                           ),
                           child: Text(
                             service.categorie!.nomcategorie,
-                            style: const TextStyle(
-                              fontSize: 12,
+                            style: SDTypography.labelSmall.copyWith(
                               fontWeight: FontWeight.w600,
-                              color: Color(0xFF2E7D32),
+                              color: SDColors.primary700,
                             ),
                           ),
                         ),
-                      const SizedBox(height: 8),
+                      SizedBox(height: SDSpacing.xs),
                       // Prix
                       Row(
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.attach_money,
                             size: 16,
-                            color: Color(0xFF2E7D32),
+                            color: SDColors.primary700,
                           ),
-                          const SizedBox(width: 4),
+                          SizedBox(width: SDSpacing.xxxs),
                           Expanded(
                             child: Text(
                               'À partir de ${service.prixmoyen} FCFA/h',
-                              style: const TextStyle(
-                                fontSize: 14,
+                              style: SDTypography.bodySmall.copyWith(
                                 fontWeight: FontWeight.w600,
-                                color: Color(0xFF2E7D32),
+                                color: SDColors.primary700,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -272,14 +267,14 @@ class _ServicesListScreenState extends State<ServicesListScreen> {
                 ),
                 // Bouton d'action
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: EdgeInsets.all(SDSpacing.xs),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF2E7D32),
-                    borderRadius: BorderRadius.circular(8),
+                    color: SDColors.primary700,
+                    borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.arrow_forward_ios,
-                    color: Colors.white,
+                    color: SDColors.white,
                     size: 16,
                   ),
                 ),

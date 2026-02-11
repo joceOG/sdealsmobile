@@ -7,6 +7,8 @@ import 'detailPageScreenM.dart';
 import '../utils/navigation_helper.dart';
 import '../../common/widgets/app_image.dart';
 import '../../common/widgets/skeleton_loader.dart';
+// ✅ Design System
+import '../../../../design_system/design_system.dart';
 
 class ProvidersListScreen extends StatefulWidget {
   const ProvidersListScreen({super.key});
@@ -31,27 +33,26 @@ class _ProvidersListScreenState extends State<ProvidersListScreen> {
           location: '',
         )),
       child: Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: SDColors.white,
         appBar: AppBar(
-          title: const Text(
+          title: Text(
             'Tous les Prestataires',
-            style: TextStyle(
+            style: SDTypography.titleMedium.copyWith(
               fontWeight: FontWeight.bold,
-              fontSize: 20,
-              color: Colors.white,
+              color: SDColors.white,
             ),
           ),
-          backgroundColor: const Color(0xFF2E7D32),
+          backgroundColor: SDColors.primary700,
           elevation: 0,
-          iconTheme: const IconThemeData(color: Colors.white),
+          iconTheme: IconThemeData(color: SDColors.white),
           flexibleSpace: Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  const Color(0xFF2E7D32),
-                  const Color(0xFF4CAF50),
+                  SDColors.primary700,
+                  SDColors.primary500,
                 ],
               ),
             ),
@@ -80,27 +81,25 @@ class _ProvidersListScreenState extends State<ProvidersListScreen> {
                     Icon(
                       Icons.error_outline,
                       size: 64,
-                      color: Colors.red.shade300,
+                      color: SDColors.error200,
                     ),
-                    const SizedBox(height: 16),
+                    SizedBox(height: SDSpacing.sm),
                     Text(
                       'Erreur de chargement',
-                      style: TextStyle(
-                        fontSize: 18,
+                      style: SDTypography.titleMedium.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: Colors.grey.shade700,
+                        color: SDColors.neutral700,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: SDSpacing.xs),
                     Text(
                       state.matchError,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey.shade600,
+                      style: SDTypography.bodySmall.copyWith(
+                        color: SDColors.neutral600,
                       ),
                       textAlign: TextAlign.center,
                     ),
-                    const SizedBox(height: 24),
+                    SizedBox(height: SDSpacing.md),
                     ElevatedButton(
                       onPressed: () {
                         context.read<JobPageBlocM>().add(LoadProviderMatchingM(
@@ -109,10 +108,10 @@ class _ProvidersListScreenState extends State<ProvidersListScreen> {
                             ));
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2E7D32),
-                        foregroundColor: Colors.white,
+                        backgroundColor: SDColors.primary700,
+                        foregroundColor: SDColors.white,
                       ),
-                      child: const Text('Réessayer'),
+                      child: Text('Réessayer', style: SDTypography.labelMedium),
                     ),
                   ],
                 ),
@@ -127,15 +126,14 @@ class _ProvidersListScreenState extends State<ProvidersListScreen> {
                     Icon(
                       Icons.person_outline,
                       size: 64,
-                      color: Colors.grey.shade300,
+                      color: SDColors.neutral300,
                     ),
-                    const SizedBox(height: 16),
+                    SizedBox(height: SDSpacing.sm),
                     Text(
                       'Aucun prestataire disponible',
-                      style: TextStyle(
-                        fontSize: 18,
+                      style: SDTypography.titleMedium.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: Colors.grey.shade700,
+                        color: SDColors.neutral700,
                       ),
                     ),
                   ],
@@ -144,7 +142,7 @@ class _ProvidersListScreenState extends State<ProvidersListScreen> {
             }
 
             return ListView.builder(
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.all(SDSpacing.sm),
               itemCount: state.matchedProviders.length,
               itemBuilder: (context, index) {
                 final provider = state.matchedProviders[index];
@@ -161,11 +159,11 @@ class _ProvidersListScreenState extends State<ProvidersListScreen> {
     return Card(
       elevation: 6,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusXLarge),
       ),
-      margin: const EdgeInsets.only(bottom: 16, left: 16, right: 16),
+      margin: EdgeInsets.only(bottom: SDSpacing.sm, left: SDSpacing.sm, right: SDSpacing.sm),
       child: InkWell(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusXLarge),
         onTap: () {
           // ✅ Navigation vers le profil complet du prestataire
           NavigationHelper.navigateToProviderProfile(
@@ -176,18 +174,18 @@ class _ProvidersListScreenState extends State<ProvidersListScreen> {
         },
         child: Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(SDSpacing.borderRadiusXLarge),
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                const Color(0xFF2E7D32).withOpacity(0.05),
-                const Color(0xFF4CAF50).withOpacity(0.08),
+                SDColors.primary700.withOpacity(0.05),
+                SDColors.primary500.withOpacity(0.08),
               ],
             ),
           ),
           child: Padding(
-            padding: const EdgeInsets.all(20),
+            padding: EdgeInsets.all(SDSpacing.md),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -198,11 +196,11 @@ class _ProvidersListScreenState extends State<ProvidersListScreen> {
                     Stack(
                       children: [
                         ClipRRect(
-                          borderRadius: BorderRadius.circular(15),
+                          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
                           child: Container(
                             width: 70,
                             height: 70,
-                            color: const Color(0xFF2E7D32).withOpacity(0.1),
+                            color: SDColors.primary700.withOpacity(0.1),
                             child: provider.utilisateur?.photoProfil != null &&
                                     provider
                                         .utilisateur!.photoProfil!.isNotEmpty
@@ -213,7 +211,7 @@ class _ProvidersListScreenState extends State<ProvidersListScreen> {
                                 : Icon(
                                     Icons.person,
                                     size: 35,
-                                    color: const Color(0xFF2E7D32),
+                                    color: SDColors.primary700,
                                   ),
                           ),
                         ),
@@ -223,21 +221,21 @@ class _ProvidersListScreenState extends State<ProvidersListScreen> {
                             top: 0,
                             right: 0,
                             child: Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: const BoxDecoration(
-                                color: Color(0xFF2E7D32),
+                              padding: EdgeInsets.all(SDSpacing.xxxs),
+                              decoration: BoxDecoration(
+                                color: SDColors.primary700,
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(
+                              child: Icon(
                                 Icons.verified,
-                                color: Colors.white,
+                                color: SDColors.white,
                                 size: 14,
                               ),
                             ),
                           ),
                       ],
                     ),
-                    const SizedBox(width: 16),
+                    SizedBox(width: SDSpacing.sm),
                     // Nom et service
                     Expanded(
                       child: Column(
@@ -245,20 +243,18 @@ class _ProvidersListScreenState extends State<ProvidersListScreen> {
                         children: [
                           Text(
                             provider.utilisateur?.fullName ?? 'Prestataire',
-                            style: const TextStyle(
-                              fontSize: 18,
+                            style: SDTypography.titleMedium.copyWith(
                               fontWeight: FontWeight.bold,
-                              color: Colors.black87,
+                              color: SDColors.neutral900,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
-                          const SizedBox(height: 4),
+                          SizedBox(height: SDSpacing.xxxs),
                           Text(
                             provider.service?.nomservice ?? 'Service',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey,
+                            style: SDTypography.bodySmall.copyWith(
+                              color: SDColors.neutral500,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -268,42 +264,41 @@ class _ProvidersListScreenState extends State<ProvidersListScreen> {
                     ),
                     // Bouton d'action
                     Container(
-                      padding: const EdgeInsets.all(8),
+                      padding: EdgeInsets.all(SDSpacing.xs),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF2E7D32),
-                        borderRadius: BorderRadius.circular(12),
+                        color: SDColors.primary700,
+                        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF2E7D32).withOpacity(0.3),
+                            color: SDColors.primary700.withOpacity(0.3),
                             blurRadius: 4,
-                            offset: const Offset(0, 2),
+                            offset: Offset(0, 2),
                           ),
                         ],
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.arrow_forward_ios,
-                        color: Colors.white,
+                        color: SDColors.white,
                         size: 16,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: SDSpacing.sm),
                 // Localisation
                 Row(
                   children: [
                     Icon(
                       Icons.location_on,
                       size: 16,
-                      color: const Color(0xFF2E7D32),
+                      color: SDColors.primary700,
                     ),
-                    const SizedBox(width: 6),
+                    SizedBox(width: SDSpacing.xxxs),
                     Expanded(
                       child: Text(
                         provider.localisation ?? 'Localisation non disponible',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey,
+                        style: SDTypography.bodySmall.copyWith(
+                          color: SDColors.neutral500,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -311,17 +306,17 @@ class _ProvidersListScreenState extends State<ProvidersListScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: SDSpacing.xs),
                 // Note et expérience
                 Row(
                   children: [
                     // Note
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
+                      padding: EdgeInsets.symmetric(
+                          horizontal: SDSpacing.xs, vertical: SDSpacing.xxxs),
                       decoration: BoxDecoration(
-                        color: Colors.amber.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
+                        color: SDColors.warning50,
+                        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -329,29 +324,28 @@ class _ProvidersListScreenState extends State<ProvidersListScreen> {
                           Icon(
                             Icons.star,
                             size: 14,
-                            color: Colors.amber.shade600,
+                            color: SDColors.warning600,
                           ),
-                          const SizedBox(width: 4),
+                          SizedBox(width: SDSpacing.xxxs),
                           Text(
                             '${provider.note ?? 'N/A'}/5',
-                            style: TextStyle(
-                              fontSize: 12,
+                            style: SDTypography.labelSmall.copyWith(
                               fontWeight: FontWeight.w600,
-                              color: Colors.amber.shade800,
+                              color: SDColors.warning700,
                             ),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: SDSpacing.xs),
                     // Expérience
                     if (provider.anneeExperience != null)
                       Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
+                        padding: EdgeInsets.symmetric(
+                            horizontal: SDSpacing.xs, vertical: SDSpacing.xxxs),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF2E7D32).withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
+                          color: SDColors.primary700.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -359,15 +353,14 @@ class _ProvidersListScreenState extends State<ProvidersListScreen> {
                             Icon(
                               Icons.work,
                               size: 14,
-                              color: const Color(0xFF2E7D32),
+                              color: SDColors.primary700,
                             ),
-                            const SizedBox(width: 4),
+                            SizedBox(width: SDSpacing.xxxs),
                             Text(
                               '${provider.anneeExperience} ans',
-                              style: const TextStyle(
-                                fontSize: 12,
+                              style: SDTypography.labelSmall.copyWith(
                                 fontWeight: FontWeight.w600,
-                                color: Color(0xFF2E7D32),
+                                color: SDColors.primary700,
                               ),
                             ),
                           ],

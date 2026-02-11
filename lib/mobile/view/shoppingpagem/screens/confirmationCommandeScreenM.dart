@@ -8,6 +8,8 @@ import '../shoppingpageblocm/shoppingPageEventM.dart';
 import '../shoppingpageblocm/shoppingPageStateM.dart';
 import 'package:sdealsmobile/mobile/view/common/utils/app_snackbar.dart';
 import 'delivery_address_screen.dart';
+// ✅ Design System
+import '../../../../design_system/design_system.dart';
 
 class ConfirmationCommandeScreen extends StatefulWidget {
   const ConfirmationCommandeScreen({super.key});
@@ -31,9 +33,10 @@ class _ConfirmationCommandeScreenState
   void _applyPromoCode() {
     if (_promoController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Veuillez entrer un code promo'),
-          backgroundColor: Colors.orange,
+        SnackBar(
+          content: Text('Veuillez entrer un code promo',
+              style: SDTypography.bodyMedium.copyWith(color: SDColors.white)),
+          backgroundColor: SDColors.warning500,
         ),
       );
       return;
@@ -86,16 +89,16 @@ class _ConfirmationCommandeScreenState
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: Icon(Icons.arrow_back, color: SDColors.white),
           onPressed: () {
             Navigator.of(context).pop();
           },
         ),
-        title: const Text(
+        title: Text(
           "Passez votre commande",
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: SDTypography.titleMedium.copyWith(color: SDColors.white, fontWeight: FontWeight.bold),
         ),
-        backgroundColor: Colors.green,
+        backgroundColor: SDColors.primary600,
         centerTitle: true,
       ),
       body: BlocConsumer<ShoppingPageBlocM, ShoppingPageStateM>(
@@ -103,8 +106,9 @@ class _ConfirmationCommandeScreenState
           if (state.cartError != null) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(state.cartError!),
-                backgroundColor: Colors.red,
+                content: Text(state.cartError!,
+                    style: SDTypography.bodyMedium.copyWith(color: SDColors.white)),
+                backgroundColor: SDColors.error500,
               ),
             );
           }
@@ -113,7 +117,7 @@ class _ConfirmationCommandeScreenState
           final cart = state.cart;
 
           if (state.isCartLoading && cart == null) {
-            return const Center(child: CircularProgressIndicator());
+            return Center(child: CircularProgressIndicator(color: SDColors.primary600));
           }
 
           if (cart == null || cart.isEmpty) {
@@ -121,17 +125,22 @@ class _ConfirmationCommandeScreenState
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.shopping_cart_outlined,
-                      size: 100, color: Colors.grey),
-                  const SizedBox(height: 16),
-                  const Text(
+                  Icon(Icons.shopping_cart_outlined,
+                      size: 100, color: SDColors.neutral500),
+                  SizedBox(height: SDSpacing.sm),
+                  Text(
                     'Votre panier est vide',
-                    style: TextStyle(fontSize: 18, color: Colors.grey),
+                    style: SDTypography.titleMedium.copyWith(color: SDColors.neutral500),
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: SDSpacing.sm),
                   ElevatedButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('Retour au shopping'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: SDColors.primary600,
+                      foregroundColor: SDColors.white,
+                    ),
+                    child: Text('Retour au shopping',
+                        style: SDTypography.labelMedium.copyWith(color: SDColors.white)),
                   ),
                 ],
               ),
@@ -144,40 +153,39 @@ class _ConfirmationCommandeScreenState
               children: [
                 // Message d'information
                 Container(
-                  padding: const EdgeInsets.all(10),
-                  color: Colors.grey[200],
-                  child: const Text(
+                  padding: EdgeInsets.all(SDSpacing.sm),
+                  color: SDColors.neutral200,
+                  child: Text(
                     "Si vous continuez, vous acceptez automatiquement notre",
-                    style: TextStyle(fontSize: 14),
+                    style: SDTypography.bodySmall,
                   ),
                 ),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 10),
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: SDSpacing.sm),
                   child: Text(
                     "Termes et Conditions",
-                    style: TextStyle(
-                      color: Colors.blue,
+                    style: SDTypography.bodySmall.copyWith(
+                      color: SDColors.info600,
                       fontWeight: FontWeight.bold,
-                      fontSize: 14,
                     ),
                   ),
                 ),
 
-                const SizedBox(height: 10),
+                SizedBox(height: SDSpacing.sm),
 
                 // RÉSUMÉ DE COMMANDE
                 Container(
-                  padding: const EdgeInsets.all(15),
-                  color: Colors.white,
+                  padding: EdgeInsets.all(SDSpacing.md),
+                  color: SDColors.white,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         "Résumé de commande",
-                        style: TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.bold),
+                        style: SDTypography.titleSmall.copyWith(
+                            fontWeight: FontWeight.bold),
                       ),
-                      const SizedBox(height: 10),
+                      SizedBox(height: SDSpacing.sm),
                       rowItem(
                         "Total articles (${cart.totalItems})",
                         "${cart.montantArticles.toStringAsFixed(0)} FCFA",
@@ -191,16 +199,16 @@ class _ConfirmationCommandeScreenState
                         rowItem(
                           "Réduction (${cart.codePromo!.code})",
                           cart.codePromo!.descriptionReduction,
-                          textColor: Colors.green,
+                          textColor: SDColors.success500,
                         ),
                       ],
-                      const Divider(),
+                      Divider(color: SDColors.neutral300),
                       rowItem(
                         "Total",
                         "${cart.montantTotal.toStringAsFixed(0)} FCFA",
                         isBold: true,
                       ),
-                      const SizedBox(height: 10),
+                      SizedBox(height: SDSpacing.sm),
 
                       // Champ de code promo
                       if (cart.codePromo == null ||
@@ -210,52 +218,56 @@ class _ConfirmationCommandeScreenState
                             Expanded(
                               child: TextField(
                                 controller: _promoController,
+                                style: SDTypography.bodyMedium,
                                 decoration: InputDecoration(
                                   hintText: "Entrez votre code ici",
+                                  hintStyle: SDTypography.bodyMedium.copyWith(color: SDColors.neutral400),
                                   border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(5),
+                                    borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
                                   ),
-                                  prefixIcon: const Icon(Icons.card_giftcard),
+                                  prefixIcon: Icon(Icons.card_giftcard, color: SDColors.primary600),
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 10),
+                            SizedBox(width: SDSpacing.sm),
                             ElevatedButton(
                               onPressed:
                                   state.isCartLoading ? null : _applyPromoCode,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green,
+                                backgroundColor: SDColors.success500,
+                                foregroundColor: SDColors.white,
                               ),
                               child: state.isCartLoading
-                                  ? const SizedBox(
+                                  ? SizedBox(
                                       width: 16,
                                       height: 16,
                                       child: CircularProgressIndicator(
-                                          strokeWidth: 2),
+                                          strokeWidth: 2,
+                                          valueColor: AlwaysStoppedAnimation<Color>(SDColors.white)),
                                     )
-                                  : const Text("Appliquer",
-                                      style: TextStyle(color: Colors.white)),
+                                  : Text("Appliquer",
+                                      style: SDTypography.labelMedium.copyWith(color: SDColors.white)),
                             ),
                           ],
                         ),
                       ] else ...[
                         Container(
-                          padding: const EdgeInsets.all(12),
+                          padding: EdgeInsets.all(SDSpacing.xs),
                           decoration: BoxDecoration(
-                            color: Colors.green.shade50,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.green.shade200),
+                            color: SDColors.success50,
+                            borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
+                            border: Border.all(color: SDColors.success200),
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.check_circle,
-                                  color: Colors.green),
-                              const SizedBox(width: 8),
+                              Icon(Icons.check_circle,
+                                  color: SDColors.success500),
+                              SizedBox(width: SDSpacing.xs),
                               Expanded(
                                 child: Text(
                                   'Code promo "${cart.codePromo!.code}" appliqué',
-                                  style: const TextStyle(
-                                    color: Colors.green,
+                                  style: SDTypography.bodyMedium.copyWith(
+                                    color: SDColors.success500,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
@@ -268,38 +280,75 @@ class _ConfirmationCommandeScreenState
                   ),
                 ),
 
-                const SizedBox(height: 10),
+                SizedBox(height: SDSpacing.sm),
 
-                // MODE DE PAIEMENT
-                sectionTitle("Mode de Paiement", isGreen: true),
-                ListTile(
-                  title: Text("Payer cash à la livraison"),
-                  subtitle: Text(
-                    "Réglez vos achats en espèces directement à la livraison. Nous n'acceptons que les Francs CFA.",
+                // MESSAGE GRATUIT (remplace les options de paiement)
+                Container(
+                  padding: EdgeInsets.all(SDSpacing.sm),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [SDColors.success100, SDColors.success50],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                    border: Border.all(color: SDColors.success200, width: 2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: SDColors.success200.withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
                   ),
-                  leading: Radio<String>(
-                    value: 'Cash à la livraison',
-                    groupValue: _selectedPaymentMethod,
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedPaymentMethod = value!;
-                      });
-                    },
-                    activeColor: Colors.green,
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: EdgeInsets.all(SDSpacing.xs),
+                        decoration: BoxDecoration(
+                          color: SDColors.success500,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(Icons.check_circle, color: SDColors.white, size: 24),
+                      ),
+                      SizedBox(width: SDSpacing.sm),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Commande 100% GRATUITE',
+                              style: SDTypography.titleSmall.copyWith(
+                                color: SDColors.success700,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            SizedBox(height: SDSpacing.xxxs),
+                            Text(
+                              'Aucun paiement requis • Service immédiat',
+                              style: SDTypography.bodySmall.copyWith(
+                                color: SDColors.success600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
 
-                const SizedBox(height: 10),
+                SizedBox(height: SDSpacing.sm),
 
                 // ADRESSE DE LIVRAISON
                 sectionTitle("Adresse", isGreen: true),
                 if (cart.adresseLivraison != null &&
                     cart.adresseLivraison!.isComplete) ...[
                   ListTile(
-                    leading: const Icon(Icons.location_on, color: Colors.green),
-                    title: Text(cart.adresseLivraison!.nom),
+                    leading: Icon(Icons.location_on, color: SDColors.success500),
+                    title: Text(cart.adresseLivraison!.nom, style: SDTypography.bodyMedium),
                     subtitle: Text(
                       "${cart.adresseLivraison!.adresse}\n${cart.adresseLivraison!.ville}, ${cart.adresseLivraison!.pays}\n${cart.adresseLivraison!.telephone}",
+                      style: SDTypography.bodySmall,
                     ),
                     trailing: TextButton(
                       onPressed: () {
@@ -315,10 +364,10 @@ class _ConfirmationCommandeScreenState
                           ),
                         );
                       },
-                      child: const Text(
+                      child: Text(
                         "Modifier",
-                        style: TextStyle(
-                          color: Colors.green,
+                        style: SDTypography.labelMedium.copyWith(
+                          color: SDColors.success500,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -327,9 +376,9 @@ class _ConfirmationCommandeScreenState
                 ] else ...[
                   ListTile(
                     leading:
-                        const Icon(Icons.add_location, color: Colors.orange),
-                    title: const Text("Aucune adresse de livraison"),
-                    subtitle: const Text("Veuillez ajouter une adresse"),
+                        Icon(Icons.add_location, color: SDColors.warning500),
+                    title: Text("Aucune adresse de livraison", style: SDTypography.bodyMedium),
+                    subtitle: Text("Veuillez ajouter une adresse", style: SDTypography.bodySmall),
                     trailing: ElevatedButton(
                       onPressed: () {
                         Navigator.push(
@@ -340,60 +389,60 @@ class _ConfirmationCommandeScreenState
                         );
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
+                        backgroundColor: SDColors.success500,
+                        foregroundColor: SDColors.white,
                       ),
-                      child: const Text("Ajouter",
-                          style: TextStyle(color: Colors.white)),
+                      child: Text("Ajouter",
+                          style: SDTypography.labelMedium.copyWith(color: SDColors.white)),
                     ),
                   ),
                 ],
 
-                const SizedBox(height: 10),
+                SizedBox(height: SDSpacing.sm),
 
                 // LIVRAISON
                 sectionTitle("Livraison", isGreen: true),
-                const ListTile(
-                  leading: Icon(Icons.local_shipping, color: Colors.green),
-                  title: Text("Livraison standard"),
-                  subtitle: Text("Livraison sous 2-5 jours ouvrés"),
+                ListTile(
+                  leading: Icon(Icons.local_shipping, color: SDColors.success500),
+                  title: Text("Livraison standard", style: SDTypography.bodyMedium),
+                  subtitle: Text("Livraison sous 2-5 jours ouvrés", style: SDTypography.bodySmall),
                 ),
 
-                const SizedBox(height: 20),
+                SizedBox(height: SDSpacing.md),
 
                 // BOUTON CONFIRMATION COMMANDE
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 15),
+                  padding: EdgeInsets.symmetric(horizontal: SDSpacing.md),
                   child: ElevatedButton(
                     onPressed: cart.canCheckout && !state.isCartLoading
                         ? _confirmOrder
                         : null,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      padding: const EdgeInsets.symmetric(vertical: 15),
+                      backgroundColor: SDColors.success500,
+                      padding: EdgeInsets.symmetric(vertical: SDSpacing.md),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
                       ),
-                      disabledBackgroundColor: Colors.grey,
+                      disabledBackgroundColor: SDColors.neutral400,
                     ),
                     child: Center(
                       child: state.isCartLoading
-                          ? const CircularProgressIndicator(
+                          ? CircularProgressIndicator(
                               valueColor:
-                                  AlwaysStoppedAnimation<Color>(Colors.white),
+                                  AlwaysStoppedAnimation<Color>(SDColors.white),
                             )
-                          : const Text(
+                          : Text(
                               "Confirmer La Commande",
-                              style: TextStyle(
-                                fontSize: 16,
+                              style: SDTypography.labelMedium.copyWith(
                                 fontWeight: FontWeight.bold,
-                                color: Colors.white,
+                                color: SDColors.white,
                               ),
                             ),
                     ),
                   ),
                 ),
 
-                const SizedBox(height: 20),
+                SizedBox(height: SDSpacing.md),
               ],
             ),
           );
@@ -406,20 +455,18 @@ class _ConfirmationCommandeScreenState
   Widget rowItem(String title, String value,
       {bool isBold = false, Color? textColor}) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
+      padding: EdgeInsets.symmetric(vertical: SDSpacing.xxxs),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
             title,
-            style: TextStyle(
-                fontSize: 15,
+            style: SDTypography.bodyMedium.copyWith(
                 fontWeight: isBold ? FontWeight.bold : FontWeight.normal),
           ),
           Text(
             value,
-            style: TextStyle(
-              fontSize: 15,
+            style: SDTypography.bodyMedium.copyWith(
               fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
               color: textColor,
             ),
@@ -433,14 +480,13 @@ class _ConfirmationCommandeScreenState
   Widget sectionTitle(String title, {bool isGreen = false}) {
     return Container(
       width: double.infinity,
-      color: isGreen ? Colors.green : Colors.grey[200],
-      padding: const EdgeInsets.all(10),
+      color: isGreen ? SDColors.success500 : SDColors.neutral200,
+      padding: EdgeInsets.all(SDSpacing.sm),
       child: Text(
         title,
-        style: TextStyle(
-          fontSize: 16,
+        style: SDTypography.titleSmall.copyWith(
           fontWeight: FontWeight.bold,
-          color: isGreen ? Colors.white : Colors.black,
+          color: isGreen ? SDColors.white : SDColors.neutral900,
         ),
       ),
     );
