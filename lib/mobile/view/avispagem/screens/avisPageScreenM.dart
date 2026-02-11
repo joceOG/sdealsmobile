@@ -7,6 +7,9 @@ import 'package:sdealsmobile/data/models/avis.dart';
 import 'createAvisScreenM.dart';
 import 'avisDetailScreenM.dart';
 
+// ✅ Design System
+import '../../../../design_system/design_system.dart';
+
 class AvisPageScreenM extends StatefulWidget {
   const AvisPageScreenM({super.key});
 
@@ -31,12 +34,16 @@ class _AvisPageScreenMState extends State<AvisPageScreenM> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.green,
-        title: const Text('Mes Avis & Évaluations'),
+        backgroundColor: SDColors.primary600,
+        title: Text(
+          'Mes Avis & Évaluations',
+          style: SDTypography.titleLarge.copyWith(color: SDColors.white),
+        ),
         centerTitle: true,
+        leading: const BackButton(color: SDColors.white),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh, color: SDColors.white),
             onPressed: () {
               context.read<AvisPageBlocM>().add(RefreshAvisM());
             },
@@ -49,7 +56,7 @@ class _AvisPageScreenMState extends State<AvisPageScreenM> {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(state.error ?? 'Erreur inconnue'),
-                backgroundColor: Colors.red,
+                backgroundColor: SDColors.error500,
               ),
             );
           }
@@ -77,8 +84,8 @@ class _AvisPageScreenMState extends State<AvisPageScreenM> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showCreateAvisDialog(),
-        backgroundColor: Colors.green,
-        child: const Icon(Icons.add, color: Colors.white),
+        backgroundColor: SDColors.primary600,
+        child: const Icon(Icons.add, color: SDColors.white),
       ),
     );
   }
@@ -86,11 +93,11 @@ class _AvisPageScreenMState extends State<AvisPageScreenM> {
   // 🔍 BARRE DE RECHERCHE ET FILTRES
   Widget _buildSearchAndFilters() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(SDSpacing.md),
       decoration: BoxDecoration(
-        color: Colors.grey[50],
+        color: SDColors.neutral50,
         border: Border(
-          bottom: BorderSide(color: Colors.grey[300]!),
+          bottom: BorderSide(color: SDColors.neutral200),
         ),
       ),
       child: Column(
@@ -100,19 +107,29 @@ class _AvisPageScreenMState extends State<AvisPageScreenM> {
             controller: _searchController,
             decoration: InputDecoration(
               hintText: 'Rechercher dans les avis...',
-              prefixIcon: const Icon(Icons.search),
+              hintStyle: SDTypography.bodyMedium.copyWith(color: SDColors.neutral500),
+              prefixIcon: const Icon(Icons.search, color: SDColors.neutral500),
               suffixIcon: IconButton(
-                icon: const Icon(Icons.clear),
+                icon: const Icon(Icons.clear, color: SDColors.neutral500),
                 onPressed: () {
                   _searchController.clear();
                   context.read<AvisPageBlocM>().add(SearchAvisM(query: ''));
                 },
               ),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(25),
+                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
+                borderSide: BorderSide(color: SDColors.neutral200),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
+                borderSide: BorderSide(color: SDColors.neutral200),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
+                borderSide: BorderSide(color: SDColors.primary600),
               ),
               filled: true,
-              fillColor: Colors.white,
+              fillColor: SDColors.white,
             ),
             onSubmitted: (value) {
               context.read<AvisPageBlocM>().add(SearchAvisM(query: value));
@@ -212,12 +229,12 @@ class _AvisPageScreenMState extends State<AvisPageScreenM> {
   // 📊 CARTE DE STATISTIQUES
   Widget _buildStatsCard(AvisPageStateM state) {
     return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(16),
+      margin: EdgeInsets.all(SDSpacing.md),
+      padding: EdgeInsets.all(SDSpacing.md),
       decoration: BoxDecoration(
-        color: Colors.green[50],
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.green[200]!),
+        color: SDColors.primary50,
+        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+        border: Border.all(color: SDColors.primary200),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -238,15 +255,15 @@ class _AvisPageScreenMState extends State<AvisPageScreenM> {
   Widget _buildStatItem(String label, String value, IconData icon) {
     return Column(
       children: [
-        Icon(icon, color: Colors.green, size: 24),
-        const SizedBox(height: 4),
+        Icon(icon, color: SDColors.primary600, size: 24),
+        SizedBox(height: SDSpacing.xxs),
         Text(
           value,
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          style: SDTypography.titleLarge.copyWith(fontWeight: FontWeight.bold, color: SDColors.neutral900),
         ),
         Text(
           label,
-          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+          style: SDTypography.bodySmall.copyWith(color: SDColors.neutral600),
         ),
       ],
     );
@@ -255,7 +272,7 @@ class _AvisPageScreenMState extends State<AvisPageScreenM> {
   // 📋 LISTE DES AVIS
   Widget _buildAvisList(List<Avis> avisList) {
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(SDSpacing.md),
       itemCount: avisList.length,
       itemBuilder: (context, index) {
         final avis = avisList[index];
@@ -267,13 +284,15 @@ class _AvisPageScreenMState extends State<AvisPageScreenM> {
   // 🎴 CARTE D'AVIS
   Widget _buildAvisCard(Avis avis) {
     return Card(
-        margin: const EdgeInsets.only(bottom: 12),
+        margin: EdgeInsets.only(bottom: SDSpacing.sm),
         elevation: 2,
+        color: SDColors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium)),
         child: InkWell(
           onTap: () => _navigateToDetail(avis),
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(SDSpacing.md),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -300,7 +319,7 @@ class _AvisPageScreenMState extends State<AvisPageScreenM> {
                             avis.anonyme
                                 ? 'Anonyme'
                                 : '${avis.auteur.nom} ${avis.auteur.prenom}',
-                            style: const TextStyle(fontWeight: FontWeight.bold),
+                            style: SDTypography.titleMedium.copyWith(fontWeight: FontWeight.bold),
                           ),
                           Text(
                             _formatDate(avis.createdAt),
@@ -319,8 +338,7 @@ class _AvisPageScreenMState extends State<AvisPageScreenM> {
                 // Titre et commentaire
                 Text(
                   avis.titre,
-                  style: const TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.bold),
+                  style: SDTypography.titleMedium.copyWith(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -337,15 +355,17 @@ class _AvisPageScreenMState extends State<AvisPageScreenM> {
                   children: [
                     Chip(
                       label: Text(avis.objetType),
-                      backgroundColor: Colors.green[100],
-                      labelStyle: const TextStyle(fontSize: 12),
+                      backgroundColor: SDColors.success100,
+                      labelStyle: SDTypography.labelSmall.copyWith(color: SDColors.success600),
+                      padding: EdgeInsets.zero,
                     ),
-                    const SizedBox(width: 8),
+                    SizedBox(width: SDSpacing.xs),
                     if (avis.recommande)
                       Chip(
                         label: const Text('Recommande'),
-                        backgroundColor: Colors.blue[100],
-                        labelStyle: const TextStyle(fontSize: 12),
+                        backgroundColor: SDColors.info100,
+                        labelStyle: SDTypography.labelSmall.copyWith(color: SDColors.info600),
+                        padding: EdgeInsets.zero,
                       ),
                     const Spacer(),
                     Text(
@@ -367,18 +387,18 @@ class _AvisPageScreenMState extends State<AvisPageScreenM> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Réponse du professionnel',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.grey[700],
+                          Text(
+                            'Réponse du professionnel',
+                            style: SDTypography.labelMedium.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: SDColors.neutral700,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          avis.reponse!.contenu,
-                          style: const TextStyle(fontSize: 14),
-                        ),
+                          SizedBox(height: SDSpacing.xxs),
+                          Text(
+                            avis.reponse!.contenu,
+                            style: SDTypography.bodyMedium,
+                          ),
                       ],
                     ),
                   ),
@@ -431,7 +451,7 @@ class _AvisPageScreenMState extends State<AvisPageScreenM> {
       children: List.generate(5, (index) {
         return Icon(
           index < note ? Icons.star : Icons.star_border,
-          color: Colors.amber,
+          color: SDColors.warning500,
           size: 20,
         );
       }),
@@ -463,23 +483,21 @@ class _AvisPageScreenMState extends State<AvisPageScreenM> {
           Icon(
             Icons.rate_review_outlined,
             size: 64,
-            color: Colors.grey[400],
+            color: SDColors.neutral400,
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: SDSpacing.md),
           Text(
             'Aucun avis trouvé',
-            style: TextStyle(
-              fontSize: 18,
-              color: Colors.grey[600],
+            style: SDTypography.titleMedium.copyWith(
+              color: SDColors.neutral600,
               fontWeight: FontWeight.w500,
             ),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: SDSpacing.sm),
           Text(
             'Commencez par donner votre premier avis !',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[500],
+            style: SDTypography.bodyMedium.copyWith(
+              color: SDColors.neutral500,
             ),
           ),
         ],
@@ -566,7 +584,7 @@ class _AvisPageScreenMState extends State<AvisPageScreenM> {
               Navigator.pop(context);
               context.read<AvisPageBlocM>().add(DeleteAvisM(avisId: avis.id));
             },
-            child: const Text('Supprimer', style: TextStyle(color: Colors.red)),
+            child: Text('Supprimer', style: SDTypography.labelLarge.copyWith(color: SDColors.error500)),
           ),
         ],
       ),

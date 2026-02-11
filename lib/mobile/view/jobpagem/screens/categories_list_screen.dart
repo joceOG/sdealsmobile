@@ -4,6 +4,8 @@ import '../jobpageblocm/jobPageBlocM.dart';
 import '../jobpageblocm/jobPageEventM.dart';
 import '../jobpageblocm/jobPageStateM.dart';
 import 'detailPageScreenM.dart';
+// ✅ Design System
+import '../../../../design_system/design_system.dart';
 
 class CategoriesListScreen extends StatefulWidget {
   const CategoriesListScreen({super.key});
@@ -24,27 +26,26 @@ class _CategoriesListScreenState extends State<CategoriesListScreen> {
     return BlocProvider(
       create: (_) => JobPageBlocM()..add(LoadCategorieDataJobM()),
       child: Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: SDColors.white,
         appBar: AppBar(
-          title: const Text(
+          title: Text(
             'Toutes les Catégories',
-            style: TextStyle(
+            style: SDTypography.titleMedium.copyWith(
               fontWeight: FontWeight.bold,
-              fontSize: 20,
-              color: Colors.white,
+              color: SDColors.white,
             ),
           ),
-          backgroundColor: const Color(0xFF2E7D32),
+          backgroundColor: SDColors.primary700,
           elevation: 0,
-          iconTheme: const IconThemeData(color: Colors.white),
+          iconTheme: IconThemeData(color: SDColors.white),
           flexibleSpace: Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  const Color(0xFF2E7D32),
-                  const Color(0xFF4CAF50),
+                  SDColors.primary700,
+                  SDColors.primary500,
                 ],
               ),
             ),
@@ -58,22 +59,21 @@ class _CategoriesListScreenState extends State<CategoriesListScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(20),
+                      padding: EdgeInsets.all(SDSpacing.md),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF2E7D32).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(20),
+                        color: SDColors.primary700.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusXLarge),
                       ),
-                      child: const CircularProgressIndicator(
-                        color: Color(0xFF2E7D32),
+                      child: CircularProgressIndicator(
+                        color: SDColors.primary700,
                         strokeWidth: 3,
                       ),
                     ),
-                    const SizedBox(height: 20),
-                    const Text(
+                    SizedBox(height: SDSpacing.md),
+                    Text(
                       'Chargement des catégories...',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Color(0xFF2E7D32),
+                      style: SDTypography.titleSmall.copyWith(
+                        color: SDColors.primary700,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -88,41 +88,39 @@ class _CategoriesListScreenState extends State<CategoriesListScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(20),
+                      padding: EdgeInsets.all(SDSpacing.md),
                       decoration: BoxDecoration(
-                        color: Colors.red.shade50,
-                        borderRadius: BorderRadius.circular(20),
+                        color: SDColors.error50,
+                        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusXLarge),
                         border: Border.all(
-                          color: Colors.red.shade200,
+                          color: SDColors.error200,
                           width: 1,
                         ),
                       ),
                       child: Icon(
                         Icons.error_outline,
                         size: 64,
-                        color: Colors.red.shade400,
+                        color: SDColors.error500,
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    SizedBox(height: SDSpacing.md),
                     Text(
                       'Erreur de chargement',
-                      style: TextStyle(
-                        fontSize: 18,
+                      style: SDTypography.titleMedium.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: Colors.red.shade700,
+                        color: SDColors.error600,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: SDSpacing.xs),
                     Text(
                       state.error,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.red.shade600,
+                      style: SDTypography.bodySmall.copyWith(
+                        color: SDColors.error600,
                         fontWeight: FontWeight.w500,
                       ),
                       textAlign: TextAlign.center,
                     ),
-                    const SizedBox(height: 24),
+                    SizedBox(height: SDSpacing.md),
                     ElevatedButton(
                       onPressed: () {
                         context
@@ -130,21 +128,22 @@ class _CategoriesListScreenState extends State<CategoriesListScreen> {
                             .add(LoadCategorieDataJobM());
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2E7D32),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 12,
+                        backgroundColor: SDColors.primary700,
+                        foregroundColor: SDColors.white,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: SDSpacing.md,
+                          vertical: SDSpacing.xs,
                         ),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
                         ),
                         elevation: 4,
                       ),
-                      child: const Text(
+                      child: Text(
                         'Réessayer',
-                        style: TextStyle(
+                        style: SDTypography.labelMedium.copyWith(
                           fontWeight: FontWeight.w600,
+                          color: SDColors.white,
                         ),
                       ),
                     ),
@@ -161,15 +160,14 @@ class _CategoriesListScreenState extends State<CategoriesListScreen> {
                     Icon(
                       Icons.category_outlined,
                       size: 64,
-                      color: Colors.grey.shade300,
+                      color: SDColors.neutral300,
                     ),
-                    const SizedBox(height: 16),
+                    SizedBox(height: SDSpacing.sm),
                     Text(
                       'Aucune catégorie disponible',
-                      style: TextStyle(
-                        fontSize: 18,
+                      style: SDTypography.titleMedium.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: Colors.grey.shade700,
+                        color: SDColors.neutral700,
                       ),
                     ),
                   ],
@@ -178,12 +176,12 @@ class _CategoriesListScreenState extends State<CategoriesListScreen> {
             }
 
             return GridView.builder(
-              padding: const EdgeInsets.all(20),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              padding: EdgeInsets.all(SDSpacing.md),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
                 childAspectRatio: 0.85, // Ajusté pour la nouvelle hauteur
-                crossAxisSpacing: 20,
-                mainAxisSpacing: 20,
+                crossAxisSpacing: SDSpacing.md,
+                mainAxisSpacing: SDSpacing.md,
               ),
               itemCount: state.listItems.length,
               itemBuilder: (context, index) {
@@ -201,10 +199,10 @@ class _CategoriesListScreenState extends State<CategoriesListScreen> {
     return Card(
       elevation: 6,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusXLarge),
       ),
       child: InkWell(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusXLarge),
         onTap: () {
           // Navigation vers les services de cette catégorie
           Navigator.push(
@@ -222,19 +220,19 @@ class _CategoriesListScreenState extends State<CategoriesListScreen> {
         child: Container(
           height: 180, // Hauteur fixe pour éviter le débordement
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(SDSpacing.borderRadiusXLarge),
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                const Color(0xFF2E7D32).withOpacity(0.08),
-                const Color(0xFF4CAF50).withOpacity(0.12),
-                const Color(0xFF66BB6A).withOpacity(0.08),
+                SDColors.primary700.withOpacity(0.08),
+                SDColors.primary500.withOpacity(0.12),
+                SDColors.primary300.withOpacity(0.08),
               ],
             ),
           ),
           child: Padding(
-            padding: const EdgeInsets.all(20),
+            padding: EdgeInsets.all(SDSpacing.md),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               mainAxisSize: MainAxisSize.min, // Évite le débordement
@@ -244,31 +242,30 @@ class _CategoriesListScreenState extends State<CategoriesListScreen> {
                   width: 70,
                   height: 70,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF2E7D32).withOpacity(0.15),
+                    color: SDColors.primary700.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(35),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF2E7D32).withOpacity(0.3),
+                        color: SDColors.primary700.withOpacity(0.3),
                         blurRadius: 8,
-                        offset: const Offset(0, 4),
+                        offset: Offset(0, 4),
                       ),
                     ],
                   ),
                   child: Icon(
                     _getCategoryIcon(category.nomcategorie),
                     size: 35,
-                    color: const Color(0xFF2E7D32),
+                    color: SDColors.primary700,
                   ),
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: SDSpacing.sm),
                 // Nom de la catégorie avec style amélioré
                 Flexible(
                   child: Text(
                     category.nomcategorie,
-                    style: const TextStyle(
-                      fontSize: 16,
+                    style: SDTypography.titleSmall.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+                      color: SDColors.neutral900,
                       height: 1.2,
                     ),
                     textAlign: TextAlign.center,
@@ -276,27 +273,26 @@ class _CategoriesListScreenState extends State<CategoriesListScreen> {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: SDSpacing.xs),
                 // Badge "Voir services" avec design amélioré
                 Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      EdgeInsets.symmetric(horizontal: SDSpacing.xs, vertical: SDSpacing.xxxs),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF2E7D32),
-                    borderRadius: BorderRadius.circular(16),
+                    color: SDColors.primary700,
+                    borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF2E7D32).withOpacity(0.3),
+                        color: SDColors.primary700.withOpacity(0.3),
                         blurRadius: 4,
-                        offset: const Offset(0, 2),
+                        offset: Offset(0, 2),
                       ),
                     ],
                   ),
-                  child: const Text(
+                  child: Text(
                     'Voir services',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
+                    style: SDTypography.labelSmall.copyWith(
+                      color: SDColors.white,
                       fontWeight: FontWeight.w600,
                     ),
                   ),

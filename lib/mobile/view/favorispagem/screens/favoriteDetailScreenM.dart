@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../favorispageblocm/favoritePageBlocM.dart';
 import '../favorispageblocm/favoritePageEventM.dart';
 import 'package:sdealsmobile/data/models/favorite.dart';
+import '../../../../design_system/design_system.dart'; // ✅ Import DS
 
 class FavoriteDetailScreenM extends StatefulWidget {
   final Favorite favorite;
@@ -18,9 +19,10 @@ class _FavoriteDetailScreenMState extends State<FavoriteDetailScreenM> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.green,
-        title: const Text('Détail du Favori'),
+        backgroundColor: SDColors.primary600,
+        title: Text('Détail du Favori', style: SDTypography.titleMedium.copyWith(color: SDColors.white)),
         centerTitle: true,
+        iconTheme: IconThemeData(color: SDColors.white),
         actions: [
           IconButton(
             icon: const Icon(Icons.edit),
@@ -59,10 +61,7 @@ class _FavoriteDetailScreenMState extends State<FavoriteDetailScreenM> {
                 Expanded(
                   child: Text(
                     widget.favorite.titre,
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: SDTypography.headlineSmall.copyWith(fontWeight: FontWeight.bold),
                   ),
                 ),
                 _buildTypeChip(widget.favorite.objetType),
@@ -152,7 +151,7 @@ class _FavoriteDetailScreenMState extends State<FavoriteDetailScreenM> {
                     'Vues',
                     '${widget.favorite.vues}',
                     Icons.visibility,
-                    Colors.grey,
+                    SDColors.neutral600,
                   ),
                 ),
               ],
@@ -198,7 +197,7 @@ class _FavoriteDetailScreenMState extends State<FavoriteDetailScreenM> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.grey[100],
+                  color: SDColors.neutral100,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -266,8 +265,8 @@ class _FavoriteDetailScreenMState extends State<FavoriteDetailScreenM> {
                     icon: const Icon(Icons.edit),
                     label: const Text('Modifier'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      foregroundColor: Colors.white,
+                      backgroundColor: SDColors.info,
+                      foregroundColor: SDColors.white,
                     ),
                   ),
                 ),
@@ -278,8 +277,8 @@ class _FavoriteDetailScreenMState extends State<FavoriteDetailScreenM> {
                     icon: const Icon(Icons.archive),
                     label: const Text('Archiver'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange,
-                      foregroundColor: Colors.white,
+                      backgroundColor: SDColors.warning,
+                      foregroundColor: SDColors.white,
                     ),
                   ),
                 ),
@@ -304,7 +303,8 @@ class _FavoriteDetailScreenMState extends State<FavoriteDetailScreenM> {
                     icon: const Icon(Icons.delete),
                     label: const Text('Supprimer'),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.red,
+                      foregroundColor: SDColors.error,
+                      side: BorderSide(color: SDColors.error),
                     ),
                   ),
                 ),
@@ -343,10 +343,7 @@ class _FavoriteDetailScreenMState extends State<FavoriteDetailScreenM> {
                 ),
                 Text(
                   value,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  style: SDTypography.bodyMedium.copyWith(fontWeight: FontWeight.w500),
                 ),
               ],
             ),
@@ -360,32 +357,32 @@ class _FavoriteDetailScreenMState extends State<FavoriteDetailScreenM> {
     Color color;
     switch (type) {
       case 'PRESTATAIRE':
-        color = Colors.blue;
+        color = SDColors.info;
         break;
       case 'VENDEUR':
-        color = Colors.orange;
+        color = SDColors.warning;
         break;
       case 'FREELANCE':
-        color = Colors.purple;
+        color = SDColors.secondary;
         break;
       case 'ARTICLE':
-        color = Colors.green;
+        color = SDColors.success;
         break;
       case 'SERVICE':
-        color = Colors.red;
+        color = SDColors.error;
         break;
       default:
-        color = Colors.grey;
+        color = SDColors.neutral500;
     }
 
     return Chip(
       label: Text(type),
       backgroundColor: color.withOpacity(0.1),
-      labelStyle: TextStyle(
-        fontSize: 12,
+      labelStyle: SDTypography.bodySmall.copyWith(
         color: color,
         fontWeight: FontWeight.bold,
       ),
+      side: BorderSide.none,
     );
   }
 
@@ -393,26 +390,26 @@ class _FavoriteDetailScreenMState extends State<FavoriteDetailScreenM> {
     Color color;
     switch (status) {
       case 'ACTIF':
-        color = Colors.green;
+        color = SDColors.success;
         break;
       case 'ARCHIVE':
-        color = Colors.orange;
+        color = SDColors.warning;
         break;
       case 'SUPPRIME':
-        color = Colors.red;
+        color = SDColors.error;
         break;
       default:
-        color = Colors.grey;
+        color = SDColors.neutral500;
     }
 
     return Chip(
       label: Text(status),
       backgroundColor: color.withOpacity(0.1),
-      labelStyle: TextStyle(
-        fontSize: 12,
+      labelStyle: SDTypography.bodySmall.copyWith(
         color: color,
         fontWeight: FontWeight.bold,
       ),
+      side: BorderSide.none,
     );
   }
 

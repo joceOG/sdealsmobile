@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../preferencespageblocm/preferencesPageBlocM.dart';
 import '../preferencespageblocm/preferencesPageEventM.dart';
 import '../preferencespageblocm/preferencesPageStateM.dart';
+import '../../../../design_system/design_system.dart';
 
 class PreferencesPageScreenM extends StatefulWidget {
   const PreferencesPageScreenM({super.key});
@@ -102,9 +103,9 @@ class _PreferencesPageScreenMState extends State<PreferencesPageScreenM>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Langue & Devise'),
-        backgroundColor: Colors.green[600],
-        foregroundColor: Colors.white,
+        title: Text('Langue & Devise', style: SDTypography.titleLarge.copyWith(color: SDColors.white)),
+        backgroundColor: SDColors.primary600,
+        foregroundColor: SDColors.white,
         elevation: 0,
         actions: [
           IconButton(
@@ -114,9 +115,9 @@ class _PreferencesPageScreenMState extends State<PreferencesPageScreenM>
         ],
         bottom: TabBar(
           controller: _tabController,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          indicatorColor: Colors.white,
+          labelColor: SDColors.white,
+          unselectedLabelColor: SDColors.white.withOpacity(0.7),
+          indicatorColor: SDColors.white,
           isScrollable: true,
           tabs: const [
             Tab(text: 'Langue', icon: Icon(Icons.language)),
@@ -133,8 +134,8 @@ class _PreferencesPageScreenMState extends State<PreferencesPageScreenM>
           if (state is PreferencesPageErrorM) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Erreur: ${state.message}'),
-                backgroundColor: Colors.red,
+                content: Text('Erreur: ${state.message}', style: SDTypography.bodyMedium.copyWith(color: SDColors.white)),
+                backgroundColor: SDColors.error500,
               ),
             );
           } else if (state is LanguageUpdatedM ||
@@ -142,9 +143,9 @@ class _PreferencesPageScreenMState extends State<PreferencesPageScreenM>
               state is CountryUpdatedM ||
               state is ThemeUpdatedM) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Préférences mises à jour avec succès'),
-                backgroundColor: Colors.green,
+              SnackBar(
+                content: Text('Préférences mises à jour avec succès', style: SDTypography.bodyMedium.copyWith(color: SDColors.white)),
+                backgroundColor: SDColors.success500,
               ),
             );
           }
@@ -174,12 +175,17 @@ class _PreferencesPageScreenMState extends State<PreferencesPageScreenM>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.error, size: 64, color: Colors.red[300]),
-                const SizedBox(height: 16),
-                Text('Erreur: ${state.message}'),
-                const SizedBox(height: 16),
+                Icon(Icons.error, size: 64, color: SDColors.error500.withOpacity(0.5)),
+                SizedBox(height: SDSpacing.md),
+                Text('Erreur: ${state.message}', style: SDTypography.bodyMedium.copyWith(color: SDColors.error500)),
+                SizedBox(height: SDSpacing.md),
                 ElevatedButton(
                   onPressed: _loadPreferences,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: SDColors.primary600,
+                    foregroundColor: SDColors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium)),
+                  ),
                   child: const Text('Réessayer'),
                 ),
               ],
@@ -568,6 +574,7 @@ class _PreferencesPageScreenMState extends State<PreferencesPageScreenM>
                                 ),
                               );
                         },
+                        activeColor: SDColors.primary600,
                       ),
                       SwitchListTile(
                         title: const Text('Notifications push'),
@@ -585,6 +592,7 @@ class _PreferencesPageScreenMState extends State<PreferencesPageScreenM>
                                 ),
                               );
                         },
+                        activeColor: SDColors.primary600,
                       ),
                       SwitchListTile(
                         title: const Text('Notifications SMS'),
@@ -706,21 +714,26 @@ class _PreferencesPageScreenMState extends State<PreferencesPageScreenM>
 
   Widget _buildSectionCard(String title, String subtitle, Widget content) {
     return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+        side: BorderSide(color: SDColors.neutral200),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(SDSpacing.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               title,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: SDTypography.titleMedium.copyWith(fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: SDSpacing.xs),
             Text(
               subtitle,
-              style: TextStyle(color: Colors.grey[600]),
+              style: SDTypography.bodySmall.copyWith(color: SDColors.neutral600),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: SDSpacing.md),
             content,
           ],
         ),

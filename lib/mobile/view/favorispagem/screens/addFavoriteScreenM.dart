@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../favorispageblocm/favoritePageBlocM.dart';
 import '../favorispageblocm/favoritePageEventM.dart';
 import '../favorispageblocm/favoritePageStateM.dart';
+import '../../../../design_system/design_system.dart'; // ✅ Import DS
 
 class AddFavoriteScreenM extends StatefulWidget {
   const AddFavoriteScreenM({super.key});
@@ -46,16 +47,16 @@ class _AddFavoriteScreenMState extends State<AddFavoriteScreenM> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.green,
-        title: const Text('Ajouter un Favori'),
+        backgroundColor: SDColors.primary600,
+        title: Text('Ajouter un Favori', style: SDTypography.titleMedium.copyWith(color: SDColors.white)),
         centerTitle: true,
+        iconTheme: IconThemeData(color: SDColors.white),
         actions: [
           TextButton(
             onPressed: _saveFavorite,
-            child: const Text(
+            child: Text(
               'Enregistrer',
-              style:
-                  TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              style: SDTypography.labelLarge.copyWith(color: SDColors.white, fontWeight: FontWeight.bold),
             ),
           ),
         ],
@@ -63,17 +64,11 @@ class _AddFavoriteScreenMState extends State<AddFavoriteScreenM> {
       body: BlocConsumer<FavoritePageBlocM, FavoritePageStateM>(
         listener: (context, state) {
           if (state.addError != null) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.addError!),
-                backgroundColor: Colors.red,
-              ),
-            );
           } else if (!state.isAdding && state.addError == null) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Favori ajouté avec succès !'),
-                backgroundColor: Colors.green,
+              SnackBar(
+                content: const Text('Favori ajouté avec succès !'),
+                backgroundColor: SDColors.success,
               ),
             );
             Navigator.pop(context);
@@ -233,6 +228,10 @@ class _AddFavoriteScreenMState extends State<AddFavoriteScreenM> {
                       Expanded(
                         child: OutlinedButton(
                           onPressed: () => Navigator.pop(context),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: SDColors.neutral300),
+                            foregroundColor: SDColors.neutral700,
+                          ),
                           child: const Text('Annuler'),
                         ),
                       ),
@@ -241,17 +240,17 @@ class _AddFavoriteScreenMState extends State<AddFavoriteScreenM> {
                         child: ElevatedButton(
                           onPressed: state.isAdding ? null : _saveFavorite,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
-                            foregroundColor: Colors.white,
+                            backgroundColor: SDColors.primary600,
+                            foregroundColor: SDColors.white,
                           ),
                           child: state.isAdding
-                              ? const SizedBox(
+                              ? SizedBox(
                                   height: 20,
                                   width: 20,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
                                     valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.white),
+                                        SDColors.white),
                                   ),
                                 )
                               : const Text('Enregistrer'),
@@ -275,10 +274,9 @@ class _AddFavoriteScreenMState extends State<AddFavoriteScreenM> {
       padding: const EdgeInsets.only(bottom: 16),
       child: Text(
         title,
-        style: const TextStyle(
-          fontSize: 18,
+        style: SDTypography.titleMedium.copyWith(
           fontWeight: FontWeight.bold,
-          color: Colors.green,
+          color: SDColors.primary600,
         ),
       ),
     );
@@ -299,9 +297,18 @@ class _AddFavoriteScreenMState extends State<AddFavoriteScreenM> {
         decoration: InputDecoration(
           labelText: label,
           hintText: hint,
-          border: const OutlineInputBorder(),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: SDColors.neutral300),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: SDColors.primary600),
+          ),
           filled: true,
-          fillColor: Colors.grey[50],
+          fillColor: SDColors.neutral50,
+          labelStyle: TextStyle(color: SDColors.neutral600),
         ),
         maxLines: maxLines,
         keyboardType: keyboardType,
@@ -322,9 +329,18 @@ class _AddFavoriteScreenMState extends State<AddFavoriteScreenM> {
         value: value,
         decoration: InputDecoration(
           labelText: label,
-          border: const OutlineInputBorder(),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: SDColors.neutral300),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: SDColors.primary600),
+          ),
           filled: true,
-          fillColor: Colors.grey[50],
+          fillColor: SDColors.neutral50,
+          labelStyle: TextStyle(color: SDColors.neutral600),
         ),
         items: items.map((item) {
           return DropdownMenuItem(
@@ -374,9 +390,18 @@ class _AddFavoriteScreenMState extends State<AddFavoriteScreenM> {
                 child: TextField(
                   decoration: InputDecoration(
                     hintText: 'Ajouter un tag',
-                    border: const OutlineInputBorder(),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: SDColors.neutral300),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: SDColors.primary600),
+                    ),
                     filled: true,
-                    fillColor: Colors.grey[50],
+                    fillColor: SDColors.neutral50,
+                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                   ),
                   onSubmitted: (value) {
                     if (value.isNotEmpty && !_tags.contains(value)) {

@@ -4,6 +4,7 @@ import '../historypageblocm/historyPageBlocM.dart';
 import '../historypageblocm/historyPageEventM.dart';
 import '../historypageblocm/historyPageStateM.dart';
 import '../../../../data/models/history.dart';
+import '../../../../design_system/design_system.dart';
 import 'historyDetailScreenM.dart';
 
 class HistoryPageScreenM extends StatefulWidget {
@@ -132,38 +133,38 @@ class _HistoryPageScreenMState extends State<HistoryPageScreenM>
   Color _getTypeColor(String type) {
     switch (type) {
       case 'PRESTATAIRE':
-        return Colors.blue;
+        return SDColors.info500;
       case 'VENDEUR':
-        return Colors.green;
+        return SDColors.success500;
       case 'FREELANCE':
-        return Colors.orange;
+        return SDColors.warning500;
       case 'ARTICLE':
-        return Colors.purple;
+        return Colors.purple; // TODO: Add to SDColors if missing, or use primary
       case 'SERVICE':
-        return Colors.red;
+        return SDColors.error500;
       case 'PRESTATION':
-        return Colors.teal;
+        return Colors.teal; // TODO: Add to SDColors
       case 'COMMANDE':
-        return Colors.brown;
+        return Colors.brown; // TODO: Add to SDColors
       case 'PAGE':
-        return Colors.grey;
+        return SDColors.neutral500;
       case 'CATEGORIE':
-        return Colors.pink;
+        return Colors.pink; // TODO: Add to SDColors
       default:
-        return Colors.grey;
+        return SDColors.neutral500;
     }
   }
 
   Color _getStatutColor(String statut) {
     switch (statut) {
       case 'ACTIVE':
-        return Colors.green;
+        return SDColors.success500;
       case 'ARCHIVE':
-        return Colors.orange;
+        return SDColors.warning500;
       case 'SUPPRIME':
-        return Colors.red;
+        return SDColors.error500;
       default:
-        return Colors.grey;
+        return SDColors.neutral500;
     }
   }
 
@@ -175,9 +176,9 @@ class _HistoryPageScreenMState extends State<HistoryPageScreenM>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Historique des Consultations'),
-        backgroundColor: Colors.green[600],
-        foregroundColor: Colors.white,
+        title: Text('Historique des Consultations', style: SDTypography.titleLarge.copyWith(color: SDColors.white)),
+        backgroundColor: SDColors.primary600,
+        foregroundColor: SDColors.white,
         elevation: 0,
         actions: [
           IconButton(
@@ -190,9 +191,9 @@ class _HistoryPageScreenMState extends State<HistoryPageScreenM>
         ],
         bottom: TabBar(
           controller: _tabController,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          indicatorColor: Colors.white,
+          labelColor: SDColors.white,
+          unselectedLabelColor: SDColors.white.withOpacity(0.7),
+          indicatorColor: SDColors.white,
           tabs: const [
             Tab(text: 'Toutes', icon: Icon(Icons.history)),
             Tab(text: 'Récentes', icon: Icon(Icons.schedule)),
@@ -204,8 +205,8 @@ class _HistoryPageScreenMState extends State<HistoryPageScreenM>
         children: [
           // 🔍 BARRE DE RECHERCHE ET FILTRES
           Container(
-            padding: const EdgeInsets.all(16),
-            color: Colors.grey[50],
+            padding: EdgeInsets.all(SDSpacing.md),
+            color: SDColors.neutral100,
             child: Column(
               children: [
                 // Barre de recherche
@@ -213,6 +214,7 @@ class _HistoryPageScreenMState extends State<HistoryPageScreenM>
                   controller: _searchController,
                   decoration: InputDecoration(
                     hintText: 'Rechercher dans l\'historique...',
+                    hintStyle: SDTypography.bodyMedium.copyWith(color: SDColors.neutral500),
                     prefixIcon: const Icon(Icons.search),
                     suffixIcon: IconButton(
                       icon: const Icon(Icons.clear),
@@ -222,18 +224,18 @@ class _HistoryPageScreenMState extends State<HistoryPageScreenM>
                       },
                     ),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
                     ),
                     filled: true,
-                    fillColor: Colors.white,
+                    fillColor: SDColors.white,
                   ),
                   onSubmitted: (_) => _searchHistory(),
                 ),
                 const SizedBox(height: 12),
                 // Filtres
                 Wrap(
-                  spacing: 4,
-                  runSpacing: 8,
+                  spacing: SDSpacing.xxs,
+                  runSpacing: SDSpacing.xs,
                   children: [
                     SizedBox(
                       width: (MediaQuery.of(context).size.width - 48) / 3,
@@ -349,19 +351,22 @@ class _HistoryPageScreenMState extends State<HistoryPageScreenM>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.error, size: 64, color: Colors.red[300]),
-                const SizedBox(height: 16),
+                Icon(Icons.error, size: 64, color: SDColors.error500.withOpacity(0.5)),
+                SizedBox(height: SDSpacing.md),
                 Text(
                   'Erreur: ${state.message}',
-                  style: TextStyle(fontSize: 16, color: Colors.red[700]),
+                  style: SDTypography.bodyMedium.copyWith(color: SDColors.error500),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: SDSpacing.md),
                 ElevatedButton(
                   onPressed: _loadHistory,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green[600],
-                    foregroundColor: Colors.white,
+                    backgroundColor: SDColors.primary600,
+                    foregroundColor: SDColors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                    ),
                   ),
                   child: const Text('Réessayer'),
                 ),
@@ -370,15 +375,15 @@ class _HistoryPageScreenMState extends State<HistoryPageScreenM>
           );
         } else if (state is HistoryPageLoadedM) {
           if (state.history.isEmpty) {
-            return const Center(
+            return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.history, size: 64, color: Colors.grey),
-                  SizedBox(height: 16),
+                  Icon(Icons.history, size: 64, color: SDColors.neutral300),
+                  SizedBox(height: SDSpacing.md),
                   Text(
                     'Aucune consultation trouvée',
-                    style: TextStyle(fontSize: 16, color: Colors.grey),
+                    style: SDTypography.bodyLarge.copyWith(color: SDColors.neutral500),
                   ),
                 ],
               ),
@@ -430,15 +435,15 @@ class _HistoryPageScreenMState extends State<HistoryPageScreenM>
           return const Center(child: CircularProgressIndicator());
         } else if (state is RecentHistoryLoadedM) {
           if (state.recentHistory.isEmpty) {
-            return const Center(
+            return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.schedule, size: 64, color: Colors.grey),
-                  SizedBox(height: 16),
+                  Icon(Icons.schedule, size: 64, color: SDColors.neutral300),
+                  SizedBox(height: SDSpacing.md),
                   Text(
                     'Aucune consultation récente',
-                    style: TextStyle(fontSize: 16, color: Colors.grey),
+                    style: SDTypography.bodyLarge.copyWith(color: SDColors.neutral500),
                   ),
                 ],
               ),
@@ -485,10 +490,10 @@ class _HistoryPageScreenMState extends State<HistoryPageScreenM>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'Statistiques Générales',
-                          style: TextStyle(
-                              fontSize: 18, fontWeight: FontWeight.bold),
+                          style: SDTypography.titleMedium.copyWith(
+                              fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 16),
                         Row(
@@ -538,36 +543,44 @@ class _HistoryPageScreenMState extends State<HistoryPageScreenM>
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
+                  const SizedBox(height: 16),
                 // Consultations par type
                 if (stats['consultationsParType'] != null)
                   Card(
+                    color: SDColors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                      side: BorderSide(color: SDColors.neutral200),
+                    ),
                     child: Padding(
-                      padding: const EdgeInsets.all(16),
+                      padding: EdgeInsets.all(SDSpacing.md),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
+                          Text(
                             'Consultations par Type',
-                            style: TextStyle(
-                                fontSize: 18, fontWeight: FontWeight.bold),
+                            style: SDTypography.titleMedium.copyWith(
+                                fontWeight: FontWeight.bold),
                           ),
-                          const SizedBox(height: 16),
+                          SizedBox(height: SDSpacing.md),
                           ...((stats['consultationsParType'] as List)
                               .map((item) {
                             return Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              padding: EdgeInsets.symmetric(vertical: SDSpacing.xxs),
                               child: Row(
                                 mainAxisAlignment:
                                     MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Text(_getTypeLabel(item['type'] ?? '')),
+                                  Text(_getTypeLabel(item['type'] ?? ''), style: SDTypography.bodyMedium),
                                   Chip(
                                     label: Text('${item['count'] ?? 0}'),
                                     backgroundColor:
                                         _getTypeColor(item['type'] ?? ''),
                                     labelStyle:
-                                        const TextStyle(color: Colors.white),
+                                        SDTypography.labelSmall.copyWith(color: SDColors.white),
+                                    padding: EdgeInsets.zero,
+                                    visualDensity: VisualDensity.compact,
                                   ),
                                 ],
                               ),
@@ -597,28 +610,27 @@ class _HistoryPageScreenMState extends State<HistoryPageScreenM>
   Widget _buildStatCard(
       String title, String value, IconData icon, Color color) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.all(SDSpacing.sm),
       decoration: BoxDecoration(
         color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
         border: Border.all(color: color.withOpacity(0.3)),
       ),
       child: Column(
         children: [
           Icon(icon, color: color, size: 24),
-          const SizedBox(height: 8),
+          SizedBox(height: SDSpacing.xs),
           Text(
             value,
-            style: TextStyle(
-              fontSize: 18,
+            style: SDTypography.titleMedium.copyWith(
               fontWeight: FontWeight.bold,
               color: color,
             ),
           ),
-          const SizedBox(height: 4),
+          SizedBox(height: SDSpacing.xxs),
           Text(
             title,
-            style: const TextStyle(fontSize: 12, color: Colors.grey),
+            style: SDTypography.bodySmall.copyWith(color: SDColors.neutral500),
             textAlign: TextAlign.center,
           ),
         ],
@@ -628,19 +640,25 @@ class _HistoryPageScreenMState extends State<HistoryPageScreenM>
 
   Widget _buildHistoryCard(History history) {
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+        side: BorderSide(color: SDColors.neutral200),
+      ),
+      margin: EdgeInsets.symmetric(horizontal: SDSpacing.md, vertical: SDSpacing.xxs),
       child: ListTile(
+        contentPadding: EdgeInsets.symmetric(horizontal: SDSpacing.md, vertical: SDSpacing.xs),
         leading: CircleAvatar(
           backgroundColor: _getTypeColor(history.objetType),
           child: Text(
             history.objetType[0],
-            style: const TextStyle(
-                color: Colors.white, fontWeight: FontWeight.bold),
+            style: SDTypography.titleSmall.copyWith(
+                color: SDColors.white, fontWeight: FontWeight.bold),
           ),
         ),
         title: Text(
           history.titre,
-          style: const TextStyle(fontWeight: FontWeight.bold),
+          style: SDTypography.bodyLarge.copyWith(fontWeight: FontWeight.bold),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
@@ -649,30 +667,30 @@ class _HistoryPageScreenMState extends State<HistoryPageScreenM>
           children: [
             Text(
               _getTypeLabel(history.objetType),
-              style: TextStyle(color: _getTypeColor(history.objetType)),
+              style: SDTypography.bodySmall.copyWith(color: _getTypeColor(history.objetType)),
             ),
-            const SizedBox(height: 4),
+            SizedBox(height: SDSpacing.xxs),
             Row(
               children: [
-                Icon(Icons.access_time, size: 14, color: Colors.grey[600]),
-                const SizedBox(width: 4),
+                Icon(Icons.access_time, size: 14, color: SDColors.neutral500),
+                SizedBox(width: SDSpacing.xxxs),
                 Text(
                   history.dureeFormatee,
-                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                  style: SDTypography.labelSmall.copyWith(color: SDColors.neutral500),
                 ),
-                const SizedBox(width: 16),
-                Icon(Icons.visibility, size: 14, color: Colors.grey[600]),
-                const SizedBox(width: 4),
+                SizedBox(width: SDSpacing.md),
+                Icon(Icons.visibility, size: 14, color: SDColors.neutral500),
+                SizedBox(width: SDSpacing.xxxs),
                 Text(
                   '${history.nombreVues}',
-                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                  style: SDTypography.labelSmall.copyWith(color: SDColors.neutral500),
                 ),
               ],
             ),
-            const SizedBox(height: 4),
+            SizedBox(height: SDSpacing.xxxs),
             Text(
               _formatDate(history.dateConsultation),
-              style: TextStyle(color: Colors.grey[600], fontSize: 12),
+              style: SDTypography.labelSmall.copyWith(color: SDColors.neutral500),
             ),
           ],
         ),
@@ -680,25 +698,28 @@ class _HistoryPageScreenMState extends State<HistoryPageScreenM>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Chip(
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
               label: Text(
                 _getStatutLabel(history.statut),
-                style: const TextStyle(fontSize: 10),
+                style: SDTypography.labelSmall.copyWith(fontSize: 10),
               ),
-              backgroundColor: _getStatutColor(history.statut).withOpacity(0.2),
-              labelStyle: TextStyle(color: _getStatutColor(history.statut)),
+              backgroundColor: _getStatutColor(history.statut).withOpacity(0.1),
+              labelStyle: SDTypography.labelSmall.copyWith(color: _getStatutColor(history.statut)),
+              side: BorderSide.none,
             ),
             if (history.estRecent)
               Container(
-                margin: const EdgeInsets.only(top: 4),
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                margin: EdgeInsets.only(top: SDSpacing.xxxs),
+                padding: EdgeInsets.symmetric(horizontal: SDSpacing.xs, vertical: 2),
                 decoration: BoxDecoration(
-                  color: Colors.green,
-                  borderRadius: BorderRadius.circular(10),
+                  color: SDColors.success500,
+                  borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
                 ),
-                child: const Text(
+                child: Text(
                   'RÉCENT',
-                  style: TextStyle(
-                    color: Colors.white,
+                  style: SDTypography.labelSmall.copyWith(
+                    color: SDColors.white,
                     fontSize: 8,
                     fontWeight: FontWeight.bold,
                   ),

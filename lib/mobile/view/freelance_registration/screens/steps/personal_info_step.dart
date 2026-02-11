@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
+import '../../../../../design_system/colors.dart';
+import '../../../../../design_system/typography.dart';
 
 class PersonalInfoStep extends StatefulWidget {
   final Map<String, dynamic> formData;
@@ -83,10 +85,7 @@ class _PersonalInfoStepState extends State<PersonalInfoStep> {
         children: [
           const Text(
             '📝 Informations personnelles',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+            style: SDTypography.titleLarge,
           ),
           const SizedBox(height: 24),
           
@@ -100,9 +99,9 @@ class _PersonalInfoStepState extends State<PersonalInfoStep> {
                     width: 120,
                     height: 120,
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade200,
+                      color: SDColors.neutral200,
                       borderRadius: BorderRadius.circular(60),
-                      border: Border.all(color: Colors.green.shade700, width: 2),
+                      border: Border.all(color: SDColors.primary700, width: 2),
                       image: _profileImage != null
                           ? DecorationImage(
                               image: FileImage(File(_profileImage!.path)),
@@ -113,7 +112,7 @@ class _PersonalInfoStepState extends State<PersonalInfoStep> {
                     child: _profileImage == null
                         ? Icon(
                             Icons.add_a_photo,
-                            color: Colors.green.shade700,
+                            color: SDColors.primary700,
                             size: 40,
                           )
                         : null,
@@ -122,12 +121,12 @@ class _PersonalInfoStepState extends State<PersonalInfoStep> {
                 const SizedBox(height: 8),
                 Text(
                   'Photo de profil',
-                  style: TextStyle(color: Colors.grey.shade600),
+                  style: SDTypography.bodySmall.copyWith(color: SDColors.neutral600),
                 ),
                 if (_profileImage == null)
-                  const Text(
+                  Text(
                     '(Obligatoire)',
-                    style: TextStyle(color: Colors.red, fontSize: 12),
+                    style: SDTypography.labelSmall.copyWith(color: SDColors.error500),
                   ),
               ],
             ),

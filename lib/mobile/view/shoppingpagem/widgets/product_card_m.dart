@@ -7,6 +7,9 @@ import 'package:sdealsmobile/data/services/authCubit.dart';
 import '../screens/panierProductScreenM.dart';
 import '../shoppingpageblocm/shoppingPageEventM.dart';
 import '../../common/widgets/app_image.dart';
+import '../../../../design_system/colors.dart';
+import '../../../../design_system/typography.dart';
+import '../../../../design_system/spacing.dart';
 
 class ProductCardM extends StatelessWidget {
   final bloc_model.Product product;
@@ -32,13 +35,13 @@ class ProductCardM extends StatelessWidget {
           )),
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: SDColors.white,
               borderRadius: BorderRadius.circular(20),
-              boxShadow: [
+              boxShadow: const [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: SDColors.overlayLight,
                   blurRadius: 10,
-                  offset: const Offset(0, 4),
+                  offset: Offset(0, 4),
                 ),
               ],
             ),
@@ -54,8 +57,8 @@ class ProductCardM extends StatelessWidget {
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade50,
+                        decoration: const BoxDecoration(
+                          color: SDColors.neutral50,
                           borderRadius: const BorderRadius.only(
                             topLeft: Radius.circular(20),
                             topRight: Radius.circular(20),
@@ -91,18 +94,17 @@ class ProductCardM extends StatelessWidget {
                         child: Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.green,
-                            borderRadius: const BorderRadius.only(
+                          decoration: const BoxDecoration(
+                            color: SDColors.primary600,
+                            borderRadius: BorderRadius.only(
                               topLeft: Radius.circular(15),
                               bottomRight: Radius.circular(10),
                             ),
                           ),
                           child: Text(
                             product.brand,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
+                            style: SDTypography.labelSmall.copyWith(
+                              color: SDColors.white,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -126,8 +128,8 @@ class ProductCardM extends StatelessWidget {
                                     ? Icons.favorite
                                     : Icons.favorite_border,
                                 color: isFavorite
-                                    ? Colors.red
-                                    : Colors.grey.shade400,
+                                    ? SDColors.error500
+                                    : SDColors.neutral400,
                                 size: 22,
                               ),
                             ),
@@ -163,19 +165,19 @@ class ProductCardM extends StatelessWidget {
                                   content: Row(
                                     children: [
                                       const Icon(Icons.check_circle,
-                                          color: Colors.white, size: 20),
+                                          color: SDColors.white, size: 20),
                                       const SizedBox(width: 8),
                                       Expanded(
                                         child: Text(
-                                            '${product.name} ajouté au panier!'),
+                                            '${product.name} ajouté au panier!', style: TextStyle(color: SDColors.white)),
                                       ),
                                     ],
                                   ),
-                                  backgroundColor: Colors.green,
+                                  backgroundColor: SDColors.success500,
                                   duration: const Duration(seconds: 2),
                                   action: SnackBarAction(
                                     label: 'VOIR',
-                                    textColor: Colors.white,
+                                    textColor: SDColors.white,
                                     onPressed: () {
                                       Navigator.push(
                                         context,
@@ -197,8 +199,8 @@ class ProductCardM extends StatelessWidget {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
                                   content: Text(
-                                      'Connectez-vous pour ajouter au panier'),
-                                  backgroundColor: Colors.orange,
+                                      'Connectez-vous pour ajouter au panier', style: TextStyle(color: SDColors.white)),
+                                  backgroundColor: SDColors.warning500,
                                 ),
                               );
                             }
@@ -206,11 +208,11 @@ class ProductCardM extends StatelessWidget {
                           child: Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: Colors.green,
+                              color: SDColors.primary500,
                               shape: BoxShape.circle,
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.green.withOpacity(0.4),
+                                  color: SDColors.primary500.withOpacity(0.4),
                                   blurRadius: 8,
                                   offset: const Offset(0, 4),
                                 ),
@@ -218,7 +220,7 @@ class ProductCardM extends StatelessWidget {
                             ),
                             child: const Icon(
                               Icons.shopping_cart_outlined,
-                              color: Colors.white,
+                              color: SDColors.white,
                               size: 18,
                             ),
                           ),
@@ -243,10 +245,8 @@ class ProductCardM extends StatelessWidget {
                             // Marque
                             Text(
                               product.brand.toUpperCase(),
-                              style: TextStyle(
-                                color: Colors.grey.shade500,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
+                              style: SDTypography.labelSmall.copyWith(
+                                color: SDColors.neutral500,
                                 letterSpacing: 0.5,
                               ),
                               maxLines: 1,
@@ -255,9 +255,8 @@ class ProductCardM extends StatelessWidget {
                             // Nom
                             Text(
                               product.name,
-                              style: const TextStyle(
+                              style: SDTypography.bodySmall.copyWith(
                                 fontWeight: FontWeight.w700,
-                                fontSize: 13,
                                 height: 1.2,
                               ),
                               maxLines: 2,
@@ -272,10 +271,9 @@ class ProductCardM extends StatelessWidget {
                           children: [
                             Text(
                               product.price,
-                              style: const TextStyle(
-                                fontSize: 15,
+                              style: SDTypography.titleMedium.copyWith(
+                                color: SDColors.primary600,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.green,
                               ),
                             ),
                             // Rating Badge
@@ -283,20 +281,19 @@ class ProductCardM extends StatelessWidget {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 4, vertical: 2),
                               decoration: BoxDecoration(
-                                color: Colors.orange.withOpacity(0.1),
+                                color: SDColors.warning100,
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Row(
                                 children: [
                                   const Icon(Icons.star,
-                                      size: 10, color: Colors.orange),
+                                      size: 10, color: SDColors.warning500),
                                   const SizedBox(width: 2),
                                   Text(
                                     product.rating.toString(),
-                                    style: const TextStyle(
-                                      fontSize: 10,
+                                    style: SDTypography.labelSmall.copyWith(
                                       fontWeight: FontWeight.bold,
-                                      color: Colors.orange,
+                                      color: SDColors.warning500,
                                     ),
                                   ),
                                 ],

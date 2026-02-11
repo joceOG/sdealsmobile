@@ -4,6 +4,8 @@ import 'package:sdealsmobile/mobile/view/shoppingpagem/shoppingpageblocm/shoppin
 import 'package:sdealsmobile/mobile/view/shoppingpagem/shoppingpageblocm/shoppingPageEventM.dart';
 import 'package:sdealsmobile/mobile/view/shoppingpagem/shoppingpageblocm/shoppingPageStateM.dart';
 import 'package:sdealsmobile/mobile/view/seller_registration/screens/seller_form_screen.dart';
+import '../../../../design_system/colors.dart';
+import '../../../../design_system/typography.dart';
 
 class SellerRegistrationScreen extends StatelessWidget {
   const SellerRegistrationScreen({Key? key}) : super(key: key);
@@ -14,8 +16,8 @@ class SellerRegistrationScreen extends StatelessWidget {
       create: (context) => ShoppingPageBlocM()..add(LoadCategorieDataM()),
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Devenir Vendeur'),
-          backgroundColor: Colors.amber.shade700,
+          title: const Text('Devenir Vendeur', style: SDTypography.titleLarge),
+          backgroundColor: SDColors.secondary700,
         ),
         body: const _SellerRegistrationContent(),
       ),
@@ -80,18 +82,16 @@ Widget build(BuildContext context) {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
       decoration: BoxDecoration(
-        color: Colors.amber.shade50,
+        color: SDColors.secondary50,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.amber.shade200),
+        border: Border.all(color: SDColors.secondary200),
       ),
       child: Column(
         children: [
           Text(
             'Ouvrez votre boutique en ligne et vendez partout en Côte d\'Ivoire',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: Colors.amber.shade900,
+            style: SDTypography.headlineSmall.copyWith(
+              color: SDColors.secondary700,
             ),
             textAlign: TextAlign.center,
           ),
@@ -112,11 +112,11 @@ Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: SDColors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.amber.withOpacity(0.1),
+            color: SDColors.secondary500.withOpacity(0.1),
             blurRadius: 5,
             spreadRadius: 1,
           ),
@@ -126,18 +126,15 @@ Widget build(BuildContext context) {
         children: [
           Text(
             value,
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Colors.amber.shade800,
+            style: SDTypography.headlineMedium.copyWith(
+              color: SDColors.secondary700,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             label,
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey.shade700,
+            style: SDTypography.bodySmall.copyWith(
+              color: SDColors.neutral600,
             ),
           ),
         ],
@@ -151,17 +148,13 @@ Widget build(BuildContext context) {
       children: [
         const Text(
           'Que voulez-vous vendre ?',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
+          style: SDTypography.titleLarge,
         ),
         const SizedBox(height: 8),
-        const Text(
+        Text(
           'Sélectionnez les catégories qui correspondent à vos produits.',
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.grey,
+          style: SDTypography.bodyMedium.copyWith(
+            color: SDColors.neutral500,
           ),
         ),
         const SizedBox(height: 16),
@@ -208,10 +201,10 @@ Widget build(BuildContext context) {
               child: Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: isSelected ? Colors.amber.shade100 : Colors.grey.shade100,
+                  color: isSelected ? SDColors.secondary100 : SDColors.neutral100,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: isSelected ? Colors.amber.shade700 : Colors.grey.shade300,
+                    color: isSelected ? SDColors.secondary700 : SDColors.neutral300,
                     width: isSelected ? 2 : 1,
                   ),
                 ),
@@ -220,7 +213,7 @@ Widget build(BuildContext context) {
                   children: [
                     Icon(
                       icon,
-                      color: isSelected ? Colors.amber.shade700 : Colors.grey.shade700,
+                      color: isSelected ? SDColors.secondary700 : SDColors.neutral600,
                       size: 28,
                     ),
                     const SizedBox(height: 8),
@@ -228,7 +221,7 @@ Widget build(BuildContext context) {
                       category.nomcategorie,
                       style: TextStyle(
                         fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                        color: isSelected ? Colors.amber.shade700 : Colors.black,
+                        color: isSelected ? SDColors.secondary700 : SDColors.neutral900,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -236,7 +229,7 @@ Widget build(BuildContext context) {
                       '120+ produits • ~75k FCFA/vente',
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.grey.shade600,
+                        color: SDColors.neutral600,
                       ),
                     ),
                   ],
@@ -274,19 +267,15 @@ Widget build(BuildContext context) {
       children: [
         const Text(
           'Types de produits demandés',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
+          style: SDTypography.titleLarge,
         ),
         const SizedBox(height: 8),
         Text(
           _selectedCategories.isEmpty
               ? 'Les produits les plus populaires et les plus vendus.'
               : 'Les produits les plus populaires dans vos catégories sélectionnées.',
-          style: const TextStyle(
-            fontSize: 14,
-            color: Colors.grey,
+          style: SDTypography.bodyMedium.copyWith(
+            color: SDColors.neutral500,
           ),
         ),
         const SizedBox(height: 16),
@@ -294,7 +283,7 @@ Widget build(BuildContext context) {
           Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: Colors.grey.shade100,
+              color: SDColors.neutral100,
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Center(
@@ -322,14 +311,13 @@ Widget build(BuildContext context) {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: Colors.blue.shade100,
+                        color: SDColors.info100,
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
                         product['category']!,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.blue.shade700,
+                        style: SDTypography.bodySmall.copyWith(
+                          color: SDColors.info600,
                         ),
                       ),
                     ),
@@ -340,7 +328,7 @@ Widget build(BuildContext context) {
                   ],
                 ),
                 value: isSelected,
-                activeColor: Colors.amber.shade700,
+                activeColor: SDColors.secondary700,
                 onChanged: (value) {
                   setState(() {
                     if (value == true) {
@@ -377,9 +365,9 @@ Widget build(BuildContext context) {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.amber.shade50,
+        color: SDColors.secondary50,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.amber.shade200),
+        border: Border.all(color: SDColors.secondary200),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -388,15 +376,12 @@ Widget build(BuildContext context) {
             children: [
               Icon(
                 Icons.calculate,
-                color: Colors.amber.shade700,
+                color: SDColors.secondary700,
               ),
               const SizedBox(width: 8),
               const Text(
                 'Calculateur de bénéfices',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: SDTypography.titleLarge,
               ),
             ],
           ),
@@ -421,7 +406,7 @@ Widget build(BuildContext context) {
           Text(
             'Basé sur $_estimatedSalesMin-$_estimatedSalesMax ventes/mois',
             style: TextStyle(
-              color: Colors.grey.shade700,
+              color: SDColors.neutral600,
             ),
           ),
         ],
@@ -435,10 +420,7 @@ Widget build(BuildContext context) {
       children: [
         const Text(
           'Avantages vendeur',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
+          style: SDTypography.titleLarge,
         ),
         const SizedBox(height: 16),
         _buildBenefitItem('Frais d\'inscription gratuits'),
@@ -456,7 +438,7 @@ Widget build(BuildContext context) {
         children: [
           Icon(
             Icons.check_circle,
-            color: Colors.green.shade700,
+            color: SDColors.success600,
             size: 24,
           ),
           const SizedBox(width: 12),
@@ -488,8 +470,8 @@ Widget build(BuildContext context) {
             );
           },
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.amber.shade700,
-            foregroundColor: Colors.white,
+            backgroundColor: SDColors.secondary700,
+            foregroundColor: SDColors.white,
             padding: const EdgeInsets.symmetric(vertical: 16),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
@@ -497,10 +479,7 @@ Widget build(BuildContext context) {
           ),
           child: const Text(
             'Ouvrir ma boutique maintenant',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
+            style: SDTypography.labelLarge,
           ),
         ),
         const SizedBox(height: 12),
@@ -543,8 +522,8 @@ Widget build(BuildContext context) {
             );
           },
           style: OutlinedButton.styleFrom(
-            foregroundColor: Colors.amber.shade700,
-            side: BorderSide(color: Colors.amber.shade700),
+            foregroundColor: SDColors.secondary700,
+            side: const BorderSide(color: SDColors.secondary700),
             padding: const EdgeInsets.symmetric(vertical: 16),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),

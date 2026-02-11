@@ -11,6 +11,8 @@ import '../../loginpagem/screens/loginPageScreenM.dart';
 import '../widgets/mini_map_widget.dart';
 import '../../orderpagem/screens/service_request_summary_screen.dart';
 import '../../common/widgets/app_image.dart';
+// ✅ Design System
+import '../../../../design_system/design_system.dart';
 
 /// 🎯 Page de profil complète d'un prestataire
 /// Affiche toutes les informations détaillées, services, avis, portfolio
@@ -128,7 +130,7 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFF2E7D32)))
+          ? Center(child: CircularProgressIndicator(color: SDColors.primary700))
           : _error != null
               ? _buildErrorState()
               : _buildProfileContent(),
@@ -139,35 +141,34 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen>
   Widget _buildErrorState() {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.all(SDSpacing.md),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.error_outline, size: 64, color: Colors.red.shade300),
-            const SizedBox(height: 16),
+            Icon(Icons.error_outline, size: 64, color: SDColors.error200),
+            SizedBox(height: SDSpacing.sm),
             Text(
               'Erreur',
-              style: TextStyle(
-                fontSize: 20,
+              style: SDTypography.titleMedium.copyWith(
                 fontWeight: FontWeight.bold,
-                color: Colors.grey.shade800,
+                color: SDColors.neutral800,
               ),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: SDSpacing.xs),
             Text(
               _error ?? 'Une erreur est survenue',
-              style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+              style: SDTypography.titleSmall.copyWith(color: SDColors.neutral600),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 24),
+            SizedBox(height: SDSpacing.md),
             ElevatedButton.icon(
               onPressed: _loadProviderData,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Réessayer'),
+              icon: Icon(Icons.refresh, color: SDColors.white),
+              label: Text('Réessayer', style: SDTypography.labelMedium.copyWith(color: SDColors.white)),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2E7D32),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                backgroundColor: SDColors.primary700,
+                foregroundColor: SDColors.white,
+                padding: EdgeInsets.symmetric(horizontal: SDSpacing.md, vertical: SDSpacing.xs),
               ),
             ),
           ],
@@ -187,9 +188,9 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildHeaderInfo(),
-              const SizedBox(height: 16),
+              SizedBox(height: SDSpacing.sm),
               _buildTabBar(),
-              const SizedBox(height: 16),
+              SizedBox(height: SDSpacing.sm),
             ],
           ),
         ),

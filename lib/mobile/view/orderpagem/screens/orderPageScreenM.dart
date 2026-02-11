@@ -9,6 +9,9 @@ import '../../common/widgets/empty_state_widget.dart';
 import '../widgets/commande_card.dart';
 import 'commande_details_screen.dart';
 
+// ✅ Design System
+import '../../../../design_system/design_system.dart';
+
 class OrderPageScreenM extends StatefulWidget {
   const OrderPageScreenM({super.key});
 
@@ -73,7 +76,7 @@ class _OrderPageScreenMState extends State<OrderPageScreenM>
       builder: (context, state) {
         return Scaffold(
           key: _scaffoldKey,
-          backgroundColor: Colors.white,
+          backgroundColor: SDColors.white,
           appBar: _buildAppBar(state),
           body: _buildBody(state),
           floatingActionButton: FloatingActionButton(
@@ -88,10 +91,10 @@ class _OrderPageScreenMState extends State<OrderPageScreenM>
                 }
               });
             },
-            backgroundColor: Colors.green,
-            child: Icon(
-              _isSearchVisible ? Icons.close : Icons.search,
-              color: Colors.white,
+            backgroundColor: SDColors.primary600,
+            child: const Icon(
+              Icons.search,
+              color: SDColors.white,
             ),
           ),
         );
@@ -114,16 +117,16 @@ class _OrderPageScreenMState extends State<OrderPageScreenM>
           ),
         ),
         flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            color: Colors.green,
+          decoration: BoxDecoration(
+            color: SDColors.primary600,
             boxShadow: [
               BoxShadow(
-                color: Colors.black26,
+                color: SDColors.neutral900.withOpacity(0.15),
                 blurRadius: 18,
-                offset: Offset(0, 8),
+                offset: const Offset(0, 8),
               ),
             ],
-            borderRadius: BorderRadius.only(
+            borderRadius: const BorderRadius.only(
               bottomLeft: Radius.circular(44),
               bottomRight: Radius.circular(44),
             ),
@@ -133,49 +136,46 @@ class _OrderPageScreenMState extends State<OrderPageScreenM>
               crossAxisAlignment: CrossAxisAlignment.stretch,
               mainAxisSize: MainAxisSize.min,
               children: [
-                const SizedBox(height: 4),
+                SizedBox(height: SDSpacing.xxxs),
                 // Titre
                 TweenAnimationBuilder<double>(
                   tween: Tween(begin: 0, end: 1),
-                  duration: const Duration(milliseconds: 700),
+                  duration: SDAnimations.medium,
                   builder: (context, value, child) => Opacity(
                     opacity: value,
                     child: child,
                   ),
-                  child: const Center(
+                  child: Center(
                     child: Text(
                       'COMMANDES',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.2,
+                      style: SDTypography.displaySmall.copyWith(
+                        color: SDColors.white,
                       ),
                     ),
                   ),
                 ),
 
-                const SizedBox(height: 20),
+                SizedBox(height: SDSpacing.md),
 
                 // Champ de recherche si visible
                 if (_isSearchVisible)
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    padding: EdgeInsets.symmetric(horizontal: SDSpacing.md),
                     child: Container(
                       decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(30),
+                        color: SDColors.white,
+                        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
                       ),
                       child: TextField(
                         controller: _searchController,
                         decoration: InputDecoration(
                           hintText: 'Rechercher une commande...',
                           prefixIcon:
-                              const Icon(Icons.search, color: Colors.green),
+                              Icon(Icons.search, color: SDColors.primary600),
                           border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 12,
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: SDSpacing.md,
+                            vertical: SDSpacing.sm,
                           ),
                         ),
                         onChanged: (value) {
@@ -187,35 +187,32 @@ class _OrderPageScreenMState extends State<OrderPageScreenM>
                     ),
                   ),
 
-                const SizedBox(height: 10),
+                SizedBox(height: SDSpacing.xs),
 
                 // TabBar
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  padding: EdgeInsets.symmetric(horizontal: SDSpacing.md),
                   child: Container(
                     height: 40,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(25),
+                      color: SDColors.white.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
                     ),
                     child: TabBar(
                       controller: _tabController,
                       indicator: BoxDecoration(
-                        borderRadius: BorderRadius.circular(25),
-                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
+                        color: SDColors.white,
                       ),
-                      labelColor: Colors.green,
-                      unselectedLabelColor: Colors.white,
+                      labelColor: SDColors.primary600,
+                      unselectedLabelColor: SDColors.white,
                       isScrollable: true,
-                      labelPadding: const EdgeInsets.symmetric(horizontal: 6),
+                      labelPadding: EdgeInsets.symmetric(horizontal: SDSpacing.xxs),
                       tabAlignment: TabAlignment.center,
-                      labelStyle: const TextStyle(
-                        fontSize: 11,
+                      labelStyle: SDTypography.labelSmall.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
-                      unselectedLabelStyle: const TextStyle(
-                        fontSize: 11,
-                      ),
+                      unselectedLabelStyle: SDTypography.labelSmall,
                       tabs: [
                         _buildTab('Toutes', state.commandes.length),
                         _buildTab(
@@ -264,22 +261,22 @@ class _OrderPageScreenMState extends State<OrderPageScreenM>
             ),
           ),
           if (count > 0) ...[
-            const SizedBox(width: 2),
+            SizedBox(width: SDSpacing.xxxs),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+              padding: EdgeInsets.symmetric(horizontal: SDSpacing.xxxs, vertical: 1),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: _tabController.index == _getTabIndexFromLabel(label)
-                    ? Colors.green
-                    : Colors.white,
+                    ? SDColors.primary600
+                    : SDColors.white,
               ),
               child: Text(
                 count.toString(),
-                style: TextStyle(
+                style: SDTypography.labelSmall.copyWith(
                   fontSize: 9,
                   color: _tabController.index == _getTabIndexFromLabel(label)
-                      ? Colors.white
-                      : Colors.green,
+                      ? SDColors.white
+                      : SDColors.primary600,
                 ),
               ),
             ),
@@ -308,9 +305,9 @@ class _OrderPageScreenMState extends State<OrderPageScreenM>
 
   Widget _buildBody(CommandeState state) {
     if (state.isLoading) {
-      return const Center(
+      return Center(
         child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(Colors.green)),
+            valueColor: AlwaysStoppedAnimation<Color>(SDColors.primary600)),
       );
     }
 
@@ -319,25 +316,25 @@ class _OrderPageScreenMState extends State<OrderPageScreenM>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.error_outline, size: 60, color: Colors.green.shade300),
-            const SizedBox(height: 16),
-            const Text(
+            Icon(Icons.error_outline, size: 60, color: SDColors.primary300),
+            SizedBox(height: SDSpacing.md),
+            Text(
               'Une erreur s\'est produite',
-              style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.green),
+              style: SDTypography.titleMedium.copyWith(
+                fontWeight: FontWeight.bold,
+                color: SDColors.primary600,
+              ),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: SDSpacing.sm),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 40),
+              padding: EdgeInsets.symmetric(horizontal: SDSpacing.xxxl),
               child: Text(
                 state.error!,
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey.shade700),
+                style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral700),
               ),
             ),
-            const SizedBox(height: 24),
+            SizedBox(height: SDSpacing.lg),
             ElevatedButton.icon(
               onPressed: () {
                 context.read<CommandeBloc>().add(const ChargerCommandes());
@@ -345,8 +342,8 @@ class _OrderPageScreenMState extends State<OrderPageScreenM>
               icon: const Icon(Icons.refresh),
               label: const Text("Réessayer"),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                foregroundColor: Colors.white,
+                backgroundColor: SDColors.primary600,
+                foregroundColor: SDColors.white,
               ),
             ),
           ],
@@ -382,7 +379,7 @@ class _OrderPageScreenMState extends State<OrderPageScreenM>
 
   Widget _buildCommandesList(List<CommandeModel> commandes) {
     return ListView.builder(
-      padding: const EdgeInsets.only(top: 16, bottom: 80),
+      padding: EdgeInsets.only(top: SDSpacing.md, bottom: SDSpacing.xxxl),
       itemCount: commandes.length,
       itemBuilder: (context, index) {
         final commande = commandes[index];
@@ -429,7 +426,7 @@ class _OrderPageScreenMState extends State<OrderPageScreenM>
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Chat avec ${commande.prestataireName} ouvert'),
-        backgroundColor: Colors.green,
+        backgroundColor: SDColors.success500,
       ),
     );
   }
@@ -453,7 +450,7 @@ class _OrderPageScreenMState extends State<OrderPageScreenM>
           children: [
             Text(
                 'Comment évaluez-vous votre expérience avec ${commande.prestataireName}?'),
-            const SizedBox(height: 20),
+            SizedBox(height: SDSpacing.lg),
             StatefulBuilder(
               builder: (context, setState) => Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -462,7 +459,7 @@ class _OrderPageScreenMState extends State<OrderPageScreenM>
                   (index) => IconButton(
                     icon: Icon(
                       index < rating ? Icons.star : Icons.star_border,
-                      color: Colors.amber,
+                      color: SDColors.warning500,
                       size: 40,
                     ),
                     onPressed: () {
@@ -474,7 +471,7 @@ class _OrderPageScreenMState extends State<OrderPageScreenM>
                 ),
               ),
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: SDSpacing.lg),
             TextField(
               controller: commentController,
               decoration: const InputDecoration(
@@ -504,21 +501,21 @@ class _OrderPageScreenMState extends State<OrderPageScreenM>
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text('Merci pour votre évaluation!'),
-                  backgroundColor: Colors.green,
+                  backgroundColor: SDColors.success500,
                 ),
               );
             } else {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text('Veuillez attribuer au moins 1 étoile'),
-                  backgroundColor: Colors.red,
+                  backgroundColor: SDColors.error500,
                 ),
               );
             }
           },
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.green,
-            foregroundColor: Colors.white,
+            backgroundColor: SDColors.primary600,
+            foregroundColor: SDColors.white,
           ),
           child: const Text('Envoyer'),
         ),

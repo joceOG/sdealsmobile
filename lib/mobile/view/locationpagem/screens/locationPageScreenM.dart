@@ -4,6 +4,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../locationpageblocm/locationPageBlocM.dart';
 import '../locationpageblocm/locationPageEventM.dart';
 import '../locationpageblocm/locationPageStateM.dart';
+import '../../../../design_system/design_system.dart';
 
 class LocationPageScreenM extends StatefulWidget {
   const LocationPageScreenM({Key? key}) : super(key: key);
@@ -28,9 +29,9 @@ class _LocationPageScreenMState extends State<LocationPageScreenM> {
       create: (context) => LocationPageBlocM(),
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Gestion de la localisation'),
-          backgroundColor: Colors.green,
-          foregroundColor: Colors.white,
+          title: Text('Gestion de la localisation', style: SDTypography.titleLarge.copyWith(color: SDColors.white)),
+          backgroundColor: SDColors.primary600,
+          foregroundColor: SDColors.white,
           actions: [
             IconButton(
               icon: const Icon(Icons.refresh),
@@ -47,8 +48,8 @@ class _LocationPageScreenMState extends State<LocationPageScreenM> {
             if (state.error != null) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text(state.error!),
-                  backgroundColor: Colors.red,
+                  content: Text(state.error!, style: SDTypography.bodyMedium.copyWith(color: SDColors.white)),
+                  backgroundColor: SDColors.error500,
                 ),
               );
             }
@@ -100,20 +101,22 @@ class _LocationPageScreenMState extends State<LocationPageScreenM> {
   Widget _buildStatusCard(LocationPageStateM state) {
     return Card(
       color: state.isLocationAvailable
-          ? Colors.green.shade50
-          : Colors.orange.shade50,
+          ? SDColors.success100
+          : SDColors.warning100,
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium)),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(SDSpacing.md),
         child: Row(
           children: [
             Icon(
               state.isLocationAvailable
                   ? Icons.location_on
                   : Icons.location_off,
-              color: state.isLocationAvailable ? Colors.green : Colors.orange,
+              color: state.isLocationAvailable ? SDColors.success600 : SDColors.warning600,
               size: 32,
             ),
-            const SizedBox(width: 16),
+            SizedBox(width: SDSpacing.md),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -122,20 +125,19 @@ class _LocationPageScreenMState extends State<LocationPageScreenM> {
                     state.isLocationAvailable
                         ? 'Localisation activée'
                         : 'Localisation désactivée',
-                    style: TextStyle(
-                      fontSize: 18,
+                    style: SDTypography.titleMedium.copyWith(
                       fontWeight: FontWeight.bold,
                       color: state.isLocationAvailable
-                          ? Colors.green
-                          : Colors.orange,
+                          ? SDColors.success600
+                          : SDColors.warning600,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  SizedBox(height: SDSpacing.xxs),
                   Text(
                     state.isLocationAvailable
                         ? 'Votre position est partagée pour une meilleure expérience'
                         : 'Activez la localisation pour découvrir les services à proximité',
-                    style: const TextStyle(color: Colors.grey),
+                    style: SDTypography.bodySmall.copyWith(color: SDColors.neutral600),
                   ),
                 ],
               ),
@@ -148,33 +150,37 @@ class _LocationPageScreenMState extends State<LocationPageScreenM> {
 
   Widget _buildMapCard(LocationPageStateM state) {
     return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+        side: BorderSide(color: SDColors.neutral200),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(SDSpacing.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Icon(Icons.map, color: Colors.green),
-                const SizedBox(width: 8),
-                const Text(
+                Icon(Icons.map, color: SDColors.primary600),
+                SizedBox(width: SDSpacing.xs),
+                Text(
                   'Votre position actuelle',
-                  style: TextStyle(
-                    fontSize: 18,
+                  style: SDTypography.titleMedium.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: SDSpacing.md),
             Container(
               height: 200,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.green.shade200, width: 2),
+                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                border: Border.all(color: SDColors.primary200, width: 2),
               ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
                 child: GoogleMap(
                   initialCameraPosition: CameraPosition(
                     target: LatLng(state.latitude!, state.longitude!),
@@ -199,40 +205,44 @@ class _LocationPageScreenMState extends State<LocationPageScreenM> {
 
   Widget _buildLocationInfoCard(LocationPageStateM state) {
     return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+        side: BorderSide(color: SDColors.neutral200),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(SDSpacing.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Icon(Icons.info, color: Colors.blue),
-                const SizedBox(width: 8),
-                const Text(
+                Icon(Icons.info, color: SDColors.info500),
+                SizedBox(width: SDSpacing.xs),
+                Text(
                   'Informations de localisation',
-                  style: TextStyle(
-                    fontSize: 18,
+                  style: SDTypography.titleMedium.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: SDSpacing.md),
             if (state.isLocationAvailable) ...[
               _buildInfoRow(
                   'Adresse', state.address ?? 'Non disponible', Icons.home),
-              const SizedBox(height: 8),
+              SizedBox(height: SDSpacing.xs),
               _buildInfoRow('Ville', state.currentCity ?? 'Non disponible',
                   Icons.location_city),
-              const SizedBox(height: 8),
+              SizedBox(height: SDSpacing.xs),
               _buildInfoRow(
                   'Coordonnées',
                   '${state.latitude?.toStringAsFixed(6)}, ${state.longitude?.toStringAsFixed(6)}',
                   Icons.gps_fixed),
             ] else ...[
-              const Text(
+              Text(
                 'Activez la localisation pour voir vos informations de position',
-                style: TextStyle(color: Colors.grey),
+                style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral500),
               ),
             ],
           ],
@@ -244,24 +254,22 @@ class _LocationPageScreenMState extends State<LocationPageScreenM> {
   Widget _buildInfoRow(String label, String value, IconData icon) {
     return Row(
       children: [
-        Icon(icon, color: Colors.grey.shade600, size: 20),
-        const SizedBox(width: 12),
+        Icon(icon, color: SDColors.neutral500, size: 20),
+        SizedBox(width: SDSpacing.sm),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 label,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey.shade600,
+                style: SDTypography.labelSmall.copyWith(
+                  color: SDColors.neutral500,
                   fontWeight: FontWeight.w500,
                 ),
               ),
               Text(
                 value,
-                style: const TextStyle(
-                  fontSize: 16,
+                style: SDTypography.bodyMedium.copyWith(
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -274,25 +282,29 @@ class _LocationPageScreenMState extends State<LocationPageScreenM> {
 
   Widget _buildActionsCard(LocationPageStateM state) {
     return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+        side: BorderSide(color: SDColors.neutral200),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(SDSpacing.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Icon(Icons.settings, color: Colors.green),
-                const SizedBox(width: 8),
-                const Text(
+                Icon(Icons.settings, color: SDColors.primary600),
+                SizedBox(width: SDSpacing.xs),
+                Text(
                   'Actions de localisation',
-                  style: TextStyle(
-                    fontSize: 18,
+                  style: SDTypography.titleMedium.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: SDSpacing.md),
             Row(
               children: [
                 Expanded(
@@ -305,12 +317,13 @@ class _LocationPageScreenMState extends State<LocationPageScreenM> {
                     icon: const Icon(Icons.my_location),
                     label: const Text('Ma position'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
+                      backgroundColor: SDColors.primary600,
+                      foregroundColor: SDColors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium)),
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: SDSpacing.xs),
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: () {
@@ -321,8 +334,9 @@ class _LocationPageScreenMState extends State<LocationPageScreenM> {
                     icon: const Icon(Icons.security),
                     label: const Text('Permissions'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      foregroundColor: Colors.white,
+                      backgroundColor: SDColors.info600,
+                      foregroundColor: SDColors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium)),
                     ),
                   ),
                 ),
@@ -336,25 +350,29 @@ class _LocationPageScreenMState extends State<LocationPageScreenM> {
 
   Widget _buildSettingsCard(LocationPageStateM state) {
     return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+        side: BorderSide(color: SDColors.neutral200),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(SDSpacing.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Icon(Icons.tune, color: Colors.purple),
-                const SizedBox(width: 8),
-                const Text(
+                Icon(Icons.tune, color: SDColors.primary600),
+                SizedBox(width: SDSpacing.xs),
+                Text(
                   'Paramètres de localisation',
-                  style: TextStyle(
-                    fontSize: 18,
+                  style: SDTypography.titleMedium.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: SDSpacing.md),
             SwitchListTile(
               title: const Text('Partager ma localisation'),
               subtitle: const Text(
@@ -365,7 +383,7 @@ class _LocationPageScreenMState extends State<LocationPageScreenM> {
                     .read<LocationPageBlocM>()
                     .add(const ToggleLocationServiceM());
               },
-              activeColor: Colors.green,
+              activeColor: SDColors.primary600,
             ),
             const Divider(),
             ListTile(

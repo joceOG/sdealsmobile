@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import '../../../../../design_system/colors.dart';
+import '../../../../../design_system/typography.dart';
 
 class SellerVerificationStep extends StatefulWidget {
   final Map<String, dynamic> formData;
@@ -92,17 +94,13 @@ class _SellerVerificationStepState extends State<SellerVerificationStep> {
         const SizedBox(height: 24),
         const Text(
           'Documents d\'identité',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
+          style: SDTypography.titleLarge,
         ),
         const SizedBox(height: 8),
-        const Text(
-          'Une pièce d\'identité officielle est requise pour confirmer votre identité',
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.grey,
+        Text(
+          'Veuillez fournir une pièce d\'identité valide (CNI, Passeport, etc.)',
+            style: SDTypography.bodyMedium.copyWith(
+            color: SDColors.neutral500,
           ),
         ),
         const SizedBox(height: 16),
@@ -128,9 +126,8 @@ class _SellerVerificationStepState extends State<SellerVerificationStep> {
         const SizedBox(height: 8),
         Text(
           'Les photos doivent être claires et lisibles',
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey.shade600,
+          style: SDTypography.bodySmall.copyWith(
+            color: SDColors.neutral600,
             fontStyle: FontStyle.italic,
           ),
         ),
@@ -138,17 +135,13 @@ class _SellerVerificationStepState extends State<SellerVerificationStep> {
           const SizedBox(height: 32),
           const Text(
             'Documents d\'entreprise',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+            style: SDTypography.titleLarge,
           ),
           const SizedBox(height: 8),
-          const Text(
-            'Documents légaux requis pour les vendeurs professionnels',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey,
+          Text(
+            'Documents justifiant votre activité commerciale (Registre de commerce, etc.)',
+            style: SDTypography.bodyMedium.copyWith(
+              color: SDColors.neutral500,
             ),
           ),
           const SizedBox(height: 16),
@@ -182,9 +175,9 @@ class _SellerVerificationStepState extends State<SellerVerificationStep> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.blue.shade50,
+        color: SDColors.info50,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.blue.shade200),
+        border: Border.all(color: SDColors.info200),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -193,15 +186,12 @@ class _SellerVerificationStepState extends State<SellerVerificationStep> {
             children: [
               Icon(
                 Icons.info,
-                color: Colors.blue.shade700,
+                color: SDColors.info700,
               ),
               const SizedBox(width: 8),
               const Text(
                 'Pourquoi avons-nous besoin de ces documents?',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
+                style: SDTypography.titleMedium,
               ),
             ],
           ),
@@ -214,9 +204,9 @@ class _SellerVerificationStepState extends State<SellerVerificationStep> {
           const Text('• Confirmer que vous êtes légalement autorisé à vendre'),
           const Text('• Respecter les réglementations locales sur le commerce'),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'Vos documents sont stockés de manière sécurisée et confidentielle conformément à notre politique de confidentialité.',
-            style: TextStyle(fontStyle: FontStyle.italic),
+            style: SDTypography.bodyMedium.copyWith(fontStyle: FontStyle.italic),
           ),
         ],
       ),
@@ -233,9 +223,7 @@ class _SellerVerificationStepState extends State<SellerVerificationStep> {
       children: [
         Text(
           title,
-          style: const TextStyle(
-            fontWeight: FontWeight.w500,
-          ),
+          style: SDTypography.titleMedium,
         ),
         const SizedBox(height: 8),
         GestureDetector(
@@ -243,9 +231,9 @@ class _SellerVerificationStepState extends State<SellerVerificationStep> {
           child: Container(
             height: 150,
             decoration: BoxDecoration(
-              color: Colors.grey.shade100,
+              color: SDColors.neutral100,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.grey.shade300),
+              border: Border.all(color: SDColors.neutral300),
               image: image != null
                   ? DecorationImage(
                       image: FileImage(File(image.path)),
@@ -260,12 +248,12 @@ class _SellerVerificationStepState extends State<SellerVerificationStep> {
                       Icon(
                         Icons.add_photo_alternate,
                         size: 40,
-                        color: Colors.grey.shade400,
+                        color: SDColors.neutral400,
                       ),
                       const SizedBox(height: 8),
-                      const Text(
+                      Text(
                         'Cliquez pour ajouter',
-                        style: TextStyle(color: Colors.grey),
+                        style: SDTypography.bodySmall.copyWith(color: SDColors.neutral500),
                       ),
                     ],
                   )
@@ -276,11 +264,11 @@ class _SellerVerificationStepState extends State<SellerVerificationStep> {
                       IconButton(
                         icon: const Icon(
                           Icons.refresh,
-                          color: Colors.white,
+                          color: SDColors.white,
                         ),
                         onPressed: onTap,
                         style: IconButton.styleFrom(
-                          backgroundColor: Colors.black54,
+                          backgroundColor: SDColors.neutral900.withOpacity(0.54),
                         ),
                       ),
                     ],
@@ -295,7 +283,7 @@ class _SellerVerificationStepState extends State<SellerVerificationStep> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.grey.shade100,
+        color: SDColors.neutral100,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -303,7 +291,7 @@ class _SellerVerificationStepState extends State<SellerVerificationStep> {
         children: [
           const Text(
             'En soumettant ces documents, vous confirmez que :',
-            style: TextStyle(fontWeight: FontWeight.bold),
+            style: SDTypography.titleSmall,
           ),
           const SizedBox(height: 8),
           const Text('• Toutes les informations fournies sont exactes et véridiques'),

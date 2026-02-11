@@ -9,6 +9,8 @@ import 'package:sdealsmobile/mobile/view/orderpagem/screens/service_request_summ
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../widgets/mini_map_widget.dart';
+// ✅ Design System
+import '../../../../design_system/design_system.dart';
 
 // Page de détails de service (2025) avec header moderne, prestataires réels, et CTA sticky
 class DetailPage extends StatefulWidget {
@@ -94,9 +96,9 @@ class _DetailPageState extends State<DetailPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.title,
-            style: const TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: const Color(0xFF2E7D32),
-        foregroundColor: Colors.white,
+            style: SDTypography.titleMedium.copyWith(fontWeight: FontWeight.bold, color: SDColors.white)),
+        backgroundColor: SDColors.primary700,
+        foregroundColor: SDColors.white,
         elevation: 0,
         flexibleSpace: Container(
           decoration: BoxDecoration(
@@ -104,15 +106,15 @@ class _DetailPageState extends State<DetailPage> {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                const Color(0xFF2E7D32),
-                const Color(0xFF4CAF50),
+                SDColors.primary700,
+                SDColors.primary500,
               ],
             ),
           ),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.ios_share_rounded),
+            icon: Icon(Icons.ios_share_rounded, color: SDColors.white),
             onPressed: _onShareTap,
           ),
           IconButton(
@@ -120,11 +122,12 @@ class _DetailPageState extends State<DetailPage> {
               _isFavorited
                   ? Icons.favorite_rounded
                   : Icons.favorite_border_rounded,
+              color: SDColors.white,
             ),
             onPressed: _onFavoriteTap,
           ),
           IconButton(
-            icon: const Icon(Icons.flag_outlined),
+            icon: Icon(Icons.flag_outlined, color: SDColors.white),
             onPressed: _onReportTap,
           ),
         ],
@@ -133,29 +136,28 @@ class _DetailPageState extends State<DetailPage> {
         slivers: [
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.all(18),
+              padding: EdgeInsets.all(SDSpacing.md),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildServiceImage(widget.image),
-                  const SizedBox(height: 16),
+                  SizedBox(height: SDSpacing.sm),
                   Text(
                     widget.title,
-                    style: const TextStyle(
-                      fontSize: 24,
+                    style: SDTypography.titleLarge.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+                      color: SDColors.neutral900,
                     ),
                   ),
-                  const SizedBox(height: 10),
+                  SizedBox(height: SDSpacing.sm),
                   _buildServiceDescription(),
-                  const SizedBox(height: 18),
-                  const SizedBox(height: 28),
+                  SizedBox(height: SDSpacing.md),
+                  SizedBox(height: SDSpacing.lg),
 
                   // Mini carte avec emplacement du prestataire
                   if (_providers.isNotEmpty && _userLocation != null)
                     ConstrainedBox(
-                      constraints: const BoxConstraints(
+                      constraints: BoxConstraints(
                         minHeight: 100,
                         maxHeight: 200,
                       ),
@@ -165,41 +167,42 @@ class _DetailPageState extends State<DetailPage> {
                       ),
                     ),
 
-                  const SizedBox(height: 20),
+                  SizedBox(height: SDSpacing.md),
                   AIProviderMatcherWidget(
                     serviceType: widget.title,
                     location: "Abidjan",
                     preferences: const [],
                   ),
-                  const SizedBox(height: 20),
+                  SizedBox(height: SDSpacing.md),
                 ],
               ),
             ),
           ),
           if (_loading)
-            const SliverToBoxAdapter(
+            SliverToBoxAdapter(
               child: Padding(
-                padding: EdgeInsets.only(top: 8),
+                padding: EdgeInsets.only(top: SDSpacing.xs),
                 child: Center(
                     child: CircularProgressIndicator(
-                        color: const Color(0xFF2E7D32))),
+                        color: SDColors.primary700)),
               ),
             )
           else if (_providers.isEmpty)
-            const SliverToBoxAdapter(
+            SliverToBoxAdapter(
               child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-                child: Text('Aucun prestataire trouvé pour ce service.'),
+                padding: EdgeInsets.symmetric(horizontal: SDSpacing.md, vertical: SDSpacing.xs),
+                child: Text('Aucun prestataire trouvé pour ce service.',
+                    style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral600)),
               ),
             )
           else
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 18),
+                padding: EdgeInsets.symmetric(horizontal: SDSpacing.md),
                 child: _buildProvidersStories(),
               ),
             ),
-          const SliverToBoxAdapter(child: SizedBox(height: 80)),
+          SliverToBoxAdapter(child: SizedBox(height: SDSpacing.xxl)),
         ],
       ),
       bottomNavigationBar: _buildStickyCta(context),
@@ -211,7 +214,8 @@ class _DetailPageState extends State<DetailPage> {
     await Clipboard.setData(ClipboardData(text: text));
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Texte copié dans le presse-papiers')),
+      SnackBar(content: Text('Texte copié dans le presse-papiers',
+          style: SDTypography.bodyMedium)),
     );
   }
 
@@ -219,8 +223,9 @@ class _DetailPageState extends State<DetailPage> {
     final auth = context.read<AuthCubit>().state;
     if (auth is! AuthAuthenticated) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Connectez-vous pour ajouter en favoris.')),
+        SnackBar(
+            content: Text('Connectez-vous pour ajouter en favoris.',
+                style: SDTypography.bodyMedium)),
       );
       Navigator.push(
         context,
@@ -231,7 +236,9 @@ class _DetailPageState extends State<DetailPage> {
 
     setState(() => _isFavorited = !_isFavorited);
     final msg = _isFavorited ? 'Ajouté aux favoris' : 'Retiré des favoris';
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(msg, style: SDTypography.bodyMedium),
+        backgroundColor: SDColors.success500));
 
     // Appel backend (fire-and-forget)
     if (_isFavorited) {
@@ -252,25 +259,30 @@ class _DetailPageState extends State<DetailPage> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Signaler le service'),
+          title: Text('Signaler le service', style: SDTypography.titleMedium),
           content: TextField(
             controller: controller,
             maxLines: 4,
-            decoration: const InputDecoration(
+            style: SDTypography.bodyMedium,
+            decoration: InputDecoration(
               hintText: 'Décrivez le problème…',
-              border: OutlineInputBorder(),
+              hintStyle: SDTypography.bodyMedium.copyWith(color: SDColors.neutral400),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+              ),
             ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('Annuler'),
+              child: Text('Annuler', style: SDTypography.labelMedium),
             ),
             ElevatedButton(
               onPressed: () async {
                 if (controller.text.trim().isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Veuillez saisir un motif.')),
+                    SnackBar(content: Text('Veuillez saisir un motif.',
+                        style: SDTypography.bodyMedium)),
                   );
                   return;
                 }
@@ -291,7 +303,11 @@ class _DetailPageState extends State<DetailPage> {
                 }
                 Navigator.pop(context, true);
               },
-              child: const Text('Envoyer'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: SDColors.error500,
+                foregroundColor: SDColors.white,
+              ),
+              child: Text('Envoyer', style: SDTypography.labelMedium.copyWith(color: SDColors.white)),
             ),
           ],
         );
@@ -301,7 +317,9 @@ class _DetailPageState extends State<DetailPage> {
     if (result == true) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Signalement envoyé. Merci.')),
+        SnackBar(content: Text('Signalement envoyé. Merci.',
+            style: SDTypography.bodyMedium),
+            backgroundColor: SDColors.success500),
       );
     }
   }
@@ -309,33 +327,33 @@ class _DetailPageState extends State<DetailPage> {
   Widget _buildStickyCta(BuildContext context) {
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        padding: EdgeInsets.fromLTRB(SDSpacing.sm, SDSpacing.xs, SDSpacing.sm, SDSpacing.sm),
         child: SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2E7D32),
-              padding: const EdgeInsets.symmetric(vertical: 16),
+              backgroundColor: SDColors.primary700,
+              padding: EdgeInsets.symmetric(vertical: SDSpacing.sm),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
               ),
               elevation: 6,
             ),
-            icon: const Icon(Icons.shopping_cart_checkout_rounded,
-                color: Colors.white),
-            label: const Text(
+            icon: Icon(Icons.shopping_cart_checkout_rounded,
+                color: SDColors.white),
+            label: Text(
               "Commander ce service",
-              style: TextStyle(
-                  fontSize: 16,
+              style: SDTypography.labelMedium.copyWith(
                   fontWeight: FontWeight.bold,
-                  color: Colors.white),
+                  color: SDColors.white),
             ),
             onPressed: () {
               final auth = context.read<AuthCubit>().state;
               if (auth is! AuthAuthenticated) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content: Text('Veuillez vous connecter pour commander.')),
+                  SnackBar(
+                      content: Text('Veuillez vous connecter pour commander.',
+                          style: SDTypography.bodyMedium)),
                 );
                 Navigator.push(
                   context,
@@ -363,15 +381,15 @@ class _DetailPageState extends State<DetailPage> {
       backgroundColor: Colors.transparent,
       builder: (context) {
         return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          decoration: BoxDecoration(
+            color: SDColors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(SDSpacing.xxxl)),
           ),
           padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-            left: 20,
-            right: 20,
-            top: 20,
+            bottom: MediaQuery.of(context).viewInsets.bottom + SDSpacing.sm,
+            left: SDSpacing.md,
+            right: SDSpacing.md,
+            top: SDSpacing.md,
           ),
           child: StatefulBuilder(
             builder: (context, setSheetState) {
@@ -384,35 +402,33 @@ class _DetailPageState extends State<DetailPage> {
                     Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.all(12),
+                          padding: EdgeInsets.all(SDSpacing.xs),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF2E7D32).withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
+                            color: SDColors.primary700.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.shopping_cart_checkout_rounded,
-                            color: Color(0xFF2E7D32),
+                            color: SDColors.primary700,
                             size: 28,
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        SizedBox(width: SDSpacing.xs),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
+                              Text(
                                 'Commander',
-                                style: TextStyle(
-                                  fontSize: 20,
+                                style: SDTypography.titleMedium.copyWith(
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.black87,
+                                  color: SDColors.neutral900,
                                 ),
                               ),
                               Text(
                                 widget.title,
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey.shade600,
+                                style: SDTypography.bodySmall.copyWith(
+                                  color: SDColors.neutral600,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -422,43 +438,42 @@ class _DetailPageState extends State<DetailPage> {
                         ),
                         IconButton(
                           onPressed: () => Navigator.pop(context),
-                          icon: const Icon(Icons.close),
-                          color: Colors.grey.shade400,
+                          icon: Icon(Icons.close, color: SDColors.neutral400),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 24),
+                    SizedBox(height: SDSpacing.md),
                     
                     // Sélecteur de prestataire moderne
                     if (_providers.isNotEmpty) ...[
                       Row(
                         children: [
-                          Icon(Icons.person, color: Colors.grey.shade700, size: 20),
-                          const SizedBox(width: 8),
-                          const Text(
+                          Icon(Icons.person, color: SDColors.neutral700, size: 20),
+                          SizedBox(width: SDSpacing.xs),
+                          Text(
                             'Choisir un prestataire',
-                            style: TextStyle(
+                            style: SDTypography.titleSmall.copyWith(
                               fontWeight: FontWeight.w600,
-                              fontSize: 16,
                             ),
                           ),
-                          const Text(' *', style: TextStyle(color: Colors.red)),
+                          Text(' *', style: SDTypography.titleSmall.copyWith(color: SDColors.error500)),
                         ],
                       ),
-                      const SizedBox(height: 8),
+                      SizedBox(height: SDSpacing.xs),
                       Container(
                         decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey.shade300),
-                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: SDColors.neutral300),
+                          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
                         ),
                         child: DropdownButtonFormField<String>(
                           value: _selectedProviderId,
-                          decoration: const InputDecoration(
+                          style: SDTypography.bodyMedium,
+                          decoration: InputDecoration(
                             border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                            prefixIcon: Icon(Icons.person_pin_circle, color: Color(0xFF2E7D32)),
+                            contentPadding: EdgeInsets.symmetric(horizontal: SDSpacing.sm, vertical: SDSpacing.xs),
+                            prefixIcon: Icon(Icons.person_pin_circle, color: SDColors.primary700),
                           ),
-                          hint: Text('Sélectionnez un prestataire', style: TextStyle(color: Colors.grey.shade500)),
+                          hint: Text('Sélectionnez un prestataire', style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral500)),
                           items: _providers.map((provider) {
                             final prenom = provider['utilisateur']?['prenom'] ?? '';
                             final nom = provider['utilisateur']?['nom'] ?? 'Inconnu';
@@ -471,22 +486,22 @@ class _DetailPageState extends State<DetailPage> {
                                   Expanded(
                                     child: Text(
                                       '$prenom $nom',
-                                      style: const TextStyle(fontWeight: FontWeight.w500),
+                                      style: SDTypography.bodyMedium.copyWith(fontWeight: FontWeight.w500),
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
-                                  const Icon(Icons.star, size: 14, color: Colors.amber),
-                                  const SizedBox(width: 2),
+                                  Icon(Icons.star, size: 14, color: SDColors.warning500),
+                                  SizedBox(width: SDSpacing.xxxs),
                                   Text(
                                     '$note',
-                                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                    style: SDTypography.labelSmall.copyWith(color: SDColors.neutral600),
                                   ),
-                                  const SizedBox(width: 8),
+                                  SizedBox(width: SDSpacing.xs),
                                   Text(
                                     '${price}F',
-                                    style: const TextStyle(
+                                    style: SDTypography.bodySmall.copyWith(
                                       fontWeight: FontWeight.bold,
-                                      color: Color(0xFF2E7D32),
+                                      color: SDColors.primary700,
                                     ),
                                   ),
                                 ],
@@ -500,64 +515,69 @@ class _DetailPageState extends State<DetailPage> {
                           },
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: SDSpacing.sm),
                     ],
                     
                     // Adresse
                     TextField(
                       controller: adresseCtrl,
+                      style: SDTypography.bodyMedium,
                       decoration: InputDecoration(
                         labelText: 'Adresse',
+                        labelStyle: SDTypography.bodyMedium,
                         hintText: 'Ex: Rue 12, Cocody',
-                        prefixIcon: const Icon(Icons.home, color: Color(0xFF2E7D32)),
+                        hintStyle: SDTypography.bodyMedium.copyWith(color: SDColors.neutral400),
+                        prefixIcon: Icon(Icons.home, color: SDColors.primary700),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
                         ),
                         focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 2),
+                          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                          borderSide: BorderSide(color: SDColors.primary700, width: 2),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    SizedBox(height: SDSpacing.xs),
                     
                     // Ville
                     TextField(
                       controller: villeCtrl,
+                      style: SDTypography.bodyMedium,
                       decoration: InputDecoration(
                         labelText: 'Ville',
+                        labelStyle: SDTypography.bodyMedium,
                         hintText: 'Ex: Abidjan',
-                        prefixIcon: const Icon(Icons.location_city, color: Color(0xFF2E7D32)),
+                        hintStyle: SDTypography.bodyMedium.copyWith(color: SDColors.neutral400),
+                        prefixIcon: Icon(Icons.location_city, color: SDColors.primary700),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
                         ),
                         focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 2),
+                          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                          borderSide: BorderSide(color: SDColors.primary700, width: 2),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    SizedBox(height: SDSpacing.xs),
                     
                     // Date/Heure
                     Container(
                       decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey.shade300),
-                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: SDColors.neutral300),
+                        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
                       ),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      padding: EdgeInsets.symmetric(horizontal: SDSpacing.sm, vertical: SDSpacing.xs),
                       child: Row(
                         children: [
-                          const Icon(Icons.calendar_today, color: Color(0xFF2E7D32)),
-                          const SizedBox(width: 12),
+                          Icon(Icons.calendar_today, color: SDColors.primary700),
+                          SizedBox(width: SDSpacing.xs),
                           Expanded(
                             child: Text(
                               selectedDateTime == null
                                   ? 'Choisir une date et heure (optionnel)'
                                   : '${selectedDateTime!.day}/${selectedDateTime!.month}/${selectedDateTime!.year} à ${selectedDateTime!.hour}:${selectedDateTime!.minute.toString().padLeft(2, '0')}',
-                              style: TextStyle(
-                                color: selectedDateTime == null ? Colors.grey.shade500 : Colors.black87,
-                                fontSize: 15,
+                              style: SDTypography.bodyMedium.copyWith(
+                                color: selectedDateTime == null ? SDColors.neutral500 : SDColors.neutral900,
                               ),
                             ),
                           ),
@@ -578,60 +598,93 @@ class _DetailPageState extends State<DetailPage> {
                               final dt = DateTime(date.year, date.month, date.day, time.hour, time.minute);
                               setSheetState(() => selectedDateTime = dt);
                             },
-                            child: const Text('Choisir', style: TextStyle(color: Color(0xFF2E7D32))),
+                            child: Text('Choisir', style: SDTypography.labelMedium.copyWith(color: SDColors.primary700)),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    SizedBox(height: SDSpacing.xs),
                     
                     // Notes
                     TextField(
                       controller: notesCtrl,
                       maxLines: 3,
+                      style: SDTypography.bodyMedium,
                       decoration: InputDecoration(
                         labelText: 'Notes / Instructions (optionnel)',
+                        labelStyle: SDTypography.bodyMedium,
                         hintText: 'Ajoutez des détails supplémentaires...',
-                        prefixIcon: const Padding(
-                          padding: EdgeInsets.only(bottom: 40),
-                          child: Icon(Icons.note_alt, color: Color(0xFF2E7D32)),
+                        hintStyle: SDTypography.bodyMedium.copyWith(color: SDColors.neutral400),
+                        prefixIcon: Padding(
+                          padding: EdgeInsets.only(bottom: SDSpacing.lg),
+                          child: Icon(Icons.note_alt, color: SDColors.primary700),
                         ),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
                         ),
                         focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 2),
+                          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                          borderSide: BorderSide(color: SDColors.primary700, width: 2),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 20),
-                    // Info système gratuit
+                    SizedBox(height: SDSpacing.md),
+                    
+                    // Message GRATUIT amélioré et plus visible
                     Container(
-                      padding: const EdgeInsets.all(12),
+                      padding: EdgeInsets.all(SDSpacing.sm),
                       decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.blue.shade200),
+                        gradient: LinearGradient(
+                          colors: [SDColors.success100, SDColors.success50],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                        border: Border.all(color: SDColors.success200, width: 2),
+                        boxShadow: [
+                          BoxShadow(
+                            color: SDColors.success200.withOpacity(0.3),
+                            blurRadius: 8,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20),
-                          const SizedBox(width: 8),
+                          Container(
+                            padding: EdgeInsets.all(SDSpacing.xs),
+                            decoration: BoxDecoration(
+                              color: SDColors.success500,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(Icons.check_circle, color: SDColors.white, size: 24),
+                          ),
+                          SizedBox(width: SDSpacing.sm),
                           Expanded(
-                            child: Text(
-                              'Service 100% GRATUIT - Aucun paiement requis',
-                              style: TextStyle(
-                                color: Colors.blue.shade700,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                              ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Service 100% GRATUIT',
+                                  style: SDTypography.titleSmall.copyWith(
+                                    color: SDColors.success700,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                SizedBox(height: SDSpacing.xxxs),
+                                Text(
+                                  'Aucun paiement requis • Accès immédiat',
+                                  style: SDTypography.bodySmall.copyWith(
+                                    color: SDColors.success600,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    SizedBox(height: SDSpacing.md),
                     
                     // Bouton de soumission moderne
                     SizedBox(
@@ -639,51 +692,94 @@ class _DetailPageState extends State<DetailPage> {
                       height: 56,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2E7D32),
-                          foregroundColor: Colors.white,
+                          backgroundColor: SDColors.primary700,
+                          foregroundColor: SDColors.white,
                           elevation: 3,
-                          shadowColor: const Color(0xFF2E7D32).withOpacity(0.4),
+                          shadowColor: SDColors.primary700.withOpacity(0.4),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
                           ),
                         ),
                         onPressed: () async {
                           final auth = context.read<AuthCubit>().state
                               as AuthAuthenticated;
 
-                          // Validation
+                          // Validation simplifiée - seulement les champs essentiels
                           if (_selectedProviderId == null) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Row(
-                                  children: const [
-                                    Icon(Icons.warning_amber_rounded, color: Colors.white),
-                                    SizedBox(width: 8),
-                                    Expanded(child: Text('Veuillez sélectionner un prestataire')),
+                                  children: [
+                                    Icon(Icons.warning_amber_rounded, color: SDColors.white),
+                                    SizedBox(width: SDSpacing.xs),
+                                    Expanded(child: Text('Veuillez sélectionner un prestataire',
+                                        style: SDTypography.bodyMedium.copyWith(color: SDColors.white))),
                                   ],
                                 ),
-                                backgroundColor: Colors.orange,
+                                backgroundColor: SDColors.warning500,
                                 behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium)),
                               ),
                             );
                             return;
                           }
+                          
+                          // Validation adresse et ville (requis)
+                          if (adresseCtrl.text.trim().isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Row(
+                                  children: [
+                                    Icon(Icons.location_off, color: SDColors.white),
+                                    SizedBox(width: SDSpacing.xs),
+                                    Expanded(child: Text('Veuillez renseigner votre adresse',
+                                        style: SDTypography.bodyMedium.copyWith(color: SDColors.white))),
+                                  ],
+                                ),
+                                backgroundColor: SDColors.error500,
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium)),
+                              ),
+                            );
+                            return;
+                          }
+                          
+                          if (villeCtrl.text.trim().isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Row(
+                                  children: [
+                                    Icon(Icons.location_city_outlined, color: SDColors.white),
+                                    SizedBox(width: SDSpacing.xs),
+                                    Expanded(child: Text('Veuillez renseigner votre ville',
+                                        style: SDTypography.bodyMedium.copyWith(color: SDColors.white))),
+                                  ],
+                                ),
+                                backgroundColor: SDColors.error500,
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium)),
+                              ),
+                            );
+                            return;
+                          }
+                          
+                          // Date/heure optionnels - utiliser valeur par défaut si non renseigné
+                          final dateTimeToUse = selectedDateTime ?? DateTime.now().add(Duration(days: 1));
 
                           // Montrer un loader
                           showDialog(
                             context: context,
                             barrierDismissible: false,
-                            builder: (_) => const Center(
+                            builder: (_) => Center(
                               child: Card(
                                 child: Padding(
-                                  padding: EdgeInsets.all(24),
+                                  padding: EdgeInsets.all(SDSpacing.md),
                                   child: Column(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      CircularProgressIndicator(color: Color(0xFF2E7D32)),
-                                      SizedBox(height: 16),
-                                      Text('Envoi en cours...'),
+                                      CircularProgressIndicator(color: SDColors.primary700),
+                                      SizedBox(height: SDSpacing.sm),
+                                      Text('Envoi en cours...', style: SDTypography.bodyMedium),
                                     ],
                                   ),
                                 ),
@@ -697,13 +793,9 @@ class _DetailPageState extends State<DetailPage> {
                               utilisateurId: auth.utilisateur.idutilisateur,
                               prestataireId: _selectedProviderId,
                               serviceId: _serviceId,
-                              adresse: adresseCtrl.text.trim().isEmpty
-                                  ? null
-                                  : adresseCtrl.text.trim(),
-                              ville: villeCtrl.text.trim().isEmpty
-                                  ? null
-                                  : villeCtrl.text.trim(),
-                              dateHeure: selectedDateTime,
+                              adresse: adresseCtrl.text.trim(),
+                              ville: villeCtrl.text.trim(),
+                              dateHeure: dateTimeToUse,
                               notesClient: notesCtrl.text.trim().isEmpty
                                   ? null
                                   : notesCtrl.text.trim(),
@@ -717,16 +809,17 @@ class _DetailPageState extends State<DetailPage> {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Row(
-                                  children: const [
-                                    Icon(Icons.check_circle, color: Colors.white),
-                                    SizedBox(width: 8),
-                                    Expanded(child: Text('Commande confirmée ! 🎉')),
+                                  children: [
+                                    Icon(Icons.check_circle, color: SDColors.white),
+                                    SizedBox(width: SDSpacing.xs),
+                                    Expanded(child: Text('Commande confirmée ! 🎉',
+                                        style: SDTypography.bodyMedium.copyWith(color: SDColors.white))),
                                   ],
                                 ),
-                                backgroundColor: const Color(0xFF2E7D32),
+                                backgroundColor: SDColors.primary700,
                                 behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                duration: const Duration(seconds: 3),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium)),
+                                duration: Duration(seconds: 3),
                               ),
                             );
                             
@@ -751,29 +844,30 @@ class _DetailPageState extends State<DetailPage> {
                               SnackBar(
                                 content: Row(
                                   children: [
-                                    const Icon(Icons.error_outline, color: Colors.white),
-                                    const SizedBox(width: 8),
-                                    Expanded(child: Text('Erreur: ${e.toString()}')),
+                                    Icon(Icons.error_outline, color: SDColors.white),
+                                    SizedBox(width: SDSpacing.xs),
+                                    Expanded(child: Text('Erreur: ${e.toString()}',
+                                        style: SDTypography.bodyMedium.copyWith(color: SDColors.white))),
                                   ],
                                 ),
-                                backgroundColor: Colors.red,
+                                backgroundColor: SDColors.error500,
                                 behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                duration: const Duration(seconds: 4),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium)),
+                                duration: Duration(seconds: 4),
                               ),
                             );
                           }
                         },
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
-                          children: const [
-                            Icon(Icons.send_rounded, size: 22),
-                            SizedBox(width: 8),
+                          children: [
+                            Icon(Icons.send_rounded, size: 22, color: SDColors.white),
+                            SizedBox(width: SDSpacing.xs),
                             Text(
                               'Confirmer la commande',
-                              style: TextStyle(
-                                fontSize: 16,
+                              style: SDTypography.labelMedium.copyWith(
                                 fontWeight: FontWeight.bold,
+                                color: SDColors.white,
                               ),
                             ),
                           ],
@@ -793,7 +887,7 @@ class _DetailPageState extends State<DetailPage> {
   Widget _buildServiceImage(String path) {
     final isUrl = path.toLowerCase().startsWith('http');
     return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
       child: isUrl
           ? Image.network(
               path,
@@ -806,21 +900,21 @@ class _DetailPageState extends State<DetailPage> {
                   height: 200,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade200,
-                    borderRadius: BorderRadius.circular(16),
+                    color: SDColors.neutral200,
+                    borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
                   ),
                   child:
-                      const CircularProgressIndicator(color: Color(0xFF2E7D32)),
+                      CircularProgressIndicator(color: SDColors.primary700),
                 );
               },
               errorBuilder: (context, error, stackTrace) {
                 return Container(
                   height: 200,
                   width: double.infinity,
-                  color: Colors.grey.shade200,
+                  color: SDColors.neutral200,
                   alignment: Alignment.center,
-                  child: const Icon(Icons.image_not_supported,
-                      size: 48, color: Colors.grey),
+                  child: Icon(Icons.image_not_supported,
+                      size: 48, color: SDColors.neutral500),
                 );
               },
             )
@@ -831,10 +925,10 @@ class _DetailPageState extends State<DetailPage> {
               fit: BoxFit.cover,
               errorBuilder: (context, error, stackTrace) => Container(
                 height: 200,
-                color: Colors.grey.shade200,
+                color: SDColors.neutral200,
                 alignment: Alignment.center,
-                child: const Icon(Icons.image_not_supported,
-                    size: 48, color: Colors.grey),
+                child: Icon(Icons.image_not_supported,
+                    size: 48, color: SDColors.neutral500),
               ),
             ),
     );
@@ -849,7 +943,7 @@ class _DetailPageState extends State<DetailPage> {
 
     return Text(
       description,
-      style: const TextStyle(fontSize: 15.5, color: Colors.black54),
+      style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral600),
     );
   }
 
@@ -857,15 +951,14 @@ class _DetailPageState extends State<DetailPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Prestataires disponibles',
-          style: TextStyle(
+          style: SDTypography.titleMedium.copyWith(
             fontWeight: FontWeight.bold,
-            fontSize: 18,
-            color: Colors.black87,
+            color: SDColors.neutral900,
           ),
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: SDSpacing.sm),
         SizedBox(
           height: 120, // Hauteur pour les stories
           child: ListView.builder(
@@ -896,7 +989,7 @@ class _DetailPageState extends State<DetailPage> {
 
     return Container(
       width: 80,
-      margin: const EdgeInsets.only(right: 16),
+      margin: EdgeInsets.only(right: SDSpacing.sm),
       child: Column(
         children: [
           // Story ronde avec photo
@@ -904,7 +997,8 @@ class _DetailPageState extends State<DetailPage> {
             onTap: () {
               // Action pour voir le profil du prestataire
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Profil de $nom')),
+                SnackBar(content: Text('Profil de $nom',
+                    style: SDTypography.bodyMedium)),
               );
             },
             child: Stack(
@@ -917,15 +1011,15 @@ class _DetailPageState extends State<DetailPage> {
                     shape: BoxShape.circle,
                     border: Border.all(
                       color: verified
-                          ? const Color(0xFF2E7D32)
-                          : Colors.grey.shade300,
+                          ? SDColors.primary700
+                          : SDColors.neutral300,
                       width: 3,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
+                        color: SDColors.neutral900.withOpacity(0.1),
                         blurRadius: 8,
-                        offset: const Offset(0, 2),
+                        offset: Offset(0, 2),
                       ),
                     ],
                   ),
@@ -936,20 +1030,20 @@ class _DetailPageState extends State<DetailPage> {
                             fit: BoxFit.cover,
                             errorBuilder: (context, error, stackTrace) {
                               return Container(
-                                color: const Color(0xFF2E7D32).withOpacity(0.1),
-                                child: const Icon(
+                                color: SDColors.primary700.withOpacity(0.1),
+                                child: Icon(
                                   Icons.person,
-                                  color: Color(0xFF2E7D32),
+                                  color: SDColors.primary700,
                                   size: 30,
                                 ),
                               );
                             },
                           )
                         : Container(
-                            color: const Color(0xFF2E7D32).withOpacity(0.1),
-                            child: const Icon(
+                            color: SDColors.primary700.withOpacity(0.1),
+                            child: Icon(
                               Icons.person,
-                              color: Color(0xFF2E7D32),
+                              color: SDColors.primary700,
                               size: 30,
                             ),
                           ),
@@ -963,13 +1057,13 @@ class _DetailPageState extends State<DetailPage> {
                     child: Container(
                       width: 20,
                       height: 20,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF2E7D32),
+                      decoration: BoxDecoration(
+                        color: SDColors.primary700,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.verified,
-                        color: Colors.white,
+                        color: SDColors.white,
                         size: 12,
                       ),
                     ),
@@ -977,26 +1071,24 @@ class _DetailPageState extends State<DetailPage> {
               ],
             ),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: SDSpacing.xs),
           // Nom du prestataire
           Text(
             nom.length > 10 ? '${nom.substring(0, 10)}...' : nom,
-            style: const TextStyle(
-              fontSize: 12,
+            style: SDTypography.labelSmall.copyWith(
               fontWeight: FontWeight.w600,
-              color: Colors.black87,
+              color: SDColors.neutral900,
             ),
             textAlign: TextAlign.center,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 2),
+          SizedBox(height: SDSpacing.xxxs),
           // Prix
           Text(
             '$price FCFA',
-            style: const TextStyle(
-              fontSize: 10,
-              color: Color(0xFF2E7D32),
+            style: SDTypography.labelSmall.copyWith(
+              color: SDColors.primary700,
               fontWeight: FontWeight.w500,
             ),
             textAlign: TextAlign.center,

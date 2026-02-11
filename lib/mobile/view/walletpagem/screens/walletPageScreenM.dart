@@ -11,6 +11,9 @@ import 'soutraRechargeScreen.dart';
 import 'soutraTransferScreen.dart';
 import 'soutraWalletMainScreen.dart';
 
+// ✅ Design System
+import '../../../../design_system/design_system.dart';
+
 class WalletPageScreenM extends StatefulWidget {
   const WalletPageScreenM({super.key});
 
@@ -49,35 +52,35 @@ class _WalletPageScreenMState extends State<WalletPageScreenM> {
       "amount": 50000,
       "date": "31 Mai 2025",
       "icon": Icons.arrow_downward_rounded,
-      "color": Colors.green
+      "color": SDColors.success500
     },
     {
       "type": "Envoyé",
       "amount": -20000,
       "date": "30 Mai 2025",
       "icon": Icons.arrow_upward_rounded,
-      "color": Colors.red
+      "color": SDColors.error500
     },
     {
       "type": "Paiement",
       "amount": -15000,
       "date": "29 Mai 2025",
       "icon": Icons.shopping_cart,
-      "color": Colors.orange
+      "color": SDColors.warning500
     },
     {
       "type": "Rechargé",
       "amount": 30000,
       "date": "28 Mai 2025",
       "icon": Icons.arrow_downward_rounded,
-      "color": Colors.green
+      "color": SDColors.success500
     },
     {
       "type": "Envoyé",
       "amount": -10000,
       "date": "27 Mai 2025",
       "icon": Icons.arrow_upward_rounded,
-      "color": Colors.red
+      "color": SDColors.error500
     },
   ];
 
@@ -98,7 +101,7 @@ class _WalletPageScreenMState extends State<WalletPageScreenM> {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(state.error!),
-                backgroundColor: Colors.red,
+                backgroundColor: SDColors.error500,
               ),
             );
           }
@@ -118,39 +121,36 @@ class _WalletPageScreenMState extends State<WalletPageScreenM> {
 
           // Sinon, afficher l'écran de chargement avec l'interface wallet de base
           return Scaffold(
-            backgroundColor: Colors.white,
+            backgroundColor: SDColors.white,
             // AppBar personnalisée avec photo de profil à droite
             appBar: AppBar(
-              backgroundColor: Colors.white,
+              backgroundColor: SDColors.white,
               elevation: 0,
-              title: const Text(
+              title: Text(
                 'Mon Compte SD',
-                style: TextStyle(
-                  color: Colors.black87,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 22,
-                  letterSpacing: 1.1,
+                style: SDTypography.displaySmall.copyWith(
+                  color: SDColors.neutral900,
                 ),
               ),
               actions: [
                 Padding(
-                  padding: const EdgeInsets.only(right: 16.0),
+                  padding: EdgeInsets.only(right: SDSpacing.md),
                   child: CircleAvatar(
                     radius: 22,
-                    backgroundColor: Colors.green.withOpacity(0.13),
+                    backgroundColor: SDColors.primary600.withOpacity(0.13),
                     backgroundImage:
                         const AssetImage('assets/profile_picture.jpg'),
                     child: Align(
                       alignment: Alignment.bottomRight,
                       child: Container(
                         decoration: BoxDecoration(
-                          color: Colors.green,
+                          color: SDColors.primary600,
                           shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 1.5),
+                          border: Border.all(color: SDColors.white, width: 1.5),
                         ),
-                        padding: const EdgeInsets.all(2),
-                        child: const Icon(Icons.verified,
-                            size: 14, color: Colors.white),
+                        padding: EdgeInsets.all(SDSpacing.xxxs),
+                        child: Icon(Icons.verified,
+                            size: 14, color: SDColors.white),
                       ),
                     ),
                   ),
@@ -158,47 +158,41 @@ class _WalletPageScreenMState extends State<WalletPageScreenM> {
               ],
             ),
             body: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+              padding: EdgeInsets.symmetric(horizontal: SDSpacing.lg, vertical: SDSpacing.xs),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Carte virtuelle du solde réorganisée
                   Center(
                     child: Container(
-                      margin: const EdgeInsets.only(top: 10, bottom: 18),
+                      margin: EdgeInsets.only(top: SDSpacing.xs, bottom: SDSpacing.lg),
                       width: double.infinity,
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(22),
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF43EA5E), Color(0xFF1CBF3F)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
+                        borderRadius: BorderRadius.circular(SDSpacing.xl),
+                        gradient: SDGradients.primaryGradient,
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.green.withOpacity(0.13),
+                            color: SDColors.primary600.withOpacity(0.13),
                             blurRadius: 16,
                             offset: const Offset(0, 6),
                           ),
                         ],
                       ),
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 24, vertical: 22),
+                        padding: EdgeInsets.symmetric(
+                            horizontal: SDSpacing.md, vertical: SDSpacing.md),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Row(
                               children: [
-                                const Icon(Icons.account_balance_wallet_rounded,
-                                    color: Colors.white70, size: 28),
-                                const SizedBox(width: 10),
-                                const Text(
+                                Icon(Icons.account_balance_wallet_rounded,
+                                    color: SDColors.white.withOpacity(0.7), size: 28),
+                                SizedBox(width: SDSpacing.xs),
+                                Text(
                                   "Solde du compte",
-                                  style: TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w500,
+                                  style: SDTypography.titleMedium.copyWith(
+                                    color: SDColors.white.withOpacity(0.7),
                                   ),
                                 ),
                                 const Spacer(),
@@ -217,44 +211,41 @@ class _WalletPageScreenMState extends State<WalletPageScreenM> {
                                     _showBalance
                                         ? Icons.visibility
                                         : Icons.visibility_off,
-                                    color: Colors.white,
+                                    color: SDColors.white,
                                     size: 26,
                                   ),
                                 ),
-                                const SizedBox(width: 10),
+                                SizedBox(width: SDSpacing.xs),
                                 // QR Code fictif
                                 Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.13),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  padding: const EdgeInsets.all(6),
-                                  child: const Icon(Icons.qr_code_rounded,
-                                      color: Colors.white, size: 28),
+                                decoration: BoxDecoration(
+                                  color: SDColors.white.withOpacity(0.13),
+                                  borderRadius: BorderRadius.circular(SDSpacing.xs),
+                                ),
+                                padding: EdgeInsets.all(SDSpacing.xxs),
+                                child: Icon(Icons.qr_code_rounded,
+                                    color: SDColors.white, size: 28),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 16),
+                            SizedBox(height: SDSpacing.md),
                             // Affichage du solde avec séparateurs ou caché
                             Text(
                               _showBalance
                                   ? "$formattedBalance FCFA"
                                   : "••••••••",
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 32,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 1.2,
+                              style: SDTypography.displayLarge.copyWith(
+                                color: SDColors.white,
                               ),
                             ),
-                            const SizedBox(height: 18),
+                            SizedBox(height: SDSpacing.lg),
                             // Boutons d'action
                             Row(
                               children: [
                                 _walletActionButton(
                                   icon: Icons.add_circle_outline,
                                   label: "Recharger",
-                                  color: Colors.white,
+                                  color: SDColors.white,
                                   onTap: () {
                                     // Naviguer vers l'écran de recharge avec GoRouter et passer le BLoC actuel
                                     Navigator.push(
@@ -271,11 +262,11 @@ class _WalletPageScreenMState extends State<WalletPageScreenM> {
                                     );
                                   },
                                 ),
-                                const SizedBox(width: 12),
+                                SizedBox(width: SDSpacing.sm),
                                 _walletActionButton(
                                   icon: Icons.send_rounded,
                                   label: "Transférer",
-                                  color: Colors.white,
+                                  color: SDColors.white,
                                   onTap: () {
                                     // Naviguer vers l'écran de transfert avec GoRouter et passer le BLoC actuel
                                     Navigator.push(
@@ -292,11 +283,11 @@ class _WalletPageScreenMState extends State<WalletPageScreenM> {
                                     );
                                   },
                                 ),
-                                const SizedBox(width: 12),
+                                SizedBox(width: SDSpacing.sm),
                                 _walletActionButton(
                                   icon: Icons.history,
                                   label: "Historique",
-                                  color: Colors.white,
+                                  color: SDColors.white,
                                   onTap: () {
                                     // Afficher un dialogue ou un modal bottom sheet avec l'historique des transactions
                                     ScaffoldMessenger.of(context).showSnackBar(
@@ -368,7 +359,6 @@ class _WalletPageScreenMState extends State<WalletPageScreenM> {
     );
   }
 
-  /// Widget pour un bouton d'action wallet (recharger, transférer, retirer, etc.)
   Widget _walletActionButton({
     required IconData icon,
     required String label,
@@ -377,24 +367,22 @@ class _WalletPageScreenMState extends State<WalletPageScreenM> {
   }) {
     return Expanded(
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(SDSpacing.sm),
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          padding: EdgeInsets.symmetric(vertical: SDSpacing.sm),
           decoration: BoxDecoration(
             color: color.withOpacity(0.13),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(SDSpacing.sm),
           ),
           child: Column(
             children: [
               Icon(icon, color: color, size: 26),
-              const SizedBox(height: 4),
+              SizedBox(height: SDSpacing.xxxs),
               Text(
                 label,
-                style: TextStyle(
+                style: SDTypography.labelMedium.copyWith(
                   color: color,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13.5,
                 ),
               ),
             ],

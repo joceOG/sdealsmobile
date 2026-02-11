@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import '../../../../../design_system/colors.dart';
+import '../../../../../design_system/typography.dart';
 
 class SellerShopInfoStep extends StatefulWidget {
   final Map<String, dynamic> formData;
@@ -133,9 +135,8 @@ class _SellerShopInfoStepState extends State<SellerShopInfoStep> {
             padding: const EdgeInsets.only(top: 4.0, left: 8.0),
             child: Text(
               'Ce nom sera visible par tous les clients',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey.shade600,
+              style: SDTypography.bodySmall.copyWith(
+                color: SDColors.neutral600,
                 fontStyle: FontStyle.italic,
               ),
             ),
@@ -143,10 +144,7 @@ class _SellerShopInfoStepState extends State<SellerShopInfoStep> {
           const SizedBox(height: 24),
           const Text(
             'Type de commerce *',
-            style: TextStyle(
-              fontWeight: FontWeight.w500,
-              fontSize: 16,
-            ),
+            style: SDTypography.titleMedium,
           ),
           const SizedBox(height: 8),
           Row(
@@ -166,9 +164,9 @@ class _SellerShopInfoStepState extends State<SellerShopInfoStep> {
                     width: 100,
                     height: 100,
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
+                      color: SDColors.neutral100,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey.shade300),
+                      border: Border.all(color: SDColors.neutral300),
                       image: _shopLogo != null
                           ? DecorationImage(
                               image: FileImage(File(_shopLogo!.path)),
@@ -180,22 +178,21 @@ class _SellerShopInfoStepState extends State<SellerShopInfoStep> {
                         ? Icon(
                             Icons.add_photo_alternate,
                             size: 40,
-                            color: Colors.grey.shade400,
+                            color: SDColors.neutral400,
                           )
                         : null,
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Logo de la boutique (optionnel)',
-                  style: TextStyle(color: Colors.grey),
+                  style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral500),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   'Format carré recommandé',
                   style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade500,
+                    color: SDColors.neutral500,
                     fontStyle: FontStyle.italic,
                   ),
                 ),
@@ -205,17 +202,13 @@ class _SellerShopInfoStepState extends State<SellerShopInfoStep> {
           const SizedBox(height: 24),
           const Text(
             'Catégories de produits *',
-            style: TextStyle(
-              fontWeight: FontWeight.w500,
-              fontSize: 16,
-            ),
+            style: SDTypography.titleMedium,
           ),
           const SizedBox(height: 8),
-          const Text(
-            'Sélectionnez au moins une catégorie de produits que vous vendez',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey,
+          Text(
+            'Sélectionnez les catégories principales de vos produits',
+            style: SDTypography.bodyMedium.copyWith(
+              color: SDColors.neutral500,
             ),
           ),
           const SizedBox(height: 16),
@@ -228,16 +221,16 @@ class _SellerShopInfoStepState extends State<SellerShopInfoStep> {
                 label: Text(category),
                 selected: isSelected,
                 onSelected: (_) => _toggleCategory(category),
-                backgroundColor: Colors.grey.shade100,
-                selectedColor: Colors.amber.shade100,
+                backgroundColor: SDColors.neutral100,
+                selectedColor: SDColors.secondary100,
                 labelStyle: TextStyle(
-                  color: isSelected ? Colors.amber.shade800 : Colors.black,
+                  color: isSelected ? SDColors.secondary700 : SDColors.neutral900,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20),
                   side: BorderSide(
-                    color: isSelected ? Colors.amber.shade700 : Colors.grey.shade300,
+                    color: isSelected ? SDColors.secondary700 : SDColors.neutral300,
                   ),
                 ),
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -247,10 +240,7 @@ class _SellerShopInfoStepState extends State<SellerShopInfoStep> {
           const SizedBox(height: 24),
           const Text(
             'Description de la boutique *',
-            style: TextStyle(
-              fontWeight: FontWeight.w500,
-              fontSize: 16,
-            ),
+            style: SDTypography.titleMedium,
           ),
           const SizedBox(height: 8),
           TextFormField(
@@ -281,9 +271,8 @@ class _SellerShopInfoStepState extends State<SellerShopInfoStep> {
             padding: const EdgeInsets.only(top: 4.0, left: 8.0),
             child: Text(
               'Décrivez votre boutique, vos produits et votre expertise',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey.shade600,
+              style: SDTypography.bodySmall.copyWith(
+                color: SDColors.neutral600,
                 fontStyle: FontStyle.italic,
               ),
             ),
@@ -310,10 +299,10 @@ class _SellerShopInfoStepState extends State<SellerShopInfoStep> {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
-            color: isSelected ? Colors.amber.shade50 : Colors.white,
+            color: isSelected ? SDColors.secondary50 : SDColors.white,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: isSelected ? Colors.amber.shade700 : Colors.grey.shade400,
+              color: isSelected ? SDColors.secondary700 : SDColors.neutral400,
               width: isSelected ? 2 : 1,
             ),
           ),
@@ -321,7 +310,7 @@ class _SellerShopInfoStepState extends State<SellerShopInfoStep> {
             child: Text(
               type,
               style: TextStyle(
-                color: isSelected ? Colors.amber.shade700 : Colors.grey.shade700,
+                color: isSelected ? SDColors.secondary700 : SDColors.neutral600,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
               ),
             ),

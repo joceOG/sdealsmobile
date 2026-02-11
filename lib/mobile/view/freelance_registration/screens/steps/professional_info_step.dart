@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../../../design_system/colors.dart';
+import '../../../../../design_system/typography.dart';
 
 class ProfessionalInfoStep extends StatefulWidget {
   final Map<String, dynamic> formData;
@@ -94,10 +96,7 @@ class _ProfessionalInfoStepState extends State<ProfessionalInfoStep> {
         children: [
           const Text(
             '💼 Profil professionnel',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+            style: SDTypography.titleLarge,
           ),
           const SizedBox(height: 24),
           
@@ -204,8 +203,8 @@ class _ProfessionalInfoStepState extends State<ProfessionalInfoStep> {
                   ElevatedButton(
                     onPressed: _addSkill,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green.shade700,
-                      foregroundColor: Colors.white,
+                      backgroundColor: SDColors.primary700,
+                      foregroundColor: SDColors.white,
                       padding: const EdgeInsets.all(14),
                     ),
                     child: const Icon(Icons.add),
@@ -278,8 +277,8 @@ class _ProfessionalInfoStepState extends State<ProfessionalInfoStep> {
                     : _selectedSkills.map((skill) {
                         return Chip(
                           label: Text(skill),
-                          backgroundColor: Colors.green.shade100,
-                          deleteIconColor: Colors.green.shade700,
+                          backgroundColor: SDColors.primary100,
+                          deleteIconColor: SDColors.primary700,
                           onDeleted: () {
                             setState(() {
                               _selectedSkills.remove(skill);

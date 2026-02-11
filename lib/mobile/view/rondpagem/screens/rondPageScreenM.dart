@@ -5,6 +5,9 @@ import 'package:sdealsmobile/mobile/view/rondpagem/rondpageblocm/rondPageStateM.
 import '../rondpageblocm/rondPageBlocM.dart';
 import '../rondpageblocm/rondPageEventM.dart';
 
+// ✅ Design System
+import '../../../../design_system/design_system.dart';
+
 class RondPageScreenM extends StatefulWidget {
   const RondPageScreenM({super.key});
   @override
@@ -25,20 +28,19 @@ class _RondPageScreenStateM extends State<RondPageScreenM> {
   Widget build(BuildContext context) {
     return Scaffold(
       key: _scaffoldKey,
-      backgroundColor: Colors.white,
+      backgroundColor: SDColors.white,
       drawer: Drawer(
         child: ListView(
           padding: EdgeInsets.zero,
-          children: const <Widget>[
+          children: <Widget>[
             DrawerHeader(
               decoration: BoxDecoration(
-                color: Colors.green,
+                gradient: SDGradients.primaryGradient,
               ),
               child: Text(
                 'Menu',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
+                style: SDTypography.displayMedium.copyWith(
+                  color: SDColors.white,
                 ),
               ),
             ),
@@ -60,20 +62,16 @@ class _RondPageScreenStateM extends State<RondPageScreenM> {
             ),
           ),
           flexibleSpace: Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF43EA5E), Color(0xFF1CBF3F)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
+            decoration: BoxDecoration(
+              gradient: SDGradients.primaryGradient,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black26,
+                  color: SDColors.neutral900.withOpacity(0.15),
                   blurRadius: 18,
-                  offset: Offset(0, 8),
+                  offset: const Offset(0, 8),
                 ),
               ],
-              borderRadius: BorderRadius.only(
+              borderRadius: const BorderRadius.only(
                 bottomLeft: Radius.circular(44),
                 bottomRight: Radius.circular(44),
               ),
@@ -84,8 +82,8 @@ class _RondPageScreenStateM extends State<RondPageScreenM> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10.0, vertical: 6),
+                    padding: EdgeInsets.symmetric(
+                        horizontal: SDSpacing.sm, vertical: SDSpacing.xxs),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -93,31 +91,30 @@ class _RondPageScreenStateM extends State<RondPageScreenM> {
                           onTap: () {
                             _scaffoldKey.currentState?.openDrawer();
                           },
-                          child: const Icon(Icons.menu,
-                              color: Colors.white, size: 32),
+                          child: Icon(Icons.menu,
+                              color: SDColors.white, size: 32),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.notifications,
-                              color: Colors.white, size: 32),
+                          icon: Icon(Icons.notifications,
+                              color: SDColors.white, size: 32),
                           onPressed: () {},
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  SizedBox(height: SDSpacing.xxxs),
                   TweenAnimationBuilder<double>(
                     tween: Tween(begin: 0, end: 1),
-                    duration: Duration(milliseconds: 700),
+                    duration: SDAnimations.medium,
                     builder: (context, value, child) => Opacity(
                       opacity: value,
                       child: child,
                     ),
-                    child: const Center(
+                    child: Center(
                       child: Text(
                         'SOUTRALI DEALS',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 22,
+                        style: SDTypography.titleLarge.copyWith(
+                          color: SDColors.white,
                           fontWeight: FontWeight.bold,
                           letterSpacing: 1.2,
                         ),
@@ -125,7 +122,7 @@ class _RondPageScreenStateM extends State<RondPageScreenM> {
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    padding: EdgeInsets.symmetric(vertical: SDSpacing.sm),
                     child: Align(
                       alignment: Alignment.center,
                       child: FractionallySizedBox(
@@ -133,13 +130,13 @@ class _RondPageScreenStateM extends State<RondPageScreenM> {
                         child: Container(
                           height: 52,
                           decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(32),
+                            color: SDColors.white,
+                            borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
                             border: Border.all(
-                                color: Colors.green.shade200, width: 1.4),
+                                color: SDColors.primary200, width: 1.4),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.green.withOpacity(0.07),
+                                color: SDColors.primary500.withOpacity(0.07),
                                 blurRadius: 10,
                                 offset: const Offset(0, 4),
                               ),
@@ -147,38 +144,37 @@ class _RondPageScreenStateM extends State<RondPageScreenM> {
                           ),
                           child: Row(
                             children: [
-                              const SizedBox(width: 10),
+                              SizedBox(width: SDSpacing.sm),
                               Material(
-                                color: Colors.green,
+                                color: SDColors.primary600,
                                 shape: const CircleBorder(),
                                 elevation: 2,
                                 child: Padding(
-                                  padding: const EdgeInsets.all(7.0),
+                                  padding: EdgeInsets.all(SDSpacing.xxs),
                                   child: Icon(Icons.search_rounded,
-                                      color: Colors.white, size: 22),
+                                      color: SDColors.white, size: 22),
                                 ),
                               ),
-                              const SizedBox(width: 12),
-                              const Expanded(
+                              SizedBox(width: SDSpacing.sm),
+                              Expanded(
                                 child: TextField(
-                                  style: TextStyle(fontSize: 16),
-                                  cursorColor: Colors.green,
+                                  style: SDTypography.bodyMedium,
+                                  cursorColor: SDColors.primary600,
                                   decoration: InputDecoration(
                                     hintText: 'Rechercher sur soutralideals',
-                                    hintStyle: TextStyle(
-                                        color: Colors.green,
-                                        fontSize: 16,
+                                    hintStyle: SDTypography.bodyMedium.copyWith(
+                                        color: SDColors.primary600,
                                         fontWeight: FontWeight.w500),
                                     border: InputBorder.none,
                                     enabledBorder: InputBorder.none,
                                     focusedBorder: InputBorder.none,
                                     isDense: true,
                                     contentPadding:
-                                        EdgeInsets.symmetric(vertical: 14),
+                                        EdgeInsets.symmetric(vertical: SDSpacing.sm),
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 10),
+                              SizedBox(width: SDSpacing.sm),
                             ],
                           ),
                         ),
@@ -193,39 +189,37 @@ class _RondPageScreenStateM extends State<RondPageScreenM> {
       ),
       body: SingleChildScrollView(
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: EdgeInsets.all(SDSpacing.md),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Barre de recherche
 
-              const SizedBox(height: 24),
+              SizedBox(height: SDSpacing.lg),
               // Liste horizontale de freelances
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
+                  Text(
                     'Freelances populaires',
-                    style: TextStyle(
+                    style: SDTypography.titleMedium.copyWith(
                       fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                      color: Colors.black,
+                      color: SDColors.neutral900,
                     ),
                   ),
                   GestureDetector(
                     onTap: () {},
-                    child: const Text(
+                    child: Text(
                       'Voir plus',
-                      style: TextStyle(
-                        color: Colors.green,
+                      style: SDTypography.labelLarge.copyWith(
+                        color: SDColors.primary600,
                         fontWeight: FontWeight.w600,
-                        fontSize: 15,
                       ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 14),
+              SizedBox(height: SDSpacing.sm),
               SizedBox(
                 height: 200,
                 child: ListView(
@@ -246,29 +240,27 @@ class _RondPageScreenStateM extends State<RondPageScreenM> {
                   ],
                 ),
               ),
-              const SizedBox(height: 30),
+              SizedBox(height: SDSpacing.xl),
               // Section À la une
-              const Text(
+              Text(
                 'À la une',
-                style: TextStyle(
+                style: SDTypography.titleMedium.copyWith(
                   fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                  color: Colors.black,
+                  color: SDColors.neutral900,
                 ),
               ),
-              const SizedBox(height: 14),
+              SizedBox(height: SDSpacing.sm),
               _buildFeaturedCard(),
-              const SizedBox(height: 30),
+              SizedBox(height: SDSpacing.xl),
               // Nouveaux freelances
-              const Text(
+              Text(
                 'Nouveaux freelances',
-                style: TextStyle(
+                style: SDTypography.titleMedium.copyWith(
                   fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                  color: Colors.black,
+                  color: SDColors.neutral900,
                 ),
               ),
-              const SizedBox(height: 14),
+              SizedBox(height: SDSpacing.sm),
               SizedBox(
                 height: 180,
                 child: ListView(
@@ -286,40 +278,38 @@ class _RondPageScreenStateM extends State<RondPageScreenM> {
                   ],
                 ),
               ),
-              const SizedBox(height: 30),
+              SizedBox(height: SDSpacing.xl),
               // Catégories populaires
-              const Text(
+              Text(
                 'Catégories populaires',
-                style: TextStyle(
+                style: SDTypography.titleMedium.copyWith(
                   fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                  color: Colors.black,
+                  color: SDColors.neutral900,
                 ),
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: SDSpacing.sm),
               Wrap(
-                spacing: 10,
-                runSpacing: 10,
+                spacing: SDSpacing.sm,
+                runSpacing: SDSpacing.sm,
                 children: [
-                  _buildCategoryChip('Développement', Colors.green),
-                  _buildCategoryChip('Design', Colors.orange),
-                  _buildCategoryChip('Rédaction', Colors.blue),
-                  _buildCategoryChip('Photo', Colors.purple),
-                  _buildCategoryChip('Traduction', Colors.teal),
-                  _buildCategoryChip('Marketing', Colors.redAccent),
+                  _buildCategoryChip('Développement', SDColors.primary600),
+                  _buildCategoryChip('Design', SDColors.secondary500),
+                  _buildCategoryChip('Rédaction', SDColors.info500),
+                  _buildCategoryChip('Photo', SDColors.primary700),
+                  _buildCategoryChip('Traduction', SDColors.success500),
+                  _buildCategoryChip('Marketing', SDColors.error500),
                 ],
               ),
-              const SizedBox(height: 36),
+              SizedBox(height: SDSpacing.xxxl),
               // Avis clients (carousel)
-              const Text(
+              Text(
                 'Avis clients',
-                style: TextStyle(
+                style: SDTypography.titleMedium.copyWith(
                   fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                  color: Colors.black,
+                  color: SDColors.neutral900,
                 ),
               ),
-              const SizedBox(height: 14),
+              SizedBox(height: SDSpacing.sm),
               SizedBox(
                 height: 170,
                 child: ListView(
@@ -334,88 +324,84 @@ class _RondPageScreenStateM extends State<RondPageScreenM> {
                   ],
                 ),
               ),
-              const SizedBox(height: 36),
+              SizedBox(height: SDSpacing.xxxl),
               // Statistiques animées
-              const Text(
+              Text(
                 'Statistiques de la communauté',
-                style: TextStyle(
+                style: SDTypography.titleMedium.copyWith(
                   fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                  color: Colors.black,
+                  color: SDColors.neutral900,
                 ),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: SDSpacing.md),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
                   _buildStatCard(
-                      'Freelances', '1 200+', Icons.people, Colors.green),
+                      'Freelances', '1 200+', Icons.people, SDColors.primary600),
                   _buildStatCard(
-                      'Clients', '3 500+', Icons.emoji_people, Colors.orange),
-                  _buildStatCard('Projets', '8 000+', Icons.work, Colors.blue),
+                      'Clients', '3 500+', Icons.emoji_people, SDColors.secondary500),
+                  _buildStatCard('Projets', '8 000+', Icons.work, SDColors.info500),
                 ],
               ),
-              const SizedBox(height: 36),
+              SizedBox(height: SDSpacing.xxxl),
               // Call-to-action secondaire
               Center(
                 child: ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.orange,
+                    backgroundColor: SDColors.secondary500,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24),
+                      borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
                     ),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 28, vertical: 12),
+                    padding: EdgeInsets.symmetric(
+                        horizontal: SDSpacing.xl, vertical: SDSpacing.sm),
                     elevation: 3,
                   ),
                   onPressed: () {},
-                  icon: const Icon(Icons.add_business, color: Colors.white),
-                  label: const Text(
+                  icon: Icon(Icons.add_business, color: SDColors.white),
+                  label: Text(
                     'Publier une mission',
-                    style: TextStyle(
-                      color: Colors.white,
+                    style: SDTypography.labelLarge.copyWith(
+                      color: SDColors.white,
                       fontWeight: FontWeight.bold,
-                      fontSize: 15,
                     ),
                   ),
                 ),
               ),
-              const SizedBox(height: 36),
+              SizedBox(height: SDSpacing.xxxl),
               // Pourquoi choisir un freelance ?
-              const Text(
+              Text(
                 'Pourquoi choisir un freelance ?',
-                style: TextStyle(
+                style: SDTypography.titleMedium.copyWith(
                   fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                  color: Colors.black,
+                  color: SDColors.neutral900,
                 ),
               ),
-              const SizedBox(height: 14),
+              SizedBox(height: SDSpacing.sm),
               _buildWhyFreelance(),
-              const SizedBox(height: 36),
+              SizedBox(height: SDSpacing.xxxl),
               // Bannière promotionnelle
               _buildPromoBanner(),
-              const SizedBox(height: 24),
+              SizedBox(height: SDSpacing.lg),
               // Bouton d'action
               Center(
                 child: ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
+                    backgroundColor: SDColors.primary600,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24),
+                      borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
                     ),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 32, vertical: 14),
+                    padding: EdgeInsets.symmetric(
+                        horizontal: SDSpacing.xl, vertical: SDSpacing.sm),
                     elevation: 4,
                   ),
                   onPressed: () {},
-                  icon: const Icon(Icons.people, color: Colors.white),
-                  label: const Text(
+                  icon: Icon(Icons.people, color: SDColors.white),
+                  label: Text(
                     'Voir tous les freelances',
-                    style: TextStyle(
-                      color: Colors.white,
+                    style: SDTypography.labelLarge.copyWith(
+                      color: SDColors.white,
                       fontWeight: FontWeight.bold,
-                      fontSize: 16,
                     ),
                   ),
                 ),
@@ -430,28 +416,28 @@ class _RondPageScreenStateM extends State<RondPageScreenM> {
   Widget _buildFreelanceCard(String name, String job, String imagePath,
       {bool isTop = false, double avatarSize = 40}) {
     return Padding(
-      padding: const EdgeInsets.only(right: 14.0),
+      padding: EdgeInsets.only(right: SDSpacing.sm),
       child: GestureDetector(
         onTap: () {},
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
+          duration: SDAnimations.short,
           width: 130,
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
+            color: SDColors.white,
+            borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
             boxShadow: [
               BoxShadow(
-                color: Colors.green.withOpacity(0.08),
+                color: SDColors.primary500.withOpacity(0.08),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
             ],
-            border: Border.all(color: Colors.green.withOpacity(0.08)),
+            border: Border.all(color: SDColors.primary500.withOpacity(0.08)),
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const SizedBox(height: 10),
+              SizedBox(height: SDSpacing.sm),
               Stack(
                 children: [
                   CircleAvatar(
@@ -463,30 +449,28 @@ class _RondPageScreenStateM extends State<RondPageScreenM> {
                       top: -2,
                       right: -2,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
+                        padding: EdgeInsets.symmetric(
+                            horizontal: SDSpacing.xxs, vertical: 2),
                         decoration: BoxDecoration(
-                          color: Colors.orange,
-                          borderRadius: BorderRadius.circular(10),
+                          color: SDColors.secondary500,
+                          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
                         ),
-                        child: const Text(
+                        child: Text(
                           'Top',
-                          style: TextStyle(
-                            color: Colors.white,
+                          style: SDTypography.labelSmall.copyWith(
+                            color: SDColors.white,
                             fontWeight: FontWeight.bold,
-                            fontSize: 10,
                           ),
                         ),
                       ),
                     ),
                 ],
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: SDSpacing.xs),
               Text(
                 name,
-                style: const TextStyle(
+                style: SDTypography.labelLarge.copyWith(
                   fontWeight: FontWeight.bold,
-                  fontSize: 15,
                 ),
                 textAlign: TextAlign.center,
                 maxLines: 1,
@@ -494,15 +478,14 @@ class _RondPageScreenStateM extends State<RondPageScreenM> {
               ),
               Text(
                 job,
-                style: const TextStyle(
-                  color: Colors.grey,
-                  fontSize: 13,
+                style: SDTypography.bodySmall.copyWith(
+                  color: SDColors.neutral500,
                 ),
                 textAlign: TextAlign.center,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: 10),
+              SizedBox(height: SDSpacing.sm),
             ],
           ),
         ),
@@ -515,15 +498,11 @@ class _RondPageScreenStateM extends State<RondPageScreenM> {
       width: double.infinity,
       height: 120,
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF43EA5E), Color(0xFF1CBF3F)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(22),
+        gradient: SDGradients.primaryGradient,
+        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
         boxShadow: [
           BoxShadow(
-            color: Colors.green.withOpacity(0.13),
+            color: SDColors.primary500.withOpacity(0.13),
             blurRadius: 18,
             offset: const Offset(0, 6),
           ),
@@ -531,31 +510,29 @@ class _RondPageScreenStateM extends State<RondPageScreenM> {
       ),
       child: Row(
         children: [
-          const SizedBox(width: 18),
+          SizedBox(width: SDSpacing.lg),
           CircleAvatar(
             radius: 38,
             backgroundImage: AssetImage('assets/profile_picture.jpg'),
           ),
-          const SizedBox(width: 18),
+          SizedBox(width: SDSpacing.lg),
           Expanded(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
+              children: [
                 Text(
                   'Aminata - Développeuse',
-                  style: TextStyle(
-                    color: Colors.white,
+                  style: SDTypography.titleMedium.copyWith(
+                    color: SDColors.white,
                     fontWeight: FontWeight.bold,
-                    fontSize: 17,
                   ),
                 ),
-                SizedBox(height: 6),
+                SizedBox(height: SDSpacing.xxs),
                 Text(
                   'Spécialiste Flutter & mobile, 5 ans d\'expérience. Disponible pour vos projets !',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
+                  style: SDTypography.bodySmall.copyWith(
+                    color: SDColors.white,
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -563,7 +540,7 @@ class _RondPageScreenStateM extends State<RondPageScreenM> {
               ],
             ),
           ),
-          const SizedBox(width: 18),
+          SizedBox(width: SDSpacing.lg),
         ],
       ),
     );
@@ -572,14 +549,14 @@ class _RondPageScreenStateM extends State<RondPageScreenM> {
   Widget _buildReviewCard(String review, String name, String imagePath) {
     return Container(
       width: 210,
-      margin: const EdgeInsets.only(right: 14),
-      padding: const EdgeInsets.all(14),
+      margin: EdgeInsets.only(right: SDSpacing.sm),
+      padding: EdgeInsets.all(SDSpacing.sm),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        color: SDColors.white,
+        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.07),
+            color: SDColors.neutral900.withOpacity(0.07),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -591,7 +568,7 @@ class _RondPageScreenStateM extends State<RondPageScreenM> {
             radius: 22,
             backgroundImage: AssetImage(imagePath),
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: SDSpacing.sm),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -599,20 +576,18 @@ class _RondPageScreenStateM extends State<RondPageScreenM> {
               children: [
                 Text(
                   review,
-                  style: const TextStyle(
+                  style: SDTypography.bodySmall.copyWith(
                     fontStyle: FontStyle.italic,
-                    fontSize: 13,
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 6),
+                SizedBox(height: SDSpacing.xxs),
                 Text(
                   '- ' + name,
-                  style: const TextStyle(
-                    color: Colors.green,
+                  style: SDTypography.labelSmall.copyWith(
+                    color: SDColors.primary600,
                     fontWeight: FontWeight.bold,
-                    fontSize: 12,
                   ),
                 ),
               ],
@@ -627,12 +602,12 @@ class _RondPageScreenStateM extends State<RondPageScreenM> {
     return Chip(
       label: Text(
         label,
-        style:
-            const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        style: SDTypography.labelMedium.copyWith(
+            color: SDColors.white, fontWeight: FontWeight.bold),
       ),
       backgroundColor: color,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      padding: EdgeInsets.symmetric(horizontal: SDSpacing.sm, vertical: SDSpacing.xxs),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium)),
       elevation: 2,
       shadowColor: color.withOpacity(0.2),
     );
@@ -641,13 +616,13 @@ class _RondPageScreenStateM extends State<RondPageScreenM> {
   Widget _buildStatCard(
       String label, String value, IconData icon, Color color) {
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 600),
+      duration: SDAnimations.long,
       curve: Curves.easeInOut,
       width: 100,
       height: 90,
       decoration: BoxDecoration(
         color: color.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
         boxShadow: [
           BoxShadow(
             color: color.withOpacity(0.13),
@@ -660,20 +635,18 @@ class _RondPageScreenStateM extends State<RondPageScreenM> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(icon, color: color, size: 32),
-          const SizedBox(height: 8),
+          SizedBox(height: SDSpacing.xs),
           Text(
             value,
-            style: TextStyle(
+            style: SDTypography.titleMedium.copyWith(
               color: color,
               fontWeight: FontWeight.bold,
-              fontSize: 18,
             ),
           ),
           Text(
             label,
-            style: const TextStyle(
-              color: Colors.black87,
-              fontSize: 13,
+            style: SDTypography.bodySmall.copyWith(
+              color: SDColors.neutral700,
             ),
           ),
         ],
@@ -684,25 +657,25 @@ class _RondPageScreenStateM extends State<RondPageScreenM> {
   Widget _buildWhyFreelance() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(18),
+      padding: EdgeInsets.all(SDSpacing.lg),
       decoration: BoxDecoration(
-        color: Colors.blue.shade50,
-        borderRadius: BorderRadius.circular(18),
+        color: SDColors.info100,
+        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
+        children: [
           Text('✔️ Flexibilité et réactivité',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-          SizedBox(height: 8),
+              style: SDTypography.labelLarge.copyWith(fontWeight: FontWeight.w600)),
+          SizedBox(height: SDSpacing.xs),
           Text('✔️ Tarifs compétitifs',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-          SizedBox(height: 8),
+              style: SDTypography.labelLarge.copyWith(fontWeight: FontWeight.w600)),
+          SizedBox(height: SDSpacing.xs),
           Text('✔️ Accès à des talents variés',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-          SizedBox(height: 8),
+              style: SDTypography.labelLarge.copyWith(fontWeight: FontWeight.w600)),
+          SizedBox(height: SDSpacing.xs),
           Text('✔️ Collaboration directe et rapide',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+              style: SDTypography.labelLarge.copyWith(fontWeight: FontWeight.w600)),
         ],
       ),
     );
@@ -711,17 +684,13 @@ class _RondPageScreenStateM extends State<RondPageScreenM> {
   Widget _buildPromoBanner() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 18),
+      padding: EdgeInsets.symmetric(vertical: SDSpacing.lg, horizontal: SDSpacing.lg),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF43EA5E), Color(0xFF1CBF3F)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(22),
+        gradient: SDGradients.primaryGradient,
+        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
         boxShadow: [
           BoxShadow(
-            color: Colors.green.withOpacity(0.13),
+            color: SDColors.primary500.withOpacity(0.13),
             blurRadius: 18,
             offset: const Offset(0, 6),
           ),
@@ -729,15 +698,14 @@ class _RondPageScreenStateM extends State<RondPageScreenM> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.star, color: Colors.white, size: 36),
-          const SizedBox(width: 18),
+          Icon(Icons.star, color: SDColors.white, size: 36),
+          SizedBox(width: SDSpacing.lg),
           Expanded(
             child: Text(
               "Rejoignez la communauté et boostez votre activité dès aujourd'hui !",
-              style: const TextStyle(
-                color: Colors.white,
+              style: SDTypography.labelLarge.copyWith(
+                color: SDColors.white,
                 fontWeight: FontWeight.bold,
-                fontSize: 15,
               ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
@@ -751,8 +719,8 @@ class _RondPageScreenStateM extends State<RondPageScreenM> {
   void _showFilterSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(SDSpacing.borderRadiusLarge)),
       ),
       isScrollControlled: true,
       builder: (context) {
@@ -763,10 +731,10 @@ class _RondPageScreenStateM extends State<RondPageScreenM> {
         return StatefulBuilder(
           builder: (context, setModalState) => Padding(
             padding: EdgeInsets.only(
-              left: 20,
-              right: 20,
-              top: 24,
-              bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+              left: SDSpacing.lg,
+              right: SDSpacing.lg,
+              top: SDSpacing.lg,
+              bottom: MediaQuery.of(context).viewInsets.bottom + SDSpacing.lg,
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -776,21 +744,21 @@ class _RondPageScreenStateM extends State<RondPageScreenM> {
                   child: Container(
                     width: 40,
                     height: 4,
-                    margin: const EdgeInsets.only(bottom: 18),
+                    margin: EdgeInsets.only(bottom: SDSpacing.lg),
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
-                      borderRadius: BorderRadius.circular(8),
+                      color: SDColors.neutral300,
+                      borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
                     ),
                   ),
                 ),
-                const Text('Filtrer les freelances',
-                    style:
-                        TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                const SizedBox(height: 18),
+                Text('Filtrer les freelances',
+                    style: SDTypography.titleMedium.copyWith(
+                        fontWeight: FontWeight.bold)),
+                SizedBox(height: SDSpacing.lg),
                 // Métier/catégorie
-                const Text('Catégorie',
-                    style: TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
+                Text('Catégorie',
+                    style: SDTypography.labelLarge.copyWith(fontWeight: FontWeight.w600)),
+                SizedBox(height: SDSpacing.xs),
                 DropdownButton<String>(
                   value: selectedCategory,
                   isExpanded: true,
@@ -807,11 +775,11 @@ class _RondPageScreenStateM extends State<RondPageScreenM> {
                       .toList(),
                   onChanged: (v) => setModalState(() => selectedCategory = v!),
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: SDSpacing.md),
                 // Localisation
-                const Text('Localisation',
-                    style: TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
+                Text('Localisation',
+                    style: SDTypography.labelLarge.copyWith(fontWeight: FontWeight.w600)),
+                SizedBox(height: SDSpacing.xs),
                 DropdownButton<String>(
                   value: selectedLocation,
                   isExpanded: true,
@@ -826,50 +794,51 @@ class _RondPageScreenStateM extends State<RondPageScreenM> {
                       .toList(),
                   onChanged: (v) => setModalState(() => selectedLocation = v!),
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: SDSpacing.md),
                 // Note minimale
-                const Text('Note minimale',
-                    style: TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
+                Text('Note minimale',
+                    style: SDTypography.labelLarge.copyWith(fontWeight: FontWeight.w600)),
+                SizedBox(height: SDSpacing.xs),
                 Slider(
                   value: minRating,
                   min: 1,
                   max: 5,
                   divisions: 4,
                   label: minRating.toStringAsFixed(1),
-                  activeColor: Colors.green,
+                  activeColor: SDColors.primary600,
                   onChanged: (v) => setModalState(() => minRating = v),
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: SDSpacing.md),
                 // Disponibilité
                 Row(
                   children: [
                     Checkbox(
                       value: availableNow,
-                      activeColor: Colors.green,
+                      activeColor: SDColors.primary600,
                       onChanged: (v) => setModalState(() => availableNow = v!),
                     ),
-                    const Text('Disponible maintenant'),
+                    Text('Disponible maintenant', style: SDTypography.bodyMedium),
                   ],
                 ),
-                const SizedBox(height: 24),
+                SizedBox(height: SDSpacing.lg),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
+                      backgroundColor: SDColors.primary600,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(18),
+                        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
                       ),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      padding: EdgeInsets.symmetric(vertical: SDSpacing.sm),
                     ),
                     onPressed: () {
                       Navigator.pop(context);
                       // Ici tu peux appliquer les filtres à ta recherche
                     },
-                    child: const Text('Appliquer les filtres',
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 16)),
+                    child: Text('Appliquer les filtres',
+                        style: SDTypography.labelLarge.copyWith(
+                            color: SDColors.white,
+                            fontWeight: FontWeight.bold)),
                   ),
                 ),
               ],

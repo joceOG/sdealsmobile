@@ -1,4 +1,3 @@
-import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:sdealsmobile/mobile/view/homepagem/screens/homePageScreenM.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -25,6 +24,9 @@ import 'morepagem/screens/morePageScreenM.dart';
 import 'orderpagem/orderpageblocm/commande_bloc.dart';
 import 'orderpagem/screens/orderPageScreenM.dart';
 
+// ✅ Design System
+import '../../design_system/design_system.dart';
+
 class Home extends StatefulWidget {
   const Home({super.key});
 
@@ -35,6 +37,16 @@ class Home extends StatefulWidget {
 int _currentIndex = 0;
 
 class _HomeState extends State<Home> {
+  bool _isBottomNavVisible = true;
+  
+  void _updateBottomNavVisibility(bool visible) {
+    if (_isBottomNavVisible != visible) {
+      setState(() {
+        _isBottomNavVisible = visible;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // ✅ Récupérer l'utilisateur connecté depuis AuthCubit
@@ -61,7 +73,10 @@ class _HomeState extends State<Home> {
 
     // ✅ Créer la liste des pages avec l'userId
     final List<Widget> _pageList = [
-      BlocProvider(create: (_) => HomePageBlocM(), child: HomePageScreenM()),
+      BlocProvider(
+        create: (_) => HomePageBlocM(),
+        child: HomePageScreenM(onScrollUpdate: _updateBottomNavVisibility),
+      ),
       BlocProvider(
           create: (_) => WalletPageBlocM(), child: WalletPageScreenM()),
       const ChatPageScreenM(), // ✅ Provider déplacé au niveau du Scaffold pour accès global (Badge)
@@ -74,82 +89,88 @@ class _HomeState extends State<Home> {
       create: (_) => ChatPageBlocM(userId: userId),
       child: Scaffold(
         body: Center(child: _pageList[_currentIndex]),
-        bottomNavigationBar: Padding(
-            padding: const EdgeInsets.all(0),
-            child: CurvedNavigationBar(
-              backgroundColor: Colors.white, // background behind the nav bar
-              color: Colors.green, // actual nav bar color
-              buttonBackgroundColor:
-                  Colors.green, // optional, color for the active button
-              onTap: (index) => setState(() {
-                _currentIndex = index;
-              }),
-              items: <Widget>[
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.home, size: 30.0, color: Colors.white),
-                    Text('Accueil',
-                        style: TextStyle(color: Colors.white, fontSize: 12)),
-                  ],
+        bottomNavigationBar: AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          height: _isBottomNavVisible ? null : 0,
+          child: _isBottomNavVisible ? Container(
+          decoration: BoxDecoration(
+            color: SDColors.white,
+            boxShadow: [
+              BoxShadow(
+                color: SDColors.neutral900.withOpacity(0.05),
+                blurRadius: 8,
+                offset: const Offset(0, -2),
+              ),
+            ],
+          ),
+          child: SafeArea(
+            child: BottomNavigationBar(
+              type: BottomNavigationBarType.fixed,
+              backgroundColor: SDColors.white,
+              selectedItemColor: SDColors.primary600,
+              unselectedItemColor: SDColors.neutral500,
+              selectedLabelStyle: SDTypography.labelSmall.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+              unselectedLabelStyle: SDTypography.labelSmall,
+              currentIndex: _currentIndex,
+              elevation: 0,
+              onTap: (index) => setState(() => _currentIndex = index),
+              items: [
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.home_outlined, size: 24),
+                  activeIcon: Icon(Icons.home, size: 24),
+                  label: 'Accueil',
                 ),
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.account_balance_wallet,
-                        size: 30.0, color: Colors.white),
-                    Text('Wallet',
-                        style: TextStyle(color: Colors.white, fontSize: 12)),
-                  ],
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.account_balance_wallet_outlined, size: 24),
+                  activeIcon: Icon(Icons.account_balance_wallet, size: 24),
+                  label: 'Wallet',
                 ),
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    BlocBuilder<ChatPageBlocM, ChatPageStateM>(
-                      builder: (context, chatState) {
-                        // Calcul du nombre de messages non lus
-                        int unreadCount = 0;
-                        // Utilisation de la liste sécurisée
-                        if (chatState.conversations != null && chatState.conversations.isNotEmpty) {
-                          try {
-                            unreadCount = chatState.conversations
-                                .where((c) => c.unread)
-                                .length;
-                          } catch (e) {
-                            // Fallback silencieux si erreur de structure
-                            unreadCount = 0;
-                          }
-                        }
-                        
-                        return NavBadge(
-                          count: unreadCount,
-                          child: const Icon(Icons.chat, size: 30.0, color: Colors.white),
-                        );
-                      },
-                    ),
-                    const Text('Chat',
-                        style: TextStyle(color: Colors.white, fontSize: 12)),
-                  ],
+                BottomNavigationBarItem(
+                  icon: _buildChatIconWithBadge(false),
+                  activeIcon: _buildChatIconWithBadge(true),
+                  label: 'Chat',
                 ),
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.shopping_bag, size: 30.0, color: Colors.white),
-                    Text('Commandes',
-                        style: TextStyle(color: Colors.white, fontSize: 12)),
-                  ],
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.shopping_bag_outlined, size: 24),
+                  activeIcon: Icon(Icons.shopping_bag, size: 24),
+                  label: 'Commandes',
                 ),
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.account_circle, size: 30.0, color: Colors.white),
-                    Text('Profil',
-                        style: TextStyle(color: Colors.white, fontSize: 12)),
-                  ],
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.account_circle_outlined, size: 24),
+                  activeIcon: Icon(Icons.account_circle, size: 24),
+                  label: 'Profil',
                 ),
               ],
-            )),
+            ),
+          ),
+        ) : null,
+        ),
       ),
+    );
+  }
+
+  Widget _buildChatIconWithBadge(bool isActive) {
+    return BlocBuilder<ChatPageBlocM, ChatPageStateM>(
+      builder: (context, chatState) {
+        int unreadCount = 0;
+        if (chatState.conversations != null && chatState.conversations.isNotEmpty) {
+          try {
+            unreadCount = chatState.conversations.where((c) => c.unread).length;
+          } catch (e) {
+            unreadCount = 0;
+          }
+        }
+        
+        return NavBadge(
+          count: unreadCount,
+          child: Icon(
+            isActive ? Icons.chat : Icons.chat_outlined,
+            size: 24,
+          ),
+        );
+      },
     );
   }
 }
