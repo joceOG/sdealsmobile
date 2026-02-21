@@ -10,8 +10,11 @@ class RegisterPageStateM extends Equatable {
   final bool isSuccess;
   final String? errorMessage;
   final Utilisateur? utilisateur;
-  final String? token;
-  final bool shouldUpdateAuth;
+<<<<<<< HEAD
+  final String? token; // ✅ Ajouter le token
+=======
+  final String? token;   // ✅ Ajout du token
+>>>>>>> 94ba01a (MAJ SDEALS MOBILE BETA)
 
   const RegisterPageStateM({
     this.fullName = '',
@@ -22,8 +25,11 @@ class RegisterPageStateM extends Equatable {
     this.isSuccess = false,
     this.errorMessage,
     this.utilisateur,
-    this.token,
-    this.shouldUpdateAuth = false,
+<<<<<<< HEAD
+    this.token, // ✅ Ajouter le token
+=======
+    this.token,  // ✅ Ajout du token
+>>>>>>> 94ba01a (MAJ SDEALS MOBILE BETA)
   });
 
   RegisterPageStateM copyWith({
@@ -35,8 +41,11 @@ class RegisterPageStateM extends Equatable {
     bool? isSuccess,
     String? errorMessage,
     Utilisateur? utilisateur,
-    String? token,
-    bool? shouldUpdateAuth,
+<<<<<<< HEAD
+    String? token, // ✅ Ajouter le token
+=======
+    String? token,   // ✅ Ajout du token
+>>>>>>> 94ba01a (MAJ SDEALS MOBILE BETA)
   }) {
     return RegisterPageStateM(
       fullName: fullName ?? this.fullName,
@@ -46,13 +55,39 @@ class RegisterPageStateM extends Equatable {
       isSubmitting: isSubmitting ?? this.isSubmitting,
       isSuccess: isSuccess ?? this.isSuccess,
       errorMessage: errorMessage,
+<<<<<<< HEAD
       utilisateur: utilisateur,
-      token: token,
-      shouldUpdateAuth: shouldUpdateAuth ?? this.shouldUpdateAuth,
+      token: token ?? this.token, // ✅ Ajouter le token
+=======
+      utilisateur: utilisateur ?? this.utilisateur,
+      token: token ?? this.token,  // ✅ Ajout du token
+>>>>>>> 94ba01a (MAJ SDEALS MOBILE BETA)
     );
   }
 
   @override
-  List<Object?> get props =>
-      [fullName, phone, password, confirmPassword, isSubmitting, isSuccess, errorMessage, utilisateur, token, shouldUpdateAuth];
+  List<Object?> get props => [
+<<<<<<< HEAD
+        fullName,
+        phone,
+        password,
+        confirmPassword,
+        isSubmitting,
+        isSuccess,
+        errorMessage,
+        utilisateur,
+        token
+      ];
+=======
+    fullName,
+    phone,
+    password,
+    confirmPassword,
+    isSubmitting,
+    isSuccess,
+    errorMessage,
+    utilisateur,
+    token, // ✅ Ajout du token
+  ];
+>>>>>>> 94ba01a (MAJ SDEALS MOBILE BETA)
 }
