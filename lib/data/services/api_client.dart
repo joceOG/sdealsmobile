@@ -8,7 +8,11 @@ import 'package:diacritic/diacritic.dart';
 import '../models/article.dart';
 import '../models/groupe.dart';
 import '../models/service.dart';
+<<<<<<< HEAD
 import 'cache_service.dart';
+=======
+import '../models/utilisateur.dart';
+>>>>>>> 94ba01a (MAJ SDEALS MOBILE BETA)
 
 // http://180.149.197.115:3000/
 
@@ -439,18 +443,31 @@ class ApiClient {
     }
   }
 
+<<<<<<< HEAD
   Future<Map<String, dynamic>> registerUser(
       {required String fullName,
         required String phone,
         required String password,
         String role = "Client"}) async {
     final url = Uri.parse("$apiUrl/register");
+=======
+  Future<Map<String, dynamic>> registerUser(Utilisateur utilisateur) async {
+    final uri = Uri.parse("$apiUrl/register");
+    var request = http.MultipartRequest("POST", uri);
+>>>>>>> 94ba01a (MAJ SDEALS MOBILE BETA)
 
-    // Découper le fullName en nom et prénom
-    final parts = fullName.trim().split(" ");
-    final nom = parts.isNotEmpty ? parts.first : "";
-    final prenom = parts.length > 1 ? parts.sublist(1).join(" ") : "";
+    // Champs texte
+    request.fields['nom'] = utilisateur.nom ?? "";
+    request.fields['prenom'] = utilisateur.prenom ?? "";
+    request.fields['email'] = utilisateur.email ?? "";
+    request.fields['password'] = utilisateur.password ?? "";
+    request.fields['telephone'] = utilisateur.telephone ?? "";
+    request.fields['genre'] = utilisateur.genre ?? "";
+    request.fields['note'] = utilisateur.note ?? "";
+    request.fields['dateNaissance'] = utilisateur.dateNaissance ?? "";
+    request.fields['role'] = utilisateur.role ?? "";
 
+<<<<<<< HEAD
     print("🌍 Appel API: $url");
     print(
         "📤 Données envoyées: { nom: $nom, prenom: $prenom, telephone: $phone, password: *****, role: $role }");
@@ -466,22 +483,30 @@ class ApiClient {
         "role": role, // ✅ Ajouter le rôle
       }),
     );
+=======
+    // Photo profil
+    if (utilisateur.photoProfil != null && File(utilisateur.photoProfil!).existsSync()) {
+      request.files.add(await http.MultipartFile.fromPath("photoProfil", utilisateur.photoProfil!));
+    }
 
-    print("📥 StatusCode: ${response.statusCode}");
-    print("📥 Réponse brute: ${response.body}");
+    print("📤 Champs envoyés utilisateur : ${request.fields}");
+    print("📤 Fichiers envoyés utilisateur : ${request.files.map((f) => f.filename).toList()}");
+>>>>>>> 94ba01a (MAJ SDEALS MOBILE BETA)
+
+    final response = await request.send();
+    final responseBody = await response.stream.bytesToString();
+
+    print("📥 Status: ${response.statusCode}");
+    print("📥 Body: $responseBody");
 
     if (response.statusCode == 200 || response.statusCode == 201) {
-      final data = jsonDecode(response.body);
-      print("✅ Succès Register: $data");
-      return data;
+      final data = jsonDecode(responseBody);
+      return data ;
     } else {
       try {
-        final error = jsonDecode(response.body);
-        print("❌ Erreur API Register: $error");
-        throw Exception(
-            error["error"] ?? error["message"] ?? "Erreur d'inscription");
-      } catch (e) {
-        print("⚠️ Impossible de parser l'erreur: ${response.body}");
+        final error = jsonDecode(responseBody);
+        throw Exception(error["message"] ?? error["error"] ?? "Erreur lors de l'inscription");
+      } catch (_) {
         throw Exception("Erreur inconnue (${response.statusCode})");
       }
     }
@@ -565,6 +590,7 @@ class ApiClient {
     print('Récupération des freelances depuis le backend (page $page)');
 
     try {
+<<<<<<< HEAD
       final uri = Uri.parse('${dotenv.env['API_URL']}/freelance').replace(
         queryParameters: {
           'page': page.toString(),
@@ -575,6 +601,10 @@ class ApiClient {
       );
 
       final response = await http.get(uri);
+=======
+      final response =
+      await http.get(Uri.parse('${dotenv.env['API_URL']}/freelance'));
+>>>>>>> 94ba01a (MAJ SDEALS MOBILE BETA)
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> responseData = jsonDecode(response.body);
@@ -615,9 +645,14 @@ class ApiClient {
   Future<bool> testConnectivity() async {
     try {
       print("🔍 Test de connectivité vers: ${dotenv.env['API_URL']}");
+<<<<<<< HEAD
       // ✅ CORRIGÉ : Tester directement l'endpoint prestataire au lieu de /health
       final response = await http
           .get(Uri.parse('${dotenv.env['API_URL']}/prestataire'), headers: {
+=======
+      final response = await http
+          .get(Uri.parse('${dotenv.env['API_URL']}/health'), headers: {
+>>>>>>> 94ba01a (MAJ SDEALS MOBILE BETA)
         'Content-Type': 'application/json'
       }).timeout(Duration(seconds: 5));
 
@@ -629,10 +664,132 @@ class ApiClient {
     }
   }
 
+<<<<<<< HEAD
+=======
+  Future<Utilisateur> registerPrestataire(Map<String, dynamic> formData) async {
+    // Étape 1 : Construire l’objet Utilisateur à partir du form
+    final fullName = (formData["fullName"] ?? "").trim();
+    final parts = fullName.split(" ");
+    final nom = parts.isNotEmpty ? parts.first : "";
+    final prenom = parts.length > 1 ? parts.sublist(1).join(" ") : "";
+
+    String? dateNaissanceStr;
+    if (formData["dateNaissance"] != null && formData["dateNaissance"] is DateTime) {
+      dateNaissanceStr = (formData["dateNaissance"] as DateTime).toIso8601String();
+    } else if (formData["dateNaissance"] is String) {
+      dateNaissanceStr = formData["dateNaissance"];
+    }
+
+    final utilisateur = Utilisateur(
+      idutilisateur: "",
+      nom: nom,
+      prenom: prenom,
+      email: formData["email"],
+      password: formData["password"],
+      telephone: formData["telephone"],
+      genre: formData["genre"],
+      note: formData["note"] ?? "",
+      photoProfil: formData["photoProfil"],
+      dateNaissance: dateNaissanceStr,
+      role: "Prestataire",
+    );
+
+    // Étape 2 : Enregistrer l’utilisateur via ton endpoint
+    final responseU = await registerUser(utilisateur);
+
+    final utilisateurData = responseU["utilisateur"] ?? {};
+
+    if (utilisateurData.idutilisateur.isEmpty) {
+      throw Exception("Impossible de créer l’utilisateur avant d’enregistrer le prestataire");
+    }
+
+    // ✅ Calcul automatique prixprestataire
+    final tarifMin = (formData["tarifHoraireMin"] ?? 0) as num;
+    final tarifMax = (formData["tarifHoraireMax"] ?? 0) as num;
+    final prixMoyen = ((tarifMin + tarifMax) / 2).toDouble();
+
+    // Étape 3 : Construire la requête multipart pour Prestataire
+    var uri = Uri.parse("$apiUrl/prestataire");
+    var request = http.MultipartRequest("POST", uri);
+
+    // Champs texte obligatoires
+    request.fields['utilisateur'] = utilisateurData.idutilisateur;
+    request.fields['service'] = formData['service'] ?? "";
+    request.fields['prixprestataire'] = prixMoyen.toString();
+    request.fields['anneeExperience'] = (formData['anneeExperience'] ?? 0).toString();
+    request.fields['description'] = formData['description'] ?? "";
+    request.fields['tarifHoraireMin'] = tarifMin.toString();
+    request.fields['tarifHoraireMax'] = tarifMax.toString();
+    request.fields['localisation'] = formData['localisation'] ?? "";
+    request.fields['numeroAssurance'] = formData['numeroAssurance'] ?? "";
+    request.fields['numeroRCCM'] = formData['numeroRCCM'] ?? "";
+    request.fields['nbMission'] = (formData['nbMission'] ?? 0).toString();
+    request.fields['revenus'] = (formData['revenus'] ?? 0).toString();
+    request.fields['verifier'] = ((formData['verifier'] ?? false) as bool).toString();
+
+    // Listes → encodage JSON
+    request.fields['specialite'] = jsonEncode(formData['specialite'] ?? []);
+    request.fields['zoneIntervention'] = jsonEncode(formData['zoneIntervention'] ?? []);
+    request.fields['clients'] = jsonEncode(formData['clients'] ?? []);
+    request.fields['localisationMaps'] = jsonEncode(formData['localisationMaps'] ?? {});
+
+    // Ajout des fichiers
+    Future<void> addFile(String key, dynamic path) async {
+      if (path != null && path is String && File(path).existsSync()) {
+        request.files.add(await http.MultipartFile.fromPath(key, path));
+      }
+    }
+
+    await addFile("cni1", formData["cni1"]);
+    await addFile("cni2", formData["cni2"]);
+    await addFile("selfie", formData["selfie"]);
+    await addFile("attestationAssurance", formData["attestationAssurance"]);
+
+    // Diplômes multiples
+    if (formData["diplomeCertificat"] != null && formData["diplomeCertificat"] is List) {
+      for (var filePath in formData["diplomeCertificat"]) {
+        if (filePath is String && File(filePath).existsSync()) {
+          request.files.add(await http.MultipartFile.fromPath("diplomeCertificat", filePath));
+        }
+      }
+    }
+
+    print("📤 Champs envoyés : ${request.fields}");
+    print("📤 Fichiers envoyés : ${request.files.map((f) => f.filename).toList()}");
+
+    // Étape 4 : Envoi
+    var response = await request.send();
+    var responseBody = await response.stream.bytesToString();
+
+    print("📥 Status: ${response.statusCode}");
+    print("📥 Body: $responseBody");
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      final json = jsonDecode(responseBody);
+
+      // ⚠️ suppose que ton backend renvoie { utilisateur: {...}, token: "..." }
+      final utilisateurJson = json['utilisateur'];
+      final token = json['token'];
+
+      final utilisateurComplet = Utilisateur.fromJson(utilisateurJson);
+      utilisateurComplet.token = token;
+
+      return utilisateurComplet; // ✅ tu renvoies l’utilisateur complet
+    } else {
+      try {
+        final error = jsonDecode(responseBody);
+        throw Exception(error["message"] ?? error["error"] ?? "Erreur lors de la création du prestataire");
+      } catch (_) {
+        throw Exception("Erreur inconnue (${response.statusCode})");
+      }
+    }
+  }
+>>>>>>> 94ba01a (MAJ SDEALS MOBILE BETA)
   // ✅ NOUVELLE MÉTHODE : Récupérer tous les prestataires
   Future<List<Map<String, dynamic>>> fetchPrestataires() async {
     print('🚀 Récupération des prestataires depuis le backend');
     print('🌐 URL complète: ${dotenv.env['API_URL']}/prestataire');
+<<<<<<< HEAD
     const cacheKey = 'all_prestataires';
 
     // 1️⃣ Cache
@@ -647,6 +804,15 @@ class ApiClient {
     // 2️⃣ API
 
     // ✅ SUPPRIMÉ : Test de connectivité inutile qui causait le problème
+=======
+
+    // Test de connectivité avant l'appel
+    final isConnected = await testConnectivity();
+    if (!isConnected) {
+      print("⚠️ Backend non accessible, utilisation des données de fallback");
+      return _getFallbackPrestataires();
+    }
+>>>>>>> 94ba01a (MAJ SDEALS MOBILE BETA)
 
     try {
       final response = await http
