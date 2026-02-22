@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:math' as math;
-import 'dart:io';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:sdealsmobile/data/models/categorie.dart';
@@ -8,7 +7,6 @@ import 'package:diacritic/diacritic.dart';
 import '../models/article.dart';
 import '../models/groupe.dart';
 import '../models/service.dart';
-import '../models/utilisateur.dart';
 
 // http://180.149.197.115:3000/
 
@@ -18,118 +16,6 @@ class ApiClient {
   // URL configurable selon la plateforme
 
   var apiUrl = dotenv.env['API_URL'];
-
-  // 🔧 MÉTHODES HTTP GÉNÉRIQUES
-  Future<http.Response> get(String endpoint) async {
-    final response = await http.get(
-      Uri.parse('$apiUrl$endpoint'),
-      headers: {'Content-Type': 'application/json'},
-    ).timeout(const Duration(seconds: 30));
-    return response;
-  }
-
-  Future<http.Response> post(String endpoint,
-      {Map<String, dynamic>? body}) async {
-    final response = await http
-        .post(
-      Uri.parse('$apiUrl$endpoint'),
-      headers: {'Content-Type': 'application/json'},
-      body: body != null ? jsonEncode(body) : null,
-    )
-        .timeout(const Duration(seconds: 30));
-    return response;
-  }
-
-  Future<http.Response> put(String endpoint,
-      {Map<String, dynamic>? body}) async {
-    final response = await http
-        .put(
-      Uri.parse('$apiUrl$endpoint'),
-      headers: {'Content-Type': 'application/json'},
-      body: body != null ? jsonEncode(body) : null,
-    )
-        .timeout(const Duration(seconds: 30));
-    return response;
-  }
-
-  Future<http.Response> delete(String endpoint) async {
-    final response = await http.delete(
-      Uri.parse('$apiUrl$endpoint'),
-      headers: {'Content-Type': 'application/json'},
-    ).timeout(const Duration(seconds: 30));
-    return response;
-  }
-
-  // ✅ MÉTHODE POUR METTRE À JOUR LE PROFIL UTILISATEUR
-  Future<Map<String, dynamic>> updateUserProfile({
-    required String userId,
-    required Map<String, dynamic> updateData,
-    File? photoFile,
-    required String token,
-  }) async {
-    try {
-      var request = http.MultipartRequest(
-        'PUT',
-        Uri.parse('$apiUrl/utilisateur/$userId'),
-      );
-
-      // Ajouter le token d'authentification
-      request.headers['Authorization'] = 'Bearer $token';
-
-      // Ajouter les données de mise à jour
-      updateData.forEach((key, value) {
-        if (value != null) {
-          request.fields[key] = value.toString();
-        }
-      });
-
-      // Ajouter la photo si fournie
-      if (photoFile != null) {
-        request.files.add(
-          await http.MultipartFile.fromPath(
-            'photoProfil',
-            photoFile.path,
-          ),
-        );
-      }
-
-      var streamedResponse = await request.send();
-      var response = await http.Response.fromStream(streamedResponse);
-
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
-      } else {
-        throw Exception(
-            'Erreur lors de la mise à jour: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Erreur API: $e');
-    }
-  }
-
-  // ✅ MÉTHODE POUR RÉCUPÉRER UN UTILISATEUR PAR ID
-  Future<Map<String, dynamic>> getUserById(String userId) async {
-    try {
-      final response = await get('/utilisateur/$userId');
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
-      } else {
-        throw Exception('Erreur lors du chargement: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Erreur API: $e');
-    }
-  }
-
-  Future<http.Response> patch(String endpoint,
-      {Map<String, dynamic>? body}) async {
-    final response = await http.patch(
-      Uri.parse('$apiUrl$endpoint'),
-      headers: {'Content-Type': 'application/json'},
-      body: body != null ? jsonEncode(body) : null,
-    );
-    return response;
-  }
 
   Future<List<Categorie>> fetchCategorie(String nomGroupe) async {
     print('Récupération des catégories pour le groupe: $nomGroupe');
@@ -161,7 +47,7 @@ class ApiClient {
         // Filtrer les catégories par nom de groupe (insensible à casse et accents)
         final filteredCategories = allCategories.where((cat) {
           final groupeNom =
-          removeDiacritics(cat.groupe.nomgroupe.toLowerCase());
+              removeDiacritics(cat.groupe.nomgroupe.toLowerCase());
           final targetNom = removeDiacritics(nomGroupe.toLowerCase());
           return groupeNom == targetNom;
         }).toList();
@@ -182,9 +68,9 @@ class ApiClient {
   // ✅ Favoris: ajouter
   Future<void> addFavorite(
       {required String token,
-        String? serviceId,
-        required String title,
-        String? image}) async {
+      String? serviceId,
+      required String title,
+      String? image}) async {
     final uri = Uri.parse('$apiUrl/favorites');
     final response = await http.post(
       uri,
@@ -207,9 +93,9 @@ class ApiClient {
   // ✅ Signalement: créer
   Future<void> createReport(
       {required String token,
-        required String targetType,
-        required String targetId,
-        required String reason}) async {
+      required String targetType,
+      required String targetId,
+      required String reason}) async {
     final uri = Uri.parse('$apiUrl/reports');
     final response = await http.post(
       uri,
@@ -283,13 +169,13 @@ class ApiClient {
 
         List<Service> allServices = servicesJson
             .map((json) {
-          try {
-            return Service.fromJson(json);
-          } catch (e) {
-            print('Erreur parsing service: $e pour $json');
-            return null;
-          }
-        })
+              try {
+                return Service.fromJson(json);
+              } catch (e) {
+                print('Erreur parsing service: $e pour $json');
+                return null;
+              }
+            })
             .whereType<Service>()
             .toList(); // filtre les null
 
@@ -332,7 +218,7 @@ class ApiClient {
       if (response.statusCode == 200) {
         List<dynamic> articlesJson = jsonDecode(response.body);
         List<Article> articles =
-        articlesJson.map((json) => Article.fromJson(json)).toList();
+            articlesJson.map((json) => Article.fromJson(json)).toList();
         print('Articles récupérés: ${articles.length}');
         return articles;
       } else {
@@ -356,43 +242,47 @@ class ApiClient {
     }
   }
 
-  Future<Map<String, dynamic>> registerUser(Utilisateur utilisateur) async {
-    final uri = Uri.parse("$apiUrl/register");
-    var request = http.MultipartRequest("POST", uri);
+  Future<Map<String, dynamic>> registerUser(
+      {required String fullName,
+      required String phone,
+      required String password}) async {
+    final url = Uri.parse("$apiUrl/register");
 
-    // Champs texte
-    request.fields['nom'] = utilisateur.nom ?? "";
-    request.fields['prenom'] = utilisateur.prenom ?? "";
-    request.fields['email'] = utilisateur.email ?? "";
-    request.fields['password'] = utilisateur.password ?? "";
-    request.fields['telephone'] = utilisateur.telephone ?? "";
-    request.fields['genre'] = utilisateur.genre ?? "";
-    request.fields['note'] = utilisateur.note ?? "";
-    request.fields['dateNaissance'] = utilisateur.dateNaissance ?? "";
-    request.fields['role'] = utilisateur.role ?? "";
+    // Découper le fullName en nom et prénom
+    final parts = fullName.trim().split(" ");
+    final nom = parts.isNotEmpty ? parts.first : "";
+    final prenom = parts.length > 1 ? parts.sublist(1).join(" ") : "";
 
-    // Photo profil
-    if (utilisateur.photoProfil != null && File(utilisateur.photoProfil!).existsSync()) {
-      request.files.add(await http.MultipartFile.fromPath("photoProfil", utilisateur.photoProfil!));
-    }
+    print("🌍 Appel API: $url");
+    print(
+        "📤 Données envoyées: { nom: $nom, prenom: $prenom, telephone: $phone, password: ***** }");
 
-    print("📤 Champs envoyés utilisateur : ${request.fields}");
-    print("📤 Fichiers envoyés utilisateur : ${request.files.map((f) => f.filename).toList()}");
+    final response = await http.post(
+      url,
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode({
+        "nom": nom,
+        "prenom": prenom,
+        "telephone": phone,
+        "password": password, // 👈 correspond à ton backend
+      }),
+    );
 
-    final response = await request.send();
-    final responseBody = await response.stream.bytesToString();
-
-    print("📥 Status: ${response.statusCode}");
-    print("📥 Body: $responseBody");
+    print("📥 StatusCode: ${response.statusCode}");
+    print("📥 Réponse brute: ${response.body}");
 
     if (response.statusCode == 200 || response.statusCode == 201) {
-      final data = jsonDecode(responseBody);
-      return data ;
+      final data = jsonDecode(response.body);
+      print("✅ Succès Register: $data");
+      return data;
     } else {
       try {
-        final error = jsonDecode(responseBody);
-        throw Exception(error["message"] ?? error["error"] ?? "Erreur lors de l'inscription");
-      } catch (_) {
+        final error = jsonDecode(response.body);
+        print("❌ Erreur API Register: $error");
+        throw Exception(
+            error["error"] ?? error["message"] ?? "Erreur d'inscription");
+      } catch (e) {
+        print("⚠️ Impossible de parser l'erreur: ${response.body}");
         throw Exception("Erreur inconnue (${response.statusCode})");
       }
     }
@@ -444,7 +334,7 @@ class ApiClient {
   Future<Map<String, dynamic>> getUserRoles(String userId) async {
     try {
       final response =
-      await http.get(Uri.parse('$apiUrl/utilisateur/$userId/roles'));
+          await http.get(Uri.parse('$apiUrl/utilisateur/$userId/roles'));
       if (response.statusCode == 200) {
         return jsonDecode(response.body) as Map<String, dynamic>;
       }
@@ -461,7 +351,7 @@ class ApiClient {
 
     try {
       final response =
-      await http.get(Uri.parse('${dotenv.env['API_URL']}/freelance'));
+          await http.get(Uri.parse('${dotenv.env['API_URL']}/freelance'));
 
       if (response.statusCode == 200) {
         List<dynamic> freelancesJson = jsonDecode(response.body);
@@ -479,269 +369,28 @@ class ApiClient {
     }
   }
 
-  // 🔧 TEST DE CONNECTIVITÉ BACKEND
-  Future<bool> testConnectivity() async {
-    try {
-      print("🔍 Test de connectivité vers: ${dotenv.env['API_URL']}");
-      final response = await http
-          .get(Uri.parse('${dotenv.env['API_URL']}/health'), headers: {
-        'Content-Type': 'application/json'
-      }).timeout(Duration(seconds: 5));
-
-      print("📡 Réponse test connectivité: ${response.statusCode}");
-      return response.statusCode == 200;
-    } catch (e) {
-      print("❌ Échec test connectivité: $e");
-      return false;
-    }
-  }
-
-  Future<Utilisateur> registerPrestataire(Map<String, dynamic> formData) async {
-    // Étape 1 : Construire l’objet Utilisateur à partir du form
-    final fullName = (formData["fullName"] ?? "").trim();
-    final parts = fullName.split(" ");
-    final nom = parts.isNotEmpty ? parts.first : "";
-    final prenom = parts.length > 1 ? parts.sublist(1).join(" ") : "";
-
-    String? dateNaissanceStr;
-    if (formData["dateNaissance"] != null && formData["dateNaissance"] is DateTime) {
-      dateNaissanceStr = (formData["dateNaissance"] as DateTime).toIso8601String();
-    } else if (formData["dateNaissance"] is String) {
-      dateNaissanceStr = formData["dateNaissance"];
-    }
-
-    final utilisateur = Utilisateur(
-      idutilisateur: "",
-      nom: nom,
-      prenom: prenom,
-      email: formData["email"],
-      password: formData["password"],
-      telephone: formData["telephone"],
-      genre: formData["genre"],
-      note: formData["note"] ?? "",
-      photoProfil: formData["photoProfil"],
-      dateNaissance: dateNaissanceStr,
-      role: "Prestataire",
-    );
-
-    // Étape 2 : Enregistrer l’utilisateur via ton endpoint
-    final responseU = await registerUser(utilisateur);
-
-    final utilisateurData = responseU["utilisateur"] ?? {};
-
-    if (utilisateurData.idutilisateur.isEmpty) {
-      throw Exception("Impossible de créer l’utilisateur avant d’enregistrer le prestataire");
-    }
-
-    // ✅ Calcul automatique prixprestataire
-    final tarifMin = (formData["tarifHoraireMin"] ?? 0) as num;
-    final tarifMax = (formData["tarifHoraireMax"] ?? 0) as num;
-    final prixMoyen = ((tarifMin + tarifMax) / 2).toDouble();
-
-    // Étape 3 : Construire la requête multipart pour Prestataire
-    var uri = Uri.parse("$apiUrl/prestataire");
-    var request = http.MultipartRequest("POST", uri);
-
-    // Champs texte obligatoires
-    request.fields['utilisateur'] = utilisateurData.idutilisateur;
-    request.fields['service'] = formData['service'] ?? "";
-    request.fields['prixprestataire'] = prixMoyen.toString();
-    request.fields['anneeExperience'] = (formData['anneeExperience'] ?? 0).toString();
-    request.fields['description'] = formData['description'] ?? "";
-    request.fields['tarifHoraireMin'] = tarifMin.toString();
-    request.fields['tarifHoraireMax'] = tarifMax.toString();
-    request.fields['localisation'] = formData['localisation'] ?? "";
-    request.fields['numeroAssurance'] = formData['numeroAssurance'] ?? "";
-    request.fields['numeroRCCM'] = formData['numeroRCCM'] ?? "";
-    request.fields['nbMission'] = (formData['nbMission'] ?? 0).toString();
-    request.fields['revenus'] = (formData['revenus'] ?? 0).toString();
-    request.fields['verifier'] = ((formData['verifier'] ?? false) as bool).toString();
-
-    // Listes → encodage JSON
-    request.fields['specialite'] = jsonEncode(formData['specialite'] ?? []);
-    request.fields['zoneIntervention'] = jsonEncode(formData['zoneIntervention'] ?? []);
-    request.fields['clients'] = jsonEncode(formData['clients'] ?? []);
-    request.fields['localisationMaps'] = jsonEncode(formData['localisationMaps'] ?? {});
-
-    // Ajout des fichiers
-    Future<void> addFile(String key, dynamic path) async {
-      if (path != null && path is String && File(path).existsSync()) {
-        request.files.add(await http.MultipartFile.fromPath(key, path));
-      }
-    }
-
-    await addFile("cni1", formData["cni1"]);
-    await addFile("cni2", formData["cni2"]);
-    await addFile("selfie", formData["selfie"]);
-    await addFile("attestationAssurance", formData["attestationAssurance"]);
-
-    // Diplômes multiples
-    if (formData["diplomeCertificat"] != null && formData["diplomeCertificat"] is List) {
-      for (var filePath in formData["diplomeCertificat"]) {
-        if (filePath is String && File(filePath).existsSync()) {
-          request.files.add(await http.MultipartFile.fromPath("diplomeCertificat", filePath));
-        }
-      }
-    }
-
-    print("📤 Champs envoyés : ${request.fields}");
-    print("📤 Fichiers envoyés : ${request.files.map((f) => f.filename).toList()}");
-
-    // Étape 4 : Envoi
-    var response = await request.send();
-    var responseBody = await response.stream.bytesToString();
-
-    print("📥 Status: ${response.statusCode}");
-    print("📥 Body: $responseBody");
-
-    if (response.statusCode == 200 || response.statusCode == 201) {
-      final json = jsonDecode(responseBody);
-
-      // ⚠️ suppose que ton backend renvoie { utilisateur: {...}, token: "..." }
-      final utilisateurJson = json['utilisateur'];
-      final token = json['token'];
-
-      final utilisateurComplet = Utilisateur.fromJson(utilisateurJson);
-      utilisateurComplet.token = token;
-
-      return utilisateurComplet; // ✅ tu renvoies l’utilisateur complet
-    } else {
-      try {
-        final error = jsonDecode(responseBody);
-        throw Exception(error["message"] ?? error["error"] ?? "Erreur lors de la création du prestataire");
-      } catch (_) {
-        throw Exception("Erreur inconnue (${response.statusCode})");
-      }
-    }
-  }
   // ✅ NOUVELLE MÉTHODE : Récupérer tous les prestataires
   Future<List<Map<String, dynamic>>> fetchPrestataires() async {
-    print('🚀 Récupération des prestataires depuis le backend');
-    print('🌐 URL complète: ${dotenv.env['API_URL']}/prestataire');
-
-    // Test de connectivité avant l'appel
-    final isConnected = await testConnectivity();
-    if (!isConnected) {
-      print("⚠️ Backend non accessible, utilisation des données de fallback");
-      return _getFallbackPrestataires();
-    }
+    print('Récupération des prestataires depuis le backend');
 
     try {
-      final response = await http
-          .get(Uri.parse('${dotenv.env['API_URL']}/prestataire'), headers: {
-        'Content-Type': 'application/json'
-      }).timeout(Duration(seconds: 10));
-
-      print('📡 Status Code: ${response.statusCode}');
-      print('📋 Response Headers: ${response.headers}');
-      print('📝 Response Body Length: ${response.body.length}');
+      final response =
+          await http.get(Uri.parse('${dotenv.env['API_URL']}/prestataire'));
 
       if (response.statusCode == 200) {
         List<dynamic> prestatairesJson = jsonDecode(response.body);
-        print('✅ Prestataires récupérés: ${prestatairesJson.length}');
+        print('Prestataires récupérés: ${prestatairesJson.length}');
 
         // Retourner la liste de Map pour que le BLoC puisse la convertir
         return prestatairesJson.cast<Map<String, dynamic>>();
       } else {
-        print('❌ Erreur HTTP ${response.statusCode}: ${response.body}');
         throw Exception(
             'Échec de récupération des prestataires: ${response.statusCode}');
       }
     } catch (e) {
-      print('🔥 Erreur dans fetchPrestataires: $e');
-      // Utiliser les données de fallback en cas d'erreur
-      return _getFallbackPrestataires();
+      print('Erreur dans fetchPrestataires: $e');
+      throw Exception('Échec de chargement des prestataires: $e');
     }
-  }
-
-  // 🛡️ DONNÉES DE FALLBACK EN CAS DE PROBLÈME DE CONNECTIVITÉ
-  List<Map<String, dynamic>> _getFallbackPrestataires() {
-    print("📦 Utilisation des données de fallback prestataires");
-    return [
-      {
-        'idprestataire': 'fallback1',
-        'utilisateur': {
-          'idutilisateur': 'user1',
-          'nom': 'Diallo',
-          'prenom': 'Amadou',
-          'email': 'amadou@example.com',
-          'telephone': '+223 65 43 21 00'
-        },
-        'service': {
-          'idservice': 'service1',
-          'nomservice': 'Ménage résidentiel',
-          'prixservice': 15000.0,
-          'categorie': {
-            'idcategorie': 'cat1',
-            'nomcategorie': 'Ménage',
-            'groupe': {'idgroupe': 'grp1', 'nomgroupe': 'Métiers'}
-          }
-        },
-        'prixprestataire': 15000.0, // ✅ Requis par le modèle
-        'localisation': 'Abidjan, Côte d\'Ivoire',
-        'localisationmaps': {'latitude': 5.3600, 'longitude': -4.0083},
-        'description': 'Service de ménage professionnel disponible 24h/7',
-        'verifier': true,
-        'note': '4.8', // ✅ String comme attendu
-        'anneeExperience': '5',
-        'specialite': ['Ménage résidentiel', 'Nettoyage bureaux'],
-        // Champs optionnels pour éviter les erreurs null
-        'cni1': null,
-        'cni2': null,
-        'selfie': null,
-        'numeroCNI': null,
-        'rayonIntervention': 10.0,
-        'zoneIntervention': ['Abidjan'],
-        'tarifHoraireMin': 2000.0,
-        'tarifHoraireMax': 5000.0,
-        'diplomeCertificat': null,
-        'attestationAssurance': null,
-        'numeroAssurance': null,
-        'numeroRCCM': null
-      },
-      {
-        'idprestataire': 'fallback2',
-        'utilisateur': {
-          'idutilisateur': 'user2',
-          'nom': 'Traoré',
-          'prenom': 'Fatoumata',
-          'email': 'fatoumata@example.com',
-          'telephone': '+223 76 54 32 10'
-        },
-        'service': {
-          'idservice': 'service2',
-          'nomservice': 'Jardinage',
-          'prixservice': 25000.0,
-          'categorie': {
-            'idcategorie': 'cat2',
-            'nomcategorie': 'Jardinage',
-            'groupe': {'idgroupe': 'grp1', 'nomgroupe': 'Métiers'}
-          }
-        },
-        'prixprestataire': 25000.0, // ✅ Requis par le modèle
-        'localisation': 'Abidjan, Côte d\'Ivoire',
-        'localisationmaps': {'latitude': 5.3700, 'longitude': -4.0200},
-        'description':
-        'Spécialiste en aménagement paysager et entretien jardins',
-        'verifier': true,
-        'note': '4.5', // ✅ String comme attendu
-        'anneeExperience': '8',
-        'specialite': ['Jardinage', 'Paysagisme'],
-        // Champs optionnels pour éviter les erreurs null
-        'cni1': null,
-        'cni2': null,
-        'selfie': null,
-        'numeroCNI': null,
-        'rayonIntervention': 15.0,
-        'zoneIntervention': ['Abidjan'],
-        'tarifHoraireMin': 3000.0,
-        'tarifHoraireMax': 8000.0,
-        'diplomeCertificat': null,
-        'attestationAssurance': null,
-        'numeroAssurance': null,
-        'numeroRCCM': null
-      }
-    ];
   }
 
   // ✅ NOUVELLE MÉTHODE : Récupérer tous les vendeurs (CORRIGÉ PARSING !)
@@ -750,7 +399,7 @@ class ApiClient {
 
     try {
       final response =
-      await http.get(Uri.parse('${dotenv.env['API_URL']}/vendeur'));
+          await http.get(Uri.parse('${dotenv.env['API_URL']}/vendeur'));
 
       if (response.statusCode == 200) {
         dynamic responseData = jsonDecode(response.body);
@@ -945,25 +594,25 @@ class ApiClient {
       final all = await fetchPrestataires();
       return all
           .where((p) {
-        bool ok = true;
-        if (serviceName != null && serviceName.isNotEmpty) {
-          final svc = p['service'];
-          final svcName = (svc is Map<String, dynamic>)
-              ? (svc['nomservice'] ?? svc['name'] ?? '')
-              : (svc?.toString() ?? '');
-          ok = ok &&
-              svcName
-                  .toString()
-                  .toLowerCase()
-                  .contains(serviceName.toLowerCase());
-        }
-        if (verified != null) {
-          final isVerified =
-              (p['verifier'] == true) || (p['verified'] == true);
-          ok = ok && (verified ? isVerified : true);
-        }
-        return ok;
-      })
+            bool ok = true;
+            if (serviceName != null && serviceName.isNotEmpty) {
+              final svc = p['service'];
+              final svcName = (svc is Map<String, dynamic>)
+                  ? (svc['nomservice'] ?? svc['name'] ?? '')
+                  : (svc?.toString() ?? '');
+              ok = ok &&
+                  svcName
+                      .toString()
+                      .toLowerCase()
+                      .contains(serviceName.toLowerCase());
+            }
+            if (verified != null) {
+              final isVerified =
+                  (p['verifier'] == true) || (p['verified'] == true);
+              ok = ok && (verified ? isVerified : true);
+            }
+            return ok;
+          })
           .take(limit ?? 9999)
           .toList();
     } catch (e) {
@@ -1083,7 +732,7 @@ extension ServiceRequestsApi on ApiClient {
       if (status != null) 'status': status
     };
     final uri =
-    Uri.parse('$apiUrl/prestations').replace(queryParameters: query);
+        Uri.parse('$apiUrl/prestations').replace(queryParameters: query);
     final res = await http.get(uri, headers: {
       'Authorization': 'Bearer $token',
     });
