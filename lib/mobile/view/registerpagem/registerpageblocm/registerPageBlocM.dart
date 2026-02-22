@@ -1,5 +1,4 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../data/models/utilisateur.dart';
 import '../../../../data/services/api_client.dart';
 import 'registerPageStateM.dart';
@@ -25,7 +24,8 @@ class RegisterPageBlocM extends Bloc<RegisterPageEventM, RegisterPageStateM> {
 
     on<RegisterSubmitted>((event, emit) async {
       if (state.password != state.confirmPassword) {
-        emit(state.copyWith(errorMessage: "Les mots de passe ne correspondent pas"));
+        emit(state.copyWith(
+            errorMessage: "Les mots de passe ne correspondent pas"));
         return;
       }
 
@@ -34,7 +34,6 @@ class RegisterPageBlocM extends Bloc<RegisterPageEventM, RegisterPageStateM> {
 
       try {
         // Découper nom et prénom
-<<<<<<< HEAD
         // Préparation des données pour l'inscription
 
         // Appel API
@@ -95,49 +94,6 @@ class RegisterPageBlocM extends Bloc<RegisterPageEventM, RegisterPageStateM> {
               isSuccess: true,
               utilisateur: utilisateurDefaut));
         }
-=======
-        final fullName = (state.fullName).trim();
-        final parts = fullName.split(" ");
-        final nom = parts.isNotEmpty ? parts.first : "";
-        final prenom = parts.length > 1 ? parts.sublist(1).join(" ") : "";
-
-        // Construire l’utilisateur (minimum requis)
-        final utilisateur = Utilisateur(
-          idutilisateur: "",
-          nom: nom,
-          prenom: prenom,
-          email: '',
-          password: state.password,
-          telephone: state.phone,
-          genre: "",       // valeur par défaut
-          note: null,
-          photoProfil: null,
-          dateNaissance: null,
-          role: "Client",
-        );
-
-        // Appel API inscription
-        final response = await apiClient.registerUser(utilisateur);
-
-        final token = response["token"] ?? "";
-
-        if (token.isEmpty) {
-          emit(state.copyWith(
-            isSubmitting: false,
-            errorMessage: "Token manquant après l'inscription",
-          ));
-          return;
-        }
-
-
-        // ✅ Succès → utilisateur automatiquement connecté
-        emit(state.copyWith(
-          isSubmitting: false,
-          isSuccess: true,
-          utilisateur: utilisateur,
-          token: token,
-        ));
->>>>>>> 94ba01a (MAJ SDEALS MOBILE BETA)
       } catch (e) {
         emit(state.copyWith(
           isSubmitting: false,
@@ -145,7 +101,5 @@ class RegisterPageBlocM extends Bloc<RegisterPageEventM, RegisterPageStateM> {
         ));
       }
     });
-
   }
-
 }
