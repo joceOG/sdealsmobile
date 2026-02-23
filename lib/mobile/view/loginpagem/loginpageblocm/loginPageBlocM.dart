@@ -48,10 +48,14 @@ class LoginPageBlocM extends Bloc<LoginPageEventM, LoginPageStateM> {
 
 
 
-      // ✅ Émettre l'état succès
+      // ✅ Mettre à jour l'AuthCubit après connexion réussie
+      // Note: L'AuthCubit sera mis à jour dans l'écran de connexion
+      
+      // ✅ Émettre l'état succès avec flag pour mise à jour AuthCubit
       emit(LoginPageSuccessM(
         token: token,
         utilisateur: utilisateur.toMap(),
+        shouldUpdateAuth: true, // ✅ Flag pour mise à jour AuthCubit
       ));
 
     } catch (error) {

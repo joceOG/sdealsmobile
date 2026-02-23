@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sdealsmobile/mobile/view/serviceproviderregistrationpagem/screens/serviceProviderRegistrationScreenM.dart';
 
+// ✅ Design System
+import '../../../../design_system/design_system.dart';
+
 class ServiceProviderWelcomeScreenM extends StatelessWidget {
   final List<dynamic> categories;
 
@@ -10,37 +13,30 @@ class ServiceProviderWelcomeScreenM extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: SDAppBar(
+        title: 'Devenir Prestataire',
+        backgroundColor: SDColors.primary600,
+        useGradient: true,
+      ),
       // Bouton fixe en bas de l'écran
       bottomNavigationBar: Container(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+        padding: EdgeInsets.fromLTRB(SDSpacing.sm, SDSpacing.xs, SDSpacing.sm, SDSpacing.md),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: SDColors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black12,
+              color: SDColors.neutral900.withOpacity(0.06),
               blurRadius: 10,
               offset: const Offset(0, -4),
             ),
           ],
         ),
-        child: ElevatedButton(
+        child: SDButton(
+          text: 'COMMENCER MON INSCRIPTION',
+          fullWidth: true,
           onPressed: () {
             GoRouter.of(context).push('/serviceProviderRegistration');
           },
-          style: ElevatedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            backgroundColor: Colors.green,
-            shape: const StadiumBorder(),
-            elevation: 0,
-          ),
-          child: const Text(
-            'COMMENCER MON INSCRIPTION',
-            style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-                letterSpacing: 0.3),
-          ),
         ),
       ),
       body: SingleChildScrollView(
@@ -57,7 +53,7 @@ class ServiceProviderWelcomeScreenM extends StatelessWidget {
             _buildCategoriesSection(context),
 
             // Espace supplémentaire en bas pour éviter que le bouton fixe ne cache du contenu
-            const SizedBox(height: 30),
+            SDSpacing.verticalLargeGap,
           ],
         ),
       ),
@@ -65,113 +61,76 @@ class ServiceProviderWelcomeScreenM extends StatelessWidget {
   }
 
   Widget _buildHeaderSection(BuildContext context) {
-    return Stack(
-      children: [
-        Container(
-          height: 360,
-          width: double.infinity,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                Colors.green.shade700,
-                Colors.green.shade500,
-                Colors.green.shade400,
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: const BorderRadius.only(
-              bottomLeft: Radius.circular(28),
-              bottomRight: Radius.circular(28),
-            ),
-          ),
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: SDGradients.primaryGradient,
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(SDSpacing.borderRadiusXLarge),
+          bottomRight: Radius.circular(SDSpacing.borderRadiusXLarge),
         ),
-        Positioned.fill(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 80, 20, 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      ),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(SDSpacing.md, SDSpacing.md, SDSpacing.md, SDSpacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                Row(
-                  children: const [
-                    Icon(Icons.handyman, color: Colors.white, size: 28),
-                    SizedBox(width: 8),
-                    Text(
-                      'Devenir Prestataire',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 26,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Développez votre activité avec Soutrali Deals',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
+                Icon(Icons.handyman, color: SDColors.white, size: 28),
+                SDSpacing.horizontalTinyGap,
+                Text(
+                  'Rejoignez-nous',
+                  style: SDTypography.displaySmall.copyWith(
+                    color: SDColors.white,
                   ),
                 ),
-                const SizedBox(height: 20),
-                Row(
-                  children: [
-                    Expanded(
-                        child: _buildStatItem('500+', 'prestataires actifs')),
-                    const SizedBox(width: 12),
-                    Expanded(
-                        child: _buildStatItem('1000+', 'missions réalisées')),
-                  ],
-                ),
               ],
             ),
-          ),
-        ),
-        SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: CircleAvatar(
-              backgroundColor: Colors.white.withOpacity(0.85),
-              child: IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.black),
-                onPressed: () => Navigator.of(context).pop(),
+            SDSpacing.verticalTinyGap,
+            Text(
+              'Développez votre activité avec Soutrali Deals',
+              style: SDTypography.bodyLarge.copyWith(
+                color: SDColors.white.withOpacity(0.9),
               ),
             ),
-          ),
+            SDSpacing.verticalMediumGap,
+            Row(
+              children: [
+                Expanded(child: _buildStatItem('500+', 'prestataires actifs')),
+                SDSpacing.horizontalSmallGap,
+                Expanded(child: _buildStatItem('1000+', 'missions réalisées')),
+              ],
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 
   Widget _buildStatItem(String number, String label) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+      padding: EdgeInsets.symmetric(horizontal: SDSpacing.sm, vertical: SDSpacing.sm),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withOpacity(0.25)),
+        color: SDColors.white.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+        border: Border.all(color: SDColors.white.withOpacity(0.25)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             number,
-            style: const TextStyle(
-              color: Colors.white,
+            style: SDTypography.titleLarge.copyWith(
+              color: SDColors.white,
               fontWeight: FontWeight.w800,
-              fontSize: 22,
             ),
           ),
-          const SizedBox(height: 2),
+          SDSpacing.verticalTinyGap,
           Text(
             label,
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
+            style: SDTypography.bodySmall.copyWith(
+              color: SDColors.white.withOpacity(0.9),
             ),
           ),
         ],
@@ -181,26 +140,23 @@ class ServiceProviderWelcomeScreenM extends StatelessWidget {
 
   Widget _buildAdvantagesSection() {
     return Padding(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(SDSpacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Pourquoi nous rejoindre ?',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
+            style: SDTypography.titleLarge,
           ),
-          const SizedBox(height: 20),
+          SDSpacing.verticalMediumGap,
 
           // Grille d'avantages
           GridView.count(
             crossAxisCount: 2,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: 15,
-            crossAxisSpacing: 15,
+            mainAxisSpacing: SDSpacing.sm,
+            crossAxisSpacing: SDSpacing.sm,
             childAspectRatio: 1.5,
             children: [
               _buildAdvantageCard('💰', 'Augmentez vos revenus',

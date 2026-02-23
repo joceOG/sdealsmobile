@@ -10,7 +10,7 @@ class RegisterPageStateM extends Equatable {
   final bool isSuccess;
   final String? errorMessage;
   final Utilisateur? utilisateur;
-  final String? token;   // ✅ Ajout du token
+  final String? token; // ✅ Ajouter le token
 
   const RegisterPageStateM({
     this.fullName = '',
@@ -21,7 +21,7 @@ class RegisterPageStateM extends Equatable {
     this.isSuccess = false,
     this.errorMessage,
     this.utilisateur,
-    this.token,  // ✅ Ajout du token
+    this.token, // ✅ Ajouter le token
   });
 
   RegisterPageStateM copyWith({
@@ -33,7 +33,7 @@ class RegisterPageStateM extends Equatable {
     bool? isSuccess,
     String? errorMessage,
     Utilisateur? utilisateur,
-    String? token,   // ✅ Ajout du token
+    String? token, // ✅ Ajouter le token
   }) {
     return RegisterPageStateM(
       fullName: fullName ?? this.fullName,
@@ -43,8 +43,8 @@ class RegisterPageStateM extends Equatable {
       isSubmitting: isSubmitting ?? this.isSubmitting,
       isSuccess: isSuccess ?? this.isSuccess,
       errorMessage: errorMessage,
-      utilisateur: utilisateur ?? this.utilisateur,
-      token: token ?? this.token,  // ✅ Ajout du token
+      utilisateur: utilisateur,
+      token: token ?? this.token, // ✅ Ajouter le token
     );
   }
 
@@ -58,6 +58,6 @@ class RegisterPageStateM extends Equatable {
     isSuccess,
     errorMessage,
     utilisateur,
-    token, // ✅ Ajout du token
+    token
   ];
 }

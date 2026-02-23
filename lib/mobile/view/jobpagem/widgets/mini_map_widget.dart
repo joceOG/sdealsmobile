@@ -70,16 +70,45 @@ class _MiniMapWidgetState extends State<MiniMapWidget> {
       );
     }
 
+    // Récupérer les données de façon sécurisée
+    final categorie = _getProviderProperty('categorie');
+    final service = _getProviderProperty('service');
+    final verifier = _getProviderProperty('verifier');
+    final disponibilite = _getProviderProperty('disponibilite');
+    final note = _getProviderProperty('note');
+    
+    String categoryName = '';
+    if (categorie is Map<String, dynamic>) {
+      categoryName = categorie['nomcategorie']?.toString() ?? '';
+    } else if (categorie != null) {
+      try {
+        categoryName = categorie.nomcategorie ?? '';
+      } catch (e) {
+        // Ignore
+      }
+    }
+    
+    String serviceName = '';
+    if (service is Map<String, dynamic>) {
+      serviceName = service['nomservice']?.toString() ?? '';
+    } else if (service != null) {
+      try {
+        serviceName = service.nomservice ?? '';
+      } catch (e) {
+        // Ignore
+      }
+    }
+
     // Marqueur du prestataire avec prix
     final providerIcon =
         await CustomMarkerService.createProviderWithPriceMarker(
-      name: widget.provider.utilisateur?.fullName ?? 'Prestataire',
-      category: widget.provider.categorie?.nomcategorie ?? '',
-      service: widget.provider.service?.nomservice ?? '',
+      name: _getProviderName(),
+      category: categoryName,
+      service: serviceName,
       price: _getProviderPrice(),
-      isVerified: widget.provider.verifier == true,
-      isUrgent: widget.provider.disponibilite == 'urgent' ||
-          (widget.provider.note != null && widget.provider.note < 3.0),
+      isVerified: verifier == true,
+      isUrgent: disponibilite == 'urgent' ||
+          (note != null && note is num && note < 3.0),
     );
 
     markers.add(
@@ -88,8 +117,8 @@ class _MiniMapWidgetState extends State<MiniMapWidget> {
         position: providerPosition,
         icon: providerIcon,
         infoWindow: InfoWindow(
-          title: widget.provider.utilisateur?.fullName ?? 'Prestataire',
-          snippet: widget.provider.service?.nomservice ?? 'Service',
+          title: _getProviderName(),
+          snippet: serviceName.isNotEmpty ? serviceName : 'Service',
         ),
       ),
     );
@@ -110,6 +139,86 @@ class _MiniMapWidgetState extends State<MiniMapWidget> {
       '25 000 F CFA',
     ];
     return prices[widget.provider.hashCode % prices.length];
+  }
+
+  // ✅ Helper pour accéder aux propriétés de façon universelle (Map ou Objet)
+  dynamic _getProviderProperty(String key) {
+    if (widget.provider == null) return null;
+    
+    // Si c'est un Map
+    if (widget.provider is Map<String, dynamic>) {
+      return widget.provider[key];
+    }
+    
+    // Si c'est un objet avec propriétés
+    try {
+      switch (key) {
+        case 'utilisateur':
+          return widget.provider.utilisateur;
+        case 'categorie':
+          return widget.provider.categorie;
+        case 'service':
+          return widget.provider.service;
+        case 'verifier':
+          return widget.provider.verifier;
+        case 'disponibilite':
+          return widget.provider.disponibilite;
+        case 'note':
+          return widget.provider.note;
+        default:
+          return null;
+      }
+    } catch (e) {
+      return null;
+    }
+  }
+
+  String _getProviderName() {
+    // Récupérer l'utilisateur de façon sécurisée
+    final utilisateur = _getProviderProperty('utilisateur');
+    
+    if (utilisateur != null) {
+      // Si utilisateur est un Map
+      if (utilisateur is Map<String, dynamic>) {
+        final nom = utilisateur['nom']?.toString() ?? '';
+        final prenom = utilisateur['prenom']?.toString() ?? '';
+        
+        if (nom.isNotEmpty && prenom.isNotEmpty) {
+          return '$nom $prenom';
+        } else if (nom.isNotEmpty) {
+          return nom;
+        } else if (prenom.isNotEmpty) {
+          return prenom;
+        }
+        
+        // Essayer fullName
+        final fullName = utilisateur['fullName']?.toString() ?? '';
+        if (fullName.isNotEmpty) {
+          return fullName;
+        }
+      } else {
+        // Si utilisateur est un objet
+        try {
+          final fullName = utilisateur.fullName ?? '';
+          if (fullName.isNotEmpty) return fullName;
+          
+          final nom = utilisateur.nom ?? '';
+          final prenom = utilisateur.prenom ?? '';
+          if (nom.isNotEmpty && prenom.isNotEmpty) {
+            return '$nom $prenom';
+          } else if (nom.isNotEmpty) {
+            return nom;
+          } else if (prenom.isNotEmpty) {
+            return prenom;
+          }
+        } catch (e) {
+          // Ignore
+        }
+      }
+    }
+
+    // Fallback
+    return 'Prestataire';
   }
 
   Future<void> _getDirections() async {
@@ -142,6 +251,32 @@ class _MiniMapWidgetState extends State<MiniMapWidget> {
     final providerLng = -4.0083 + (widget.provider.hashCode % 100) * 0.001;
     final providerPosition = LatLng(providerLat, providerLng);
 
+    // Récupérer les données de façon sécurisée
+    final categorie = _getProviderProperty('categorie');
+    final service = _getProviderProperty('service');
+    
+    String categoryName = '';
+    if (categorie is Map<String, dynamic>) {
+      categoryName = categorie['nomcategorie']?.toString() ?? '';
+    } else if (categorie != null) {
+      try {
+        categoryName = categorie.nomcategorie ?? '';
+      } catch (e) {
+        // Ignore
+      }
+    }
+    
+    String serviceName = '';
+    if (service is Map<String, dynamic>) {
+      serviceName = service['nomservice']?.toString() ?? '';
+    } else if (service != null) {
+      try {
+        serviceName = service.nomservice ?? '';
+      } catch (e) {
+        // Ignore
+      }
+    }
+
     // Naviguer vers la full map
     Navigator.push(
       context,
@@ -150,8 +285,8 @@ class _MiniMapWidgetState extends State<MiniMapWidget> {
           initialPosition: providerPosition,
           providers: [widget.provider], // Liste avec le prestataire actuel
           searchRadius: 10.0,
-          selectedCategory: widget.provider.categorie?.nomcategorie ?? '',
-          selectedService: widget.provider.service?.nomservice ?? '',
+          selectedCategory: categoryName,
+          selectedService: serviceName,
         ),
       ),
     );
@@ -174,33 +309,10 @@ class _MiniMapWidgetState extends State<MiniMapWidget> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // En-tête de la section
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.location_on,
-                  color: Colors.green,
-                  size: 20,
-                ),
-                const SizedBox(width: 8),
-                const Text(
-                  'Emplacement du prestataire',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Mini carte Google Maps
-          Container(
-            height: 200,
-            margin: const EdgeInsets.symmetric(horizontal: 16),
+          // Mini carte Google Maps (adaptative avec Expanded)
+          Expanded(
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: Colors.green.shade200, width: 2),
@@ -266,111 +378,47 @@ class _MiniMapWidgetState extends State<MiniMapWidget> {
                 ],
               ),
             ),
-          ),
-
-          const SizedBox(height: 12),
-
-          // Informations de localisation
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Column(
-              children: [
-                // Adresse
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey.shade200),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.home,
-                        color: Colors.grey.shade600,
-                        size: 16,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _address,
-                          style: TextStyle(
-                            color: Colors.grey.shade700,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 8),
-
-                // Distance
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.amber.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.amber.shade200),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.location_on,
-                        color: Colors.amber.shade700,
-                        size: 16,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _distance,
-                          style: TextStyle(
-                            color: Colors.amber.shade800,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                      Icon(
-                        Icons.arrow_forward_ios,
-                        color: Colors.amber.shade700,
-                        size: 12,
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 12),
-
-                // Bouton "Obtenir l'itinéraire"
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: _getDirections,
-                    icon: const Icon(Icons.directions, color: Colors.white),
-                    label: const Text(
-                      'Obtenir l\'itinéraire',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      elevation: 2,
-                    ),
-                  ),
-                ),
-              ],
             ),
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 4),
+
+          // Informations de localisation compactes
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.location_on,
+                    color: Colors.amber.shade700,
+                    size: 11,
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      _distance,
+                      style: TextStyle(
+                        color: Colors.amber.shade800,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 4),
         ],
       ),
     );

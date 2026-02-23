@@ -1,217 +1,492 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
+import 'package:sdealsmobile/mobile/data/models/commande_model.dart';
+import '../../../../data/services/authCubit.dart';
+import '../shoppingpageblocm/shoppingPageBlocM.dart';
+import '../shoppingpageblocm/shoppingPageEventM.dart';
+import '../shoppingpageblocm/shoppingPageStateM.dart';
+import 'package:sdealsmobile/mobile/view/common/utils/app_snackbar.dart';
+import 'delivery_address_screen.dart';
+// ✅ Design System
+import '../../../../design_system/design_system.dart';
 
-class ConfirmationCommandeScreen extends StatelessWidget {
+class ConfirmationCommandeScreen extends StatefulWidget {
   const ConfirmationCommandeScreen({super.key});
+
+  @override
+  State<ConfirmationCommandeScreen> createState() =>
+      _ConfirmationCommandeScreenState();
+}
+
+class _ConfirmationCommandeScreenState
+    extends State<ConfirmationCommandeScreen> {
+  final TextEditingController _promoController = TextEditingController();
+  String _selectedPaymentMethod = 'Cash à la livraison';
+
+  @override
+  void dispose() {
+    _promoController.dispose();
+    super.dispose();
+  }
+
+  void _applyPromoCode() {
+    if (_promoController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Veuillez entrer un code promo',
+              style: SDTypography.bodyMedium.copyWith(color: SDColors.white)),
+          backgroundColor: SDColors.warning500,
+        ),
+      );
+      return;
+    }
+
+    final authState = context.read<AuthCubit>().state;
+    if (authState is AuthAuthenticated) {
+      // TODO: Pour appliquer un code promo, il faudrait d'abord le valider côté backend
+      // Pour l'instant, on applique une réduction fictive de 10%
+      context.read<ShoppingPageBlocM>().add(
+            ApplyPromoCodeEvent(
+              userId: authState.utilisateur.idutilisateur,
+              code: _promoController.text.trim(),
+              reduction: 10.0, // Exemple: 10% ou 10 FCFA selon le type
+              typeReduction: 'POURCENTAGE',
+            ),
+          );
+    }
+  }
+
+  void _confirmOrder() {
+    final state = context.read<ShoppingPageBlocM>().state;
+    final cart = state.cart;
+
+    if (cart == null || cart.isEmpty) {
+      AppSnackBar.warning(context, 'Votre panier est vide');
+      return;
+    }
+
+    if (!cart.hasDeliveryAddress) {
+      AppSnackBar.warning(context, 'Veuillez ajouter une adresse de livraison');
+      return;
+    }
+
+    // TODO: Pour le moment, pas de paiement intégré
+    // On va juste valider la commande
+    final authState = context.read<AuthCubit>().state;
+    if (authState is AuthAuthenticated) {
+      context.read<ShoppingPageBlocM>().add(
+            CheckoutEvent(
+              userId: authState.utilisateur.idutilisateur,
+              moyenPaiement: _selectedPaymentMethod,
+            ),
+          );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: Icon(Icons.arrow_back, color: SDColors.white),
           onPressed: () {
             Navigator.of(context).pop();
           },
         ),
-        title: const Text("Passez votre commande"),
-        backgroundColor: Colors.green,
+        title: Text(
+          "Passez votre commande",
+          style: SDTypography.titleMedium.copyWith(color: SDColors.white, fontWeight: FontWeight.bold),
+        ),
+        backgroundColor: SDColors.primary600,
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Message d'information
-            Container(
-              padding: const EdgeInsets.all(10),
-              color: Colors.grey[200],
-              child: const Text(
-                "Si vous continuez, vous acceptez automatiquement notre",
-                style: TextStyle(fontSize: 14),
+      body: BlocConsumer<ShoppingPageBlocM, ShoppingPageStateM>(
+        listener: (context, state) {
+          if (state.cartError != null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.cartError!,
+                    style: SDTypography.bodyMedium.copyWith(color: SDColors.white)),
+                backgroundColor: SDColors.error500,
               ),
-            ),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 10),
-              child: Text(
-                "Termes et Conditions",
-                style: TextStyle(
-                  color: Colors.blue,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                ),
-              ),
-            ),
+            );
+          }
+        },
+        builder: (context, state) {
+          final cart = state.cart;
 
-            const SizedBox(height: 10),
+          if (state.isCartLoading && cart == null) {
+            return Center(child: CircularProgressIndicator(color: SDColors.primary600));
+          }
 
-            // RÉSUMÉ DE COMMANDE
-            Container(
-              padding: const EdgeInsets.all(15),
-              color: Colors.white,
+          if (cart == null || cart.isEmpty) {
+            return Center(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text(
-                    "Résumé de commande",
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  Icon(Icons.shopping_cart_outlined,
+                      size: 100, color: SDColors.neutral500),
+                  SizedBox(height: SDSpacing.sm),
+                  Text(
+                    'Votre panier est vide',
+                    style: SDTypography.titleMedium.copyWith(color: SDColors.neutral500),
                   ),
-                  const SizedBox(height: 10),
-                  rowItem("Total articles (2)", "75,590 FCFA"),
-                  rowItem("Frais de livraison", "800 FCFA"),
-                  const Divider(),
-                  rowItem(
-                    "Total",
-                    "76,390 FCFA",
-                    isBold: true,
-                  ),
-                  const SizedBox(height: 10),
-
-                  // Champ de code promo
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          decoration: InputDecoration(
-                            hintText: "Entrez votre code ici",
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(5),
-                            ),
-                            prefixIcon: const Icon(Icons.card_giftcard),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      ElevatedButton(
-                        onPressed: () {},
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.grey[300],
-                        ),
-                        child: const Text("Appliquer"),
-                      ),
-                    ],
+                  SizedBox(height: SDSpacing.sm),
+                  ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: SDColors.primary600,
+                      foregroundColor: SDColors.white,
+                    ),
+                    child: Text('Retour au shopping',
+                        style: SDTypography.labelMedium.copyWith(color: SDColors.white)),
                   ),
                 ],
               ),
-            ),
+            );
+          }
 
-            const SizedBox(height: 10),
-
-            // MODE DE PAIEMENT
-            sectionTitle("Mode de Paiement", isGreen: true), // ✅ En vert
-            const ListTile(
-              title: Text("Payer cash à la livraison."),
-              subtitle: Text(
-                "Réglez vos achats en espèces directement à la livraison. Nous n'acceptons que les Francs CFA.",
-              ),
-              trailing: Text(
-                "Modifier",
-                style:
-                    TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
-              ),
-            ),
-
-            const SizedBox(height: 10),
-
-            // ADRESSE DE LIVRAISON
-            sectionTitle("Adresse", isGreen: true), // ✅ En vert
-            const ListTile(
-              title: Text("Afisu Yussuf"),
-              subtitle: Text("Grand Mosquée du Plateau"),
-              trailing: Text(
-                "Changer Votre Adresse",
-                style:
-                    TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
-              ),
-            ),
-
-            const SizedBox(height: 10),
-
-            // LIVRAISON
-            sectionTitle("Livraison", isGreen: true), // ✅ En vert
-            const ListTile(
-              leading: Icon(Icons.local_shipping, color: Colors.green),
-              title: Text("Point Relais"),
-              subtitle: Text("Livraison entre le 11 février et le 14 février"),
-              trailing: Text(
-                "Modifier",
-                style:
-                    TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // BOUTON CONFIRMATION COMMANDE
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 15),
-              child: ElevatedButton(
-                onPressed: () {
-                  // Logique pour confirmer la commande
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  padding: const EdgeInsets.symmetric(vertical: 15),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
+          return SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Message d'information
+                Container(
+                  padding: EdgeInsets.all(SDSpacing.sm),
+                  color: SDColors.neutral200,
+                  child: Text(
+                    "Si vous continuez, vous acceptez automatiquement notre",
+                    style: SDTypography.bodySmall,
                   ),
                 ),
-                child: const Center(
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: SDSpacing.sm),
                   child: Text(
-                    "Confirmer La Commande",
-                    style: TextStyle(
-                      fontSize: 16,
+                    "Termes et Conditions",
+                    style: SDTypography.bodySmall.copyWith(
+                      color: SDColors.info600,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
                     ),
                   ),
                 ),
-              ),
-            ),
 
-            const SizedBox(height: 20),
-          ],
-        ),
+                SizedBox(height: SDSpacing.sm),
+
+                // RÉSUMÉ DE COMMANDE
+                Container(
+                  padding: EdgeInsets.all(SDSpacing.md),
+                  color: SDColors.white,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Résumé de commande",
+                        style: SDTypography.titleSmall.copyWith(
+                            fontWeight: FontWeight.bold),
+                      ),
+                      SizedBox(height: SDSpacing.sm),
+                      rowItem(
+                        "Total articles (${cart.totalItems})",
+                        "${cart.montantArticles.toStringAsFixed(0)} FCFA",
+                      ),
+                      rowItem(
+                        "Frais de livraison",
+                        "${cart.fraisLivraison.toStringAsFixed(0)} FCFA",
+                      ),
+                      if (cart.codePromo != null &&
+                          cart.codePromo!.isValid) ...[
+                        rowItem(
+                          "Réduction (${cart.codePromo!.code})",
+                          cart.codePromo!.descriptionReduction,
+                          textColor: SDColors.success500,
+                        ),
+                      ],
+                      Divider(color: SDColors.neutral300),
+                      rowItem(
+                        "Total",
+                        "${cart.montantTotal.toStringAsFixed(0)} FCFA",
+                        isBold: true,
+                      ),
+                      SizedBox(height: SDSpacing.sm),
+
+                      // Champ de code promo
+                      if (cart.codePromo == null ||
+                          !cart.codePromo!.isValid) ...[
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _promoController,
+                                style: SDTypography.bodyMedium,
+                                decoration: InputDecoration(
+                                  hintText: "Entrez votre code ici",
+                                  hintStyle: SDTypography.bodyMedium.copyWith(color: SDColors.neutral400),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
+                                  ),
+                                  prefixIcon: Icon(Icons.card_giftcard, color: SDColors.primary600),
+                                ),
+                              ),
+                            ),
+                            SizedBox(width: SDSpacing.sm),
+                            ElevatedButton(
+                              onPressed:
+                                  state.isCartLoading ? null : _applyPromoCode,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: SDColors.success500,
+                                foregroundColor: SDColors.white,
+                              ),
+                              child: state.isCartLoading
+                                  ? SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor: AlwaysStoppedAnimation<Color>(SDColors.white)),
+                                    )
+                                  : Text("Appliquer",
+                                      style: SDTypography.labelMedium.copyWith(color: SDColors.white)),
+                            ),
+                          ],
+                        ),
+                      ] else ...[
+                        Container(
+                          padding: EdgeInsets.all(SDSpacing.xs),
+                          decoration: BoxDecoration(
+                            color: SDColors.success50,
+                            borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
+                            border: Border.all(color: SDColors.success200),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.check_circle,
+                                  color: SDColors.success500),
+                              SizedBox(width: SDSpacing.xs),
+                              Expanded(
+                                child: Text(
+                                  'Code promo "${cart.codePromo!.code}" appliqué',
+                                  style: SDTypography.bodyMedium.copyWith(
+                                    color: SDColors.success500,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+
+                SizedBox(height: SDSpacing.sm),
+
+                // MESSAGE GRATUIT (remplace les options de paiement)
+                Container(
+                  padding: EdgeInsets.all(SDSpacing.sm),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [SDColors.success100, SDColors.success50],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                    border: Border.all(color: SDColors.success200, width: 2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: SDColors.success200.withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: EdgeInsets.all(SDSpacing.xs),
+                        decoration: BoxDecoration(
+                          color: SDColors.success500,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(Icons.check_circle, color: SDColors.white, size: 24),
+                      ),
+                      SizedBox(width: SDSpacing.sm),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Commande 100% GRATUITE',
+                              style: SDTypography.titleSmall.copyWith(
+                                color: SDColors.success700,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            SizedBox(height: SDSpacing.xxxs),
+                            Text(
+                              'Aucun paiement requis • Service immédiat',
+                              style: SDTypography.bodySmall.copyWith(
+                                color: SDColors.success600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                SizedBox(height: SDSpacing.sm),
+
+                // ADRESSE DE LIVRAISON
+                sectionTitle("Adresse", isGreen: true),
+                if (cart.adresseLivraison != null &&
+                    cart.adresseLivraison!.isComplete) ...[
+                  ListTile(
+                    leading: Icon(Icons.location_on, color: SDColors.success500),
+                    title: Text(cart.adresseLivraison!.nom, style: SDTypography.bodyMedium),
+                    subtitle: Text(
+                      "${cart.adresseLivraison!.adresse}\n${cart.adresseLivraison!.ville}, ${cart.adresseLivraison!.pays}\n${cart.adresseLivraison!.telephone}",
+                      style: SDTypography.bodySmall,
+                    ),
+                    trailing: TextButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => DeliveryAddressScreen(
+                              currentAddress: cart.adresseLivraison,
+                              onAddressSaved: (address) {
+                                // L'adresse sera automatiquement mise à jour via le BLoC
+                              },
+                            ),
+                          ),
+                        );
+                      },
+                      child: Text(
+                        "Modifier",
+                        style: SDTypography.labelMedium.copyWith(
+                          color: SDColors.success500,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ] else ...[
+                  ListTile(
+                    leading:
+                        Icon(Icons.add_location, color: SDColors.warning500),
+                    title: Text("Aucune adresse de livraison", style: SDTypography.bodyMedium),
+                    subtitle: Text("Veuillez ajouter une adresse", style: SDTypography.bodySmall),
+                    trailing: ElevatedButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const DeliveryAddressScreen(),
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: SDColors.success500,
+                        foregroundColor: SDColors.white,
+                      ),
+                      child: Text("Ajouter",
+                          style: SDTypography.labelMedium.copyWith(color: SDColors.white)),
+                    ),
+                  ),
+                ],
+
+                SizedBox(height: SDSpacing.sm),
+
+                // LIVRAISON
+                sectionTitle("Livraison", isGreen: true),
+                ListTile(
+                  leading: Icon(Icons.local_shipping, color: SDColors.success500),
+                  title: Text("Livraison standard", style: SDTypography.bodyMedium),
+                  subtitle: Text("Livraison sous 2-5 jours ouvrés", style: SDTypography.bodySmall),
+                ),
+
+                SizedBox(height: SDSpacing.md),
+
+                // BOUTON CONFIRMATION COMMANDE
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: SDSpacing.md),
+                  child: ElevatedButton(
+                    onPressed: cart.canCheckout && !state.isCartLoading
+                        ? _confirmOrder
+                        : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: SDColors.success500,
+                      padding: EdgeInsets.symmetric(vertical: SDSpacing.md),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                      ),
+                      disabledBackgroundColor: SDColors.neutral400,
+                    ),
+                    child: Center(
+                      child: state.isCartLoading
+                          ? CircularProgressIndicator(
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(SDColors.white),
+                            )
+                          : Text(
+                              "Confirmer La Commande",
+                              style: SDTypography.labelMedium.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: SDColors.white,
+                              ),
+                            ),
+                    ),
+                  ),
+                ),
+
+                SizedBox(height: SDSpacing.md),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
 
   // Widget pour afficher les lignes du résumé de commande
-  Widget rowItem(String title, String value, {bool isBold = false}) {
+  Widget rowItem(String title, String value,
+      {bool isBold = false, Color? textColor}) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
+      padding: EdgeInsets.symmetric(vertical: SDSpacing.xxxs),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
             title,
-            style: TextStyle(
-                fontSize: 15,
+            style: SDTypography.bodyMedium.copyWith(
                 fontWeight: isBold ? FontWeight.bold : FontWeight.normal),
           ),
           Text(
             value,
-            style: TextStyle(
-                fontSize: 15,
-                fontWeight: isBold ? FontWeight.bold : FontWeight.normal),
+            style: SDTypography.bodyMedium.copyWith(
+              fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+              color: textColor,
+            ),
           ),
         ],
       ),
     );
   }
 
-  // Widget pour les titres des sections (ex: Mode de paiement, Adresse, Livraison)
+  // Widget pour afficher les titres de section
   Widget sectionTitle(String title, {bool isGreen = false}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+    return Container(
+      width: double.infinity,
+      color: isGreen ? SDColors.success500 : SDColors.neutral200,
+      padding: EdgeInsets.all(SDSpacing.sm),
       child: Text(
         title,
-        style: TextStyle(
-          fontSize: 16,
+        style: SDTypography.titleSmall.copyWith(
           fontWeight: FontWeight.bold,
-          color: isGreen
-              ? Colors.green
-              : Colors
-                  .black, // Texte en vert pour "Mode de paiement", "Adresse", "Livraison"
+          color: isGreen ? SDColors.white : SDColors.neutral900,
         ),
       ),
     );

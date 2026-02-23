@@ -7,7 +7,7 @@ class MessageBubble extends StatelessWidget {
   final bool isSameUser;
   final Function(MessageModel) onTap;
   final Color primaryColor;
-  
+
   const MessageBubble({
     Key? key,
     required this.message,
@@ -28,11 +28,13 @@ class MessageBubble extends StatelessWidget {
     );
 
     return Column(
-      crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      crossAxisAlignment:
+          isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
       children: [
         if (!isSameUser) const SizedBox(height: 10),
         Row(
-          mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+          mainAxisAlignment:
+              isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             if (!isMe) _buildStatusIndicator(),
@@ -48,9 +50,7 @@ class MessageBubble extends StatelessWidget {
                 horizontal: 16,
               ),
               decoration: BoxDecoration(
-                color: isMe 
-                    ? primaryColor 
-                    : Colors.grey.shade200,
+                color: isMe ? primaryColor : Colors.green.shade50,
                 borderRadius: borderRadius,
                 boxShadow: [
                   BoxShadow(
@@ -96,10 +96,10 @@ class MessageBubble extends StatelessWidget {
 
   Widget _buildStatusIndicator() {
     if (!isMe) return const SizedBox(width: 4);
-    
+
     IconData icon;
     Color color;
-    
+
     switch (message.status) {
       case MessageStatus.sending:
         icon = Icons.access_time;
@@ -122,7 +122,7 @@ class MessageBubble extends StatelessWidget {
         color = Colors.red;
         break;
     }
-    
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 8.0, left: 2, right: 2),
       child: Icon(

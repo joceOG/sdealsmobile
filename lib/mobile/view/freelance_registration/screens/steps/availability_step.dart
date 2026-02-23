@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../../../design_system/colors.dart';
+import '../../../../../design_system/typography.dart';
 
 class AvailabilityStep extends StatefulWidget {
   final Map<String, dynamic> formData;
@@ -70,10 +72,7 @@ class _AvailabilityStepState extends State<AvailabilityStep> {
         children: [
           const Text(
             '🎯 Disponibilité',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+            style: SDTypography.titleLarge,
           ),
           const SizedBox(height: 24),
           
@@ -89,7 +88,7 @@ class _AvailabilityStepState extends State<AvailabilityStep> {
                   return ChoiceChip(
                     label: Text(status),
                     selected: _selectedStatus == status,
-                    selectedColor: Colors.green.shade100,
+                    selectedColor: SDColors.primary100,
                     onSelected: (selected) {
                       setState(() {
                         _selectedStatus = selected ? status : null;
@@ -162,10 +161,7 @@ class _AvailabilityStepState extends State<AvailabilityStep> {
           // Langues parlées
           const Text(
             'Langues parlées',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-            ),
+            style: SDTypography.titleMedium,
           ),
           const SizedBox(height: 16),
           
@@ -189,8 +185,8 @@ class _AvailabilityStepState extends State<AvailabilityStep> {
                     if (selectedLevel != null)
                       Chip(
                         label: Text(selectedLevel),
-                        backgroundColor: Colors.green.shade100,
-                        deleteIconColor: Colors.green.shade700,
+                        backgroundColor: SDColors.primary100,
+                        deleteIconColor: SDColors.primary700,
                         onDeleted: () {
                           setState(() {
                             _selectedLanguages.remove(languageName);
@@ -227,15 +223,15 @@ class _AvailabilityStepState extends State<AvailabilityStep> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.blue.shade50,
+              color: SDColors.secondary50,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.blue.shade100),
+              border: Border.all(color: SDColors.secondary100),
             ),
             child: Row(
               children: [
-                Icon(
+                const Icon(
                   Icons.info_outline,
-                  color: Colors.blue.shade700,
+                  color: SDColors.secondary700,
                 ),
                 const SizedBox(width: 12),
                 const Expanded(

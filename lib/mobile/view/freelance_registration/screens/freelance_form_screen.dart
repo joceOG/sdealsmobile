@@ -5,6 +5,8 @@ import 'package:sdealsmobile/mobile/view/freelance_registration/screens/steps/av
 import 'package:sdealsmobile/mobile/view/freelance_registration/screens/steps/pricing_step.dart';
 import 'package:sdealsmobile/mobile/view/freelance_registration/screens/steps/verification_step.dart';
 import 'package:sdealsmobile/mobile/view/freelance_registration/screens/steps/portfolio_step.dart';
+import '../../../../design_system/colors.dart';
+import '../../../../design_system/typography.dart';
 
 class FreelanceFormScreen extends StatefulWidget {
   final Set<String>? preSelectedCategories;
@@ -123,16 +125,21 @@ class _FreelanceFormScreenState extends State<FreelanceFormScreen> {
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Confirmation'),
+          title: const Text('Confirmation', style: SDTypography.titleLarge),
           content: const Text(
-              'Votre demande d\'inscription freelance a été soumise avec succès. Nous examinerons votre profil et vous contacterons prochainement.'),
+            'Votre demande d\'inscription freelance a été soumise avec succès. Nous examinerons votre profil et vous contacterons prochainement.',
+            style: SDTypography.bodyMedium,
+          ),
           actions: [
             TextButton(
               onPressed: () {
                 // Retourner à la page d'accueil
                 Navigator.of(context).popUntil((route) => route.isFirst);
               },
-              child: const Text('OK'),
+              child: Text(
+                'OK',
+                style: SDTypography.labelLarge.copyWith(color: SDColors.primary700),
+              ),
             ),
           ],
         ),
@@ -144,8 +151,8 @@ class _FreelanceFormScreenState extends State<FreelanceFormScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Inscription Freelance'),
-        backgroundColor: Colors.green.shade700,
+        title: const Text('Inscription Freelance', style: SDTypography.titleLarge),
+        backgroundColor: SDColors.primary700,
       ),
       body: Form(
         key: _formKey,
@@ -160,17 +167,18 @@ class _FreelanceFormScreenState extends State<FreelanceFormScreen> {
               child: Row(
                 children: [
                   Expanded(
-                    child: ElevatedButton(
-                      onPressed: details.onStepContinue,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green.shade700,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: ElevatedButton(
+                        onPressed: details.onStepContinue,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: SDColors.primary700,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        child: Text(
+                          _currentStep < _formSteps.length - 1 ? 'SUIVANT' : 'SOUMETTRE',
+                          style: SDTypography.titleMedium.copyWith(color: SDColors.white),
+                        ),
                       ),
-                      child: Text(
-                        _currentStep < _formSteps.length - 1 ? 'SUIVANT' : 'SOUMETTRE',
-                        style: const TextStyle(color: Colors.white),
-                      ),
-                    ),
                   ),
                   if (_currentStep > 0) ...[
                     const SizedBox(width: 12),
@@ -179,8 +187,10 @@ class _FreelanceFormScreenState extends State<FreelanceFormScreen> {
                         onPressed: details.onStepCancel,
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 12),
+                          side: const BorderSide(color: SDColors.neutral300),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         ),
-                        child: const Text('RETOUR'),
+                        child: Text('RETOUR', style: SDTypography.titleMedium.copyWith(color: SDColors.neutral700)),
                       ),
                     ),
                   ],

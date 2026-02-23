@@ -18,10 +18,10 @@ class Service {
   /// Construire depuis JSON / Map
   factory Service.fromJson(Map<String, dynamic> json) {
     return Service(
-      idservice: json['_id'] as String,
-      nomservice: json['nomservice'] as String,
-      imageservice: json['imageservice'] as String,
-      prixmoyen: json['prixmoyen'] as String,
+      idservice: json['_id'] as String? ?? json['idservice'] as String? ?? '',
+      nomservice: json['nomservice'] as String? ?? '',
+      imageservice: json['imageservice'] as String? ?? '',
+      prixmoyen: json['prixmoyen'] as String? ?? json['prixservice']?.toString() ?? '0',
       categorie: json['categorie'] != null
           ? Categorie.fromJson(json['categorie'] as Map<String, dynamic>)
           : null,

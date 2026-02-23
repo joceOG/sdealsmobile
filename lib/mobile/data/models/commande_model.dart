@@ -104,6 +104,44 @@ class CommandeModel {
       adresseLivraison: adresseLivraison ?? this.adresseLivraison,
     );
   }
+
+  /// Factory pour créer une instance depuis les données backend
+  factory CommandeModel.fromBackend(Map<String, dynamic> json) {
+    return CommandeModel(
+      id: json['_id'] ?? '',
+      prestataireId: json['infoCommande']?['prestataireId'] ?? '',
+      prestataireName: json['infoCommande']?['nom'] ?? 'Inconnu',
+      prestataireImage: json['infoCommande']?['image'] ?? 'assets/profil.png',
+      typeService: json['infoCommande']?['typeService'] ?? 'Service',
+      montant: (json['prixTotal'] ?? 0).toDouble(),
+      dateCommande: json['dateCreation'] != null 
+          ? DateTime.parse(json['dateCreation'])
+          : DateTime.now(),
+      status: _parseStatus(json['statusCommande'] ?? 'En cours'),
+      estNotee: json['estNotee'] ?? false,
+      note: json['note'] != null ? (json['note']).toDouble() : null,
+      commentaire: json['commentaire'],
+      adresseLivraison: json['adresseLivraison'],
+    );
+  }
+
+  /// Parse le statut depuis une string backend
+  static CommandeStatus _parseStatus(String status) {
+    switch (status.toLowerCase()) {
+      case 'en attente':
+        return CommandeStatus.enAttente;
+      case 'en cours':
+        return CommandeStatus.enCours;
+      case 'terminée':
+      case 'terminee':
+        return CommandeStatus.terminee;
+      case 'annulée':
+      case 'annulee':
+        return CommandeStatus.annulee;
+      default:
+        return CommandeStatus.enCours;
+    }
+  }
 }
 
 // Liste simulée de commandes pour les tests

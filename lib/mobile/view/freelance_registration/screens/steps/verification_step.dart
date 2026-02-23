@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
+import '../../../../../design_system/colors.dart';
+import '../../../../../design_system/typography.dart';
 
 class VerificationStep extends StatefulWidget {
   final Map<String, dynamic> formData;
@@ -56,10 +58,7 @@ class _VerificationStepState extends State<VerificationStep> {
         children: [
           const Text(
             '📋 Vérification',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+            style: SDTypography.titleLarge,
           ),
           const SizedBox(height: 16),
           
@@ -67,39 +66,37 @@ class _VerificationStepState extends State<VerificationStep> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.blue.shade50,
+              color: SDColors.primary50,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.blue.shade100),
+              border: Border.all(color: SDColors.primary100),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    Icon(Icons.verified_user, color: Colors.blue.shade700),
+                    const Icon(Icons.verified_user, color: SDColors.primary700),
                     const SizedBox(width: 8),
                     const Text(
                       'Pourquoi la vérification d\'identité ?',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
+                      style: SDTypography.titleMedium,
                     ),
                   ],
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'La vérification d\'identité est nécessaire pour :',
+                  style: SDTypography.bodyMedium,
                 ),
                 const SizedBox(height: 4),
-                const Text('• Assurer la sécurité des utilisateurs de la plateforme'),
-                const Text('• Confirmer votre identité réelle'),
-                const Text('• Faciliter les paiements sécurisés'),
-                const Text('• Prévenir les fraudes et comportements malveillants'),
+                Text('• Assurer la sécurité des utilisateurs de la plateforme', style: SDTypography.bodySmall),
+                Text('• Confirmer votre identité réelle', style: SDTypography.bodySmall),
+                Text('• Faciliter les paiements sécurisés', style: SDTypography.bodySmall),
+                Text('• Prévenir les fraudes et comportements malveillants', style: SDTypography.bodySmall),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Vos documents sont stockés de manière sécurisée et ne sont utilisés que pour la vérification de votre identité.',
-                  style: TextStyle(fontStyle: FontStyle.italic),
+                  style: SDTypography.bodySmall.copyWith(fontStyle: FontStyle.italic),
                 ),
               ],
             ),
@@ -109,10 +106,7 @@ class _VerificationStepState extends State<VerificationStep> {
           // Photo CNI recto
           const Text(
             'Photo CNI recto *',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-            ),
+            style: SDTypography.titleMedium,
           ),
           const SizedBox(height: 8),
           GestureDetector(
@@ -121,10 +115,10 @@ class _VerificationStepState extends State<VerificationStep> {
               height: 200,
               width: double.infinity,
               decoration: BoxDecoration(
-                color: Colors.grey.shade200,
+                color: SDColors.neutral200,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: _idFrontImage == null ? Colors.grey.shade400 : Colors.green.shade700,
+                  color: _idFrontImage == null ? SDColors.neutral400 : SDColors.primary700,
                   width: _idFrontImage == null ? 1 : 2,
                 ),
                 image: _idFrontImage != null
@@ -138,16 +132,16 @@ class _VerificationStepState extends State<VerificationStep> {
                   ? Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
+                        const Icon(
                           Icons.add_a_photo,
                           size: 40,
-                          color: Colors.grey.shade600,
+                          color: SDColors.neutral600,
                         ),
                         const SizedBox(height: 12),
                         Text(
                           'Cliquez pour ajouter la photo recto',
-                          style: TextStyle(
-                            color: Colors.grey.shade700,
+                          style: SDTypography.bodyMedium.copyWith(
+                            color: SDColors.neutral700,
                           ),
                         ),
                       ],
@@ -171,10 +165,7 @@ class _VerificationStepState extends State<VerificationStep> {
           // Photo CNI verso
           const Text(
             'Photo CNI verso *',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-            ),
+            style: SDTypography.titleMedium,
           ),
           const SizedBox(height: 8),
           GestureDetector(
@@ -183,10 +174,10 @@ class _VerificationStepState extends State<VerificationStep> {
               height: 200,
               width: double.infinity,
               decoration: BoxDecoration(
-                color: Colors.grey.shade200,
+                color: SDColors.neutral200,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: _idBackImage == null ? Colors.grey.shade400 : Colors.green.shade700,
+                  color: _idBackImage == null ? SDColors.neutral400 : SDColors.primary700,
                   width: _idBackImage == null ? 1 : 2,
                 ),
                 image: _idBackImage != null
@@ -200,16 +191,16 @@ class _VerificationStepState extends State<VerificationStep> {
                   ? Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
+                        const Icon(
                           Icons.add_a_photo,
                           size: 40,
-                          color: Colors.grey.shade600,
+                          color: SDColors.neutral600,
                         ),
                         const SizedBox(height: 12),
                         Text(
                           'Cliquez pour ajouter la photo verso',
-                          style: TextStyle(
-                            color: Colors.grey.shade700,
+                          style: SDTypography.bodyMedium.copyWith(
+                            color: SDColors.neutral700,
                           ),
                         ),
                       ],
@@ -234,32 +225,29 @@ class _VerificationStepState extends State<VerificationStep> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.amber.shade50,
+              color: SDColors.warning50,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.amber.shade200),
+              border: Border.all(color: SDColors.warning200),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    Icon(Icons.lightbulb_outline, color: Colors.amber.shade800),
+                    const Icon(Icons.lightbulb_outline, color: SDColors.warning700),
                     const SizedBox(width: 8),
                     const Text(
                       'Conseils pour les photos',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
+                      style: SDTypography.titleMedium,
                     ),
                   ],
                 ),
                 const SizedBox(height: 8),
-                const Text('• Assurez-vous que le document est bien visible'),
-                const Text('• Évitez les reflets ou ombres sur le document'),
-                const Text('• Prenez la photo dans un endroit bien éclairé'),
-                const Text('• Toutes les informations doivent être lisibles'),
-                const Text('• La photo doit être nette et de bonne qualité'),
+                Text('• Assurez-vous que le document est bien visible', style: SDTypography.bodySmall),
+                Text('• Évitez les reflets ou ombres sur le document', style: SDTypography.bodySmall),
+                Text('• Prenez la photo dans un endroit bien éclairé', style: SDTypography.bodySmall),
+                Text('• Toutes les informations doivent être lisibles', style: SDTypography.bodySmall),
+                Text('• La photo doit être nette et de bonne qualité', style: SDTypography.bodySmall),
               ],
             ),
           ),

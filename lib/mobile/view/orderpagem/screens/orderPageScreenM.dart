@@ -5,8 +5,12 @@ import '../../../data/models/commande_model.dart';
 import '../orderpageblocm/commande_bloc.dart';
 import '../orderpageblocm/commande_event.dart';
 import '../orderpageblocm/commande_state.dart';
+import '../../common/widgets/empty_state_widget.dart';
 import '../widgets/commande_card.dart';
 import 'commande_details_screen.dart';
+
+// ✅ Design System
+import '../../../../design_system/design_system.dart';
 
 class OrderPageScreenM extends StatefulWidget {
   const OrderPageScreenM({super.key});
@@ -15,7 +19,8 @@ class OrderPageScreenM extends StatefulWidget {
   State<OrderPageScreenM> createState() => _OrderPageScreenMState();
 }
 
-class _OrderPageScreenMState extends State<OrderPageScreenM> with SingleTickerProviderStateMixin {
+class _OrderPageScreenMState extends State<OrderPageScreenM>
+    with SingleTickerProviderStateMixin {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
@@ -34,7 +39,7 @@ class _OrderPageScreenMState extends State<OrderPageScreenM> with SingleTickerPr
   void _handleTabChange() {
     if (!_tabController.indexIsChanging) {
       CommandeStatus? selectedStatus;
-      
+
       switch (_tabController.index) {
         case 0: // Toutes
           selectedStatus = null;
@@ -52,7 +57,7 @@ class _OrderPageScreenMState extends State<OrderPageScreenM> with SingleTickerPr
           selectedStatus = CommandeStatus.annulee;
           break;
       }
-      
+
       context.read<CommandeBloc>().add(FiltrerParStatus(selectedStatus));
     }
   }
@@ -71,7 +76,7 @@ class _OrderPageScreenMState extends State<OrderPageScreenM> with SingleTickerPr
       builder: (context, state) {
         return Scaffold(
           key: _scaffoldKey,
-          backgroundColor: Colors.white,
+          backgroundColor: SDColors.white,
           appBar: _buildAppBar(state),
           body: _buildBody(state),
           floatingActionButton: FloatingActionButton(
@@ -80,14 +85,16 @@ class _OrderPageScreenMState extends State<OrderPageScreenM> with SingleTickerPr
                 _isSearchVisible = !_isSearchVisible;
                 if (!_isSearchVisible) {
                   _searchController.clear();
-                  context.read<CommandeBloc>().add(const RechercherCommandes(''));
+                  context
+                      .read<CommandeBloc>()
+                      .add(const RechercherCommandes(''));
                 }
               });
             },
-            backgroundColor: Colors.green,
-            child: Icon(
-              _isSearchVisible ? Icons.close : Icons.search,
-              color: Colors.white,
+            backgroundColor: SDColors.primary600,
+            child: const Icon(
+              Icons.search,
+              color: SDColors.white,
             ),
           ),
         );
@@ -110,20 +117,16 @@ class _OrderPageScreenMState extends State<OrderPageScreenM> with SingleTickerPr
           ),
         ),
         flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFF43EA5E), Color(0xFF1CBF3F)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+          decoration: BoxDecoration(
+            color: SDColors.primary600,
             boxShadow: [
               BoxShadow(
-                color: Colors.black26,
+                color: SDColors.neutral900.withOpacity(0.15),
                 blurRadius: 18,
-                offset: Offset(0, 8),
+                offset: const Offset(0, 8),
               ),
             ],
-            borderRadius: BorderRadius.only(
+            borderRadius: const BorderRadius.only(
               bottomLeft: Radius.circular(44),
               bottomRight: Radius.circular(44),
             ),
@@ -133,103 +136,104 @@ class _OrderPageScreenMState extends State<OrderPageScreenM> with SingleTickerPr
               crossAxisAlignment: CrossAxisAlignment.stretch,
               mainAxisSize: MainAxisSize.min,
               children: [
-                const SizedBox(height: 4),
+                SizedBox(height: SDSpacing.xxxs),
                 // Titre
                 TweenAnimationBuilder<double>(
                   tween: Tween(begin: 0, end: 1),
-                  duration: const Duration(milliseconds: 700),
+                  duration: SDAnimations.medium,
                   builder: (context, value, child) => Opacity(
                     opacity: value,
                     child: child,
                   ),
-                  child: const Center(
+                  child: Center(
                     child: Text(
                       'COMMANDES',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.2,
+                      style: SDTypography.displaySmall.copyWith(
+                        color: SDColors.white,
                       ),
                     ),
                   ),
                 ),
-                
-                const SizedBox(height: 20),
-                
+
+                SizedBox(height: SDSpacing.md),
+
                 // Champ de recherche si visible
-                if (_isSearchVisible) 
+                if (_isSearchVisible)
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    padding: EdgeInsets.symmetric(horizontal: SDSpacing.md),
                     child: Container(
                       decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(30),
+                        color: SDColors.white,
+                        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
                       ),
                       child: TextField(
                         controller: _searchController,
                         decoration: InputDecoration(
                           hintText: 'Rechercher une commande...',
-                          prefixIcon: const Icon(Icons.search, color: Colors.green),
+                          prefixIcon:
+                              Icon(Icons.search, color: SDColors.primary600),
                           border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 12,
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: SDSpacing.md,
+                            vertical: SDSpacing.sm,
                           ),
                         ),
                         onChanged: (value) {
-                          context.read<CommandeBloc>().add(RechercherCommandes(value));
+                          context
+                              .read<CommandeBloc>()
+                              .add(RechercherCommandes(value));
                         },
                       ),
                     ),
                   ),
-                  
-                const SizedBox(height: 10),
-                
+
+                SizedBox(height: SDSpacing.xs),
+
                 // TabBar
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  padding: EdgeInsets.symmetric(horizontal: SDSpacing.md),
                   child: Container(
                     height: 40,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(25),
+                      color: SDColors.white.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
                     ),
                     child: TabBar(
                       controller: _tabController,
                       indicator: BoxDecoration(
-                        borderRadius: BorderRadius.circular(25),
-                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
+                        color: SDColors.white,
                       ),
-                      labelColor: Colors.green,
-                      unselectedLabelColor: Colors.white,
+                      labelColor: SDColors.primary600,
+                      unselectedLabelColor: SDColors.white,
                       isScrollable: true,
-                      labelPadding: const EdgeInsets.symmetric(horizontal: 6),
+                      labelPadding: EdgeInsets.symmetric(horizontal: SDSpacing.xxs),
                       tabAlignment: TabAlignment.center,
-                      labelStyle: const TextStyle(
-                        fontSize: 11,
+                      labelStyle: SDTypography.labelSmall.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
-                      unselectedLabelStyle: const TextStyle(
-                        fontSize: 11,
-                      ),
+                      unselectedLabelStyle: SDTypography.labelSmall,
                       tabs: [
                         _buildTab('Toutes', state.commandes.length),
                         _buildTab(
                           'En attente',
-                          state.getNombreCommandesParStatus(CommandeStatus.enAttente),
+                          state.getNombreCommandesParStatus(
+                              CommandeStatus.enAttente),
                         ),
                         _buildTab(
                           'En cours',
-                          state.getNombreCommandesParStatus(CommandeStatus.enCours),
+                          state.getNombreCommandesParStatus(
+                              CommandeStatus.enCours),
                         ),
                         _buildTab(
                           'Terminées',
-                          state.getNombreCommandesParStatus(CommandeStatus.terminee),
+                          state.getNombreCommandesParStatus(
+                              CommandeStatus.terminee),
                         ),
                         _buildTab(
                           'Annulées',
-                          state.getNombreCommandesParStatus(CommandeStatus.annulee),
+                          state.getNombreCommandesParStatus(
+                              CommandeStatus.annulee),
                         ),
                       ],
                     ),
@@ -256,23 +260,23 @@ class _OrderPageScreenMState extends State<OrderPageScreenM> with SingleTickerPr
               maxLines: 1,
             ),
           ),
-          if (count > 0) ...[  
-            const SizedBox(width: 2),
+          if (count > 0) ...[
+            SizedBox(width: SDSpacing.xxxs),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+              padding: EdgeInsets.symmetric(horizontal: SDSpacing.xxxs, vertical: 1),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: _tabController.index == _getTabIndexFromLabel(label)
-                    ? Colors.green
-                    : Colors.white,
+                    ? SDColors.primary600
+                    : SDColors.white,
               ),
               child: Text(
                 count.toString(),
-                style: TextStyle(
+                style: SDTypography.labelSmall.copyWith(
                   fontSize: 9,
                   color: _tabController.index == _getTabIndexFromLabel(label)
-                      ? Colors.white
-                      : Colors.green,
+                      ? SDColors.white
+                      : SDColors.primary600,
                 ),
               ),
             ),
@@ -284,43 +288,53 @@ class _OrderPageScreenMState extends State<OrderPageScreenM> with SingleTickerPr
 
   int _getTabIndexFromLabel(String label) {
     switch (label) {
-      case 'Toutes': return 0;
-      case 'En attente': return 1;
-      case 'En cours': return 2;
-      case 'Terminées': return 3;
-      case 'Annulées': return 4;
-      default: return 0;
+      case 'Toutes':
+        return 0;
+      case 'En attente':
+        return 1;
+      case 'En cours':
+        return 2;
+      case 'Terminées':
+        return 3;
+      case 'Annulées':
+        return 4;
+      default:
+        return 0;
     }
   }
 
   Widget _buildBody(CommandeState state) {
     if (state.isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.green)),
+      return Center(
+        child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(SDColors.primary600)),
       );
     }
-    
+
     if (state.error != null) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.error_outline, size: 60, color: Colors.red.shade300),
-            const SizedBox(height: 16),
-            const Text(
+            Icon(Icons.error_outline, size: 60, color: SDColors.primary300),
+            SizedBox(height: SDSpacing.md),
+            Text(
               'Une erreur s\'est produite',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: SDTypography.titleMedium.copyWith(
+                fontWeight: FontWeight.bold,
+                color: SDColors.primary600,
+              ),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: SDSpacing.sm),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 40),
+              padding: EdgeInsets.symmetric(horizontal: SDSpacing.xxxl),
               child: Text(
                 state.error!,
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey.shade700),
+                style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral700),
               ),
             ),
-            const SizedBox(height: 24),
+            SizedBox(height: SDSpacing.lg),
             ElevatedButton.icon(
               onPressed: () {
                 context.read<CommandeBloc>().add(const ChargerCommandes());
@@ -328,37 +342,24 @@ class _OrderPageScreenMState extends State<OrderPageScreenM> with SingleTickerPr
               icon: const Icon(Icons.refresh),
               label: const Text("Réessayer"),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                foregroundColor: Colors.white,
+                backgroundColor: SDColors.primary600,
+                foregroundColor: SDColors.white,
               ),
             ),
           ],
         ),
       );
     }
-    
+
     if (state.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.shopping_bag_outlined, size: 80, color: Colors.grey.shade300),
-            const SizedBox(height: 16),
-            const Text(
-              'Aucune commande trouvée',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _getEmptyStateMessage(state.filtreStatus),
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey.shade600),
-            ),
-          ],
-        ),
+      return EmptyStateWidget(
+        imagePath: 'assets/commandes_vides.png',
+        title: 'Aucune commande',
+        message: 'Vous n\'avez pas encore passé de commande.\nCommencez vos achats dès maintenant !',
+        imageSize: 200,
       );
     }
-    
+
     return TabBarView(
       controller: _tabController,
       children: [
@@ -378,7 +379,7 @@ class _OrderPageScreenMState extends State<OrderPageScreenM> with SingleTickerPr
 
   Widget _buildCommandesList(List<CommandeModel> commandes) {
     return ListView.builder(
-      padding: const EdgeInsets.only(top: 16, bottom: 80),
+      padding: EdgeInsets.only(top: SDSpacing.md, bottom: SDSpacing.xxxl),
       itemCount: commandes.length,
       itemBuilder: (context, index) {
         final commande = commandes[index];
@@ -396,7 +397,7 @@ class _OrderPageScreenMState extends State<OrderPageScreenM> with SingleTickerPr
     if (status == null) {
       return 'Vous n\'avez pas encore passé de commande';
     }
-    
+
     switch (status) {
       case CommandeStatus.enAttente:
         return 'Aucune commande en attente actuellement';
@@ -425,7 +426,7 @@ class _OrderPageScreenMState extends State<OrderPageScreenM> with SingleTickerPr
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Chat avec ${commande.prestataireName} ouvert'),
-        backgroundColor: Colors.green,
+        backgroundColor: SDColors.success500,
       ),
     );
   }
@@ -440,15 +441,16 @@ class _OrderPageScreenMState extends State<OrderPageScreenM> with SingleTickerPr
   Widget _buildRatingDialog(CommandeModel commande) {
     double rating = 0;
     final commentController = TextEditingController();
-    
+
     return AlertDialog(
       title: const Text('Noter cette commande'),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('Comment évaluez-vous votre expérience avec ${commande.prestataireName}?'),
-            const SizedBox(height: 20),
+            Text(
+                'Comment évaluez-vous votre expérience avec ${commande.prestataireName}?'),
+            SizedBox(height: SDSpacing.lg),
             StatefulBuilder(
               builder: (context, setState) => Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -457,7 +459,7 @@ class _OrderPageScreenMState extends State<OrderPageScreenM> with SingleTickerPr
                   (index) => IconButton(
                     icon: Icon(
                       index < rating ? Icons.star : Icons.star_border,
-                      color: Colors.amber,
+                      color: SDColors.warning500,
                       size: 40,
                     ),
                     onPressed: () {
@@ -469,7 +471,7 @@ class _OrderPageScreenMState extends State<OrderPageScreenM> with SingleTickerPr
                 ),
               ),
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: SDSpacing.lg),
             TextField(
               controller: commentController,
               decoration: const InputDecoration(
@@ -490,30 +492,30 @@ class _OrderPageScreenMState extends State<OrderPageScreenM> with SingleTickerPr
           onPressed: () {
             if (rating > 0) {
               context.read<CommandeBloc>().add(NoterCommande(
-                commandeId: commande.id,
-                note: rating,
-                commentaire: commentController.text,
-              ));
+                    commandeId: commande.id,
+                    note: rating,
+                    commentaire: commentController.text,
+                  ));
               Navigator.pop(context);
-              
+
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text('Merci pour votre évaluation!'),
-                  backgroundColor: Colors.green,
+                  backgroundColor: SDColors.success500,
                 ),
               );
             } else {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text('Veuillez attribuer au moins 1 étoile'),
-                  backgroundColor: Colors.red,
+                  backgroundColor: SDColors.error500,
                 ),
               );
             }
           },
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.green,
-            foregroundColor: Colors.white,
+            backgroundColor: SDColors.primary600,
+            foregroundColor: SDColors.white,
           ),
           child: const Text('Envoyer'),
         ),

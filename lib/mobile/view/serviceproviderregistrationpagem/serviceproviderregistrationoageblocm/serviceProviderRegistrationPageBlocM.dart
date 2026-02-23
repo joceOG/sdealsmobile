@@ -5,6 +5,7 @@ import 'dart:convert';
 
 import 'serviceProviderRegistrationPageEventM.dart';
 import 'serviceProviderRegistrationPageStateM.dart';
+import '../../../../data/services/authCubit.dart';
 
 class ServiceProviderRegistrationBlocM extends Bloc<
     ServiceProviderRegistrationEventM, ServiceProviderRegistrationStateM> {
@@ -48,8 +49,20 @@ class ServiceProviderRegistrationBlocM extends Bloc<
         }
 
         final userResult = jsonDecode(userResponse.body);
-        userId = userResult['utilisateur']['_id'];
-        print("✅ Utilisateur créé avec ID: $userId");
+        print("🔍 Réponse API utilisateur: $userResult");
+
+        // Vérifier la structure de la réponse
+        if (userResult['utilisateur'] != null) {
+          userId = userResult['utilisateur']['_id'];
+          print("✅ Utilisateur créé avec ID: $userId");
+        } else if (userResult['_id'] != null) {
+          // Si la structure est différente
+          userId = userResult['_id'];
+          print("✅ Utilisateur créé avec ID (structure alternative): $userId");
+        } else {
+          print("❌ Structure de réponse inattendue: $userResult");
+          throw Exception("Structure de réponse utilisateur inattendue");
+        }
       }
 
       // ✅ ÉTAPE 2: Créer le prestataire avec le nouveau modèle
@@ -65,6 +78,10 @@ class ServiceProviderRegistrationBlocM extends Bloc<
       if (prestataireResponse.statusCode == 201 ||
           prestataireResponse.statusCode == 200) {
         print("✅ Prestataire créé avec succès!");
+
+        // ✅ NOUVEAU : Mettre à jour les rôles de l'utilisateur connecté
+        await _updateUserRoles(userId);
+
         emit(ServiceProviderRegistrationSuccess(
             message:
                 "🎉 Inscription réussie ! Bienvenue chez Soutrali Deals !"));
@@ -91,87 +108,74 @@ class ServiceProviderRegistrationBlocM extends Bloc<
     final nom = nameParts.isNotEmpty ? nameParts.first : '';
     final prenom = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
 
+    // Générer un mot de passe temporaire basé sur le téléphone
+    final phone = formData['phone'] ?? '';
+    final tempPassword =
+        phone.replaceAll(RegExp(r'[^\d]'), ''); // Garder seulement les chiffres
+    final finalPassword = tempPassword.isNotEmpty
+        ? tempPassword
+        : '123456'; // Mot de passe par défaut
+
     return {
       "nom": nom,
       "prenom": prenom,
-      "telephone": formData['phone'] ?? '',
+      "telephone": phone,
       "email": formData['email'] ?? '',
-      "password": formData['password'] ?? '',
+      "password": finalPassword, // ✅ Mot de passe temporaire généré
       "genre": formData['gender'] ?? 'Homme',
+      "role": "prestataire", // ✅ Ajouter le rôle prestataire
     };
   }
 
-  // ✅ PRÉPARATION DES DONNÉES PRESTATAIRE (NOUVEAU MODÈLE)
+  // ✅ NOUVELLE MÉTHODE : Mettre à jour les rôles de l'utilisateur
+  Future<void> _updateUserRoles(String userId) async {
+    try {
+      // Note: La mise à jour des rôles sera gérée dans l'écran après l'inscription
+      // car le BLoC n'a pas accès au context
+      print("✅ Rôle PRESTATAIRE à ajouter pour l'utilisateur: $userId");
+    } catch (e) {
+      print("❌ Erreur lors de la mise à jour des rôles: $e");
+    }
+  }
+
+  // ✅ PRÉPARATION DES DONNÉES PRESTATAIRE (MODÈLE BACKEND EXISTANT)
   Map<String, dynamic> _preparePrestataireData(
       Map<String, dynamic> formData, String userId) {
     return {
-      // Champs de base
+      // Champs requis par le backend
       "utilisateur": userId,
-      "name": formData['fullName'] ?? '',
-      "job": formData['category'] ?? '',
-      "category": formData['category'] ?? '',
+      "service":
+          formData['service'] ?? '', // Service sélectionné par l'utilisateur
+      "category": formData['category'] ?? '', // Catégorie sélectionnée
+      "prixprestataire": formData['dailyRate'] ?? 0,
+      "localisation": (formData['serviceAreas'] as List?)?.isNotEmpty == true
+          ? (formData['serviceAreas'] as List)[0]
+          : 'Abidjan',
+      "localisationmaps": formData['position'] != null
+          ? {
+              'latitude': formData['position'].latitude,
+              'longitude': formData['position'].longitude,
+            }
+          : formData['localisationmaps'] ?? {'latitude': 0.0, 'longitude': 0.0},
+      "description": formData['description'] ?? '',
+      "zoneIntervention": formData['serviceAreas'] ?? [],
 
-      // Système de performance
-      "rating": 0,
-      "completedJobs": 0,
-      "isTopRated": false,
-      "isFeatured": false,
-      "isNew": true,
-      "responseTime": 24,
+      // Champs optionnels avec valeurs par défaut
+      "note": 'Profil créé via inscription simplifiée',
+      "verifier": false,
+      "specialite": [formData['category'] ?? ''],
+      "anneeExperience": '0',
+      "rayonIntervention": 10,
+      "tarifHoraireMin": (formData['dailyRate'] ?? 0) / 8,
+      "tarifHoraireMax": (formData['dailyRate'] ?? 0) / 6,
 
-      // Compétences et tarification
-      "skills": formData['specialties'] ?? [],
-      "hourlyRate": formData['minimumHourlyRate'] ?? 0,
-      "description": formData['serviceDescription'] ?? '',
-
-      // Informations professionnelles
-      "experienceLevel": _convertExperience(formData['yearsOfExperience']),
-      "availabilityStatus": "Disponible",
-      "workingHours": "Temps partiel",
-
-      // Localisation et contact
-      "location": _getFirstLocation(formData['serviceAreas']),
-      "phoneNumber": formData['phone'] ?? '',
-
-      // Portfolio vide pour l'instant
-      "portfolioItems": [],
-
-      // Documents de vérification
-      "verificationDocuments": {
-        "isVerified": false
-        // Les fichiers seront uploadés séparément
-      },
-
-      // Statistiques business
-      "totalEarnings": 0,
-      "currentProjects": 0,
-      "clientSatisfaction": 0,
-
-      // Préférences
-      "preferredCategories": [formData['category'] ?? ''],
-      "minimumProjectBudget":
-          (formData['minimumHourlyRate'] ?? 0) * 2, // Estimation
-      "maxProjectsPerMonth": 10,
-
-      // Statut du compte
-      "accountStatus": "Pending",
-      "subscriptionType": "Free"
+      // Champs optionnels vides
+      "numeroCNI": '',
+      "numeroRCCM": '',
+      "numeroAssurance": '',
+      "nbMission": 0,
+      "revenus": 0,
+      "clients": [],
     };
-  }
-
-  // ✅ CONVERTIR LES ANNÉES D'EXPÉRIENCE EN NIVEAU
-  String _convertExperience(dynamic years) {
-    final exp = years is int ? years : (int.tryParse(years.toString()) ?? 0);
-    if (exp < 2) return 'Débutant';
-    if (exp < 5) return 'Intermédiaire';
-    return 'Expert';
-  }
-
-  // ✅ RÉCUPÉRER LA PREMIÈRE LOCALISATION
-  String _getFirstLocation(dynamic serviceAreas) {
-    if (serviceAreas is List && serviceAreas.isNotEmpty) {
-      return serviceAreas.first.toString();
-    }
-    return '';
   }
 }

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import '../../../../../design_system/colors.dart';
+import '../../../../../design_system/typography.dart';
 
 class SellerPersonalInfoStep extends StatefulWidget {
   final Map<String, dynamic> formData;
@@ -94,7 +96,7 @@ class _SellerPersonalInfoStepState extends State<SellerPersonalInfoStep> {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: ColorScheme.light(
-              primary: Colors.amber.shade700,
+              primary: SDColors.secondary700,
             ),
           ),
           child: child!,
@@ -139,7 +141,7 @@ class _SellerPersonalInfoStepState extends State<SellerPersonalInfoStep> {
                   onTap: _pickImage,
                   child: CircleAvatar(
                     radius: 50,
-                    backgroundColor: Colors.grey.shade200,
+                    backgroundColor: SDColors.neutral200,
                     backgroundImage: _profileImage != null
                         ? FileImage(File(_profileImage!.path))
                         : null,
@@ -147,15 +149,15 @@ class _SellerPersonalInfoStepState extends State<SellerPersonalInfoStep> {
                         ? Icon(
                             Icons.person_add,
                             size: 50,
-                            color: Colors.grey.shade400,
+                            color: SDColors.neutral400,
                           )
                         : null,
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Photo de profil (obligatoire)',
-                  style: TextStyle(color: Colors.grey),
+                  style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral500),
                 ),
               ],
             ),
@@ -204,7 +206,7 @@ class _SellerPersonalInfoStepState extends State<SellerPersonalInfoStep> {
               'Une vérification par SMS sera envoyée à ce numéro',
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.blue.shade700,
+                color: SDColors.info600,
                 fontStyle: FontStyle.italic,
               ),
             ),
@@ -235,7 +237,7 @@ class _SellerPersonalInfoStepState extends State<SellerPersonalInfoStep> {
               'Un email de confirmation sera envoyé à cette adresse',
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.blue.shade700,
+                color: SDColors.info600,
                 fontStyle: FontStyle.italic,
               ),
             ),
@@ -303,10 +305,7 @@ class _SellerPersonalInfoStepState extends State<SellerPersonalInfoStep> {
           const SizedBox(height: 20),
           const Text(
             'Date de naissance (optionnel)',
-            style: TextStyle(
-              fontWeight: FontWeight.w500,
-              fontSize: 16,
-            ),
+            style: SDTypography.titleMedium,
           ),
           const SizedBox(height: 8),
           InkWell(
@@ -314,19 +313,19 @@ class _SellerPersonalInfoStepState extends State<SellerPersonalInfoStep> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 15),
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey.shade400),
+                border: Border.all(color: SDColors.neutral400),
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.calendar_today, color: Colors.grey),
+                  const Icon(Icons.calendar_today, color: SDColors.neutral500),
                   const SizedBox(width: 12),
                   Text(
                     _selectedDate != null
                         ? '${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}'
                         : 'Sélectionner une date',
                     style: TextStyle(
-                      color: _selectedDate != null ? Colors.black : Colors.grey.shade700,
+                      color: _selectedDate != null ? SDColors.neutral900 : SDColors.neutral700,
                     ),
                   ),
                 ],
@@ -336,10 +335,7 @@ class _SellerPersonalInfoStepState extends State<SellerPersonalInfoStep> {
           const SizedBox(height: 20),
           const Text(
             'Genre (optionnel)',
-            style: TextStyle(
-              fontWeight: FontWeight.w500,
-              fontSize: 16,
-            ),
+            style: SDTypography.titleMedium,
           ),
           const SizedBox(height: 8),
           Row(
@@ -370,11 +366,11 @@ class _SellerPersonalInfoStepState extends State<SellerPersonalInfoStep> {
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: isSelected ? Colors.amber.shade50 : Colors.white,
+            decoration: BoxDecoration(
+          color: isSelected ? SDColors.secondary50 : SDColors.white,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isSelected ? Colors.amber.shade700 : Colors.grey.shade400,
+            color: isSelected ? SDColors.secondary700 : SDColors.neutral400,
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -382,13 +378,13 @@ class _SellerPersonalInfoStepState extends State<SellerPersonalInfoStep> {
           children: [
             Icon(
               icon,
-              color: isSelected ? Colors.amber.shade700 : Colors.grey.shade600,
+              color: isSelected ? SDColors.secondary700 : SDColors.neutral600,
             ),
             const SizedBox(width: 8),
             Text(
               label,
               style: TextStyle(
-                color: isSelected ? Colors.amber.shade700 : Colors.grey.shade700,
+                color: isSelected ? SDColors.secondary700 : SDColors.neutral700,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
               ),
             ),

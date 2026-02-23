@@ -52,3 +52,8 @@ class UpdateUserLocationM extends LocationPageEventM {
   List<Object> get props => [latitude, longitude];
 }
 
+
+
+
+
+

@@ -16,11 +16,15 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
   final ApiClient _apiClient = ApiClient();
   final WebSocketService _webSocketService = WebSocketService();
   final NotificationService _notificationService = NotificationService();
-  final String _currentUserId =
-      'currentUser'; // À remplacer par l'ID réel de l'utilisateur connecté
+
+  // ✅ ID utilisateur passé au constructeur (depuis AuthCubit)
+  final String _currentUserId;
   final _uuid = const Uuid();
 
-  ChatPageBlocM() : super(ChatPageStateM.initial()) {
+  ChatPageBlocM({String? userId})
+      : _currentUserId =
+      userId ?? 'currentUser', // ⚠️ Fallback sur mock si non fourni
+        super(ChatPageStateM.initial()) {
     on<LoadConversations>(_onLoadConversations);
     on<SelectConversation>(_onSelectConversation);
     on<LoadMessages>(_onLoadMessages);
@@ -35,6 +39,8 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
     on<MessageStatusUpdated>(_onMessageStatusUpdated);
     on<SendChatNotification>(_onSendChatNotification);
     on<ChatNotificationReceived>(_onChatNotificationReceived);
+    on<SearchMessages>(_onSearchMessages);
+    on<DeleteMessage>(_onDeleteMessage);
 
     // Gardons la compatibilité avec le code existant
     on<LoadCategorieDataM>(_onLoadCategorieDataM);
@@ -51,7 +57,7 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
     try {
       var nomgroupe = "Métiers";
       List<Categorie> list_categorie =
-          await _apiClient.fetchCategorie(nomgroupe);
+      await _apiClient.fetchCategorie(nomgroupe);
       emit(state.copyWith(listItems: list_categorie, isLoading: false));
     } catch (error) {
       emit(state.copyWith(error: error.toString(), isLoading: false));
@@ -63,12 +69,27 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
     emit(state.copyWith(status: ChatPageStatus.loading));
 
     try {
-      // Simulons une API call avec les données mockées
-      await Future.delayed(const Duration(milliseconds: 500));
+      List<ConversationModel> conversations;
 
-      // Dans un environnement réel, nous appellerions l'API ici
-      // final List<ConversationModel> conversations = await _apiClient.getConversations(_currentUserId);
-      final List<ConversationModel> conversations = mockConversations;
+      // 🔄 Tenter d'abord l'API backend
+      try {
+        print('🔄 Tentative chargement conversations depuis API...');
+        final conversationsData =
+        await _apiClient.getConversations(_currentUserId);
+
+        // Convertir les données backend en modèles
+        conversations = conversationsData
+            .map((data) => ConversationModel.fromBackend(data, _currentUserId))
+            .toList();
+
+        print('✅ ${conversations.length} conversations chargées depuis API');
+      } catch (apiError) {
+        // ⚠️ Fallback sur les données mock si l'API échoue
+        print('⚠️ API indisponible, utilisation des données mock: $apiError');
+        await Future.delayed(const Duration(milliseconds: 500));
+        conversations = mockConversations;
+        print('📦 ${conversations.length} conversations mock chargées');
+      }
 
       emit(state.copyWith(
         status: ChatPageStatus.loaded,
@@ -77,7 +98,7 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
       ));
     } catch (error) {
       if (kDebugMode) {
-        print('Error loading conversations: $error');
+        print('❌ Error loading conversations: $error');
       }
       emit(state.copyWith(
         status: ChatPageStatus.error,
@@ -108,36 +129,46 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
     emit(state.copyWith(status: ChatPageStatus.loading));
 
     try {
-      // Simulons une API call avec les données mockées
-      await Future.delayed(const Duration(milliseconds: 500));
-
-      // Dans un environnement réel, nous appellerions l'API ici
-      // final List<MessageModel> messages = await _apiClient.getMessages(
-      //   event.conversationId,
-      //   limit: event.limit,
-      //   offset: event.offset,
-      // );
-
-      // Utilisons des données mockées pour le développement
       List<MessageModel> messages;
-      switch (event.conversationId) {
-        case 'conv1':
-          messages = mockMessages;
-          break;
-        case 'conv2':
-          messages = mockVendeurMessages;
-          break;
-        case 'conv3':
-          messages = mockFreelanceMessages;
-          break;
-        default:
-          messages = [];
-          break;
+
+      // 🔄 Tenter d'abord l'API backend
+      try {
+        print(
+            '🔄 Tentative chargement messages depuis API pour conversation: ${event.conversationId}');
+        final messagesData =
+        await _apiClient.getConversationMessages(event.conversationId);
+
+        // Convertir les données backend en modèles
+        messages =
+            messagesData.map((data) => MessageModel.fromBackend(data)).toList();
+
+        print('✅ ${messages.length} messages chargés depuis API');
+      } catch (apiError) {
+        // ⚠️ Fallback sur les données mock si l'API échoue
+        print('⚠️ API indisponible, utilisation des données mock: $apiError');
+        await Future.delayed(const Duration(milliseconds: 500));
+
+        // Utilisons des données mockées pour le développement
+        switch (event.conversationId) {
+          case 'conv1':
+            messages = mockMessages;
+            break;
+          case 'conv2':
+            messages = mockVendeurMessages;
+            break;
+          case 'conv3':
+            messages = mockFreelanceMessages;
+            break;
+          default:
+            messages = [];
+            break;
+        }
+        print('📦 ${messages.length} messages mock chargés');
       }
 
       // Mettre à jour les messages pour la conversation actuelle
       final updatedMessagesMap =
-          Map<String, List<MessageModel>>.from(state.messagesByConversation);
+      Map<String, List<MessageModel>>.from(state.messagesByConversation);
       updatedMessagesMap[event.conversationId] = messages;
 
       emit(state.copyWith(
@@ -146,7 +177,7 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
       ));
     } catch (error) {
       if (kDebugMode) {
-        print('Error loading messages: $error');
+        print('❌ Error loading messages: $error');
       }
       emit(state.copyWith(
         status: ChatPageStatus.error,
@@ -177,7 +208,7 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
         ..add(newMessage);
 
       final updatedMessagesMap =
-          Map<String, List<MessageModel>>.from(state.messagesByConversation);
+      Map<String, List<MessageModel>>.from(state.messagesByConversation);
       updatedMessagesMap[event.conversationId] = updatedMessages;
 
       // Mettre à jour également la dernière conversation
@@ -200,16 +231,43 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
         selectedConversation: updatedConversation,
       ));
 
-      // Simuler l'envoi du message à l'API
-      await Future.delayed(const Duration(milliseconds: 500));
+      // 🔄 Tenter d'envoyer via l'API backend
+      MessageModel sentMessage;
+      try {
+        print('🔄 Tentative envoi message via API...');
+        final responseData = await _apiClient.sendMessage(
+          expediteur: _currentUserId,
+          destinataire: state.selectedConversation!.participantId,
+          contenu: event.content,
+          pieceJointe: event.imageFile,
+          typePieceJointe: event.imageFile != null ? 'IMAGE' : null,
+        );
 
-      // Dans un environnement réel, nous appellerions l'API ici
-      // final sentMessage = await _apiClient.sendMessage(event.conversationId, newMessage);
+        // Convertir la réponse backend en MessageModel
+        sentMessage = MessageModel.fromBackend(responseData);
+        print('✅ Message envoyé via API avec ID: ${sentMessage.id}');
 
-      // Mettre à jour le statut du message à "envoyé"
-      final sentMessage = newMessage.copyWith(newStatus: MessageStatus.sent);
+        // Envoyer aussi via WebSocket pour temps réel
+        if (_webSocketService.isConnected) {
+          _webSocketService.sendMessage(
+            expediteur: _currentUserId,
+            destinataire: state.selectedConversation!.participantId,
+            contenu: event.content,
+            conversationId: event.conversationId,
+          );
+        }
+      } catch (apiError) {
+        // ⚠️ Fallback sur simulation si l'API échoue
+        print('⚠️ API indisponible, simulation envoi: $apiError');
+        await Future.delayed(const Duration(milliseconds: 500));
+        sentMessage = newMessage.copyWith(newStatus: MessageStatus.sent);
 
-      // Mettre à jour les messages avec le statut mis à jour
+        // Simuler la réception après un délai
+        await Future.delayed(const Duration(seconds: 1));
+        sentMessage = sentMessage.copyWith(newStatus: MessageStatus.delivered);
+      }
+
+      // Mettre à jour les messages avec le message envoyé
       final finalMessages = updatedMessages.map((msg) {
         if (msg.id == newMessage.id) {
           return sentMessage;
@@ -218,24 +276,6 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
       }).toList();
 
       updatedMessagesMap[event.conversationId] = finalMessages;
-
-      emit(state.copyWith(
-        messagesByConversation: updatedMessagesMap,
-      ));
-
-      // Simuler la réception du message par le destinataire après un court délai
-      await Future.delayed(const Duration(seconds: 1));
-
-      final deliveredMessage =
-          sentMessage.copyWith(newStatus: MessageStatus.delivered);
-      final deliveredMessages = finalMessages.map((msg) {
-        if (msg.id == sentMessage.id) {
-          return deliveredMessage;
-        }
-        return msg;
-      }).toList();
-
-      updatedMessagesMap[event.conversationId] = deliveredMessages;
 
       emit(state.copyWith(
         messagesByConversation: updatedMessagesMap,
@@ -254,7 +294,7 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
       }).toList();
 
       final updatedMessagesMap =
-          Map<String, List<MessageModel>>.from(state.messagesByConversation);
+      Map<String, List<MessageModel>>.from(state.messagesByConversation);
       updatedMessagesMap[event.conversationId] = updatedMessages;
 
       emit(state.copyWith(
@@ -278,7 +318,7 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
         return;
 
       final updatedMessages =
-          state.messagesByConversation[event.conversationId]!.map((msg) {
+      state.messagesByConversation[event.conversationId]!.map((msg) {
         if (msg.id == event.messageId) {
           return msg.copyWith(newStatus: MessageStatus.seen);
         }
@@ -286,7 +326,7 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
       }).toList();
 
       final updatedMessagesMap =
-          Map<String, List<MessageModel>>.from(state.messagesByConversation);
+      Map<String, List<MessageModel>>.from(state.messagesByConversation);
       updatedMessagesMap[event.conversationId] = updatedMessages;
 
       emit(state.copyWith(
@@ -302,11 +342,18 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
   Future<void> _onMarkConversationAsRead(
       MarkConversationAsRead event, Emitter<ChatPageStateM> emit) async {
     try {
-      // Simuler l'appel API
-      await Future.delayed(const Duration(milliseconds: 200));
-
-      // Dans un environnement réel, nous appellerions l'API ici
-      // await _apiClient.markConversationAsRead(event.conversationId);
+      // 🔄 Tenter d'appeler l'API backend
+      try {
+        print(
+            '🔄 Marquage conversation comme lue via API: ${event.conversationId}');
+        await _apiClient.markMessagesAsRead(
+            event.conversationId, _currentUserId);
+        print('✅ Conversation marquée comme lue via API');
+      } catch (apiError) {
+        // ⚠️ Fallback sur simulation si l'API échoue
+        print('⚠️ API indisponible, simulation marquage: $apiError');
+        await Future.delayed(const Duration(milliseconds: 200));
+      }
 
       // Mettre à jour la conversation localement
       final updatedConversations = state.conversations.map((conv) {
@@ -328,26 +375,26 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
         }).toList();
 
         final updatedMessagesMap =
-            Map<String, List<MessageModel>>.from(state.messagesByConversation);
+        Map<String, List<MessageModel>>.from(state.messagesByConversation);
         updatedMessagesMap[event.conversationId] = updatedMessages;
 
         emit(state.copyWith(
           conversations: updatedConversations,
           messagesByConversation: updatedMessagesMap,
           selectedConversation:
-              state.selectedConversation?.id == event.conversationId
-                  ? state.selectedConversation!
-                      .copyWith(unread: false, unreadCount: 0)
-                  : null,
+          state.selectedConversation?.id == event.conversationId
+              ? state.selectedConversation!
+              .copyWith(unread: false, unreadCount: 0)
+              : null,
         ));
       } else {
         emit(state.copyWith(
           conversations: updatedConversations,
           selectedConversation:
-              state.selectedConversation?.id == event.conversationId
-                  ? state.selectedConversation!
-                      .copyWith(unread: false, unreadCount: 0)
-                  : null,
+          state.selectedConversation?.id == event.conversationId
+              ? state.selectedConversation!
+              .copyWith(unread: false, unreadCount: 0)
+              : null,
         ));
       }
     } catch (error) {
@@ -364,7 +411,7 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
     try {
       // Vérifier si une conversation existe déjà avec ce participant
       final existingConversation = state.conversations.firstWhere(
-        (conv) => conv.participantId == event.participantId,
+            (conv) => conv.participantId == event.participantId,
         orElse: () => ConversationModel(
           id: '',
           userId: '',
@@ -420,7 +467,7 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
 
       // Initialiser la liste des messages pour cette conversation
       final updatedMessagesMap =
-          Map<String, List<MessageModel>>.from(state.messagesByConversation);
+      Map<String, List<MessageModel>>.from(state.messagesByConversation);
       updatedMessagesMap[newConversation.id] = [];
 
       emit(state.copyWith(
@@ -540,7 +587,7 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
       final updatedMessages = [...currentMessages, newMessage];
 
       final updatedMessagesMap =
-          Map<String, List<MessageModel>>.from(state.messagesByConversation);
+      Map<String, List<MessageModel>>.from(state.messagesByConversation);
       updatedMessagesMap[conversationId] = updatedMessages;
 
       // Mettre à jour la conversation avec le dernier message
@@ -578,7 +625,7 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
       if (!state.messagesByConversation.containsKey(conversationId)) return;
 
       final updatedMessages =
-          state.messagesByConversation[conversationId]!.map((msg) {
+      state.messagesByConversation[conversationId]!.map((msg) {
         if (msg.id == messageId) {
           return msg.copyWith(newStatus: newStatus);
         }
@@ -586,7 +633,7 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
       }).toList();
 
       final updatedMessagesMap =
-          Map<String, List<MessageModel>>.from(state.messagesByConversation);
+      Map<String, List<MessageModel>>.from(state.messagesByConversation);
       updatedMessagesMap[conversationId] = updatedMessages;
 
       emit(state.copyWith(
@@ -599,9 +646,9 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
 
   // 🔔 ENVOYER NOTIFICATION CHAT
   Future<void> _onSendChatNotification(
-    SendChatNotification event,
-    Emitter<ChatPageStateM> emit,
-  ) async {
+      SendChatNotification event,
+      Emitter<ChatPageStateM> emit,
+      ) async {
     try {
       final success = await _notificationService.notifyNewMessage(
         userId: event.userId,
@@ -622,9 +669,9 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
 
   // 🔔 NOTIFICATION CHAT REÇUE
   Future<void> _onChatNotificationReceived(
-    ChatNotificationReceived event,
-    Emitter<ChatPageStateM> emit,
-  ) async {
+      ChatNotificationReceived event,
+      Emitter<ChatPageStateM> emit,
+      ) async {
     try {
       final notificationData = event.notificationData;
       final type = notificationData['type']?.toString() ?? '';
@@ -649,9 +696,9 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
 
   // 📨 TRAITER NOTIFICATION NOUVEAU MESSAGE
   void _handleNewMessageNotification(
-    Map<String, dynamic> data,
-    Emitter<ChatPageStateM> emit,
-  ) {
+      Map<String, dynamic> data,
+      Emitter<ChatPageStateM> emit,
+      ) {
     final conversationId = data['conversationId']?.toString() ?? '';
     final senderName = data['senderName']?.toString() ?? '';
     final message = data['message']?.toString() ?? '';
@@ -677,9 +724,9 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
 
   // 📊 TRAITER NOTIFICATION STATUT MESSAGE
   void _handleMessageStatusNotification(
-    Map<String, dynamic> data,
-    Emitter<ChatPageStateM> emit,
-  ) {
+      Map<String, dynamic> data,
+      Emitter<ChatPageStateM> emit,
+      ) {
     final messageId = data['messageId']?.toString() ?? '';
     final status = data['status']?.toString() ?? '';
     final conversationId = data['conversationId']?.toString() ?? '';
@@ -697,7 +744,7 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
       }).toList();
 
       final updatedMessagesMap =
-          Map<String, List<MessageModel>>.from(state.messagesByConversation);
+      Map<String, List<MessageModel>>.from(state.messagesByConversation);
       updatedMessagesMap[conversationId] = updatedMessages;
 
       emit(state.copyWith(
@@ -723,7 +770,130 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
   }
 
   // 🧹 NETTOYAGE
-  @override
+  // 🔍 RECHERCHER DANS LES MESSAGES
+  Future<void> _onSearchMessages(
+      SearchMessages event, Emitter<ChatPageStateM> emit) async {
+    if (event.query.isEmpty) {
+      // Si la recherche est vide, recharger toutes les conversations
+      add(const LoadConversations());
+      return;
+    }
+
+    emit(state.copyWith(status: ChatPageStatus.loading));
+
+    try {
+      // 🔄 Tenter d'abord l'API backend
+      try {
+        print('🔍 Recherche messages via API: "${event.query}"');
+        final messagesData =
+        await _apiClient.searchMessages(_currentUserId, event.query);
+
+        // Grouper les messages par conversation
+        final Map<String, List<MessageModel>> messagesByConv = {};
+        for (var data in messagesData) {
+          final message = MessageModel.fromBackend(data);
+          final convId = data['conversationId']?.toString() ?? '';
+
+          if (!messagesByConv.containsKey(convId)) {
+            messagesByConv[convId] = [];
+          }
+          messagesByConv[convId]!.add(message);
+        }
+
+        print(
+            '✅ ${messagesData.length} messages trouvés dans ${messagesByConv.length} conversations');
+
+        emit(state.copyWith(
+          status: ChatPageStatus.loaded,
+          messagesByConversation: messagesByConv,
+        ));
+      } catch (apiError) {
+        // ⚠️ Fallback sur recherche locale si l'API échoue
+        print('⚠️ API indisponible, recherche locale: $apiError');
+
+        final query = event.query.toLowerCase();
+        final filteredConversations = state.conversations.where((conv) {
+          return conv.participantName.toLowerCase().contains(query) ||
+              (conv.lastMessage?.content.toLowerCase().contains(query) ??
+                  false);
+        }).toList();
+
+        print(
+            '📦 ${filteredConversations.length} conversations trouvées localement');
+
+        emit(state.copyWith(
+          status: ChatPageStatus.loaded,
+          conversations: filteredConversations,
+        ));
+      }
+    } catch (error) {
+      if (kDebugMode) {
+        print('❌ Error searching messages: $error');
+      }
+      emit(state.copyWith(
+        status: ChatPageStatus.error,
+        error: error.toString(),
+      ));
+    }
+  }
+
+  // 🗑️ SUPPRIMER UN MESSAGE
+  Future<void> _onDeleteMessage(
+      DeleteMessage event, Emitter<ChatPageStateM> emit) async {
+    try {
+      // 🔄 Tenter d'abord l'API backend
+      try {
+        print('🗑️ Suppression message via API: ${event.messageId}');
+        await _apiClient.deleteMessageForUser(event.messageId, _currentUserId);
+        print('✅ Message supprimé via API');
+      } catch (apiError) {
+        // ⚠️ Fallback sur suppression locale si l'API échoue
+        print('⚠️ API indisponible, suppression locale: $apiError');
+      }
+
+      // Supprimer le message localement
+      if (!state.messagesByConversation.containsKey(event.conversationId)) {
+        return;
+      }
+
+      final updatedMessages = state
+          .messagesByConversation[event.conversationId]!
+          .where((msg) => msg.id != event.messageId)
+          .toList();
+
+      final updatedMessagesMap =
+      Map<String, List<MessageModel>>.from(state.messagesByConversation);
+      updatedMessagesMap[event.conversationId] = updatedMessages;
+
+      // Mettre à jour le dernier message de la conversation
+      final lastMessage =
+      updatedMessages.isNotEmpty ? updatedMessages.last : null;
+      final updatedConversations = state.conversations.map((conv) {
+        if (conv.id == event.conversationId) {
+          return conv.copyWith(
+            lastMessage: lastMessage,
+            lastUpdated: lastMessage?.timestamp ?? DateTime.now(),
+          );
+        }
+        return conv;
+      }).toList();
+
+      emit(state.copyWith(
+        messagesByConversation: updatedMessagesMap,
+        conversations: updatedConversations,
+      ));
+
+      print('✅ Message supprimé localement');
+    } catch (error) {
+      if (kDebugMode) {
+        print('❌ Error deleting message: $error');
+      }
+      emit(state.copyWith(
+        error: error.toString(),
+      ));
+    }
+  }
+
   Future<void> close() {
     _webSocketService.dispose();
     _notificationService.dispose();

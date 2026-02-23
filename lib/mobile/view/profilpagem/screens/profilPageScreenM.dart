@@ -1,8 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../design_system/design_system.dart'; // ✅ Import DS
+import '../../../../data/services/api_client.dart';
+import '../../../../data/services/authCubit.dart'; // ✅ Import AuthCubit
+import 'package:go_router/go_router.dart';
 import '../../loginpagem/screens/loginPageScreenM.dart';
 import '../../orderpagem/screens/service_requests_list_screen.dart';
 import '../profilpageblocm/profilPageBlocM.dart';
+import 'edit_profile_screen.dart';
+import '../../avispagem/screens/avisPageScreenM.dart';
+import '../../avispagem/avispageblocm/avisPageBlocM.dart';
+import '../../favorispagem/screens/favorite_page_screen_m.dart';
+import '../../favorispagem/favorispageblocm/favoritePageBlocM.dart';
+import '../../historypagem/screens/historyPageScreenM.dart';
+import '../../historypagem/historypageblocm/historyPageBlocM.dart';
+import '../../alertpagem/screens/alertPageScreenM.dart';
+import '../../alertpagem/alertpageblocm/alertPageBlocM.dart';
+import '../../preferencespagem/screens/preferencesPageScreenM.dart';
+import '../../preferencespagem/preferencespageblocm/preferencesPageBlocM.dart';
+import '../../securitypagem/screens/securityPageScreenM.dart';
+import '../../securitypagem/securitypageblocm/securityPageBlocM.dart';
+import '../../locationpagem/screens/locationPageScreenM.dart';
+import '../../locationpagem/locationpageblocm/locationPageBlocM.dart';
 
 class ProfilPageScreenM extends StatefulWidget {
   const ProfilPageScreenM({super.key});
@@ -11,13 +30,6 @@ class ProfilPageScreenM extends StatefulWidget {
 }
 
 class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
-  final GlobalKey<ScaffoldState> _scaffoldKey =
-      GlobalKey<ScaffoldState>(); // ignore: unused_field
-
-  // Simuler des données utilisateur
-  final String userName = "Afisu Yussuf";
-  final String userStatus = "Compte vérifié"; // Ou "Client simple", "Premium"
-
   @override
   void initState() {
     BlocProvider.of<ProfilPageBlocM>(context);
@@ -34,7 +46,7 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
       ),
       builder: (context) => Container(
         height: MediaQuery.of(context).size.height * 0.7,
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.all(SDSpacing.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -43,25 +55,24 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
                 height: 5,
                 width: 50,
                 decoration: BoxDecoration(
-                  color: Colors.grey[300],
+                  color: SDColors.neutral300,
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
             ),
-            const SizedBox(height: 20),
-            const Text(
+            SizedBox(height: SDSpacing.md),
+            Text(
               "Tarification SoutraPay",
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
+              style: SDTypography.displaySmall.copyWith(
+                color: SDColors.neutral900,
               ),
             ),
-            const SizedBox(height: 10),
-            const Text(
+            SizedBox(height: SDSpacing.xs),
+            Text(
               "Tous les tarifs et frais applicables aux services SoutraPay",
-              style: TextStyle(color: Colors.grey),
+              style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral600),
             ),
-            const SizedBox(height: 30),
+            SizedBox(height: SDSpacing.lg),
             Expanded(
               child: ListView(
                 children: [
@@ -70,43 +81,46 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
                     "Gratuit",
                     "Créez votre compte SoutraPay sans frais",
                     Icons.person_add,
-                    Colors.green,
+                    SDColors.success,
                   ),
                   _buildTarificationCard(
                     "Rechargement de compte",
                     "0 FCFA",
                     "Aucun frais pour recharger votre compte",
                     Icons.account_balance_wallet,
-                    Colors.blue,
+                    SDColors.info,
                   ),
                   _buildTarificationCard(
                     "Transfert entre utilisateurs",
                     "0 FCFA",
                     "Envoyez de l'argent sans frais entre comptes SoutraPay",
                     Icons.swap_horiz,
-                    Colors.orange,
+                    SDColors.warning,
                   ),
                   _buildTarificationCard(
                     "Paiement aux marchands",
                     "0 FCFA",
                     "Réglez vos achats sans frais",
                     Icons.shopping_cart,
-                    Colors.purple,
+                    SDColors.secondary,
                   ),
                   _buildTarificationCard(
                     "Retrait vers compte bancaire",
                     "1,5%",
                     "Des frais minimes pour les retraits vers votre banque",
                     Icons.account_balance,
-                    Colors.indigo,
+                    SDColors.primary600,
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 10),
-            const Text(
+            SizedBox(height: SDSpacing.xs),
+            Text(
               "Note: Les tarifs sont sujets à modification. Consultez régulièrement cette page pour les mises à jour.",
-              style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+              style: SDTypography.bodySmall.copyWith(
+                fontStyle: FontStyle.italic,
+                color: SDColors.neutral600,
+              ),
             ),
           ],
         ),
@@ -118,65 +132,63 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
   Widget _buildTarificationCard(String title, String price, String description,
       IconData icon, Color color) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
+      margin: EdgeInsets.only(bottom: SDSpacing.sm),
+      padding: SDSpacing.cardPadding,
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        color: SDColors.white,
+        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: SDColors.neutral900.withOpacity(0.05),
             spreadRadius: 1,
             blurRadius: 5,
-            offset: const Offset(0, 2),
+            offset: Offset(0, 2),
           ),
         ],
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: EdgeInsets.all(SDSpacing.sm),
             decoration: BoxDecoration(
               color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
             ),
             child: Icon(icon, color: color, size: 28),
           ),
-          const SizedBox(width: 16),
+          SizedBox(width: SDSpacing.sm),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
+                  style: SDTypography.titleSmall.copyWith(
+                    color: SDColors.neutral900,
                   ),
                 ),
-                const SizedBox(height: 4),
+                SizedBox(height: SDSpacing.xxxs),
                 Text(
                   description,
-                  style: const TextStyle(color: Colors.grey, fontSize: 13),
+                  style: SDTypography.bodySmall.copyWith(color: SDColors.neutral500),
                 ),
               ],
             ),
           ),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            padding: EdgeInsets.symmetric(horizontal: SDSpacing.sm, vertical: SDSpacing.xxxs),
             decoration: BoxDecoration(
               color: price.contains("Gratuit") || price.contains("0 FCFA")
-                  ? Colors.green.withOpacity(0.1)
-                  : Colors.grey.withOpacity(0.1),
+                  ? SDColors.success.withOpacity(0.1)
+                  : SDColors.neutral200,
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
               price,
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
+              style: SDTypography.labelSmall.copyWith(
                 color: price.contains("Gratuit") || price.contains("0 FCFA")
-                    ? Colors.green
-                    : Colors.black87,
+                    ? SDColors.success
+                    : SDColors.neutral800,
               ),
             ),
           ),
@@ -188,225 +200,649 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: SDColors.neutral50,
       appBar: AppBar(
-        backgroundColor: Colors.green,
+        backgroundColor: SDColors.primary600,
         elevation: 0,
-        title: const Text("Mon Profil"),
         centerTitle: true,
+        title: Text(
+          "Profil",
+          style: SDTypography.titleLarge.copyWith(
+            color: SDColors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.settings, color: SDColors.white),
+            onPressed: () {
+              // Navigation vers paramètres si nécessaire
+            },
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // En-tête du profil
-            _buildProfileHeader(),
-            const SizedBox(height: 20),
+            // Bannière de connexion si non connecté
+            BlocBuilder<AuthCubit, AuthState>(
+              builder: (context, authState) {
+                if (authState is! AuthAuthenticated) {
+                  return _buildLoginBanner(context);
+                }
+                return SizedBox.shrink();
+              },
+            ),
+            
+            // En-tête du profil (seulement si connecté)
+            BlocBuilder<AuthCubit, AuthState>(
+              builder: (context, authState) {
+                if (authState is AuthAuthenticated) {
+                  return Column(
+                    children: [
+                      _buildProfileHeader(context),
+                      SizedBox(height: SDSpacing.md),
+                    ],
+                  );
+                }
+                return SizedBox.shrink();
+              },
+            ),
 
             // Section "Mon activité"
-            const SectionTitle(title: '🧭 Mon activité'),
-            MenuItem(
-              icon: Icons.inventory_2,
-              title: "Mes commandes",
-              subtitle: "Voir les commandes passées et en cours",
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const _ServiceRequestsEntry(),
-                  ),
-                );
-              },
-            ),
-            MenuItem(
-              icon: Icons.rate_review,
-              title: "Mes avis & évaluations",
-              subtitle: "Historique des commentaires laissés",
-              onTap: () {
-                // Navigation vers les avis
-              },
-            ),
-            MenuItem(
-              icon: Icons.favorite,
-              title: "Favoris / Listes enregistrées",
-              subtitle: "Articles, prestataires ou annonces sauvegardés",
-              onTap: () {
-                // Navigation vers les favoris
-              },
-            ),
-            MenuItem(
-              icon: Icons.history,
-              title: "Historique des consultations",
-              subtitle: "Services et produits récemment visités",
-              onTap: () {
-                // Navigation vers l'historique
-              },
-            ),
-            MenuItem(
-              icon: Icons.notifications,
-              title: "Mes alertes",
-              subtitle: "Notifs personnalisées : offres, rappels",
-              onTap: () {
-                // Navigation vers les alertes
+            BlocBuilder<AuthCubit, AuthState>(
+              builder: (context, authState) {
+                if (authState is AuthAuthenticated) {
+                  return Column(
+                    children: [
+                      const SectionTitle(title: 'Mon activité'),
+                      Container(
+                        margin: EdgeInsets.symmetric(horizontal: SDSpacing.md),
+                        decoration: BoxDecoration(
+                          color: SDColors.white,
+                          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
+                          boxShadow: [
+                            BoxShadow(
+                              color: SDColors.neutral200.withOpacity(0.3),
+                              blurRadius: 8,
+                              offset: Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          children: [
+                            MenuItem(
+                              icon: Icons.inventory_2,
+                              title: "Mes commandes",
+                              subtitle: "Voir les commandes passées et en cours",
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => const _ServiceRequestsEntry(),
+                                  ),
+                                );
+                              },
+                            ),
+                            MenuItem(
+                              icon: Icons.rate_review,
+                              title: "Mes avis & évaluations",
+                              subtitle: "Historique des commentaires laissés",
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (context) => BlocProvider(
+                                      create: (context) => AvisPageBlocM(),
+                                      child: const AvisPageScreenM(),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                            MenuItem(
+                              icon: Icons.favorite,
+                              title: "Favoris / Listes enregistrées",
+                              subtitle: "Articles, prestataires ou annonces sauvegardés",
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (context) => BlocProvider(
+                                      create: (context) => FavoritePageBlocM(),
+                                      child: const FavoritePageScreenM(),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                            MenuItem(
+                              icon: Icons.history,
+                              title: "Historique des consultations",
+                              subtitle: "Voir toutes vos consultations récentes",
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (context) => BlocProvider(
+                                      create: (context) => HistoryPageBlocM(),
+                                      child: const HistoryPageScreenM(),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                            MenuItem(
+                              icon: Icons.notifications,
+                              title: "Mes alertes",
+                              subtitle: "Notifs personnalisées : offres, rappels",
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (context) => BlocProvider(
+                                      create: (context) => AlertPageBlocM(),
+                                      child: const AlertPageScreenM(),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                            MenuItem(
+                              icon: Icons.language,
+                              title: "Langue & Devise",
+                              subtitle: "Configurer langue, devise, localisation",
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (context) => BlocProvider(
+                                      create: (context) => PreferencesPageBlocM(),
+                                      child: const PreferencesPageScreenM(),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  );
+                }
+                return SizedBox.shrink();
               },
             ),
 
             // Section "Mon SoutraPay"
-            const SectionTitle(title: '💳 Mon SoutraPay'),
-            MenuItem(
-              icon: Icons.account_balance_wallet,
-              title: "Portefeuille SoutraPay",
-              subtitle: "Gérer mon portefeuille électronique",
-              onTap: () {
-                Navigator.pushNamed(context, '/wallet');
+            BlocBuilder<AuthCubit, AuthState>(
+              builder: (context, authState) {
+                if (authState is AuthAuthenticated) {
+                  return Column(
+                    children: [
+                      const SectionTitle(title: 'Mon SoutraPay'),
+                      Container(
+                        margin: EdgeInsets.symmetric(horizontal: SDSpacing.md),
+                        decoration: BoxDecoration(
+                          color: SDColors.white,
+                          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
+                          boxShadow: [
+                            BoxShadow(
+                              color: SDColors.neutral200.withOpacity(0.3),
+                              blurRadius: 8,
+                              offset: Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          children: [
+                            MenuItem(
+                              icon: Icons.account_balance_wallet,
+                              title: "Portefeuille SoutraPay",
+                              subtitle: "Gérer mon portefeuille électronique",
+                              onTap: () {
+                                Navigator.pushNamed(context, '/wallet');
+                              },
+                            ),
+                            MenuItem(
+                              icon: Icons.monetization_on,
+                              title: "Tarification SoutraPay",
+                              subtitle: "Consultez les frais et tarifs",
+                              onTap: () {
+                                _showSoutraPayTarificationSheet(context);
+                              },
+                              badge: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: SDColors.success.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  "Gratuit",
+                                  style: SDTypography.labelSmall.copyWith(
+                                      color: SDColors.success, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  );
+                }
+                return SizedBox.shrink();
               },
-            ),
-            MenuItem(
-              icon: Icons.monetization_on,
-              title: "Tarification SoutraPay",
-              subtitle: "Consultez les frais et tarifs",
-              onTap: () {
-                _showSoutraPayTarificationSheet(context);
-              },
-              badge: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Text(
-                  "Gratuit",
-                  style: TextStyle(
-                      color: Colors.green, fontWeight: FontWeight.bold),
-                ),
-              ),
             ),
 
             // Section "Mes interactions"
-            const SectionTitle(title: '💼 Mes interactions'),
-            MenuItem(
-              icon: Icons.receipt_long,
-              title: "Factures & paiements",
-              subtitle: "Accès aux reçus, abonnements, paiements",
-              onTap: () {
-                // Navigation vers les factures
-              },
-            ),
-            MenuItem(
-              icon: Icons.card_giftcard,
-              title: "Parrainage & récompenses",
-              subtitle: "Invitez des amis, gagnez des bonus",
-              onTap: () {
-                // Navigation vers le parrainage
-              },
-            ),
-            MenuItem(
-              icon: Icons.local_offer,
-              title: "Offres personnalisées",
-              subtitle: "Voir les bons plans proposés selon vos intérêts",
-              onTap: () {
-                // Navigation vers les offres
+            BlocBuilder<AuthCubit, AuthState>(
+              builder: (context, authState) {
+                if (authState is AuthAuthenticated) {
+                  return Column(
+                    children: [
+                      const SectionTitle(title: 'Mes interactions'),
+                      Container(
+                        margin: EdgeInsets.symmetric(horizontal: SDSpacing.md),
+                        decoration: BoxDecoration(
+                          color: SDColors.white,
+                          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
+                          boxShadow: [
+                            BoxShadow(
+                              color: SDColors.neutral200.withOpacity(0.3),
+                              blurRadius: 8,
+                              offset: Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          children: [
+                            MenuItem(
+                              icon: Icons.receipt_long,
+                              title: "Factures & paiements",
+                              subtitle: "Accès aux reçus, abonnements, paiements",
+                              onTap: () {
+                                // Navigation vers les factures
+                              },
+                            ),
+                            MenuItem(
+                              icon: Icons.card_giftcard,
+                              title: "Parrainage & récompenses",
+                              subtitle: "Invitez des amis, gagnez des bonus",
+                              onTap: () {
+                                // Navigation vers le parrainage
+                              },
+                            ),
+                            MenuItem(
+                              icon: Icons.local_offer,
+                              title: "Offres personnalisées",
+                              subtitle: "Voir les bons plans proposés selon vos intérêts",
+                              onTap: () {
+                                // Navigation vers les offres
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  );
+                }
+                return SizedBox.shrink();
               },
             ),
 
+            // 🎯 SECTION MODE PRESTATAIRE
+            _buildPrestataireModeSection(),
+
             // Section "Paramètres"
-            const SectionTitle(title: '⚙️ Paramètres'),
-            MenuItem(
-              icon: Icons.language,
-              title: "Langue & Devise",
-              subtitle: "Personnalisation par langue (fr, en, nouchi)",
-              onTap: () {
-                // Navigation vers les paramètres de langue
+            BlocBuilder<AuthCubit, AuthState>(
+              builder: (context, authState) {
+                if (authState is AuthAuthenticated) {
+                  return Column(
+                    children: [
+                      const SectionTitle(title: 'Paramètres'),
+                      Container(
+                        margin: EdgeInsets.symmetric(horizontal: SDSpacing.md),
+                        decoration: BoxDecoration(
+                          color: SDColors.white,
+                          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
+                          boxShadow: [
+                            BoxShadow(
+                              color: SDColors.neutral200.withOpacity(0.3),
+                              blurRadius: 8,
+                              offset: Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          children: [
+                            MenuItem(
+                              icon: Icons.language,
+                              title: "Langue & Devise",
+                              subtitle: "Personnalisation par langue (fr, en, nouchi)",
+                              onTap: () {
+                                // Navigation vers les paramètres de langue
+                              },
+                            ),
+                            MenuItem(
+                              icon: Icons.location_on,
+                              title: "Localisation",
+                              subtitle: "Gérer votre adresse, géolocalisation",
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (context) => BlocProvider(
+                                      create: (context) => LocationPageBlocM(),
+                                      child: const LocationPageScreenM(),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                            MenuItem(
+                              icon: Icons.security,
+                              title: "Sécurité du compte",
+                              subtitle: "Mot de passe, double authentification",
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (context) => BlocProvider(
+                                      create: (context) => SecurityPageBlocM(
+                                        apiClient: ApiClient(),
+                                      ),
+                                      child: const SecurityPageScreenM(),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                            MenuItem(
+                              icon: Icons.settings,
+                              title: "Préférences utilisateurs",
+                              subtitle: "Notifications, catégories favorites",
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (context) => BlocProvider(
+                                      create: (context) => PreferencesPageBlocM(),
+                                      child: const PreferencesPageScreenM(),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                            MenuItem(
+                              icon: Icons.logout,
+                              title: "Se déconnecter",
+                              subtitle: "",
+                              isLogout: true,
+                              onTap: () {
+                                _showLogoutDialog();
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  );
+                }
+                return SizedBox.shrink();
               },
             ),
-            MenuItem(
-              icon: Icons.location_on,
-              title: "Localisation",
-              subtitle: "Gérer votre adresse, géolocalisation",
-              onTap: () {
-                // Navigation vers les paramètres de localisation
-              },
-            ),
-            MenuItem(
-              icon: Icons.security,
-              title: "Sécurité du compte",
-              subtitle: "Mot de passe, double authentification",
-              onTap: () {
-                // Navigation vers les paramètres de sécurité
-              },
-            ),
-            MenuItem(
-              icon: Icons.settings,
-              title: "Préférences utilisateurs",
-              subtitle: "Notifications, catégories favorites",
-              onTap: () {
-                // Navigation vers les préférences
-              },
-            ),
-            MenuItem(
-              icon: Icons.logout,
-              title: "Se déconnecter",
-              subtitle: "",
-              isLogout: true,
-              onTap: () {
-                _showLogoutDialog();
-              },
-            ),
-            const SizedBox(height: 20),
+            SizedBox(height: SDSpacing.md),
           ],
         ),
       ),
     );
   }
 
-  // En-tête du profil avec photo, nom et statut
-  Widget _buildProfileHeader() {
+  // Bannière de connexion - DESIGN AMÉLIORÉ
+  Widget _buildLoginBanner(BuildContext context) {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: const BoxDecoration(
-        color: Colors.green,
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(30),
-          bottomRight: Radius.circular(30),
+      margin: EdgeInsets.all(SDSpacing.md),
+      padding: EdgeInsets.all(SDSpacing.lg),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [SDColors.primary500, SDColors.primary600],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
+        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
+        boxShadow: [
+          BoxShadow(
+            color: SDColors.primary600.withOpacity(0.3),
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         children: [
-          // Photo de profil
-          Container(
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.white, width: 3),
-              shape: BoxShape.circle,
-            ),
-            child: const CircleAvatar(
-              radius: 50,
-              backgroundImage: AssetImage('assets/profile_picture.jpg'),
-            ),
+          Icon(
+            Icons.person_outline,
+            size: 48,
+            color: SDColors.white,
           ),
-          const SizedBox(height: 10),
+          SizedBox(height: SDSpacing.md),
+          Text(
+            'Connectez-vous ou créez un compte',
+            style: SDTypography.titleMedium.copyWith(
+              color: SDColors.white,
+              fontWeight: FontWeight.bold,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          SizedBox(height: SDSpacing.xs),
+          Text(
+            'Connectez-vous pour voir les freelances, vendeurs et artisans',
+            style: SDTypography.bodyMedium.copyWith(
+              color: SDColors.white.withOpacity(0.9),
+            ),
+            textAlign: TextAlign.center,
+          ),
+          SizedBox(height: SDSpacing.md),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              // Si l'écran est trop petit, mettre les boutons en colonne
+              if (constraints.maxWidth < 300) {
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => const LoginPageScreenM(),
+                            ),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: SDColors.white,
+                          foregroundColor: SDColors.primary600,
+                          padding: EdgeInsets.symmetric(horizontal: SDSpacing.lg, vertical: SDSpacing.sm),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                          ),
+                        ),
+                        child: Text(
+                          'Se connecter',
+                          style: SDTypography.labelMedium.copyWith(
+                            color: SDColors.primary600,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: SDSpacing.sm),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        onPressed: () {
+                          context.push('/register');
+                        },
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: SDColors.white,
+                          side: BorderSide(color: SDColors.white, width: 2),
+                          padding: EdgeInsets.symmetric(horizontal: SDSpacing.lg, vertical: SDSpacing.sm),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                          ),
+                        ),
+                        child: Text(
+                          'Créer un compte',
+                          style: SDTypography.labelMedium.copyWith(
+                            color: SDColors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              }
+              // Sinon, mettre les boutons en ligne avec Flexible
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Flexible(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => const LoginPageScreenM(),
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: SDColors.white,
+                        foregroundColor: SDColors.primary600,
+                        padding: EdgeInsets.symmetric(horizontal: SDSpacing.md, vertical: SDSpacing.sm),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                        ),
+                      ),
+                      child: Text(
+                        'Se connecter',
+                        style: SDTypography.labelMedium.copyWith(
+                          color: SDColors.primary600,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: SDSpacing.sm),
+                  Flexible(
+                    child: OutlinedButton(
+                      onPressed: () {
+                        context.push('/register');
+                      },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: SDColors.white,
+                        side: BorderSide(color: SDColors.white, width: 2),
+                        padding: EdgeInsets.symmetric(horizontal: SDSpacing.md, vertical: SDSpacing.sm),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                        ),
+                      ),
+                      child: Text(
+                        'Créer un compte',
+                        style: SDTypography.labelMedium.copyWith(
+                          color: SDColors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  // En-tête du profil avec photo, nom et statut - DESIGN AMÉLIORÉ
+  Widget _buildProfileHeader(BuildContext context) {
+    // ✅ Récupérer l'utilisateur connecté
+    final authState = context.read<AuthCubit>().state;
+    final String userName = authState is AuthAuthenticated
+        ? authState.utilisateur.fullName
+        : "Utilisateur";
+    final String userEmail = authState is AuthAuthenticated
+        ? (authState.utilisateur.email ?? "email@exemple.com")
+        : "email@exemple.com";
+    final String? userPhoto = authState is AuthAuthenticated
+        ? authState.utilisateur.photoProfil
+        : null;
+
+    return Container(
+      margin: EdgeInsets.all(SDSpacing.md),
+      padding: EdgeInsets.all(SDSpacing.lg),
+      decoration: BoxDecoration(
+        color: SDColors.white,
+        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
+        boxShadow: [
+          BoxShadow(
+            color: SDColors.neutral200.withOpacity(0.5),
+            blurRadius: 10,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Photo de profil (sans photo mock)
+          CircleAvatar(
+            radius: 50,
+            backgroundColor: SDColors.primary600,
+            backgroundImage: userPhoto != null && userPhoto.isNotEmpty && userPhoto.startsWith('http')
+                ? NetworkImage(userPhoto) as ImageProvider
+                : null,
+            child: userPhoto == null || userPhoto.isEmpty || !userPhoto.startsWith('http')
+                ? Text(
+                    userName.isNotEmpty ? userName[0].toUpperCase() : 'U',
+                    style: SDTypography.headlineMedium.copyWith(
+                      color: SDColors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  )
+                : null,
+          ),
+          SizedBox(height: SDSpacing.md),
           // Nom d'utilisateur
           Text(
             userName,
-            style: const TextStyle(
-              fontSize: 22,
+            style: SDTypography.titleMedium.copyWith(
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: SDColors.neutral900,
             ),
           ),
-          const SizedBox(height: 5),
-          // Statut utilisateur avec icône
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _getStatusIcon(),
-              const SizedBox(width: 5),
-              Text(
-                userStatus,
-                style: const TextStyle(
-                  fontSize: 16,
-                  color: Colors.white,
-                ),
+          SizedBox(height: SDSpacing.xxxs),
+          // Email
+          Text(
+            userEmail,
+            style: SDTypography.bodyMedium.copyWith(
+              color: SDColors.neutral600,
+            ),
+          ),
+          SizedBox(height: SDSpacing.md),
+          // Bouton Éditer
+          ElevatedButton(
+            onPressed: () => _navigateToEditProfile(),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: SDColors.primary600,
+              foregroundColor: SDColors.white,
+              padding: EdgeInsets.symmetric(horizontal: SDSpacing.lg, vertical: SDSpacing.sm),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
               ),
-            ],
+            ),
+            child: Text(
+              'Éditer',
+              style: SDTypography.labelMedium.copyWith(
+                color: SDColors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
@@ -414,14 +850,52 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
   }
 
   // Retourne l'icône correspondant au statut de l'utilisateur
-  Widget _getStatusIcon() {
+  Widget _getStatusIcon(String userStatus) {
     switch (userStatus) {
       case "Compte vérifié":
-        return const Icon(Icons.verified, color: Colors.white);
+        return Icon(Icons.verified, color: SDColors.white);
       case "Premium":
-        return const Icon(Icons.lock, color: Colors.white);
+        return Icon(Icons.lock, color: SDColors.white);
       default:
-        return const Icon(Icons.person, color: Colors.white);
+        return Icon(Icons.person, color: SDColors.white);
+    }
+  }
+
+  // Navigation vers l'écran d'édition du profil
+  void _navigateToEditProfile() async {
+    // ✅ Récupérer les données utilisateur depuis AuthCubit
+    final authState = context.read<AuthCubit>().state;
+    if (authState is! AuthAuthenticated) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Veuillez vous connecter')),
+      );
+      return;
+    }
+
+    final utilisateur = authState.utilisateur;
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EditProfileScreen(
+          initialUserData: {
+            'nom': utilisateur.nom,
+            'prenom': utilisateur.prenom ?? '',
+            'telephone': utilisateur.telephone,
+            'email': utilisateur.email ?? '',
+            'genre': utilisateur.genre ?? '',
+            'datedenaissance': utilisateur.dateNaissance ?? '',
+            'photoProfil':
+                utilisateur.photoProfil ?? 'assets/profile_picture.jpg',
+          },
+        ),
+      ),
+    );
+
+    // Rafraîchir la page si des modifications ont été apportées
+    if (result == true) {
+      setState(() {
+        // Rafraîchir les données du profil
+      });
     }
   }
 
@@ -448,13 +922,176 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
                   ),
                 );
               },
-              child: const Text("Se déconnecter",
-                  style: TextStyle(color: Colors.red)),
+              child: Text("Se déconnecter",
+                  style: SDTypography.labelLarge.copyWith(color: SDColors.error)),
             ),
           ],
         );
       },
     );
+  }
+
+  // 🎯 SECTION MODE PRESTATAIRE
+  Widget _buildPrestataireModeSection() {
+    return BlocBuilder<AuthCubit, AuthState>(
+      builder: (context, state) {
+        // 🔍 DEBUG : Toujours afficher pour test
+        print('🔍 DEBUG - AuthState: $state');
+        if (state is AuthAuthenticated) {
+          print('🔍 DEBUG - Roles: ${state.roles}');
+          print(
+              '🔍 DEBUG - Contains PRESTATAIRE: ${state.roles.contains('PRESTATAIRE')}');
+        }
+
+        // Vérifier si l'utilisateur a le rôle PRESTATAIRE
+        if (state is AuthAuthenticated && state.roles.contains('PRESTATAIRE')) {
+          return Column(
+            children: [
+              const SectionTitle(title: 'Mode Prestataire'),
+              Container(
+                margin: EdgeInsets.symmetric(horizontal: SDSpacing.md),
+                decoration: BoxDecoration(
+                  color: SDColors.white,
+                  borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
+                  boxShadow: [
+                    BoxShadow(
+                      color: SDColors.neutral200.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: ListTile(
+                  contentPadding: EdgeInsets.symmetric(horizontal: SDSpacing.md, vertical: SDSpacing.sm),
+                  leading: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: SDColors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.handyman,
+                      color: SDColors.white,
+                      size: 24,
+                    ),
+                  ),
+                  title: Text(
+                    'Mode Prestataire',
+                    style: SDTypography.titleMedium.copyWith(
+                      color: SDColors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  subtitle: Text(
+                    'Accéder à votre interface prestataire',
+                    style: TextStyle(
+                      color: SDColors.white.withOpacity(0.7),
+                    ),
+                  ),
+                  trailing: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: SDColors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Text(
+                      'Disponible',
+                      style: TextStyle(
+                        color: SDColors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  onTap: () => _switchToPrestataireMode(context),
+                ),
+              ),
+            ],
+          );
+        }
+
+        // 🔍 DEBUG : Afficher une version de test
+        return Column(
+          children: [
+            const SectionTitle(title: '🔧 Mode Prestataire (DEBUG)'),
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF4CAF50), Color(0xFF2E7D32)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.green.withOpacity(0.3),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: SDColors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.handyman,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+                title: Text(
+                  'Mode Prestataire (DEBUG)',
+                  style: SDTypography.titleMedium.copyWith(
+                    color: SDColors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                subtitle: Text(
+                  'Version de test - toujours visible',
+                  style: TextStyle(
+                    color: SDColors.white.withOpacity(0.7),
+                  ),
+                ),
+                trailing: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: SDColors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Text(
+                    'DEBUG',
+                    style: TextStyle(
+                      color: SDColors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                onTap: () => _switchToPrestataireMode(context),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // 🔄 SWITCH VERS MODE PRESTATAIRE
+  void _switchToPrestataireMode(BuildContext context) {
+    try {
+      context.read<AuthCubit>().switchActiveRole('PRESTATAIRE');
+      Future.delayed(const Duration(milliseconds: 100), () {
+        context.push('/providermain');
+      });
+    } catch (e) {
+      print('Erreur lors du switch vers prestataire: $e');
+      context.push('/providermain');
+    }
   }
 }
 
@@ -521,7 +1158,7 @@ class _ServiceRequestsScaffold extends StatelessWidget {
   }
 }
 
-// Widget pour les titres de section
+// Widget pour les titres de section - DESIGN AMÉLIORÉ
 class SectionTitle extends StatelessWidget {
   final String title;
 
@@ -529,16 +1166,24 @@ class SectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Nettoyer le titre (enlever emoji) et garder la casse normale
+    final String cleanTitle = title.replaceAll(RegExp(r'[^\w\s]'), '').trim();
+    
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+      padding: EdgeInsets.only(
+        top: SDSpacing.md,
+        bottom: SDSpacing.sm,
+        left: SDSpacing.md,
+        right: SDSpacing.md,
+      ),
       child: Align(
         alignment: Alignment.centerLeft,
         child: Text(
-          title,
-          style: const TextStyle(
-            fontSize: 18,
+          cleanTitle,
+          style: SDTypography.labelLarge.copyWith(
             fontWeight: FontWeight.bold,
-            color: Colors.black,
+            color: SDColors.primary600,
+            letterSpacing: 0.3,
           ),
         ),
       ),
@@ -546,14 +1191,14 @@ class SectionTitle extends StatelessWidget {
   }
 }
 
-// Widget pour les éléments de menu
+// Widget pour les éléments de menu - DESIGN AMÉLIORÉ (VERT)
 class MenuItem extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
   final bool isLogout;
   final VoidCallback onTap;
-  final Widget? badge; // Ajout du paramètre badge pour les indicateurs visuels
+  final Widget? badge;
 
   const MenuItem({
     super.key,
@@ -567,51 +1212,62 @@ class MenuItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          margin: const EdgeInsets.symmetric(vertical: 5),
-          decoration: BoxDecoration(
-            color: isLogout ? Colors.red.shade50 : Colors.green.shade50,
-            borderRadius: BorderRadius.circular(10),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: EdgeInsets.symmetric(vertical: SDSpacing.sm, horizontal: SDSpacing.md),
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(
+              color: SDColors.neutral100,
+              width: 0.5,
+            ),
           ),
-          child: ListTile(
-            leading: Icon(icon, color: isLogout ? Colors.red : Colors.green),
-            title: Text(
-              title,
-              style: TextStyle(
-                fontSize: 16,
-                color: isLogout ? Colors.red : Colors.black,
-                fontWeight: isLogout ? FontWeight.bold : FontWeight.normal,
+        ),
+        child: Row(
+          children: [
+            // Icône à gauche (VERT)
+            Icon(
+              icon,
+              color: isLogout ? SDColors.error500 : SDColors.primary600,
+              size: 24,
+            ),
+            SizedBox(width: SDSpacing.md),
+            // Texte au centre (VERT)
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: SDTypography.bodyMedium.copyWith(
+                      color: isLogout ? SDColors.error500 : SDColors.primary600,
+                      fontWeight: isLogout ? FontWeight.bold : FontWeight.w600,
+                    ),
+                  ),
+                  if (subtitle.isNotEmpty) ...[
+                    SizedBox(height: SDSpacing.xxxs),
+                    Text(
+                      subtitle,
+                      style: SDTypography.bodySmall.copyWith(
+                        color: SDColors.neutral500,
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
-            subtitle: subtitle.isNotEmpty
-                ? Text(
-                    subtitle,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: isLogout ? Colors.red.shade300 : Colors.black54,
-                    ),
-                  )
-                : null,
-            trailing: badge != null
-                ? Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      badge!,
-                      const SizedBox(width: 8),
-                      isLogout
-                          ? const Icon(Icons.logout, color: Colors.red)
-                          : const Icon(Icons.arrow_forward_ios,
-                              color: Colors.green),
-                    ],
-                  )
-                : isLogout
-                    ? const Icon(Icons.logout, color: Colors.red)
-                    : const Icon(Icons.arrow_forward_ios, color: Colors.green),
-          ),
+            // Badge et chevron à droite
+            if (badge != null) ...[
+              badge!,
+              SizedBox(width: SDSpacing.xs),
+            ],
+            Icon(
+              Icons.chevron_right,
+              color: SDColors.primary600,
+              size: 20,
+            ),
+          ],
         ),
       ),
     );

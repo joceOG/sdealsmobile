@@ -1,752 +1,779 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../design_system/design_system.dart'; // ✅ Import DS
+import '../../jobpagem/screens/detailPageScreenM.dart';
+import '../../jobpagem/screens/provider_profile_screen.dart';
+import '../../shoppingpagem/screens/productDetailsScreenM.dart';
+import '../../shoppingpagem/shoppingpageblocm/shoppingPageStateM.dart' as shop_model;
+import '../../common/widgets/empty_state_widget.dart';
+import 'package:sdealsmobile/mobile/view/searchpagem/searchpageblocm/searchPageBlocM.dart';
+import 'package:sdealsmobile/mobile/view/searchpagem/searchpageblocm/searchPageEventM.dart';
+import 'package:sdealsmobile/mobile/view/searchpagem/searchpageblocm/searchPageStateM.dart';
+import '../../common/widgets/app_image.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import '../../common/widgets/skeleton_loader.dart';
 
-class SearchPageScreenM extends StatefulWidget {
-  const SearchPageScreenM({super.key});
-
-  @override
-  State<SearchPageScreenM> createState() => _SearchPageScreenMState();
-}
-
-class _SearchPageScreenMState extends State<SearchPageScreenM> {
-  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  bool _arrowPressed = false;
-  int _prestatairePressed = -1;
+class SearchPageScreenM extends StatelessWidget {
+  final int initialIndex;
+  
+  const SearchPageScreenM({super.key, this.initialIndex = 0});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      key: _scaffoldKey,
-      backgroundColor: Colors.white,
-      drawer: Drawer(
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: const <Widget>[
-            DrawerHeader(
-              decoration: BoxDecoration(
-                color: Colors.green,
-              ),
-              child: Text(
-                'Menu',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
-                ),
-              ),
-            ),
-            // Ajoute ici d'autres éléments de menu si besoin
-          ],
-        ),
-      ),
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(170),
-        child: AppBar(
-          backgroundColor: Colors.transparent,
-          surfaceTintColor: Colors.transparent,
-          elevation: 0,
-          automaticallyImplyLeading: false,
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.only(
-              bottomLeft: Radius.circular(44),
-              bottomRight: Radius.circular(44),
-            ),
-          ),
-          flexibleSpace: Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF43EA5E), Color(0xFF1CBF3F)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black26,
-                  blurRadius: 18,
-                  offset: Offset(0, 8),
-                ),
-              ],
-              borderRadius: BorderRadius.only(
-                bottomLeft: Radius.circular(44),
-                bottomRight: Radius.circular(44),
-              ),
-            ),
-            child: SafeArea(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10.0, vertical: 6),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        GestureDetector(
-                          onTap: () {
-                            _scaffoldKey.currentState?.openDrawer();
-                          },
-                          child: const Icon(Icons.menu,
-                              color: Colors.white, size: 32),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.notifications,
-                              color: Colors.white, size: 32),
-                          onPressed: () {},
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  TweenAnimationBuilder<double>(
-                    tween: Tween(begin: 0, end: 1),
-                    duration: Duration(milliseconds: 700),
-                    builder: (context, value, child) => Opacity(
-                      opacity: value,
-                      child: child,
-                    ),
-                    child: const Center(
-                      child: Text(
-                        'SOUTRALI DEALS',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8.0),
-                    child: Align(
-                      alignment: Alignment.center,
-                      child: FractionallySizedBox(
-                        widthFactor: 0.8,
-                        child: Container(
-                          height: 52,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(32),
-                            border: Border.all(
-                                color: Colors.green.shade200, width: 1.4),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.green.withOpacity(0.07),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            children: [
-                              const SizedBox(width: 10),
-                              Material(
-                                color: Colors.green,
-                                shape: const CircleBorder(),
-                                elevation: 2,
-                                child: Padding(
-                                  padding: const EdgeInsets.all(7.0),
-                                  child: Icon(Icons.search_rounded,
-                                      color: Colors.white, size: 22),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              const Expanded(
-                                child: TextField(
-                                  style: TextStyle(fontSize: 16),
-                                  cursorColor: Colors.green,
-                                  decoration: InputDecoration(
-                                    hintText: 'Rechercher sur soutralideals',
-                                    hintStyle: TextStyle(
-                                        color: Colors.green,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w500),
-                                    border: InputBorder.none,
-                                    enabledBorder: InputBorder.none,
-                                    focusedBorder: InputBorder.none,
-                                    isDense: true,
-                                    contentPadding:
-                                    EdgeInsets.symmetric(vertical: 14),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 20),
-              // Section navigation boutons
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 0.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _buildStyledNavButton(
-                        'Prestation de service', Icons.settings),
-                    _buildStyledNavButton('E-commerce', Icons.shopping_cart),
-                    Stack(
-                      children: [
-                        _buildStyledNavButton(
-                            'Crypto Store', Icons.currency_bitcoin),
-                        Positioned(
-                          top: 0,
-                          right: 0,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.redAccent,
-                              borderRadius: BorderRadius.circular(10),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.redAccent.withOpacity(0.18),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: const Text(
-                              'Nouveau',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 10,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    _buildStyledNavButton(
-                        'Petite Annonce', Icons.alternate_email),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-              // Animation fade pour Métiers
-              TweenAnimationBuilder<double>(
-                tween: Tween(begin: 0, end: 1),
-                duration: const Duration(milliseconds: 600),
-                builder: (context, value, child) => Opacity(
-                  opacity: value,
-                  child: child,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 16.0),
-                      child: Text(
-                        'Métiers',
-                        style: TextStyle(
-                          fontSize: 36,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    _buildStyledCategoryItem('Maçonnerie', 'Catégorie',
-                        'assets/categories/image1.png',
-                        isPopular: true),
-                    _buildStyledCategoryItem('Menuisier', 'Catégorie',
-                        'assets/categories/image2.png'),
-                    _buildStyledCategoryItem('Mécanique', 'Catégorie',
-                        'assets/categories/image3.png'),
-                    _buildStyledCategoryItem('Plomberie', 'Catégorie',
-                        'assets/categories/image4.png'),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 30),
-              // Animation fade pour Prestataires
-              TweenAnimationBuilder<double>(
-                tween: Tween(begin: 0, end: 1),
-                duration: const Duration(milliseconds: 800),
-                builder: (context, value, child) => Opacity(
-                  opacity: value,
-                  child: child,
-                ),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(28),
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 16.0),
-                        child: Text(
-                          'Prestataires',
-                          style: TextStyle(
-                            fontSize: 36,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      Container(
-                        height: 160,
-                        margin: const EdgeInsets.symmetric(horizontal: 0),
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          physics: const BouncingScrollPhysics(),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const SizedBox(width: 16),
-                              _buildStyledProviderItem('Marc', '1000 FCFA',
-                                  'assets/profile_picture.jpg',
-                                  isPopular: true, index: 0),
-                              const SizedBox(width: 12),
-                              _buildStyledProviderItem(
-                                  'Elie', '1000 FCFA', 'assets/esty.jpg',
-                                  index: 1),
-                              const SizedBox(width: 12),
-                              _buildStyledProviderItem('Tratra', '1000 FCFA',
-                                  'assets/coiffuer2.jpeg',
-                                  index: 2),
-                              const SizedBox(width: 12),
-                              _buildStyledProviderItem(
-                                  'OLI', '1000 FCFA', 'assets/esty.jpg',
-                                  index: 3),
-                              const SizedBox(width: 16),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 30),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStyledCategoryItem(
-      String title, String subtitle, String imagePath,
-      {bool isPopular = false}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
-      child: Material(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        elevation: 4,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(22),
-          onTap: () {},
-          child: Stack(
-            children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Colors.white, Colors.green.withOpacity(0.07)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(22),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.green.withOpacity(0.08),
-                      blurRadius: 12,
-                      offset: Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(14.0),
-                  child: Row(
-                    children: [
-                      AnimatedScale(
-                        scale: 1.0,
-                        duration: const Duration(milliseconds: 100),
-                        child: CircleAvatar(
-                          radius: 30,
-                          backgroundImage: AssetImage(imagePath),
-                        ),
-                      ),
-                      const SizedBox(width: 18),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            title,
-                            style: const TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black),
-                          ),
-                          Text(
-                            subtitle,
-                            style: const TextStyle(
-                                fontSize: 15, color: Colors.grey),
-                          ),
-                        ],
-                      ),
-                      const Spacer(),
-                      GestureDetector(
-                        onTapDown: (_) => setState(() => _arrowPressed = true),
-                        onTapUp: (_) => setState(() => _arrowPressed = false),
-                        onTapCancel: () =>
-                            setState(() => _arrowPressed = false),
-                        child: AnimatedScale(
-                          scale: _arrowPressed ? 1.15 : 1.0,
-                          duration: Duration(milliseconds: 120),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [Color(0xFF43EA5E), Color(0xFF1CBF3F)],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.green.withOpacity(0.25),
-                                  blurRadius: 8,
-                                  offset: Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            padding: EdgeInsets.all(6),
-                            child: Icon(
-                              Icons.arrow_forward_ios,
-                              color: Colors.white,
-                              size: 18,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              if (isPopular)
-                Positioned(
-                  top: 10,
-                  right: 10,
-                  child: TweenAnimationBuilder<double>(
-                    tween: Tween(begin: 0, end: 1),
-                    duration: Duration(milliseconds: 600),
-                    builder: (context, value, child) => Opacity(
-                      opacity: value,
-                      child: child,
-                    ),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.orange.shade200,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Text(
-                        'Populaire',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 11,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStyledProviderItem(String name, String price, String imagePath,
-      {bool isPopular = false, required int index}) {
-    final bool pressed = _prestatairePressed == index;
-    return AnimatedScale(
-      scale: pressed ? 0.96 : 1.0,
-      duration: const Duration(milliseconds: 120),
-      child: GestureDetector(
-        onTapDown: (_) => setState(() => _prestatairePressed = index),
-        onTapUp: (_) => setState(() => _prestatairePressed = -1),
-        onTapCancel: () => setState(() => _prestatairePressed = -1),
-        child: Container(
-          width: 120,
-          margin: const EdgeInsets.symmetric(vertical: 4),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Colors.white, Colors.green.withOpacity(0.08)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(22),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.green.withOpacity(0.10),
-                blurRadius: 12,
-                offset: Offset(0, 4),
-              ),
-              if (isPopular)
-                BoxShadow(
-                  color: Colors.orange.withOpacity(0.18),
-                  blurRadius: 18,
-                  spreadRadius: 2,
-                  offset: Offset(0, 2),
-                ),
-            ],
-          ),
-          child: Material(
-            color: Colors.transparent,
-            borderRadius: BorderRadius.circular(22),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(22),
-              splashColor: Colors.green.withOpacity(0.08),
-              onTap: () {},
-              child: Stack(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8.0, vertical: 12.0),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          decoration: isPopular
-                              ? BoxDecoration(
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.orange.withOpacity(0.25),
-                                blurRadius: 18,
-                                spreadRadius: 2,
-                              ),
-                            ],
-                            shape: BoxShape.circle,
-                          )
-                              : null,
-                          child: CircleAvatar(
-                            radius: 40,
-                            backgroundImage: AssetImage(imagePath),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          name,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                            color: Colors.black,
-                          ),
-                          textAlign: TextAlign.center,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        Text(
-                          price,
-                          style: const TextStyle(
-                            color: Colors.green,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (isPopular)
-                    Positioned(
-                      top: 8,
-                      right: 8,
-                      child: TweenAnimationBuilder<double>(
-                        tween: Tween(begin: 0, end: 1),
-                        duration: const Duration(milliseconds: 600),
-                        builder: (context, value, child) => Opacity(
-                          opacity: value,
-                          child: child,
-                        ),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.orange.shade200,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Text(
-                            'Populaire',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 10,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStyledNavButton(String label, IconData icon) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0.95, end: 1.0),
-      duration: const Duration(milliseconds: 400),
-      builder: (context, value, child) => Transform.scale(
-        scale: value,
-        child: child,
-      ),
-      child: GestureDetector(
-        onTapDown: (_) {},
-        child: Container(
-          margin: const EdgeInsets.symmetric(vertical: 4),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xFF43EA5E), Color(0xFF1CBF3F)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.green.withOpacity(0.18),
-                      blurRadius: 12,
-                      offset: Offset(0, 4),
-                    ),
-                  ],
-                  borderRadius: BorderRadius.circular(32),
-                ),
-                child: CircleAvatar(
-                  radius: 32,
-                  backgroundColor: Colors.transparent,
-                  child: Icon(icon, color: Colors.white, size: 32),
-                ),
-              ),
-              const SizedBox(height: 8),
-              SizedBox(
-                width: 70,
-                child: Text(
-                  label,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 13),
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+    return BlocProvider(
+      create: (context) => SearchPageBlocM(),
+      child: _SearchBody(initialIndex: initialIndex),
     );
   }
 }
 
-class _AnimatedSearchBar extends StatefulWidget {
+class _SearchBody extends StatefulWidget {
+  final int initialIndex;
+  const _SearchBody({this.initialIndex = 0});
+
   @override
-  State<_AnimatedSearchBar> createState() => _AnimatedSearchBarState();
+  State<_SearchBody> createState() => _SearchBodyState();
 }
 
-class _AnimatedSearchBarState extends State<_AnimatedSearchBar> {
-  bool _focused = false;
-  final FocusNode _focusNode = FocusNode();
+class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderStateMixin {
+  final TextEditingController _searchController = TextEditingController();
+  late TabController _tabController;
+  Timer? _debounce;
+  bool _showSuggestions = false;
 
   @override
   void initState() {
     super.initState();
-    _focusNode.addListener(() {
-      setState(() {
-        _focused = _focusNode.hasFocus;
-      });
+    _tabController = TabController(length: 5, vsync: this, initialIndex: widget.initialIndex); // ✅ 5 Tabs
+    
+    // Listen to tab changes to dismiss keyboard
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging) {
+        FocusScope.of(context).unfocus();
+      }
+    });
+
+    // Charger l'historique au démarrage
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<SearchPageBlocM>().add(LoadHistory());
     });
   }
 
   @override
   void dispose() {
-    _focusNode.dispose();
+    _searchController.dispose();
+    _tabController.dispose();
+    _debounce?.cancel();
     super.dispose();
+  }
+
+  void _onSearchChanged(String query) {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 300), () {
+      // Pour l'historique (query vide) ou les suggestions (query texte)
+      // on appelle toujours FetchSuggestions.
+      context.read<SearchPageBlocM>().add(FetchSuggestions(query));
+      setState(() => _showSuggestions = true);
+    });
+  }
+
+  void _onSubmit(String query) {
+    if (query.trim().isNotEmpty) {
+      context.read<SearchPageBlocM>().add(PerformGlobalSearch(query));
+      setState(() => _showSuggestions = false);
+      FocusScope.of(context).unfocus();
+    }
+  }
+
+  void _onSuggestionTap(String suggestion) {
+    _searchController.text = suggestion;
+    _onSubmit(suggestion);
   }
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedScale(
-      scale: _focused ? 1.035 : 1.0,
-      duration: const Duration(milliseconds: 180),
-      curve: Curves.easeOut,
+    return Scaffold(
+      backgroundColor: SDColors.neutral50, // Light grey background like Facebook/Telegram
+      appBar: _buildAppBar(),
+      body: BlocBuilder<SearchPageBlocM, SearchPageStateM>(
+        builder: (context, state) {
+          if (state.isLoading) {
+            return SkeletonList(
+              itemCount: 5,
+              itemTemplate: const SkeletonWidget.rectangular(
+                width: double.infinity,
+                height: 80,
+              ),
+            );
+          }
+
+          if (state.error.isNotEmpty) {
+            return Center(child: Text('Erreur: ${state.error}'));
+          }
+
+          // Case 1: Show Suggestions OR History Overlay
+          if (_showSuggestions) {
+            if (state.query.isEmpty && state.history.isNotEmpty) {
+               return _buildHistoryList(state.history);
+            } else if (state.suggestions.isNotEmpty) {
+               return _buildSuggestionsList(state.suggestions);
+            }
+          }
+
+          // Case 2: Show Results (if any data exists)
+          bool hasResults = state.services.isNotEmpty || 
+                           state.articles.isNotEmpty || 
+                           state.freelances.isNotEmpty || 
+                           state.prestataires.isNotEmpty || // ✅ Check Prestas
+                           state.vendeurs.isNotEmpty;
+
+          if (hasResults) {
+            return Column(
+              children: [
+                _buildTabBar(state.counts),
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildAllTab(state),       // Tout
+                      _buildServicesTab(state),  // Services
+                      _buildFreelancesTab(state),// Freelances
+                      _buildPrestatairesTab(state), // ✅ Prestataires Tab
+                      _buildShopTab(state),      // Boutique
+                    ],
+                  ),
+                ),
+              ],
+            );
+          }
+
+          // Case 3: Empty State / Initial View
+          return _buildEmptyState();
+        },
+      ),
+    );
+  }
+
+  PreferredSizeWidget _buildAppBar() {
+    return PreferredSize(
+      preferredSize: const Size.fromHeight(80),
       child: Container(
-        height: 52,
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(32),
-          border: Border.all(
-              color: _focused ? Colors.green : Colors.green.shade200,
-              width: 1.4),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.green.withOpacity(_focused ? 0.13 : 0.07),
-              blurRadius: _focused ? 18 : 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          gradient: LinearGradient(
+            colors: [SDColors.primary500, SDColors.primary700], // ✅ Standard Theme Gradient
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.vertical(bottom: Radius.circular(SDSpacing.borderRadiusLarge)),
+          boxShadow: [BoxShadow(color: SDColors.neutral900.withOpacity(0.12), blurRadius: 4, offset: Offset(0, 2))],
         ),
-        child: Row(
-          children: [
-            const SizedBox(width: 10),
-            Material(
-              color: Colors.green,
-              shape: const CircleBorder(),
-              elevation: 2,
-              child: Padding(
-                padding: const EdgeInsets.all(7.0),
-                child:
-                Icon(Icons.search_rounded, color: Colors.white, size: 22),
+        child: SafeArea(
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: SDSpacing.sm, vertical: SDSpacing.xs),
+            child: Row(
+              children: [
+                // Back Button (if navigation allows, otherwise Menu)
+                GestureDetector(
+                  onTap: () => Navigator.of(context).pop(), // Or open drawer
+                  child: Icon(Icons.arrow_back_ios, color: SDColors.white, size: 20),
+                ),
+                SizedBox(width: SDSpacing.xs),
+                
+                // Search Bar
+                Expanded(
+                  child: Container(
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: SDColors.white,
+                      borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
+                    ),
+                    child: TextField(
+                      controller: _searchController,
+                      onChanged: _onSearchChanged,
+                      onSubmitted: _onSubmit,
+                      onTap: () {
+                         // Montrer l'historique au focus si le champ est vide
+                         if (_searchController.text.isEmpty) {
+                            _onSearchChanged('');
+                         }
+                      },
+                      decoration: InputDecoration(
+                        hintText: 'Rechercher services, produits...',
+                        hintStyle: SDTypography.bodyMedium.copyWith(color: SDColors.neutral400),
+                        prefixIcon: Icon(Icons.search, color: SDColors.primary600, size: 20), // ✅ Standard Green
+                        suffixIcon: _searchController.text.isNotEmpty 
+                          ? GestureDetector(
+                              onTap: () {
+                                _searchController.clear();
+                                _onSearchChanged('');
+                              },
+                              child: Icon(Icons.close, color: SDColors.neutral500, size: 18),
+                            )
+                          : null,
+                        isDense: true,
+                      ),
+                      style: SDTypography.bodyMedium,
+                      textInputAction: TextInputAction.search,
+                    ),
+                  ),
+                ),
+                
+                // 🎛️ BUTTON FILTRE
+                SizedBox(width: SDSpacing.xs),
+                GestureDetector(
+                  onTap: () => _showFilterModal(context),
+                  child: Container(
+                    padding: EdgeInsets.all(SDSpacing.xs),
+                    decoration: BoxDecoration(
+                      color: SDColors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [BoxShadow(color: SDColors.neutral900.withOpacity(0.1), blurRadius: 4)],
+                    ),
+                    child: Icon(Icons.tune, color: SDColors.primary600, size: 20),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // 🎛️ MODAL DE FILTRES
+  void _showFilterModal(BuildContext context) {
+    // 1️⃣ Capturer le BLoC actuel AVANT d'ouvrir le modal via le context parent
+    final searchBloc = context.read<SearchPageBlocM>();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        // 2️⃣ Réinjecter le BLoC dans le nouveau context du modal
+        return BlocProvider.value(
+          value: searchBloc,
+          child: Builder(
+            builder: (context) => _buildFilterModalContent(context),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildFilterModalContent(BuildContext context) {
+    final state = context.read<SearchPageBlocM>().state;
+    // Variables locales pour le modal
+    double localMin = state.minPrice;
+    double localMax = state.maxPrice;
+    final TextEditingController cityCtrl = TextEditingController(text: state.city);
+
+    return StatefulBuilder(
+      builder: (context, setModalState) {
+        return Container(
+          decoration: BoxDecoration(
+            color: SDColors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(SDSpacing.borderRadiusLarge)),
+          ),
+          padding: EdgeInsets.only(
+            left: SDSpacing.md, right: SDSpacing.md, top: SDSpacing.md,
+            bottom: MediaQuery.of(context).viewInsets.bottom + SDSpacing.md
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Filtres', style: SDTypography.titleMedium.copyWith(fontWeight: FontWeight.bold)),
+                  IconButton(
+                    icon: Icon(Icons.close, color: SDColors.neutral900),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              Divider(color: SDColors.neutral200),
+              
+              // 1. Prix
+              Text('Prix (FCFA)', style: SDTypography.titleSmall.copyWith(fontWeight: FontWeight.bold)),
+              RangeSlider(
+                values: RangeValues(localMin, localMax),
+                min: 0,
+                max: 1000000,
+                divisions: 20,
+                labels: RangeLabels('${localMin.round()}', '${localMax.round()}'),
+                activeColor: SDColors.primary600,
+                onChanged: (values) {
+                  setModalState(() {
+                    localMin = values.start;
+                    localMax = values.end;
+                  });
+                },
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('${localMin.round()} FCFA', style: SDTypography.bodySmall.copyWith(color: SDColors.neutral600)),
+                  Text('${localMax.round()} FCFA', style: SDTypography.bodySmall.copyWith(color: SDColors.neutral600)),
+                ],
+              ),
+              SizedBox(height: SDSpacing.sm),
+
+              // 2. Ville
+              Text('Ville / Commune', style: SDTypography.titleSmall.copyWith(fontWeight: FontWeight.bold)),
+              SizedBox(height: SDSpacing.xs),
+              TextField(
+                controller: cityCtrl,
+                decoration: InputDecoration(
+                  hintText: 'Ex: Cocody, Abidjan...',
+                  prefixIcon: Icon(Icons.location_on, color: SDColors.neutral500),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium)),
+                  contentPadding: EdgeInsets.symmetric(horizontal: SDSpacing.sm, vertical: 0),
+                ),
+              ),
+              SizedBox(height: SDSpacing.md),
+
+              // Actions
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () {
+                        // Reset
+                        context.read<SearchPageBlocM>().add(const UpdateFilters(minPrice: 0, maxPrice: 1000000, city: ''));
+                        context.read<SearchPageBlocM>().add(PerformGlobalSearch(state.query));
+                        Navigator.pop(context);
+                      },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: SDColors.neutral600,
+                        side: BorderSide(color: SDColors.neutral400),
+                      ),
+                      child: Text('Réinitialiser', style: SDTypography.labelMedium),
+                    ),
+                  ),
+                  SizedBox(width: SDSpacing.xs),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        // Appliquer
+                        context.read<SearchPageBlocM>().add(UpdateFilters(
+                          minPrice: localMin,
+                          maxPrice: localMax,
+                          city: cityCtrl.text,
+                        ));
+                         // Lancer la recherche avec les nouveaux filtres
+                        context.read<SearchPageBlocM>().add(PerformGlobalSearch(state.query));
+                        Navigator.pop(context);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: SDColors.primary600,
+                        foregroundColor: SDColors.white,
+                      ),
+                      child: Text('Appliquer', style: SDTypography.labelMedium.copyWith(color: SDColors.white)),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildTabBar(Map<String, int> counts) {
+    return Container(
+      color: SDColors.white,
+      child: TabBar(
+        controller: _tabController,
+        labelColor: SDColors.primary600, // ✅ Standard Green
+        unselectedLabelColor: SDColors.neutral500,
+        indicatorColor: SDColors.primary600, // ✅ Standard Green
+        indicatorWeight: 3,
+        labelStyle: SDTypography.labelMedium.copyWith(fontWeight: FontWeight.bold),
+        tabs: [
+          const Tab(text: 'Tout'),
+          Tab(text: 'Services (${counts['services']})'),
+          Tab(text: 'Freelances (${counts['freelances']})'),
+          Tab(text: 'Presta. (${counts['prestataires']})'), // ✅ Tab Label
+          Tab(text: 'Shop (${counts['articles']})'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHistoryList(List<String> history) {
+    return Container(
+      color: SDColors.white,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: EdgeInsets.fromLTRB(SDSpacing.sm, SDSpacing.xs, SDSpacing.sm, SDSpacing.xs),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text("Récents", style: SDTypography.titleSmall.copyWith(fontWeight: FontWeight.bold, color: SDColors.neutral500)),
+                GestureDetector(
+                  onTap: () {
+                     context.read<SearchPageBlocM>().add(ClearHistory());
+                  },
+                  child: Text("Effacer", style: SDTypography.bodySmall.copyWith(color: SDColors.error500)),
+                )
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView.separated(
+              itemCount: history.length,
+              separatorBuilder: (_, __) => Divider(height: 1, indent: SDSpacing.sm, color: SDColors.neutral200),
+              itemBuilder: (context, index) {
+                final item = history[index];
+                return ListTile(
+                  leading: Icon(Icons.history, color: SDColors.neutral500, size: 20),
+                  title: Text(item, style: SDTypography.bodyMedium),
+                  trailing: Icon(Icons.north_west, size: 16, color: SDColors.neutral500),
+                  onTap: () => _onSuggestionTap(item),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSuggestionsList(List<String> suggestions) {
+    return Container(
+      color: SDColors.white,
+      child: ListView.separated(
+        itemCount: suggestions.length,
+        separatorBuilder: (_, __) => Divider(height: 1, indent: SDSpacing.sm, color: SDColors.neutral200),
+        itemBuilder: (context, index) {
+          final suggestion = suggestions[index];
+          return ListTile(
+            leading: Icon(Icons.search, color: SDColors.primary700, size: 20), // 🔍 for active search
+            title: Text(suggestion, style: SDTypography.bodyMedium),
+            onTap: () => _onSuggestionTap(suggestion),
+          );
+        },
+      ),
+    );
+  }
+
+  // 🎨 EMPTY STATE (No Query / No Results)
+  Widget _buildEmptyState() {
+    return EmptyStateWidget(
+      imagePath: 'assets/recherche_vide.png',
+      title: 'Aucun résultat',
+      message: 'Essayez avec d\'autres mots-clés ou filtres',
+      imageSize: 180,
+    );
+  }
+
+  // --- TAB: TOUT (Summary) ---
+  Widget _buildAllTab(SearchPageStateM state) {
+    return ListView(
+      padding: EdgeInsets.all(SDSpacing.sm),
+      children: [
+        if (state.services.isNotEmpty) ...[
+          _buildSectionHeader('Services', 1, state.counts['services'] ?? 0),
+          ...state.services.take(2).map((s) => _buildServiceCard(s)).toList(),
+          SizedBox(height: SDSpacing.sm),
+        ],
+        
+        if (state.freelances.isNotEmpty) ...[
+          _buildSectionHeader('Freelances', 2, state.counts['freelances'] ?? 0),
+          _buildHorizontalScroll(
+            state.freelances.take(5).map((f) => _buildFreelanceSquare(f)).toList()
+          ),
+          SizedBox(height: SDSpacing.sm),
+        ],
+
+        if (state.prestataires.isNotEmpty) ...[
+          _buildSectionHeader('Prestataires', 3, state.counts['prestataires'] ?? 0),
+          _buildHorizontalScroll(
+            state.prestataires.take(5).map((p) => _buildFreelanceSquare(p)).toList() 
+          ),
+          SizedBox(height: SDSpacing.sm),
+        ],
+
+        if (state.articles.isNotEmpty) ...[
+          _buildSectionHeader('Boutique', 4, state.counts['articles'] ?? 0),
+          _buildArticleGrid(state.articles.take(2).toList()), 
+        ],
+      ],
+    );
+  }
+
+  // --- TAB: SERVICES ---
+  Widget _buildServicesTab(SearchPageStateM state) {
+    if (state.services.isEmpty) return Center(child: Text("Aucun service trouvé", style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral600)));
+    return ListView.builder(
+      padding: EdgeInsets.all(SDSpacing.sm),
+      itemCount: state.services.length,
+      itemBuilder: (context, index) => _buildServiceCard(state.services[index]),
+    );
+  }
+
+  // --- TAB: FREELANCES ---
+  Widget _buildFreelancesTab(SearchPageStateM state) {
+    if (state.freelances.isEmpty) return Center(child: Text("Aucun freelance trouvé", style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral600)));
+    return ListView.builder(
+      padding: EdgeInsets.all(SDSpacing.sm),
+      itemCount: state.freelances.length,
+      itemBuilder: (context, index) => _buildFreelanceCard(state.freelances[index]),
+    );
+  }
+
+  // --- TAB: PRESTATAIRES ---
+  Widget _buildPrestatairesTab(SearchPageStateM state) {
+    if (state.prestataires.isEmpty) return Center(child: Text("Aucun prestataire trouvé", style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral600)));
+    return ListView.builder(
+      padding: EdgeInsets.all(SDSpacing.sm),
+      itemCount: state.prestataires.length,
+      itemBuilder: (context, index) => _buildFreelanceCard(state.prestataires[index]), // Reuse Card
+    );
+  }
+
+  // --- TAB: ARTICLES ---
+  Widget _buildShopTab(SearchPageStateM state) {
+    if (state.articles.isEmpty) return Center(child: Text("Aucun article trouvé", style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral600)));
+    return GridView.builder(
+      padding: EdgeInsets.all(SDSpacing.sm),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        childAspectRatio: 0.75,
+        mainAxisSpacing: SDSpacing.sm,
+        crossAxisSpacing: SDSpacing.sm,
+      ),
+      itemCount: state.articles.length,
+      itemBuilder: (context, index) => _buildArticleCard(state.articles[index]),
+    );
+  }
+
+  // --- WIDGET HELPER METHODS ---
+
+  Widget _buildSectionHeader(String title, int tabIndex, int count) {
+    if (count == 0) return SizedBox();
+    return Padding(
+      padding: EdgeInsets.only(bottom: SDSpacing.xs),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(title, style: SDTypography.titleMedium.copyWith(fontWeight: FontWeight.bold)),
+          GestureDetector(
+            onTap: () => _tabController.animateTo(tabIndex),
+            child: Text('Voir tout', 
+              style: SDTypography.labelMedium.copyWith(color: SDColors.primary600, fontWeight: FontWeight.bold)
+            ), 
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHorizontalScroll(List<Widget> children) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(children: children.map((c) => Padding(padding: EdgeInsets.only(right: SDSpacing.xs), child: c)).toList()),
+    );
+  }
+
+  Widget _buildArticleGrid(List<dynamic> articles) {
+    return GridView.count(
+      shrinkWrap: true,
+      physics: NeverScrollableScrollPhysics(),
+      crossAxisCount: 2,
+      childAspectRatio: 0.75,
+      mainAxisSpacing: SDSpacing.sm,
+      crossAxisSpacing: SDSpacing.sm,
+      children: articles.map((a) => _buildArticleCard(a)).toList(),
+    );
+  }
+
+  // --- CARDS ---
+
+  Widget _buildServiceCard(dynamic service) {
+    // Extract properties safely
+    final String name = service['nomservice'] ?? 'Service';
+    final String image = service['imageservice'] ?? '';
+    final int price = int.tryParse(service['prixmoyen']?.toString() ?? '0') ?? 0;
+    
+    return Container(
+      margin: EdgeInsets.only(bottom: SDSpacing.xs),
+      decoration: BoxDecoration(
+        color: SDColors.white,
+        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+        boxShadow: [BoxShadow(color: SDColors.neutral900.withOpacity(0.05), blurRadius: 4)],
+      ),
+      child: ListTile(
+        contentPadding: EdgeInsets.all(SDSpacing.xs),
+        leading: ClipRRect(
+          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
+          child: AppImage(
+            imageUrl: image,
+            width: 60,
+            height: 60,
+            fit: BoxFit.cover,
+          ),
+        ),
+        title: Text(name, style: SDTypography.titleSmall),
+        subtitle: Text('À partir de $price FCFA', style: SDTypography.bodySmall.copyWith(color: SDColors.success500)),
+        trailing: Icon(Icons.arrow_forward_ios, size: 14, color: SDColors.neutral500),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => DetailPage(
+                title: name,
+                image: image,
               ),
             ),
-            const SizedBox(width: 12),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildFreelanceSquare(dynamic freelance) {
+    final String name = freelance['name'] ?? 'John Doe';
+    final String job = freelance['job'] ?? 'Prestataire';
+    final String image = freelance['imagePath'] ?? '';
+
+    return Container(
+      width: 100,
+      padding: EdgeInsets.all(SDSpacing.xs),
+      decoration: BoxDecoration(
+        color: SDColors.white,
+        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+        boxShadow: [BoxShadow(color: SDColors.neutral900.withOpacity(0.05), blurRadius: 4)],
+      ),
+      child: Column(
+        children: [
+          CircleAvatar(
+            radius: 30,
+            backgroundImage: image.isNotEmpty ? CachedNetworkImageProvider(image) : null,
+            child: image.isEmpty ? Icon(Icons.person, color: SDColors.neutral400) : null,
+          ),
+          SizedBox(height: SDSpacing.xs),
+          Text(name, maxLines: 1, overflow: TextOverflow.ellipsis,
+              style: SDTypography.bodySmall.copyWith(fontWeight: FontWeight.bold)),
+          Text(job, maxLines: 1, overflow: TextOverflow.ellipsis,
+              style: SDTypography.labelSmall.copyWith(color: SDColors.neutral500)),
+        ],
+      ),
+    );
+  }
+
+    Widget _buildFreelanceCard(dynamic freelance) {
+    final String name = freelance['name'] ?? 'John Doe';
+    final String job = freelance['job'] ?? 'Prestataire';
+    final String image = freelance['imagePath'] ?? '';
+    final dynamic rating = freelance['rating'] ?? 0.0;
+
+    return Container(
+      margin: EdgeInsets.only(bottom: SDSpacing.xs),
+      decoration: BoxDecoration(
+        color: SDColors.white,
+        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+        boxShadow: [BoxShadow(color: SDColors.neutral900.withOpacity(0.05), blurRadius: 4)],
+      ),
+      child: ListTile(
+        leading: CircleAvatar(
+          radius: 25,
+          backgroundImage: image.isNotEmpty ? CachedNetworkImageProvider(image) : null,
+          child: image.isEmpty ? Icon(Icons.person, color: SDColors.neutral400) : null,
+        ),
+        title: Text(name, style: SDTypography.titleSmall.copyWith(fontWeight: FontWeight.bold)),
+        subtitle: Row(
+          children: [
+            Text(job, style: SDTypography.bodySmall),
+            SizedBox(width: SDSpacing.xs),
+            Icon(Icons.star, size: 14, color: SDColors.warning500),
+            Text(' $rating', style: SDTypography.bodySmall),
+          ],
+        ),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ProviderProfileScreen(
+                providerId: freelance['_id'] ?? '',
+                providerData: freelance,
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildArticleCard(dynamic article) {
+    final String name = article['nomArticle'] ?? 'Article';
+    final String image = article['photoArticle'] ?? '';
+    // ✅ Fix: Parsing sécurisé car le backend envoie parfois une String
+    final int price = int.tryParse(article['prixArticle']?.toString() ?? '0') ?? 0;
+
+    return GestureDetector(
+      onTap: () {
+        // Construction de l'objet Product
+        final product = shop_model.Product(
+          id: article['_id'] ?? '',
+          name: name,
+          image: image,
+          size: '', // Info non dispo direct ici, on laisse vide
+          price: price.toString(),
+          brand: article['marque'] ?? 'Générique',
+          vendeurId: article['vendeur'] is Map ? article['vendeur']['_id'] : article['vendeur'],
+        );
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ProductDetails(product: product),
+          ),
+        );
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: SDColors.white,
+          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+          boxShadow: [BoxShadow(color: SDColors.neutral900.withOpacity(0.05), blurRadius: 4)],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
             Expanded(
-              child: TextField(
-                focusNode: _focusNode,
-                style: const TextStyle(fontSize: 16),
-                cursorColor: Colors.green,
-                decoration: InputDecoration(
-                  hintText: 'Rechercher sur soutralideals',
-                  hintStyle: TextStyle(
-                      color: Colors.green.shade400,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500),
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                  isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 14),
+              child: ClipRRect(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(SDSpacing.borderRadiusMedium)),
+                child: Image.network(
+                  image, 
+                  width: double.infinity, 
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(color: SDColors.neutral200, child: Icon(Icons.shopping_bag, color: SDColors.neutral400)),
                 ),
               ),
             ),
-            const SizedBox(width: 10),
+            Padding(
+              padding: EdgeInsets.all(SDSpacing.xs),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(name, 
+                    maxLines: 2, 
+                    overflow: TextOverflow.ellipsis,
+                    style: SDTypography.bodySmall.copyWith(fontWeight: FontWeight.bold)
+                  ),
+                  Text('$price FCFA', 
+                    style: SDTypography.labelMedium.copyWith(color: SDColors.primary600, fontWeight: FontWeight.bold) // ✅ Standard Green
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
