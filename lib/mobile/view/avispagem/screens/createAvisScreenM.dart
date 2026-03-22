@@ -4,6 +4,7 @@ import '../avispageblocm/avisPageBlocM.dart';
 import '../avispageblocm/avisPageEventM.dart';
 import '../avispageblocm/avisPageStateM.dart';
 import 'package:sdealsmobile/data/models/avis.dart';
+import '../../../../design_system/design_system.dart';
 
 class CreateAvisScreenM extends StatefulWidget {
   final String objetType;
@@ -59,10 +60,9 @@ class _CreateAvisScreenMState extends State<CreateAvisScreenM> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.green,
-        title: const Text('Donner un avis'),
+      appBar: SDWhiteAppBar.appBar(
         centerTitle: true,
+        title: 'Donner un avis',
         actions: [
           BlocBuilder<AvisPageBlocM, AvisPageStateM>(
             builder: (context, state) {
@@ -70,8 +70,10 @@ class _CreateAvisScreenMState extends State<CreateAvisScreenM> {
                 onPressed: state.isCreating ? null : _submitAvis,
                 child: Text(
                   'Publier',
-                  style: TextStyle(
-                    color: state.isCreating ? Colors.grey : Colors.white,
+                  style: SDTypography.labelLarge.copyWith(
+                    color: state.isCreating
+                        ? SDColors.neutral400
+                        : SDColors.primary700,
                     fontWeight: FontWeight.bold,
                   ),
                 ),

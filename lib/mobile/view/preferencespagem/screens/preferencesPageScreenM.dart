@@ -102,29 +102,28 @@ class _PreferencesPageScreenMState extends State<PreferencesPageScreenM>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Langue & Devise', style: SDTypography.titleLarge.copyWith(color: SDColors.white)),
-        backgroundColor: SDColors.primary600,
-        foregroundColor: SDColors.white,
-        elevation: 0,
+      appBar: SDWhiteAppBar.appBar(
+        title: 'Langue & Devise',
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh_rounded),
             onPressed: _loadPreferences,
           ),
         ],
         bottom: TabBar(
           controller: _tabController,
-          labelColor: SDColors.white,
-          unselectedLabelColor: SDColors.white.withOpacity(0.7),
-          indicatorColor: SDColors.white,
+          labelColor: SDColors.primary700,
+          unselectedLabelColor: SDColors.neutral500,
+          indicatorColor: SDColors.primary600,
+          indicatorWeight: 3,
+          dividerColor: SDColors.neutral200,
           isScrollable: true,
           tabs: const [
-            Tab(text: 'Langue', icon: Icon(Icons.language)),
+            Tab(text: 'Langue', icon: Icon(Icons.language_outlined)),
             Tab(text: 'Devise', icon: Icon(Icons.attach_money)),
-            Tab(text: 'Localisation', icon: Icon(Icons.public)),
-            Tab(text: 'Affichage', icon: Icon(Icons.palette)),
-            Tab(text: 'Notifications', icon: Icon(Icons.notifications)),
+            Tab(text: 'Localisation', icon: Icon(Icons.public_outlined)),
+            Tab(text: 'Affichage', icon: Icon(Icons.palette_outlined)),
+            Tab(text: 'Notifications', icon: Icon(Icons.notifications_outlined)),
             Tab(text: 'Sécurité', icon: Icon(Icons.security)),
           ],
         ),

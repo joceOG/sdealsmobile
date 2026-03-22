@@ -13,6 +13,7 @@ export 'animations.dart';
 // WIDGETS (Components)
 // ═══════════════════════════════════════
 export 'widgets/sd_appbar.dart';
+export 'widgets/sd_white_appbar.dart';
 export 'widgets/sd_button.dart';
 export 'widgets/sd_input.dart';
 export 'widgets/sd_card.dart';

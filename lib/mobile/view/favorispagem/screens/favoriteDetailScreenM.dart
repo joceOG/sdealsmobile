@@ -18,18 +18,16 @@ class _FavoriteDetailScreenMState extends State<FavoriteDetailScreenM> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: SDColors.primary600,
-        title: Text('Détail du Favori', style: SDTypography.titleMedium.copyWith(color: SDColors.white)),
+      appBar: SDWhiteAppBar.appBar(
         centerTitle: true,
-        iconTheme: IconThemeData(color: SDColors.white),
+        title: 'Détail du Favori',
         actions: [
           IconButton(
-            icon: const Icon(Icons.edit),
+            icon: const Icon(Icons.edit_outlined),
             onPressed: () => _showEditDialog(),
           ),
           IconButton(
-            icon: const Icon(Icons.share),
+            icon: const Icon(Icons.share_outlined),
             onPressed: () => _shareFavorite(),
           ),
         ],

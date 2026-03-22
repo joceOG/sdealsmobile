@@ -94,27 +94,11 @@ class _DetailPageState extends State<DetailPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.title,
-            style: SDTypography.titleMedium.copyWith(fontWeight: FontWeight.bold, color: SDColors.white)),
-        backgroundColor: SDColors.primary700,
-        foregroundColor: SDColors.white,
-        elevation: 0,
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                SDColors.primary700,
-                SDColors.primary500,
-              ],
-            ),
-          ),
-        ),
+      appBar: SDWhiteAppBar.appBar(
+        title: widget.title,
         actions: [
           IconButton(
-            icon: Icon(Icons.ios_share_rounded, color: SDColors.white),
+            icon: const Icon(Icons.ios_share_rounded),
             onPressed: _onShareTap,
           ),
           IconButton(
@@ -122,12 +106,11 @@ class _DetailPageState extends State<DetailPage> {
               _isFavorited
                   ? Icons.favorite_rounded
                   : Icons.favorite_border_rounded,
-              color: SDColors.white,
             ),
             onPressed: _onFavoriteTap,
           ),
           IconButton(
-            icon: Icon(Icons.flag_outlined, color: SDColors.white),
+            icon: const Icon(Icons.flag_outlined),
             onPressed: _onReportTap,
           ),
         ],

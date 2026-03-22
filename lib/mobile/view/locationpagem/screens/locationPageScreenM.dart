@@ -28,13 +28,11 @@ class _LocationPageScreenMState extends State<LocationPageScreenM> {
     return BlocProvider(
       create: (context) => LocationPageBlocM(),
       child: Scaffold(
-        appBar: AppBar(
-          title: Text('Gestion de la localisation', style: SDTypography.titleLarge.copyWith(color: SDColors.white)),
-          backgroundColor: SDColors.primary600,
-          foregroundColor: SDColors.white,
+        appBar: SDWhiteAppBar.appBar(
+          title: 'Gestion de la localisation',
           actions: [
             IconButton(
-              icon: const Icon(Icons.refresh),
+              icon: const Icon(Icons.refresh_rounded),
               onPressed: () {
                 context
                     .read<LocationPageBlocM>()

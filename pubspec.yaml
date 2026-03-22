@@ -86,7 +86,11 @@ flutter:
     - assets/products/
     - assets/logos/
     - assets/onboarding/
+    # Racine : metier.png, marketplace.png, freelances.png (cartes accueil)
+    - assets/banner/
+    # Sous-dossier : bannières carrousel page Métiers (banner1…3)
     - assets/banner/metiers/
+    - assets/profil_vide.png
     - .env
 
   # To add assets to your application, add an assets section, like this:

@@ -4,6 +4,7 @@ import '../avispageblocm/avisPageBlocM.dart';
 import '../avispageblocm/avisPageEventM.dart';
 import '../avispageblocm/avisPageStateM.dart';
 import 'package:sdealsmobile/data/models/avis.dart';
+import '../../../../design_system/design_system.dart';
 
 class AvisDetailScreenM extends StatefulWidget {
   final Avis avis;
@@ -21,10 +22,9 @@ class _AvisDetailScreenMState extends State<AvisDetailScreenM> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.green,
-        title: const Text('Détail de l\'avis'),
+      appBar: SDWhiteAppBar.appBar(
         centerTitle: true,
+        title: 'Détail de l\'avis',
         actions: [
           PopupMenuButton<String>(
             onSelected: (value) {

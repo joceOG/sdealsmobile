@@ -369,7 +369,7 @@ class MyApp extends StatelessWidget {
             // ═══════════════════════════════════════
             // CARDS
             // ═══════════════════════════════════════
-            cardTheme: CardTheme(
+            cardTheme: CardThemeData(
               color: SDColors.white,
               elevation: 2,
               shadowColor: SDColors.neutral900.withOpacity(0.1),

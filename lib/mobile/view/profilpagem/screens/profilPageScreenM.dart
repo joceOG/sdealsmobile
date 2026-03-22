@@ -30,6 +30,9 @@ class ProfilPageScreenM extends StatefulWidget {
 }
 
 class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
+  /// Illustration écran profil non connecté.
+  static const String _guestProfilIllustration = 'assets/profil_vide.png';
+
   @override
   void initState() {
     BlocProvider.of<ProfilPageBlocM>(context);
@@ -201,20 +204,13 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: SDColors.neutral50,
-      appBar: AppBar(
-        backgroundColor: SDColors.primary600,
-        elevation: 0,
-        centerTitle: true,
-        title: Text(
-          "Profil",
-          style: SDTypography.titleLarge.copyWith(
-            color: SDColors.white,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+      appBar: SDWhiteAppBar.appBar(
+        automaticallyImplyLeading: false,
+        centerTitle: false,
+        title: 'Profil',
         actions: [
           IconButton(
-            icon: Icon(Icons.settings, color: SDColors.white),
+            icon: const Icon(Icons.settings_outlined),
             onPressed: () {
               // Navigation vers paramètres si nécessaire
             },
@@ -590,39 +586,47 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
     );
   }
 
-  // Bannière de connexion - DESIGN AMÉLIORÉ
+  /// Invité : carte claire + illustration `assets/profil_vide.png` (pas de gros bandeau dégradé).
   Widget _buildLoginBanner(BuildContext context) {
     return Container(
       margin: EdgeInsets.all(SDSpacing.md),
-      padding: EdgeInsets.all(SDSpacing.lg),
+      padding: EdgeInsets.fromLTRB(SDSpacing.lg, SDSpacing.md, SDSpacing.lg, SDSpacing.lg),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [SDColors.primary500, SDColors.primary600],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: SDColors.white,
         borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
         boxShadow: [
           BoxShadow(
-            color: SDColors.primary600.withOpacity(0.3),
-            blurRadius: 10,
-            offset: Offset(0, 4),
+            color: SDColors.neutral900.withOpacity(0.06),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Column(
         children: [
-          Icon(
-            Icons.person_outline,
-            size: 48,
-            color: SDColors.white,
+          SizedBox(
+            height: 200,
+            width: double.infinity,
+            child: Image.asset(
+              _guestProfilIllustration,
+              fit: BoxFit.contain,
+              alignment: Alignment.center,
+              filterQuality: FilterQuality.high,
+              errorBuilder: (_, __, ___) => Center(
+                child: Icon(
+                  Icons.person_outline_rounded,
+                  size: 88,
+                  color: SDColors.neutral300,
+                ),
+              ),
+            ),
           ),
           SizedBox(height: SDSpacing.md),
           Text(
-            'Connectez-vous ou créez un compte',
+            'Accédez à tous les services autour de vous',
             style: SDTypography.titleMedium.copyWith(
-              color: SDColors.white,
-              fontWeight: FontWeight.bold,
+              color: SDColors.primary800,
+              fontWeight: FontWeight.w800,
             ),
             textAlign: TextAlign.center,
           ),
@@ -630,14 +634,13 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
           Text(
             'Connectez-vous pour voir les freelances, vendeurs et artisans',
             style: SDTypography.bodyMedium.copyWith(
-              color: SDColors.white.withOpacity(0.9),
+              color: SDColors.neutral600,
             ),
             textAlign: TextAlign.center,
           ),
-          SizedBox(height: SDSpacing.md),
+          SizedBox(height: SDSpacing.lg),
           LayoutBuilder(
             builder: (context, constraints) {
-              // Si l'écran est trop petit, mettre les boutons en colonne
               if (constraints.maxWidth < 300) {
                 return Column(
                   mainAxisSize: MainAxisSize.min,
@@ -653,9 +656,12 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
                           );
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: SDColors.white,
-                          foregroundColor: SDColors.primary600,
-                          padding: EdgeInsets.symmetric(horizontal: SDSpacing.lg, vertical: SDSpacing.sm),
+                          backgroundColor: SDColors.primary600,
+                          foregroundColor: SDColors.white,
+                          padding: EdgeInsets.symmetric(
+                            horizontal: SDSpacing.lg,
+                            vertical: SDSpacing.sm,
+                          ),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
                           ),
@@ -663,7 +669,7 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
                         child: Text(
                           'Se connecter',
                           style: SDTypography.labelMedium.copyWith(
-                            color: SDColors.primary600,
+                            color: SDColors.white,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -677,9 +683,12 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
                           context.push('/register');
                         },
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: SDColors.white,
-                          side: BorderSide(color: SDColors.white, width: 2),
-                          padding: EdgeInsets.symmetric(horizontal: SDSpacing.lg, vertical: SDSpacing.sm),
+                          foregroundColor: SDColors.primary700,
+                          side: const BorderSide(color: SDColors.primary600, width: 1.5),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: SDSpacing.lg,
+                            vertical: SDSpacing.sm,
+                          ),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
                           ),
@@ -687,7 +696,7 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
                         child: Text(
                           'Créer un compte',
                           style: SDTypography.labelMedium.copyWith(
-                            color: SDColors.white,
+                            color: SDColors.primary700,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -696,11 +705,9 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
                   ],
                 );
               }
-              // Sinon, mettre les boutons en ligne avec Flexible
               return Row(
-                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Flexible(
+                  Expanded(
                     child: ElevatedButton(
                       onPressed: () {
                         Navigator.of(context).push(
@@ -710,9 +717,12 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
                         );
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: SDColors.white,
-                        foregroundColor: SDColors.primary600,
-                        padding: EdgeInsets.symmetric(horizontal: SDSpacing.md, vertical: SDSpacing.sm),
+                        backgroundColor: SDColors.primary600,
+                        foregroundColor: SDColors.white,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: SDSpacing.md,
+                          vertical: SDSpacing.sm,
+                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
                         ),
@@ -720,7 +730,7 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
                       child: Text(
                         'Se connecter',
                         style: SDTypography.labelMedium.copyWith(
-                          color: SDColors.primary600,
+                          color: SDColors.white,
                           fontWeight: FontWeight.bold,
                         ),
                         textAlign: TextAlign.center,
@@ -728,15 +738,18 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
                     ),
                   ),
                   SizedBox(width: SDSpacing.sm),
-                  Flexible(
+                  Expanded(
                     child: OutlinedButton(
                       onPressed: () {
                         context.push('/register');
                       },
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: SDColors.white,
-                        side: BorderSide(color: SDColors.white, width: 2),
-                        padding: EdgeInsets.symmetric(horizontal: SDSpacing.md, vertical: SDSpacing.sm),
+                        foregroundColor: SDColors.primary700,
+                        side: const BorderSide(color: SDColors.primary600, width: 1.5),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: SDSpacing.md,
+                          vertical: SDSpacing.sm,
+                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
                         ),
@@ -744,7 +757,7 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
                       child: Text(
                         'Créer un compte',
                         style: SDTypography.labelMedium.copyWith(
-                          color: SDColors.white,
+                          color: SDColors.primary700,
                           fontWeight: FontWeight.bold,
                         ),
                         textAlign: TextAlign.center,
