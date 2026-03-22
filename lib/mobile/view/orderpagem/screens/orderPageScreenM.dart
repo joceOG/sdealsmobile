@@ -8,6 +8,7 @@ import '../orderpageblocm/commande_state.dart';
 import '../../common/widgets/empty_state_widget.dart';
 import '../widgets/commande_card.dart';
 import 'commande_details_screen.dart';
+import '../../common/widgets/standard_screen_header.dart';
 
 // ✅ Design System
 import '../../../../design_system/design_system.dart';
@@ -77,173 +78,118 @@ class _OrderPageScreenMState extends State<OrderPageScreenM>
         return Scaffold(
           key: _scaffoldKey,
           backgroundColor: SDColors.white,
-          appBar: _buildAppBar(state),
-          body: _buildBody(state),
-          floatingActionButton: FloatingActionButton(
-            onPressed: () {
-              setState(() {
-                _isSearchVisible = !_isSearchVisible;
-                if (!_isSearchVisible) {
-                  _searchController.clear();
-                  context
-                      .read<CommandeBloc>()
-                      .add(const RechercherCommandes(''));
-                }
-              });
-            },
-            backgroundColor: SDColors.primary600,
-            child: const Icon(
-              Icons.search,
-              color: SDColors.white,
-            ),
+          body: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    SDSpacing.md,
+                    SDSpacing.sm,
+                    SDSpacing.md,
+                    SDSpacing.xs,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      StandardScreenHeader(
+                        title: 'Commandes',
+                        actions: [
+                          SdCircleIconButton(
+                            icon: _isSearchVisible
+                                ? Icons.close_rounded
+                                : Icons.search_rounded,
+                            tooltip: _isSearchVisible
+                                ? 'Fermer la recherche'
+                                : 'Rechercher',
+                            onPressed: () {
+                              setState(() {
+                                _isSearchVisible = !_isSearchVisible;
+                                if (!_isSearchVisible) {
+                                  _searchController.clear();
+                                  context.read<CommandeBloc>().add(
+                                        const RechercherCommandes(''),
+                                      );
+                                }
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                      if (_isSearchVisible) ...[
+                        SizedBox(height: SDSpacing.md),
+                        FreelanceStyleSearchBar(
+                          controller: _searchController,
+                          hintText: 'Rechercher une commande…',
+                          onTunePressed: null,
+                          onChanged: (value) {
+                            context
+                                .read<CommandeBloc>()
+                                .add(RechercherCommandes(value));
+                          },
+                        ),
+                      ],
+                      SizedBox(height: SDSpacing.sm),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: SDColors.neutral100,
+                          borderRadius:
+                              BorderRadius.circular(SDSpacing.borderRadiusLarge),
+                        ),
+                        child: TabBar(
+                          controller: _tabController,
+                          isScrollable: true,
+                          tabAlignment: TabAlignment.start,
+                          indicator: BoxDecoration(
+                            borderRadius: BorderRadius.circular(
+                                SDSpacing.borderRadiusLarge),
+                            color: SDColors.primary600,
+                          ),
+                          indicatorSize: TabBarIndicatorSize.tab,
+                          dividerColor: Colors.transparent,
+                          labelColor: SDColors.white,
+                          unselectedLabelColor: SDColors.neutral600,
+                          labelPadding: EdgeInsets.symmetric(
+                              horizontal: SDSpacing.sm),
+                          labelStyle: SDTypography.labelSmall.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                          unselectedLabelStyle: SDTypography.labelSmall,
+                          tabs: [
+                            _buildTab('Toutes', state.commandes.length),
+                            _buildTab(
+                              'En attente',
+                              state.getNombreCommandesParStatus(
+                                  CommandeStatus.enAttente),
+                            ),
+                            _buildTab(
+                              'En cours',
+                              state.getNombreCommandesParStatus(
+                                  CommandeStatus.enCours),
+                            ),
+                            _buildTab(
+                              'Terminées',
+                              state.getNombreCommandesParStatus(
+                                  CommandeStatus.terminee),
+                            ),
+                            _buildTab(
+                              'Annulées',
+                              state.getNombreCommandesParStatus(
+                                  CommandeStatus.annulee),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Expanded(child: _buildBody(state)),
+            ],
           ),
         );
       },
-    );
-  }
-
-  PreferredSize _buildAppBar(CommandeState state) {
-    return PreferredSize(
-      preferredSize: Size.fromHeight(_isSearchVisible ? 230 : 170),
-      child: AppBar(
-        backgroundColor: Colors.transparent,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        automaticallyImplyLeading: false,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.only(
-            bottomLeft: Radius.circular(44),
-            bottomRight: Radius.circular(44),
-          ),
-        ),
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            color: SDColors.primary600,
-            boxShadow: [
-              BoxShadow(
-                color: SDColors.neutral900.withOpacity(0.15),
-                blurRadius: 18,
-                offset: const Offset(0, 8),
-              ),
-            ],
-            borderRadius: const BorderRadius.only(
-              bottomLeft: Radius.circular(44),
-              bottomRight: Radius.circular(44),
-            ),
-          ),
-          child: SafeArea(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(height: SDSpacing.xxxs),
-                // Titre
-                TweenAnimationBuilder<double>(
-                  tween: Tween(begin: 0, end: 1),
-                  duration: SDAnimations.medium,
-                  builder: (context, value, child) => Opacity(
-                    opacity: value,
-                    child: child,
-                  ),
-                  child: Center(
-                    child: Text(
-                      'COMMANDES',
-                      style: SDTypography.displaySmall.copyWith(
-                        color: SDColors.white,
-                      ),
-                    ),
-                  ),
-                ),
-
-                SizedBox(height: SDSpacing.md),
-
-                // Champ de recherche si visible
-                if (_isSearchVisible)
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: SDSpacing.md),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: SDColors.white,
-                        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
-                      ),
-                      child: TextField(
-                        controller: _searchController,
-                        decoration: InputDecoration(
-                          hintText: 'Rechercher une commande...',
-                          prefixIcon:
-                              Icon(Icons.search, color: SDColors.primary600),
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: SDSpacing.md,
-                            vertical: SDSpacing.sm,
-                          ),
-                        ),
-                        onChanged: (value) {
-                          context
-                              .read<CommandeBloc>()
-                              .add(RechercherCommandes(value));
-                        },
-                      ),
-                    ),
-                  ),
-
-                SizedBox(height: SDSpacing.xs),
-
-                // TabBar
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: SDSpacing.md),
-                  child: Container(
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: SDColors.white.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
-                    ),
-                    child: TabBar(
-                      controller: _tabController,
-                      indicator: BoxDecoration(
-                        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
-                        color: SDColors.white,
-                      ),
-                      labelColor: SDColors.primary600,
-                      unselectedLabelColor: SDColors.white,
-                      isScrollable: true,
-                      labelPadding: EdgeInsets.symmetric(horizontal: SDSpacing.xxs),
-                      tabAlignment: TabAlignment.center,
-                      labelStyle: SDTypography.labelSmall.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                      unselectedLabelStyle: SDTypography.labelSmall,
-                      tabs: [
-                        _buildTab('Toutes', state.commandes.length),
-                        _buildTab(
-                          'En attente',
-                          state.getNombreCommandesParStatus(
-                              CommandeStatus.enAttente),
-                        ),
-                        _buildTab(
-                          'En cours',
-                          state.getNombreCommandesParStatus(
-                              CommandeStatus.enCours),
-                        ),
-                        _buildTab(
-                          'Terminées',
-                          state.getNombreCommandesParStatus(
-                              CommandeStatus.terminee),
-                        ),
-                        _buildTab(
-                          'Annulées',
-                          state.getNombreCommandesParStatus(
-                              CommandeStatus.annulee),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
     );
   }
 

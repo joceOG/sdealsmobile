@@ -40,17 +40,12 @@ class _FavoritePageScreenMState extends State<FavoritePageScreenM>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: SDColors.neutral50,
-      appBar: AppBar(
-        backgroundColor: SDColors.primary600,
-        title: Text(
-          'Mes Favoris',
-          style: SDTypography.titleMedium.copyWith(color: SDColors.white),
-        ),
+      appBar: SDWhiteAppBar.appBar(
         centerTitle: true,
-        iconTheme: IconThemeData(color: SDColors.white),
+        title: 'Mes Favoris',
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh_rounded),
             onPressed: () {
               context.read<FavoritePageBlocM>().add(RefreshFavoritesM());
             },
@@ -58,13 +53,15 @@ class _FavoritePageScreenMState extends State<FavoritePageScreenM>
         ],
         bottom: TabBar(
           controller: _tabController,
-          labelColor: SDColors.white,
-          unselectedLabelColor: SDColors.white.withOpacity(0.7),
-          indicatorColor: SDColors.white,
+          labelColor: SDColors.primary700,
+          unselectedLabelColor: SDColors.neutral500,
+          indicatorColor: SDColors.primary600,
+          indicatorWeight: 3,
+          dividerColor: SDColors.neutral200,
           tabs: const [
-            Tab(text: 'Tous', icon: Icon(Icons.favorite)),
-            Tab(text: 'Actifs', icon: Icon(Icons.check_circle)),
-            Tab(text: 'Archivés', icon: Icon(Icons.archive)),
+            Tab(text: 'Tous', icon: Icon(Icons.favorite_outline)),
+            Tab(text: 'Actifs', icon: Icon(Icons.check_circle_outline)),
+            Tab(text: 'Archivés', icon: Icon(Icons.archive_outlined)),
           ],
         ),
       ),

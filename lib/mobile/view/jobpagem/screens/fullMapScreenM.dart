@@ -10,6 +10,8 @@ import '../jobpageblocm/jobPageBlocM.dart';
 import '../jobpageblocm/jobPageStateM.dart';
 import '../jobpageblocm/jobPageEventM.dart';
 import '../../../../data/models/prestataire.dart'; // ✅ Import nécessaire
+// ✅ Design System
+import '../../../../design_system/design_system.dart';
 
 class FullMapScreenM extends StatefulWidget {
   final LatLng? initialPosition;
@@ -279,18 +281,16 @@ class _FullMapScreenMState extends State<FullMapScreenM> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Carte Complète'),
-        backgroundColor: Colors.green,
-        foregroundColor: Colors.white,
+      appBar: SDWhiteAppBar.appBar(
+        title: 'Carte complète',
         actions: [
           IconButton(
-            icon: const Icon(Icons.my_location),
+            icon: const Icon(Icons.my_location_outlined),
             onPressed: _getCurrentLocation,
             tooltip: 'Ma position',
           ),
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh_rounded),
             onPressed: _searchNearbyProviders,
             tooltip: 'Actualiser',
           ),
@@ -308,23 +308,23 @@ class _FullMapScreenMState extends State<FullMapScreenM> {
             children: [
               // Contrôles de la carte
               Container(
-                padding: const EdgeInsets.all(16),
-                color: Colors.grey.shade50,
+                padding: EdgeInsets.all(SDSpacing.sm),
+                color: SDColors.neutral50,
                 child: Column(
                   children: [
                     // Slider de rayon
                     Row(
                       children: [
-                        const Icon(Icons.radio_button_unchecked, size: 16),
-                        const SizedBox(width: 8),
-                        const Text('Rayon: '),
+                        Icon(Icons.radio_button_unchecked, size: 16, color: SDColors.neutral600),
+                        SizedBox(width: SDSpacing.xs),
+                        Text('Rayon: ', style: SDTypography.bodyMedium),
                         Expanded(
                           child: Slider(
                             value: _currentRadius,
                             min: 1.0,
                             max: 50.0,
                             divisions: 49,
-                            activeColor: Colors.green,
+                            activeColor: SDColors.primary500,
                             onChanged: (value) {
                               setState(() {
                                 _currentRadius = value;
@@ -332,50 +332,48 @@ class _FullMapScreenMState extends State<FullMapScreenM> {
                             },
                           ),
                         ),
-                        Text('${_currentRadius.toInt()}km'),
+                        Text('${_currentRadius.toInt()}km', style: SDTypography.bodyMedium),
                       ],
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: SDSpacing.xs),
 
                     // Indicateur de prix
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
-                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: EdgeInsets.symmetric(
+                          horizontal: SDSpacing.sm, vertical: SDSpacing.xs),
+                      margin: EdgeInsets.only(bottom: SDSpacing.xs),
                       decoration: BoxDecoration(
-                        color: Colors.green.shade800,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.green.shade900),
+                        color: SDColors.primary700,
+                        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
+                        border: Border.all(color: SDColors.primary800),
                       ),
                       child: Row(
                         children: [
                           Icon(Icons.attach_money,
-                              color: Colors.white, size: 14),
-                          const SizedBox(width: 6),
+                              color: SDColors.white, size: 14),
+                          SizedBox(width: SDSpacing.xxxs),
                           Expanded(
                             child: Text(
                               'Prix des services affichés sur la carte',
-                              style: const TextStyle(
-                                color: Colors.white,
+                              style: SDTypography.labelSmall.copyWith(
+                                color: SDColors.white,
                                 fontWeight: FontWeight.bold,
-                                fontSize: 12,
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          const SizedBox(width: 6),
+                          SizedBox(width: SDSpacing.xxxs),
                           Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 3),
+                            padding: EdgeInsets.symmetric(
+                                horizontal: SDSpacing.xxxs, vertical: SDSpacing.xxxs),
                             decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(10),
+                              color: SDColors.white,
+                              borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
                             ),
                             child: Text(
                               'FCFA',
-                              style: TextStyle(
-                                color: Colors.green.shade800,
-                                fontSize: 10,
+                              style: SDTypography.labelSmall.copyWith(
+                                color: SDColors.primary700,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -392,25 +390,29 @@ class _FullMapScreenMState extends State<FullMapScreenM> {
                             value: _selectedCategory.isEmpty
                                 ? null
                                 : _selectedCategory,
-                            decoration: const InputDecoration(
+                            decoration: InputDecoration(
                               labelText: 'Catégorie',
-                              border: OutlineInputBorder(),
+                              labelStyle: SDTypography.bodyMedium,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                              ),
                               contentPadding: EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 4),
+                                  horizontal: SDSpacing.xs, vertical: SDSpacing.xxxs),
                               isDense: true,
                             ),
+                            style: SDTypography.bodyMedium,
                             isExpanded: true,
                             items: [
-                              const DropdownMenuItem(
-                                  value: '', child: Text('Toutes')),
-                              const DropdownMenuItem(
-                                  value: 'Auto', child: Text('Auto')),
-                              const DropdownMenuItem(
+                              DropdownMenuItem(
+                                  value: '', child: Text('Toutes', style: SDTypography.bodyMedium)),
+                              DropdownMenuItem(
+                                  value: 'Auto', child: Text('Auto', style: SDTypography.bodyMedium)),
+                              DropdownMenuItem(
                                   value: 'Immobilier',
-                                  child: Text('Immobilier')),
-                              const DropdownMenuItem(
+                                  child: Text('Immobilier', style: SDTypography.bodyMedium)),
+                              DropdownMenuItem(
                                   value: 'Électronique',
-                                  child: Text('Électronique')),
+                                  child: Text('Électronique', style: SDTypography.bodyMedium)),
                             ],
                             onChanged: (value) {
                               setState(() {
@@ -420,30 +422,34 @@ class _FullMapScreenMState extends State<FullMapScreenM> {
                             },
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        SizedBox(width: SDSpacing.xs),
                         Expanded(
                           child: DropdownButtonFormField<String>(
                             value: _selectedService.isEmpty
                                 ? null
                                 : _selectedService,
-                            decoration: const InputDecoration(
+                            decoration: InputDecoration(
                               labelText: 'Service',
-                              border: OutlineInputBorder(),
+                              labelStyle: SDTypography.bodyMedium,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                              ),
                               contentPadding: EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 4),
+                                  horizontal: SDSpacing.xs, vertical: SDSpacing.xxxs),
                               isDense: true,
                             ),
+                            style: SDTypography.bodyMedium,
                             isExpanded: true,
                             items: [
-                              const DropdownMenuItem(
-                                  value: '', child: Text('Tous')),
-                              const DropdownMenuItem(
-                                  value: 'Plombier', child: Text('Plombier')),
-                              const DropdownMenuItem(
-                                  value: 'Coiffeur', child: Text('Coiffeur')),
-                              const DropdownMenuItem(
+                              DropdownMenuItem(
+                                  value: '', child: Text('Tous', style: SDTypography.bodyMedium)),
+                              DropdownMenuItem(
+                                  value: 'Plombier', child: Text('Plombier', style: SDTypography.bodyMedium)),
+                              DropdownMenuItem(
+                                  value: 'Coiffeur', child: Text('Coiffeur', style: SDTypography.bodyMedium)),
+                              DropdownMenuItem(
                                   value: 'Photographe',
-                                  child: Text('Photographe')),
+                                  child: Text('Photographe', style: SDTypography.bodyMedium)),
                             ],
                             onChanged: (value) {
                               setState(() {
@@ -467,27 +473,25 @@ class _FullMapScreenMState extends State<FullMapScreenM> {
                           if (kIsWeb) {
                             return Container(
                               decoration: BoxDecoration(
-                                color: Colors.grey.shade100,
+                                color: SDColors.neutral100,
                               ),
-                              child: const Center(
+                              child: Center(
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     Icon(Icons.map,
-                                        size: 64, color: Colors.green),
-                                    SizedBox(height: 16),
+                                        size: 64, color: SDColors.primary500),
+                                    SizedBox(height: SDSpacing.sm),
                                     Text('Carte complète disponible sur mobile',
-                                        style: TextStyle(
-                                          color: Colors.green,
+                                        style: SDTypography.titleMedium.copyWith(
+                                          color: SDColors.primary500,
                                           fontWeight: FontWeight.bold,
-                                          fontSize: 18,
                                         )),
-                                    SizedBox(height: 8),
+                                    SizedBox(height: SDSpacing.xs),
                                     Text(
                                         'Utilisez l\'application mobile pour voir la carte complète',
-                                        style: TextStyle(
-                                          color: Colors.grey,
-                                          fontSize: 14,
+                                        style: SDTypography.bodySmall.copyWith(
+                                          color: SDColors.neutral500,
                                         )),
                                   ],
                                 ),
@@ -526,17 +530,16 @@ class _FullMapScreenMState extends State<FullMapScreenM> {
                             );
                           } catch (e) {
                             print('Erreur Google Maps: $e');
-                            return const Center(
+                            return Center(
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Icon(Icons.error_outline,
-                                      size: 64, color: Colors.red),
-                                  SizedBox(height: 16),
+                                      size: 64, color: SDColors.error500),
+                                  SizedBox(height: SDSpacing.sm),
                                   Text('Erreur de chargement de la carte',
-                                      style: TextStyle(
-                                        color: Colors.red,
-                                        fontSize: 18,
+                                      style: SDTypography.titleMedium.copyWith(
+                                        color: SDColors.error500,
                                         fontWeight: FontWeight.bold,
                                       )),
                                 ],
@@ -545,24 +548,22 @@ class _FullMapScreenMState extends State<FullMapScreenM> {
                           }
                         },
                       )
-                    : const Center(
+                    : Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(Icons.location_off,
-                                size: 64, color: Colors.grey),
-                            SizedBox(height: 16),
+                                size: 64, color: SDColors.neutral500),
+                            SizedBox(height: SDSpacing.sm),
                             Text('Position non disponible',
-                                style: TextStyle(
-                                  color: Colors.grey,
-                                  fontSize: 18,
+                                style: SDTypography.titleMedium.copyWith(
+                                  color: SDColors.neutral500,
                                 )),
-                            SizedBox(height: 8),
+                            SizedBox(height: SDSpacing.xs),
                             Text(
                                 'Activez la géolocalisation pour voir la carte',
-                                style: TextStyle(
-                                  color: Colors.grey,
-                                  fontSize: 14,
+                                style: SDTypography.bodySmall.copyWith(
+                                  color: SDColors.neutral500,
                                 )),
                           ],
                         ),

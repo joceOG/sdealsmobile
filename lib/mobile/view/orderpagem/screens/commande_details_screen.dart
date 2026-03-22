@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:sdealsmobile/design_system/design_system.dart';
 import '../../../data/models/commande_model.dart';
 
 class CommandeDetailsScreen extends StatelessWidget {
@@ -18,18 +19,23 @@ class CommandeDetailsScreen extends StatelessWidget {
     );
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: SDColors.white,
       appBar: AppBar(
-        backgroundColor: Colors.green,
-        foregroundColor: Colors.white,
-        title: Text('Commande ${commande.id}'),
-        centerTitle: true,
-        elevation: 2,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.only(
-            bottomLeft: Radius.circular(44),
-            bottomRight: Radius.circular(44),
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        backgroundColor: SDColors.white,
+        surfaceTintColor: Colors.transparent,
+        foregroundColor: SDColors.neutral900,
+        title: Text(
+          'Commande ${commande.id}',
+          style: SDTypography.titleLarge.copyWith(
+            color: SDColors.neutral900,
+            fontWeight: FontWeight.w800,
           ),
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Divider(height: 1, color: SDColors.neutral200),
         ),
       ),
       body: SingleChildScrollView(

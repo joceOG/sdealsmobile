@@ -46,26 +46,22 @@ class _SecurityPageScreenMState extends State<SecurityPageScreenM>
         apiClient: ApiClient(),
       ),
       child: Scaffold(
-        appBar: AppBar(
-          title: Text(
-            'Sécurité du compte',
-            style: SDTypography.titleLarge.copyWith(color: SDColors.white),
-          ),
-          backgroundColor: SDColors.primary600,
-          foregroundColor: SDColors.white,
-          leading: const BackButton(color: SDColors.white),
+        appBar: SDWhiteAppBar.appBar(
+          title: 'Sécurité du compte',
           bottom: TabBar(
             controller: _tabController,
-            indicatorColor: SDColors.white,
-            labelColor: SDColors.white,
-            unselectedLabelColor: SDColors.white.withOpacity(0.7),
+            indicatorColor: SDColors.primary600,
+            indicatorWeight: 3,
+            labelColor: SDColors.primary700,
+            unselectedLabelColor: SDColors.neutral500,
+            dividerColor: SDColors.neutral200,
             labelStyle: SDTypography.labelMedium.copyWith(fontWeight: FontWeight.bold),
             unselectedLabelStyle: SDTypography.labelMedium,
             tabs: const [
               Tab(icon: Icon(Icons.security), text: 'Général'),
-              Tab(icon: Icon(Icons.phone_android), text: 'Sessions'),
-              Tab(icon: Icon(Icons.notifications), text: 'Alertes'),
-              Tab(icon: Icon(Icons.settings), text: 'Paramètres'),
+              Tab(icon: Icon(Icons.phone_android_outlined), text: 'Sessions'),
+              Tab(icon: Icon(Icons.notifications_outlined), text: 'Alertes'),
+              Tab(icon: Icon(Icons.settings_outlined), text: 'Paramètres'),
             ],
           ),
         ),

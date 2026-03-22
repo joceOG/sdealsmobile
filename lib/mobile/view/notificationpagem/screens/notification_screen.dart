@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../design_system/design_system.dart'; // ✅ Import DS
 import '../bloc/notification_bloc.dart';
 import '../bloc/notification_event.dart';
 import '../bloc/notification_state.dart';
@@ -67,7 +68,7 @@ class _NotificationScreenState extends State<NotificationScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: SDColors.neutral50,
       appBar: _buildAppBar(),
       body: Column(
         children: [
@@ -90,17 +91,8 @@ class _NotificationScreenState extends State<NotificationScreen>
 
   // 🎨 APP BAR MAGNIFIQUE
   PreferredSizeWidget _buildAppBar() {
-    return AppBar(
-      elevation: 0,
-      backgroundColor: const Color(0xFF2E7D32),
-      foregroundColor: Colors.white,
-      title: const Text(
-        'Mes Notifications',
-        style: TextStyle(
-          fontSize: 20,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
+    return SDWhiteAppBar.appBar(
+      title: 'Mes Notifications',
       actions: [
         BlocBuilder<NotificationBloc, NotificationState>(
           builder: (context, state) {
@@ -108,7 +100,7 @@ class _NotificationScreenState extends State<NotificationScreen>
               return Stack(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.mark_email_read),
+                    icon: const Icon(Icons.mark_email_read_outlined),
                     onPressed: _markAllAsRead,
                   ),
                   Positioned(
@@ -117,7 +109,7 @@ class _NotificationScreenState extends State<NotificationScreen>
                     child: Container(
                       padding: const EdgeInsets.all(2),
                       decoration: BoxDecoration(
-                        color: Colors.red,
+                        color: SDColors.error,
                         borderRadius: BorderRadius.circular(10),
                       ),
                       constraints: const BoxConstraints(
@@ -126,9 +118,8 @@ class _NotificationScreenState extends State<NotificationScreen>
                       ),
                       child: Text(
                         '${state.unreadCount}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
+                        style: SDTypography.labelSmall.copyWith(
+                          color: SDColors.white,
                           fontWeight: FontWeight.bold,
                         ),
                         textAlign: TextAlign.center,
@@ -139,7 +130,7 @@ class _NotificationScreenState extends State<NotificationScreen>
               );
             }
             return IconButton(
-              icon: const Icon(Icons.mark_email_read),
+              icon: const Icon(Icons.mark_email_read_outlined),
               onPressed: _markAllAsRead,
             );
           },
@@ -151,8 +142,8 @@ class _NotificationScreenState extends State<NotificationScreen>
   // 🔍 BARRE DE RECHERCHE ET FILTRES
   Widget _buildSearchAndFilter() {
     return Container(
-      padding: const EdgeInsets.all(16),
-      color: Colors.white,
+      padding: EdgeInsets.all(SDSpacing.sm),
+      color: SDColors.white,
       child: Column(
         children: [
           // Barre de recherche
@@ -160,38 +151,40 @@ class _NotificationScreenState extends State<NotificationScreen>
             controller: _searchController,
             decoration: InputDecoration(
               hintText: 'Rechercher dans les notifications...',
-              prefixIcon: const Icon(Icons.search, color: Color(0xFF2E7D32)),
+              hintStyle: SDTypography.bodyMedium.copyWith(color: SDColors.neutral400),
+              prefixIcon: Icon(Icons.search, color: SDColors.primary600),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                borderSide: BorderSide(color: SDColors.neutral200),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFF2E7D32)),
+                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                borderSide: BorderSide(color: SDColors.primary600),
               ),
               filled: true,
-              fillColor: const Color(0xFFF8F9FA),
+              fillColor: SDColors.neutral50,
             ),
+            style: SDTypography.bodyMedium,
             onChanged: (value) {
               setState(() {
                 _searchQuery = value;
               });
             },
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: SDSpacing.xs),
           // Filtres rapides
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
                 _buildFilterChip('Toutes', 'all'),
-                const SizedBox(width: 8),
+                SizedBox(width: SDSpacing.xs),
                 _buildFilterChip('Non lues', 'unread'),
-                const SizedBox(width: 8),
+                SizedBox(width: SDSpacing.xs),
                 _buildFilterChip('Lues', 'read'),
-                const SizedBox(width: 8),
+                SizedBox(width: SDSpacing.xs),
                 _buildFilterChip('Missions', 'MISSION'),
-                const SizedBox(width: 8),
+                SizedBox(width: SDSpacing.xs),
                 _buildFilterChip('Système', 'SYSTEM'),
               ],
             ),
@@ -215,11 +208,11 @@ class _NotificationScreenState extends State<NotificationScreen>
               FilterNotifications(statut: value == 'all' ? null : value),
             );
       },
-      selectedColor: const Color(0xFF2E7D32).withOpacity(0.2),
-      checkmarkColor: const Color(0xFF2E7D32),
-      backgroundColor: Colors.white,
+      selectedColor: SDColors.primary600.withOpacity(0.2),
+      checkmarkColor: SDColors.primary600,
+      backgroundColor: SDColors.white,
       side: BorderSide(
-        color: isSelected ? const Color(0xFF2E7D32) : const Color(0xFFE0E0E0),
+        color: isSelected ? SDColors.primary600 : SDColors.neutral200,
       ),
     );
   }
@@ -227,13 +220,14 @@ class _NotificationScreenState extends State<NotificationScreen>
   // 📑 BARRE D'ONGLETS
   Widget _buildTabBar() {
     return Container(
-      color: Colors.white,
+      color: SDColors.white,
       child: TabBar(
         controller: _tabController,
-        labelColor: const Color(0xFF2E7D32),
-        unselectedLabelColor: Colors.grey[600],
-        indicatorColor: const Color(0xFF2E7D32),
+        labelColor: SDColors.primary600,
+        unselectedLabelColor: SDColors.neutral500,
+        indicatorColor: SDColors.primary600,
         indicatorWeight: 3,
+        labelStyle: SDTypography.labelMedium.copyWith(fontWeight: FontWeight.bold),
         tabs: const [
           Tab(text: 'Toutes'),
           Tab(text: 'Non lues'),
@@ -265,9 +259,9 @@ class _NotificationScreenState extends State<NotificationScreen>
     return BlocBuilder<NotificationBloc, NotificationState>(
       builder: (context, state) {
         if (state is NotificationLoading) {
-          return const Center(
+          return Center(
             child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2E7D32)),
+              valueColor: AlwaysStoppedAnimation<Color>(SDColors.primary700),
             ),
           );
         }
@@ -280,24 +274,23 @@ class _NotificationScreenState extends State<NotificationScreen>
                 Icon(
                   Icons.error_outline,
                   size: 64,
-                  color: Colors.grey[400],
+                  color: SDColors.neutral400,
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: SDSpacing.sm),
                 Text(
                   'Erreur de chargement',
-                  style: TextStyle(
-                    fontSize: 18,
+                  style: SDTypography.titleMedium.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: Colors.grey[600],
+                    color: SDColors.neutral600,
                   ),
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: SDSpacing.xs),
                 Text(
                   state.message,
-                  style: TextStyle(color: Colors.grey[500]),
+                  style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral500),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: SDSpacing.sm),
                 ElevatedButton(
                   onPressed: () {
                     if (_userId != null) {
@@ -307,10 +300,10 @@ class _NotificationScreenState extends State<NotificationScreen>
                     }
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2E7D32),
-                    foregroundColor: Colors.white,
+                    backgroundColor: SDColors.primary600,
+                    foregroundColor: SDColors.white,
                   ),
-                  child: const Text('Réessayer'),
+                  child: Text('Réessayer', style: SDTypography.labelMedium.copyWith(color: SDColors.white)),
                 ),
               ],
             ),
@@ -344,6 +337,9 @@ class _NotificationScreenState extends State<NotificationScreen>
             return _buildEmptyState(filter);
           }
 
+          // Grouper les notifications par type
+          final groupedNotifications = _groupNotificationsByType(notifications);
+
           return RefreshIndicator(
             onRefresh: () async {
               if (_userId != null) {
@@ -352,55 +348,115 @@ class _NotificationScreenState extends State<NotificationScreen>
                     );
               }
             },
-            color: const Color(0xFF2E7D32),
+            color: SDColors.primary700,
             child: ListView.builder(
               controller: _scrollController,
-              padding: const EdgeInsets.all(16),
-              itemCount: notifications.length,
+              padding: EdgeInsets.all(SDSpacing.sm),
+              itemCount: groupedNotifications.length,
               itemBuilder: (context, index) {
-                return Dismissible(
-                  key: Key(notifications[index]['_id'] ?? index.toString()),
-                  direction: DismissDirection.endToStart,
-                  background: Container(
-                    alignment: Alignment.centerRight,
-                    padding: const EdgeInsets.only(right: 20),
-                    color: Colors.red,
-                    child: const Icon(Icons.delete, color: Colors.white),
-                  ),
-                  confirmDismiss: (direction) async {
-                    return await showDialog<bool>(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: const Text('Supprimer cette notification ?'),
-                        content: const Text('Cette action est irréversible.'),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context, false),
-                            child: const Text('Annuler'),
-                          ),
-                          TextButton(
-                            onPressed: () => Navigator.pop(context, true),
-                            style: TextButton.styleFrom(
-                              foregroundColor: Colors.red,
+                final group = groupedNotifications[index];
+                final groupType = group['type'] as String;
+                final groupNotifications = group['notifications'] as List<Map<String, dynamic>>;
+                
+                // Si un seul élément dans le groupe, afficher directement
+                if (groupNotifications.length == 1) {
+                  return Dismissible(
+                    key: Key(groupNotifications[0]['_id'] ?? index.toString()),
+                    direction: DismissDirection.endToStart,
+                    background: Container(
+                      alignment: Alignment.centerRight,
+                      padding: EdgeInsets.only(right: SDSpacing.md),
+                      color: SDColors.error500,
+                      child: Icon(Icons.delete, color: SDColors.white),
+                    ),
+                    confirmDismiss: (direction) async {
+                      return await showDialog<bool>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: Text('Supprimer cette notification ?', style: SDTypography.titleMedium),
+                          content: Text('Cette action est irréversible.', style: SDTypography.bodyMedium),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: Text('Annuler', style: SDTypography.labelMedium),
                             ),
-                            child: const Text('Supprimer'),
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              style: TextButton.styleFrom(
+                                foregroundColor: SDColors.error500,
+                              ),
+                              child: Text('Supprimer', style: SDTypography.labelMedium.copyWith(color: SDColors.error500)),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                    onDismissed: (direction) {
+                      context.read<NotificationBloc>().add(
+                        DeleteNotification(groupNotifications[0]['_id'] ?? ''),
+                      );
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Notification supprimée', style: SDTypography.bodyMedium.copyWith(color: SDColors.white)),
+                          backgroundColor: SDColors.primary600,
+                        ),
+                      );
+                    },
+                    child: _buildNotificationCard(groupNotifications[0]),
+                  );
+                }
+                
+                // Si plusieurs éléments, afficher avec en-tête de groupe
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildGroupHeader(groupType, groupNotifications.length),
+                    ...groupNotifications.map((notification) => Dismissible(
+                      key: Key(notification['_id'] ?? '${groupType}_${groupNotifications.indexOf(notification)}'),
+                      direction: DismissDirection.endToStart,
+                      background: Container(
+                        alignment: Alignment.centerRight,
+                        padding: EdgeInsets.only(right: SDSpacing.md),
+                        color: SDColors.error500,
+                        child: Icon(Icons.delete, color: SDColors.white),
+                      ),
+                      confirmDismiss: (direction) async {
+                        return await showDialog<bool>(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: Text('Supprimer cette notification ?', style: SDTypography.titleMedium),
+                            content: Text('Cette action est irréversible.', style: SDTypography.bodyMedium),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context, false),
+                                child: Text('Annuler', style: SDTypography.labelMedium),
+                              ),
+                              TextButton(
+                                onPressed: () => Navigator.pop(context, true),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: SDColors.error500,
+                                ),
+                                child: Text('Supprimer', style: SDTypography.labelMedium.copyWith(color: SDColors.error500)),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                    );
-                  },
-                  onDismissed: (direction) {
-                    context.read<NotificationBloc>().add(
-                      DeleteNotification(notifications[index]['_id'] ?? ''),
-                    );
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Notification supprimée'),
-                        backgroundColor: Color(0xFF2E7D32),
-                      ),
-                    );
-                  },
-                  child: _buildNotificationCard(notifications[index]),
+                        );
+                      },
+                      onDismissed: (direction) {
+                        context.read<NotificationBloc>().add(
+                          DeleteNotification(notification['_id'] ?? ''),
+                        );
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Notification supprimée', style: SDTypography.bodyMedium.copyWith(color: SDColors.white)),
+                            backgroundColor: SDColors.primary600,
+                          ),
+                        );
+                      },
+                      child: _buildNotificationCard(notification),
+                    )).toList(),
+                    SizedBox(height: SDSpacing.md),
+                  ],
                 );
               },
             ),
@@ -427,63 +483,63 @@ class _NotificationScreenState extends State<NotificationScreen>
     switch (type) {
       case 'NOUVELLE_MISSION':
         iconData = Icons.assignment;
-        iconColor = const Color(0xFF2E7D32);
+        iconColor = SDColors.primary600;
         break;
       case 'MISSION_ACCEPTEE':
         iconData = Icons.check_circle;
-        iconColor = Colors.green;
+        iconColor = SDColors.success;
         break;
       case 'MISSION_REFUSEE':
         iconData = Icons.cancel;
-        iconColor = Colors.red;
+        iconColor = SDColors.error;
         break;
       case 'MISSION_DEMARREE':
         iconData = Icons.play_circle;
-        iconColor = Colors.blue;
+        iconColor = SDColors.info;
         break;
       case 'MISSION_TERMINEE':
         iconData = Icons.done_all;
-        iconColor = Colors.green;
+        iconColor = SDColors.success;
         break;
       default:
         iconData = Icons.notifications;
-        iconColor = const Color(0xFF2E7D32);
+        iconColor = SDColors.primary600;
     }
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: EdgeInsets.only(bottom: SDSpacing.xs),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        color: SDColors.white,
+        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: SDColors.neutral900.withOpacity(0.05),
             spreadRadius: 1,
             blurRadius: 4,
-            offset: const Offset(0, 2),
+            offset: Offset(0, 2),
           ),
         ],
         border: isRead
             ? null
             : Border.all(
-                color: const Color(0xFF2E7D32).withOpacity(0.3),
+                color: SDColors.primary600.withOpacity(0.3),
                 width: 1,
               ),
       ),
       child: InkWell(
         onTap: () => _onNotificationTap(notification),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(SDSpacing.sm),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Icône
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: EdgeInsets.all(SDSpacing.xs),
                 decoration: BoxDecoration(
                   color: iconColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
                 ),
                 child: Icon(
                   iconData,
@@ -491,7 +547,7 @@ class _NotificationScreenState extends State<NotificationScreen>
                   size: 20,
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: SDSpacing.xs),
               // Contenu
               Expanded(
                 child: Column(
@@ -502,69 +558,65 @@ class _NotificationScreenState extends State<NotificationScreen>
                         Expanded(
                           child: Text(
                             titre,
-                            style: TextStyle(
-                              fontSize: 16,
+                            style: SDTypography.titleSmall.copyWith(
                               fontWeight:
                                   isRead ? FontWeight.w500 : FontWeight.bold,
-                              color: isRead ? Colors.grey[700] : Colors.black87,
+                              color: isRead ? SDColors.neutral700 : SDColors.neutral900,
                             ),
                           ),
                         ),
                         if (priorite == 'HAUTE')
                           Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
+                            padding: EdgeInsets.symmetric(
+                              horizontal: SDSpacing.xxxs,
+                              vertical: SDSpacing.xxxs,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.red,
-                              borderRadius: BorderRadius.circular(4),
+                              color: SDColors.error500,
+                              borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
                             ),
-                            child: const Text(
+                            child: Text(
                               'URGENT',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
+                              style: SDTypography.labelSmall.copyWith(
+                                color: SDColors.white,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                           ),
                       ],
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      contenu,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[600],
-                        height: 1.3,
+                    SizedBox(height: SDSpacing.xxxs),
+                      Text(
+                        contenu,
+                        style: SDTypography.bodyMedium.copyWith(
+                          color: SDColors.neutral600,
+                          height: 1.3,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: SDSpacing.xs),
                     Row(
                       children: [
                         Icon(
                           Icons.access_time,
                           size: 12,
-                          color: Colors.grey[500],
+                          color: SDColors.neutral500,
                         ),
-                        const SizedBox(width: 4),
+                        SizedBox(width: SDSpacing.xxxs),
                         Text(
                           _formatDate(dateCreation),
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[500],
+                          style: SDTypography.labelSmall.copyWith(
+                            color: SDColors.neutral500,
                           ),
                         ),
-                        const Spacer(),
+                        Spacer(),
                         if (!isRead)
                           Container(
                             width: 8,
                             height: 8,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFF2E7D32),
+                            decoration: BoxDecoration(
+                              color: SDColors.primary600,
                               shape: BoxShape.circle,
                             ),
                           ),
@@ -606,21 +658,20 @@ class _NotificationScreenState extends State<NotificationScreen>
           Icon(
             icon,
             size: 64,
-            color: Colors.grey[400],
+            color: SDColors.neutral400,
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: SDSpacing.sm),
           Text(
             message,
-            style: TextStyle(
-              fontSize: 18,
+            style: SDTypography.titleMedium.copyWith(
               fontWeight: FontWeight.bold,
-              color: Colors.grey[600],
+              color: SDColors.neutral600,
             ),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: SDSpacing.xs),
           Text(
             'Vous recevrez des notifications ici\nquand vous aurez des missions',
-            style: TextStyle(color: Colors.grey[500]),
+            style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral500),
             textAlign: TextAlign.center,
           ),
         ],
@@ -647,9 +698,9 @@ class _NotificationScreenState extends State<NotificationScreen>
         context.push('/mission-details/$missionId');
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('ID de mission manquant'),
-            backgroundColor: Colors.orange,
+          SnackBar(
+            content: Text('ID de mission manquant', style: SDTypography.bodyMedium.copyWith(color: SDColors.white)),
+            backgroundColor: SDColors.warning500,
           ),
         );
       }
@@ -660,9 +711,9 @@ class _NotificationScreenState extends State<NotificationScreen>
         context.push('/chat/$conversationId');
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('ID de conversation manquant'),
-            backgroundColor: Colors.orange,
+          SnackBar(
+            content: Text('ID de conversation manquant', style: SDTypography.bodyMedium.copyWith(color: SDColors.white)),
+            backgroundColor: SDColors.warning500,
           ),
         );
       }
@@ -676,6 +727,106 @@ class _NotificationScreenState extends State<NotificationScreen>
             MarkAllNotificationsAsRead(_userId!),
           );
     }
+  }
+  
+  // Grouper les notifications par type
+  List<Map<String, dynamic>> _groupNotificationsByType(List<Map<String, dynamic>> notifications) {
+    final Map<String, List<Map<String, dynamic>>> grouped = {};
+    
+    for (var notification in notifications) {
+      final type = notification['type']?.toString() ?? 'AUTRE';
+      if (!grouped.containsKey(type)) {
+        grouped[type] = [];
+      }
+      grouped[type]!.add(notification);
+    }
+    
+    // Convertir en liste avec métadonnées
+    return grouped.entries.map((entry) => {
+      'type': entry.key,
+      'notifications': entry.value,
+    }).toList();
+  }
+  
+  // En-tête de groupe
+  Widget _buildGroupHeader(String type, int count) {
+    String title;
+    IconData icon;
+    Color color;
+    
+    switch (type) {
+      case 'NOUVELLE_MISSION':
+        title = 'Nouvelles Missions';
+        icon = Icons.assignment;
+        color = SDColors.primary600;
+        break;
+      case 'MISSION_ACCEPTEE':
+        title = 'Missions Acceptées';
+        icon = Icons.check_circle;
+        color = SDColors.success500;
+        break;
+      case 'MISSION_REFUSEE':
+        title = 'Missions Refusées';
+        icon = Icons.cancel;
+        color = SDColors.error500;
+        break;
+      case 'MISSION_DEMARREE':
+        title = 'Missions en Cours';
+        icon = Icons.play_circle;
+        color = SDColors.info500;
+        break;
+      case 'MISSION_TERMINEE':
+        title = 'Missions Terminées';
+        icon = Icons.done_all;
+        color = SDColors.success500;
+        break;
+      case 'MESSAGE_RECU':
+        title = 'Messages';
+        icon = Icons.message;
+        color = SDColors.primary600;
+        break;
+      default:
+        title = 'Autres';
+        icon = Icons.notifications;
+        color = SDColors.neutral500;
+    }
+    
+    return Container(
+      margin: EdgeInsets.only(bottom: SDSpacing.xs, top: SDSpacing.sm),
+      padding: EdgeInsets.symmetric(horizontal: SDSpacing.sm, vertical: SDSpacing.xs),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 18),
+          SizedBox(width: SDSpacing.xs),
+          Text(
+            title,
+            style: SDTypography.labelMedium.copyWith(
+              color: color,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          Spacer(),
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: SDSpacing.xs, vertical: 2),
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              '$count',
+              style: SDTypography.labelSmall.copyWith(
+                color: SDColors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   // 📅 FORMATAGE DE DATE

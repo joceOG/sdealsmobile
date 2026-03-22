@@ -3,6 +3,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../morepageblocm/morePageBlocM.dart';
 import '../../../../data/services/authCubit.dart';
 import 'package:go_router/go_router.dart';
+import '../../searchpagem/screens/searchPageScreenM.dart';
+import '../../common/widgets/standard_screen_header.dart';
+
+// ✅ Design System
+import '../../../../design_system/design_system.dart';
 
 class MorePageScreenM extends StatefulWidget {
   const MorePageScreenM({super.key});
@@ -12,29 +17,37 @@ class MorePageScreenM extends StatefulWidget {
 
 class _MorePagePageScreenStateM extends State<MorePageScreenM> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  final TextEditingController _headerSearchController = TextEditingController();
+
   @override
   void initState() {
     BlocProvider.of<MorePageBlocM>(context);
     super.initState();
   }
 
+  @override
+  void dispose() {
+    _headerSearchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       key: _scaffoldKey,
-      backgroundColor: Colors.white,
+      backgroundColor: SDColors.white,
       drawer: Drawer(
         child: ListView(
           padding: EdgeInsets.zero,
-          children: const <Widget>[
+          children: <Widget>[
             DrawerHeader(
               decoration: BoxDecoration(
-                color: Colors.green,
+                color: SDColors.primary600,
               ),
               child: Text(
                 'Menu',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
+                style: SDTypography.titleLarge.copyWith(
+                  color: SDColors.white,
                 ),
               ),
             ),
@@ -42,199 +55,111 @@ class _MorePagePageScreenStateM extends State<MorePageScreenM> {
           ],
         ),
       ),
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(170),
-        child: AppBar(
-          backgroundColor: Colors.transparent,
-          surfaceTintColor: Colors.transparent,
-          elevation: 0,
-          automaticallyImplyLeading: false,
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.only(
-              bottomLeft: Radius.circular(44),
-              bottomRight: Radius.circular(44),
-            ),
-          ),
-          flexibleSpace: Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF43EA5E), Color(0xFF1CBF3F)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                SDSpacing.md,
+                SDSpacing.sm,
+                SDSpacing.md,
+                0,
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black26,
-                  blurRadius: 18,
-                  offset: Offset(0, 8),
-                ),
-              ],
-              borderRadius: BorderRadius.only(
-                bottomLeft: Radius.circular(44),
-                bottomRight: Radius.circular(44),
-              ),
-            ),
-            child: SafeArea(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
-                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10.0, vertical: 6),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        GestureDetector(
-                          onTap: () {
-                            _scaffoldKey.currentState?.openDrawer();
-                          },
-                          child: const Icon(Icons.menu,
-                              color: Colors.white, size: 32),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.notifications,
-                              color: Colors.white, size: 32),
-                          onPressed: () {},
-                        ),
-                      ],
+                  StandardScreenHeader(
+                    title: 'Plus',
+                    leading: SdCircleIconButton(
+                      icon: Icons.menu_rounded,
+                      tooltip: 'Menu',
+                      onPressed: () =>
+                          _scaffoldKey.currentState?.openDrawer(),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  TweenAnimationBuilder<double>(
-                    tween: Tween(begin: 0, end: 1),
-                    duration: Duration(milliseconds: 700),
-                    builder: (context, value, child) => Opacity(
-                      opacity: value,
-                      child: child,
-                    ),
-                    child: const Center(
-                      child: Text(
-                        'SOUTRALI DEALS',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1.2,
-                        ),
+                    actions: [
+                      SdCircleIconButton(
+                        icon: Icons.notifications_outlined,
+                        tooltip: 'Notifications',
+                        onPressed: () {},
                       ),
-                    ),
+                    ],
                   ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8.0),
-                    child: Align(
-                      alignment: Alignment.center,
-                      child: FractionallySizedBox(
-                        widthFactor: 0.8,
-                        child: Container(
-                          height: 52,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(32),
-                            border: Border.all(
-                                color: Colors.green.shade200, width: 1.4),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.green.withOpacity(0.07),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            children: [
-                              const SizedBox(width: 10),
-                              Material(
-                                color: Colors.green,
-                                shape: const CircleBorder(),
-                                elevation: 2,
-                                child: Padding(
-                                  padding: const EdgeInsets.all(7.0),
-                                  child: Icon(Icons.search_rounded,
-                                      color: Colors.white, size: 22),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              const Expanded(
-                                child: TextField(
-                                  style: TextStyle(fontSize: 16),
-                                  cursorColor: Colors.green,
-                                  decoration: InputDecoration(
-                                    hintText: 'Rechercher sur soutralideals',
-                                    hintStyle: TextStyle(
-                                        color: Colors.green,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w500),
-                                    border: InputBorder.none,
-                                    enabledBorder: InputBorder.none,
-                                    focusedBorder: InputBorder.none,
-                                    isDense: true,
-                                    contentPadding:
-                                        EdgeInsets.symmetric(vertical: 14),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                            ],
-                          ),
+                  SizedBox(height: SDSpacing.md),
+                  FreelanceStyleSearchBar(
+                    controller: _headerSearchController,
+                    hintText: 'Rechercher sur soutralideals',
+                    onTunePressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const SearchPageScreenM(),
                         ),
-                      ),
-                    ),
+                      );
+                    },
                   ),
                 ],
               ),
             ),
           ),
-        ),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 30),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                Expanded(
-                  child: _AnimatedCardWithBadge(
-                    icon: Icons.article_rounded,
-                    label: 'Soutra News',
-                    badge: 'Nouveau',
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF43EA5E), Color(0xFF1CBF3F)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    onTap: () {
-                      // TODO: Naviguer vers Soutra News
-                    },
+          Expanded(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.symmetric(
+                  horizontal: SDSpacing.lg, vertical: SDSpacing.xs),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(height: SDSpacing.lg),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      Expanded(
+                        child: _AnimatedCardWithBadge(
+                          icon: Icons.article_rounded,
+                          label: 'Soutra News',
+                          badge: 'Nouveau',
+                          gradient: LinearGradient(
+                            colors: [
+                              SDColors.success500,
+                              SDColors.success600
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          onTap: () {
+                            // TODO: Naviguer vers Soutra News
+                          },
+                        ),
+                      ),
+                      SizedBox(width: SDSpacing.md),
+                      Expanded(
+                        child: _AnimatedCardWithBadge(
+                          icon: Icons.account_balance_wallet_rounded,
+                          label: 'Soutra Pay',
+                          badge: 'Nouveau',
+                          gradient: LinearGradient(
+                            colors: [
+                              SDColors.success500,
+                              SDColors.success600
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          onTap: () {
+                            // TODO: Naviguer vers Soutra Pay
+                          },
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(width: 18),
-                Expanded(
-                  child: _AnimatedCardWithBadge(
-                    icon: Icons.account_balance_wallet_rounded,
-                    label: 'Soutra Pay',
-                    badge: 'Nouveau',
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF43EA5E), Color(0xFF1CBF3F)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    onTap: () {
-                      // TODO: Naviguer vers Soutra Pay
-                    },
-                  ),
-                ),
-              ],
+                  SizedBox(height: SDSpacing.md),
+                  _buildPrestataireModeCard(),
+                  SizedBox(height: SDSpacing.lg),
+                ],
+              ),
             ),
-            const SizedBox(height: 20),
-            // 🎯 CARTE MODE PRESTATAIRE
-            _buildPrestataireModeCard(),
-            const SizedBox(height: 30),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -249,15 +174,15 @@ class _MorePagePageScreenStateM extends State<MorePageScreenM> {
             icon: Icons.handyman,
             label: 'Mode Prestataire',
             badge: 'Disponible',
-            gradient: const LinearGradient(
-              colors: [Color(0xFF4CAF50), Color(0xFF2E7D32)],
+            gradient: LinearGradient(
+              colors: [SDColors.primary500, SDColors.primary700],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
             onTap: () => _switchToPrestataireMode(context),
           );
         }
-        return const SizedBox.shrink(); // Masquer si pas prestataire
+        return SizedBox.shrink(); // Masquer si pas prestataire
       },
     );
   }
@@ -313,37 +238,35 @@ class _AnimatedCardWithBadgeState extends State<_AnimatedCardWithBadge> {
           clipBehavior: Clip.none,
           children: [
             AnimatedContainer(
-              duration: const Duration(milliseconds: 120),
+              duration: Duration(milliseconds: 120),
               height: 100,
               decoration: BoxDecoration(
                 gradient: widget.gradient,
-                borderRadius: BorderRadius.circular(28),
-                border: Border.all(color: Colors.white, width: 2),
+                borderRadius: BorderRadius.circular(SDSpacing.xxxl),
+                border: Border.all(color: SDColors.white, width: 2),
                 boxShadow: [
                   BoxShadow(
                     color: _pressed
-                        ? Colors.greenAccent.withOpacity(0.25)
-                        : Colors.black.withOpacity(0.10),
+                        ? SDColors.success500.withOpacity(0.25)
+                        : SDColors.neutral900.withOpacity(0.10),
                     blurRadius: _pressed ? 24 : 16,
-                    offset: const Offset(0, 6),
+                    offset: Offset(0, 6),
                   ),
                 ],
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(widget.icon, color: Colors.white, size: 32),
-                  const SizedBox(width: 10),
+                  Icon(widget.icon, color: SDColors.white, size: 32),
+                  SizedBox(width: SDSpacing.sm),
                   Flexible(
                     child: Text(
                       widget.label,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
+                      style: SDTypography.titleMedium.copyWith(
+                        color: SDColors.white,
                         fontWeight: FontWeight.w700,
-                        fontFamily: 'Montserrat',
                         letterSpacing: 1.2,
                       ),
                     ),
@@ -357,24 +280,23 @@ class _AnimatedCardWithBadgeState extends State<_AnimatedCardWithBadge> {
                 right: 18,
                 child: Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      EdgeInsets.symmetric(horizontal: SDSpacing.sm, vertical: SDSpacing.xxxs),
                   decoration: BoxDecoration(
-                    color: Colors.redAccent,
-                    borderRadius: BorderRadius.circular(16),
+                    color: SDColors.error500,
+                    borderRadius: BorderRadius.circular(SDSpacing.sm),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.redAccent.withOpacity(0.18),
+                        color: SDColors.error500.withOpacity(0.18),
                         blurRadius: 8,
-                        offset: const Offset(0, 2),
+                        offset: Offset(0, 2),
                       ),
                     ],
                   ),
                   child: Text(
                     widget.badge!,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: SDTypography.labelSmall.copyWith(
+                      color: SDColors.white,
                       fontWeight: FontWeight.bold,
-                      fontSize: 12,
                     ),
                   ),
                 ),

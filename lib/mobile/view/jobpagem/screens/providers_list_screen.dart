@@ -34,29 +34,8 @@ class _ProvidersListScreenState extends State<ProvidersListScreen> {
         )),
       child: Scaffold(
         backgroundColor: SDColors.white,
-        appBar: AppBar(
-          title: Text(
-            'Tous les Prestataires',
-            style: SDTypography.titleMedium.copyWith(
-              fontWeight: FontWeight.bold,
-              color: SDColors.white,
-            ),
-          ),
-          backgroundColor: SDColors.primary700,
-          elevation: 0,
-          iconTheme: IconThemeData(color: SDColors.white),
-          flexibleSpace: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  SDColors.primary700,
-                  SDColors.primary500,
-                ],
-              ),
-            ),
-          ),
+        appBar: SDWhiteAppBar.appBar(
+          title: 'Tous les Prestataires',
         ),
         body: BlocBuilder<JobPageBlocM, JobPageStateM>(
           builder: (context, state) {

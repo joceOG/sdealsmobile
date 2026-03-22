@@ -16,21 +16,32 @@ import '../../common/widgets/skeleton_loader.dart';
 
 class SearchPageScreenM extends StatelessWidget {
   final int initialIndex;
-  
-  const SearchPageScreenM({super.key, this.initialIndex = 0});
+  /// Si renseigné, lance la recherche globale au chargement (ex. depuis Explorer).
+  final String? initialQuery;
+
+  const SearchPageScreenM({
+    super.key,
+    this.initialIndex = 0,
+    this.initialQuery,
+  });
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (context) => SearchPageBlocM(),
-      child: _SearchBody(initialIndex: initialIndex),
+      child: _SearchBody(
+        initialIndex: initialIndex,
+        initialQuery: initialQuery,
+      ),
     );
   }
 }
 
 class _SearchBody extends StatefulWidget {
   final int initialIndex;
-  const _SearchBody({this.initialIndex = 0});
+  final String? initialQuery;
+
+  const _SearchBody({this.initialIndex = 0, this.initialQuery});
 
   @override
   State<_SearchBody> createState() => _SearchBodyState();
@@ -54,9 +65,14 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
       }
     });
 
-    // Charger l'historique au démarrage
+    // Charger l'historique au démarrage (+ recherche initiale depuis Explorer)
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<SearchPageBlocM>().add(LoadHistory());
+      final q = widget.initialQuery?.trim();
+      if (q != null && q.isNotEmpty) {
+        _searchController.text = q;
+        context.read<SearchPageBlocM>().add(PerformGlobalSearch(q));
+      }
     });
   }
 
@@ -156,87 +172,82 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
   }
 
   PreferredSizeWidget _buildAppBar() {
-    return PreferredSize(
-      preferredSize: const Size.fromHeight(80),
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [SDColors.primary500, SDColors.primary700], // ✅ Standard Theme Gradient
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.vertical(bottom: Radius.circular(SDSpacing.borderRadiusLarge)),
-          boxShadow: [BoxShadow(color: SDColors.neutral900.withOpacity(0.12), blurRadius: 4, offset: Offset(0, 2))],
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: SDSpacing.sm, vertical: SDSpacing.xs),
-            child: Row(
-              children: [
-                // Back Button (if navigation allows, otherwise Menu)
-                GestureDetector(
-                  onTap: () => Navigator.of(context).pop(), // Or open drawer
-                  child: Icon(Icons.arrow_back_ios, color: SDColors.white, size: 20),
-                ),
-                SizedBox(width: SDSpacing.xs),
-                
-                // Search Bar
-                Expanded(
-                  child: Container(
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: SDColors.white,
-                      borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
-                    ),
-                    child: TextField(
-                      controller: _searchController,
-                      onChanged: _onSearchChanged,
-                      onSubmitted: _onSubmit,
-                      onTap: () {
-                         // Montrer l'historique au focus si le champ est vide
-                         if (_searchController.text.isEmpty) {
+    final canPop = Navigator.of(context).canPop();
+    return SDWhiteAppBar.appBar(
+      automaticallyImplyLeading: false,
+      leading: canPop
+          ? IconButton(
+              icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+              onPressed: () => Navigator.of(context).maybePop(),
+            )
+          : SizedBox(width: SDSpacing.sm),
+      titleWidget: Row(
+        children: [
+          Expanded(
+            child: Container(
+              height: 40,
+              decoration: BoxDecoration(
+                color: SDColors.neutral50,
+                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
+                border: Border.all(color: SDColors.primary100),
+              ),
+              alignment: Alignment.centerLeft,
+              child: TextField(
+                controller: _searchController,
+                onChanged: (value) {
+                  setState(() {});
+                  _onSearchChanged(value);
+                },
+                onSubmitted: _onSubmit,
+                onTap: () {
+                  if (_searchController.text.isEmpty) {
+                    _onSearchChanged('');
+                  }
+                },
+                decoration: InputDecoration(
+                  hintText: 'Rechercher services, produits...',
+                  hintStyle:
+                      SDTypography.bodyMedium.copyWith(color: SDColors.neutral400),
+                  prefixIcon: Icon(Icons.search, color: SDColors.primary600, size: 20),
+                  suffixIcon: _searchController.text.isNotEmpty
+                      ? IconButton(
+                          icon: Icon(Icons.close, color: SDColors.neutral500, size: 18),
+                          onPressed: () {
+                            _searchController.clear();
                             _onSearchChanged('');
-                         }
-                      },
-                      decoration: InputDecoration(
-                        hintText: 'Rechercher services, produits...',
-                        hintStyle: SDTypography.bodyMedium.copyWith(color: SDColors.neutral400),
-                        prefixIcon: Icon(Icons.search, color: SDColors.primary600, size: 20), // ✅ Standard Green
-                        suffixIcon: _searchController.text.isNotEmpty 
-                          ? GestureDetector(
-                              onTap: () {
-                                _searchController.clear();
-                                _onSearchChanged('');
-                              },
-                              child: Icon(Icons.close, color: SDColors.neutral500, size: 18),
-                            )
-                          : null,
-                        isDense: true,
-                      ),
-                      style: SDTypography.bodyMedium,
-                      textInputAction: TextInputAction.search,
-                    ),
+                            setState(() {});
+                          },
+                        )
+                      : null,
+                  isDense: true,
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: SDSpacing.xs,
+                    vertical: SDSpacing.xs,
                   ),
                 ),
-                
-                // 🎛️ BUTTON FILTRE
-                SizedBox(width: SDSpacing.xs),
-                GestureDetector(
-                  onTap: () => _showFilterModal(context),
-                  child: Container(
-                    padding: EdgeInsets.all(SDSpacing.xs),
-                    decoration: BoxDecoration(
-                      color: SDColors.white,
-                      shape: BoxShape.circle,
-                      boxShadow: [BoxShadow(color: SDColors.neutral900.withOpacity(0.1), blurRadius: 4)],
-                    ),
-                    child: Icon(Icons.tune, color: SDColors.primary600, size: 20),
-                  ),
-                ),
-              ],
+                style: SDTypography.bodyMedium,
+                textInputAction: TextInputAction.search,
+              ),
             ),
           ),
-        ),
+          SizedBox(width: SDSpacing.xs),
+          GestureDetector(
+            onTap: () => _showFilterModal(context),
+            child: Container(
+              padding: EdgeInsets.all(SDSpacing.xs),
+              decoration: BoxDecoration(
+                color: SDColors.white,
+                shape: BoxShape.circle,
+                border: Border.all(color: SDColors.neutral200),
+                boxShadow: [
+                  BoxShadow(color: SDColors.neutral900.withOpacity(0.08), blurRadius: 4),
+                ],
+              ),
+              child: Icon(Icons.tune, color: SDColors.primary600, size: 20),
+            ),
+          ),
+        ],
       ),
     );
   }

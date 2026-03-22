@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:sdealsmobile/data/services/authCubit.dart';
+import 'package:sdealsmobile/design_system/design_system.dart';
 import '../servicerequestcubit/service_request_cubit.dart';
 import 'service_request_summary_screen.dart';
 
@@ -20,23 +21,32 @@ class ServiceRequestsListScreen extends StatelessWidget {
         ..fetchMine(
             token: auth.token, utilisateurId: auth.utilisateur.idutilisateur),
       child: Scaffold(
+        backgroundColor: SDColors.white,
         appBar: AppBar(
-          title: const Text('Mes demandes de services'),
-          backgroundColor: Colors.green,
-          foregroundColor: Colors.white,
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.only(
-              bottomLeft: Radius.circular(44),
-              bottomRight: Radius.circular(44),
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          backgroundColor: SDColors.white,
+          surfaceTintColor: Colors.transparent,
+          foregroundColor: SDColors.neutral900,
+          title: Text(
+            'Mes demandes',
+            style: SDTypography.titleLarge.copyWith(
+              color: SDColors.neutral900,
+              fontWeight: FontWeight.w800,
             ),
+          ),
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(1),
+            child: Divider(height: 1, color: SDColors.neutral200),
           ),
         ),
         body: BlocBuilder<ServiceRequestCubit, ServiceRequestState>(
           builder: (context, state) {
             if (state is ServiceRequestLoading ||
                 state is ServiceRequestInitial) {
-              return const Center(
-                  child: CircularProgressIndicator(color: Colors.green));
+              return Center(
+                  child: CircularProgressIndicator(
+                      color: SDColors.primary600));
             } else if (state is ServiceRequestError) {
               return Center(child: Text(state.message));
             } else if (state is ServiceRequestListLoaded) {

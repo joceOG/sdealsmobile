@@ -21,11 +21,8 @@ class ServiceRequestSummaryScreen extends StatelessWidget {
           ServiceRequestCubit()..getById(token: token, id: requestId),
       child: Scaffold(
         backgroundColor: SDColors.neutral50,
-        appBar: AppBar(
-          title: const Text('Suivi de commande'),
-          backgroundColor: SDColors.primary600,
-          foregroundColor: SDColors.white,
-          elevation: 0,
+        appBar: SDWhiteAppBar.appBar(
+          title: 'Suivi de commande',
         ),
         body: BlocBuilder<ServiceRequestCubit, ServiceRequestState>(
           builder: (context, state) {

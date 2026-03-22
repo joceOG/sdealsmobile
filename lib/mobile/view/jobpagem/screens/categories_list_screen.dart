@@ -27,29 +27,8 @@ class _CategoriesListScreenState extends State<CategoriesListScreen> {
       create: (_) => JobPageBlocM()..add(LoadCategorieDataJobM()),
       child: Scaffold(
         backgroundColor: SDColors.white,
-        appBar: AppBar(
-          title: Text(
-            'Toutes les Catégories',
-            style: SDTypography.titleMedium.copyWith(
-              fontWeight: FontWeight.bold,
-              color: SDColors.white,
-            ),
-          ),
-          backgroundColor: SDColors.primary700,
-          elevation: 0,
-          iconTheme: IconThemeData(color: SDColors.white),
-          flexibleSpace: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  SDColors.primary700,
-                  SDColors.primary500,
-                ],
-              ),
-            ),
-          ),
+        appBar: SDWhiteAppBar.appBar(
+          title: 'Toutes les Catégories',
         ),
         body: BlocBuilder<JobPageBlocM, JobPageStateM>(
           builder: (context, state) {

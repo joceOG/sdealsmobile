@@ -30,8 +30,14 @@ import 'mobile/view/walletpagem/soutrapayblocm/soutra_wallet_bloc.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
+import 'package:hive_flutter/hive_flutter.dart';
+
+// Design System
+import 'design_system/design_system.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Hive.initFlutter();
   await dotenv.load(fileName: ".env");
   await initializeDateFormatting('fr_FR', null);
 
@@ -229,24 +235,180 @@ class MyApp extends StatelessWidget {
           title: 'Soutrali Deals',
           debugShowCheckedModeBanner: false,
           theme: ThemeData(
-            colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
+            // ═══════════════════════════════════════
+            // COLORS
+            // ═══════════════════════════════════════
             useMaterial3: true,
-            inputDecorationTheme: const InputDecorationTheme(
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.all(Radius.circular(8.0)),
-                    borderSide: BorderSide(
-                      color: Colors.grey,
-                      width: 1.5,
-                    )),
-                enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.all(Radius.circular(8.0)),
-                    borderSide: BorderSide(
-                      color: Colors.grey,
-                      width: 1.5,
-                    )),
-                focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.grey)),
-                hintStyle: TextStyle(color: Colors.grey, fontSize: 14)),
+            primaryColor: SDColors.primary500,
+            scaffoldBackgroundColor: SDColors.neutral50,
+            cardColor: SDColors.white,
+            dividerColor: SDColors.neutral300,
+            
+            colorScheme: ColorScheme.light(
+              primary: SDColors.primary600,
+              secondary: SDColors.secondary500,
+              surface: SDColors.white,
+              background: SDColors.neutral50,
+              error: SDColors.error500,
+              onPrimary: SDColors.white,
+              onSecondary: SDColors.white,
+              onSurface: SDColors.neutral900,
+              onBackground: SDColors.neutral900,
+              onError: SDColors.white,
+            ),
+            
+            // ═══════════════════════════════════════
+            // TYPOGRAPHY
+            // ═══════════════════════════════════════
+            fontFamily: SDTypography.fontFamily,
+            textTheme: TextTheme(
+              displayLarge: SDTypography.displayLarge,
+              displayMedium: SDTypography.displayMedium,
+              displaySmall: SDTypography.displaySmall,
+              titleLarge: SDTypography.titleLarge,
+              titleMedium: SDTypography.titleMedium,
+              titleSmall: SDTypography.titleSmall,
+              bodyLarge: SDTypography.bodyLarge,
+              bodyMedium: SDTypography.bodyMedium,
+              bodySmall: SDTypography.bodySmall,
+              labelLarge: SDTypography.labelLarge,
+              labelMedium: SDTypography.labelMedium,
+              labelSmall: SDTypography.labelSmall,
+            ),
+            
+            // ═══════════════════════════════════════
+            // APPBAR
+            // ═══════════════════════════════════════
+            appBarTheme: AppBarTheme(
+              backgroundColor: SDColors.primary500,
+              elevation: 0,
+              centerTitle: true,
+              titleTextStyle: SDTypography.titleLarge.copyWith(
+                color: SDColors.white,
+              ),
+              iconTheme: const IconThemeData(
+                color: SDColors.white,
+                size: 24,
+              ),
+            ),
+            
+            // ═══════════════════════════════════════
+            // BUTTONS
+            // ═══════════════════════════════════════
+            elevatedButtonTheme: ElevatedButtonThemeData(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: SDColors.primary600,
+                foregroundColor: SDColors.white,
+                textStyle: SDTypography.labelLarge,
+                padding: SDSpacing.buttonPadding,
+                minimumSize: const Size(120, SDSpacing.buttonHeight),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                ),
+                elevation: 2,
+              ),
+            ),
+            
+            outlinedButtonTheme: OutlinedButtonThemeData(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: SDColors.primary600,
+                textStyle: SDTypography.labelLarge,
+                padding: SDSpacing.buttonPadding,
+                minimumSize: const Size(120, SDSpacing.buttonHeight),
+                side: const BorderSide(color: SDColors.primary600, width: 2),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                ),
+              ),
+            ),
+            
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                foregroundColor: SDColors.primary600,
+                textStyle: SDTypography.labelLarge,
+                padding: SDSpacing.buttonPadding,
+              ),
+            ),
+            
+            // ═══════════════════════════════════════
+            // INPUT FIELDS
+            // ═══════════════════════════════════════
+            inputDecorationTheme: InputDecorationTheme(
+              filled: true,
+              fillColor: SDColors.white,
+              contentPadding: SDSpacing.inputPadding,
+              
+              labelStyle: SDTypography.bodyMedium.copyWith(
+                color: SDColors.neutral600,
+              ),
+              hintStyle: SDTypography.bodyMedium.copyWith(
+                color: SDColors.neutral400,
+              ),
+              errorStyle: SDTypography.bodySmall.copyWith(
+                color: SDColors.error500,
+              ),
+              
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                borderSide: const BorderSide(color: SDColors.neutral300, width: 1),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                borderSide: const BorderSide(color: SDColors.neutral300, width: 1),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                borderSide: const BorderSide(color: SDColors.primary600, width: 2),
+              ),
+              errorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                borderSide: const BorderSide(color: SDColors.error500, width: 1),
+              ),
+            ),
+            
+            // ═══════════════════════════════════════
+            // CARDS
+            // ═══════════════════════════════════════
+            cardTheme: CardThemeData(
+              color: SDColors.white,
+              elevation: 2,
+              shadowColor: SDColors.neutral900.withOpacity(0.1),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
+              ),
+            ),
+            
+            // ═══════════════════════════════════════
+            // LIST TILES
+            // ═══════════════════════════════════════
+            listTileTheme: ListTileThemeData(
+              contentPadding: const EdgeInsets.all(SDSpacing.sm),
+              titleTextStyle: SDTypography.titleMedium,
+              subtitleTextStyle: SDTypography.bodyMedium.copyWith(
+                color: SDColors.neutral600,
+              ),
+            ),
+            
+            // ═══════════════════════════════════════
+            // FLOATING ACTION BUTTON
+            // ═══════════════════════════════════════
+            floatingActionButtonTheme: FloatingActionButtonThemeData(
+              backgroundColor: SDColors.primary600,
+              foregroundColor: SDColors.white,
+              elevation: 4,
+            ),
+            
+            // ═══════════════════════════════════════
+            // BOTTOM NAVIGATION BAR
+            // ═══════════════════════════════════════
+            bottomNavigationBarTheme: BottomNavigationBarThemeData(
+              backgroundColor: SDColors.white,
+              selectedItemColor: SDColors.primary600,
+              unselectedItemColor: SDColors.neutral500,
+              selectedLabelStyle: SDTypography.labelSmall,
+              unselectedLabelStyle: SDTypography.labelSmall,
+              type: BottomNavigationBarType.fixed,
+            ),
           ),
         );
       }),

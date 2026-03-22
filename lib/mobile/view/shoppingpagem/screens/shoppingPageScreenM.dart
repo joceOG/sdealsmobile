@@ -1,19 +1,56 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:sdealsmobile/data/models/categorie.dart';
 import 'package:sdealsmobile/data/services/authCubit.dart';
 import '../shoppingpageblocm/shoppingPageBlocM.dart';
 import '../shoppingpageblocm/shoppingPageEventM.dart';
 import '../shoppingpageblocm/shoppingPageStateM.dart' as bloc_model;
 import 'productDetailsScreenM.dart';
+import 'package:sdealsmobile/mobile/view/searchpagem/screens/searchPageScreenM.dart';
 import 'panierProductScreenM.dart';
-import '../../seller_registration/screens/seller_registration_screen.dart';
 import 'package:sdealsmobile/data/models/vendeur.dart';
 import '../widgets/filter_bottom_sheet.dart';
-import '../widgets/product_card_m.dart';
+import '../../common/widgets/app_image.dart';
+import '../../common/widgets/skeleton_loader.dart';
+
+// Design System
+import '../../../../design_system/colors.dart';
+import '../../../../design_system/typography.dart';
+import '../../../../design_system/spacing.dart';
 
 // Utilisation du modèle Product du BLoC
 typedef Product = bloc_model.Product;
+
+/// Aperçu catégories sur le hub (comme Freelance).
+const int _kShopCategoryPreviewCount = 8;
+
+IconData _shopCategoryIcon(String rawName) {
+  final name = rawName.toLowerCase();
+  if (name.contains('auto') || name.contains('moto')) {
+    return Icons.directions_car;
+  }
+  if (name.contains('immobilier') || name.contains('maison')) {
+    return Icons.house;
+  }
+  if (name.contains('électronique') || name.contains('electronique')) {
+    return Icons.devices;
+  }
+  if (name.contains('tech')) return Icons.electrical_services;
+  if (name.contains('mode') ||
+      name.contains('vêtement') ||
+      name.contains('vetement')) {
+    return Icons.style;
+  }
+  if (name.contains('meuble')) return Icons.chair;
+  if (name.contains('sport')) return Icons.sports_soccer;
+  if (name.contains('jeu')) return Icons.videogame_asset;
+  if (name.contains('santé') || name.contains('sante')) {
+    return Icons.health_and_safety;
+  }
+  return Icons.category_outlined;
+}
 
 class ShoppingPageScreenM extends StatefulWidget {
   // Retiré la dépendance aux catégories passées depuis HomePage
@@ -27,13 +64,12 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
   @override
   void initState() {
     super.initState();
-    // Charger les catégories spécifiquement pour E-marché
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       context.read<ShoppingPageBlocM>().add(LoadCategorieDataM());
-      // Charger aussi les produits
       context.read<ShoppingPageBlocM>().add(LoadProductsEvent());
+      context.read<ShoppingPageBlocM>().add(LoadVendeursEvent());
 
-      // 🛒 NOUVEAU : Charger le panier de l'utilisateur
       final authState = context.read<AuthCubit>().state;
       if (authState is AuthAuthenticated) {
         context.read<ShoppingPageBlocM>().add(
@@ -43,525 +79,638 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
     });
   }
 
-  bool hasSoutraPayBalance = true; // Solde disponible sur SoutraPay
-  bool isCompareDialogOpen = false; // Dialog de comparaison ouvert ou fermé
-  // Note: selectedFilter sera maintenant géré par le BLoC
-
-  // Méthode pour attribuer une icône selon le nom de la catégorie
-  IconData _getCategoryIcon(String name) {
-    // Attribution d'une icône selon le nom de la catégorie
-    IconData icon = Icons.category; // Icône par défaut
-
-    name = name.toLowerCase();
-
-    if (name.contains('auto') || name.contains('moto')) {
-      return Icons.directions_car;
-    } else if (name.contains('immobilier') || name.contains('maison')) {
-      return Icons.house;
-    } else if (name.contains('électronique') || name.contains('electronique')) {
-      return Icons.devices;
-    } else if (name.contains('tech')) {
-      return Icons.electrical_services;
-    } else if (name.contains('mode') ||
-        name.contains('vêtement') ||
-        name.contains('vetement')) {
-      return Icons.style;
-    } else if (name.contains('meuble')) {
-      return Icons.chair;
-    } else if (name.contains('sport')) {
-      return Icons.sports_soccer;
-    } else if (name.contains('jeu')) {
-      return Icons.videogame_asset;
-    } else if (name.contains('santé') || name.contains('sante')) {
-      return Icons.health_and_safety;
-    }
-
-    return icon;
+  List<Product> _displayProducts(bloc_model.ShoppingPageStateM state) {
+    return state.filteredProducts ?? state.products ?? [];
   }
 
-  // Liste de produits fictifs (remplacer par nos données API)
-  List<Product> get products => [
-        Product(
-            id: '1',
-            name: 'Nike Air Max',
-            image: 'assets/products/1.png',
-            size: 'Pointures 42-43',
-            price: '25.000 Fcfa',
-            brand: 'Nike'),
-        Product(
-            id: '2',
-            name: 'Adidas Superstar',
-            image: 'assets/products/2.png',
-            size: 'Pointures 42-43',
-            price: '30.000 Fcfa',
-            brand: 'Adidas',
-            isFavorite: true),
-        Product(
-            id: '3',
-            name: 'Puma Suede',
-            image: 'assets/products/3.png',
-            size: 'Pointures 40-44',
-            price: '22.000 Fcfa',
-            brand: 'Puma'),
-        Product(
-            id: '4',
-            name: 'Reebok Classic',
-            image: 'assets/products/4.png',
-            size: 'Pointures 41-45',
-            price: '28.000 Fcfa',
-            brand: 'Reebok',
-            isFavorite: true),
-        Product(
-            id: '5',
-            name: 'Fila Disruptor',
-            image: 'assets/products/5.png',
-            size: 'Pointures 39-43',
-            price: '20.000 Fcfa',
-            brand: 'Fila'),
-        Product(
-            id: '6',
-            name: 'Converse Chuck Taylor',
-            image: 'assets/products/6.png',
-            size: 'Pointures 38-42',
-            price: '27.000 Fcfa',
-            brand: 'Converse'),
-        Product(
-            id: '7',
-            name: 'Vans Old Skool',
-            image: 'assets/products/7.png',
-            size: 'Pointures 40-44',
-            price: '24.000 Fcfa',
-            brand: 'Vans'),
-        Product(
-            id: '8',
-            name: 'New Balance 574',
-            image: 'assets/products/8.png',
-            size: 'Pointures 41-45',
-            price: '29.000 Fcfa',
-            brand: 'New Balance'),
-        Product(
-            id: '9',
-            name: 'Asics Gel Lyte',
-            image: 'assets/products/9.png',
-            size: 'Pointures 40-43',
-            price: '23.000 Fcfa',
-            brand: 'Asics'),
-        Product(
-            id: '10',
-            name: 'Air Jordan 4',
-            image: 'assets/products/10.png',
-            size: 'Pointures 42-46',
-            price: '35.000 Fcfa',
-            brand: 'Jordan',
-            rating: 4.9),
-      ];
+  void _openSearchShop(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const SearchPageScreenM(initialIndex: 4),
+      ),
+    );
+  }
 
-  // Conversion des catégories de l'API en format utilisable
-  List<Map<String, dynamic>> _getCategories() {
-    // Récupérer les catégories depuis le BLoC
-    final state = context.read<ShoppingPageBlocM>().state;
-    final categories = state.listItems;
+  /// Même gabarit que Freelance / Métiers (`_buildSectionHeaderRow`).
+  Widget _buildSectionHeaderRow({
+    required IconData leadingIcon,
+    required String title,
+    required String actionLabel,
+    required VoidCallback onAction,
+    int titleMaxLines = 1,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Icon(leadingIcon, color: SDColors.primary600, size: 22),
+        SizedBox(width: SDSpacing.xs),
+        Expanded(
+          child: Text(
+            title,
+            style: SDTypography.titleMedium.copyWith(
+              color: SDColors.neutral900,
+            ),
+            maxLines: titleMaxLines,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        TextButton.icon(
+          onPressed: onAction,
+          icon: const Icon(Icons.arrow_forward, size: 14),
+          label: Text(actionLabel, style: SDTypography.labelSmall),
+          style: TextButton.styleFrom(
+            foregroundColor: SDColors.primary600,
+            padding: SDSpacing.chipPadding,
+            minimumSize: const Size(0, 32),
+          ),
+        ),
+      ],
+    );
+  }
 
-    if (categories == null || categories.isEmpty) {
-      print('Aucune catégorie dans le BLoC de ShoppingPageScreenM');
-      return [
-        {'name': 'Aucune catégorie', 'icon': Icons.error_outline},
-      ];
+  Widget _buildSectionTitleOnly({
+    required IconData leadingIcon,
+    required String title,
+  }) {
+    return Row(
+      children: [
+        Icon(leadingIcon, color: SDColors.primary600, size: 22),
+        SizedBox(width: SDSpacing.xs),
+        Expanded(
+          child: Text(
+            title,
+            style: SDTypography.titleMedium.copyWith(
+              color: SDColors.neutral900,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+
+  List<Categorie> _categoriesList(bloc_model.ShoppingPageStateM state) {
+    final raw = state.listItems;
+    if (raw == null) return [];
+    return List<Categorie>.from(raw);
+  }
+
+  Widget _buildMarketplaceHeader(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: Text(
+            'Marketplace',
+            textAlign: TextAlign.start,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: SDTypography.headlineSmall.copyWith(
+              color: SDColors.neutral900,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        BlocBuilder<ShoppingPageBlocM, bloc_model.ShoppingPageStateM>(
+          builder: (context, state) {
+            final cartCount = state.cart?.totalItems ?? 0;
+            return Stack(
+              clipBehavior: Clip.none,
+              children: [
+                IconButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => BlocProvider.value(
+                          value: context.read<ShoppingPageBlocM>(),
+                          child: const PanierProductScreenM(),
+                        ),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.shopping_cart_outlined),
+                  color: SDColors.neutral900,
+                  tooltip: 'Panier',
+                ),
+                if (cartCount > 0)
+                  Positioned(
+                    right: 6,
+                    top: 6,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 5, vertical: 2),
+                      constraints:
+                          const BoxConstraints(minWidth: 18, minHeight: 18),
+                      decoration: BoxDecoration(
+                        color: SDColors.primary600,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        cartCount > 99 ? '99+' : '$cartCount',
+                        textAlign: TextAlign.center,
+                        style: SDTypography.labelSmall.copyWith(
+                          color: SDColors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
+        BlocBuilder<AuthCubit, AuthState>(
+          builder: (context, authState) {
+            if (authState is AuthAuthenticated) {
+              final u = authState.utilisateur;
+              final url = u.photoProfil;
+              return Padding(
+                padding: const EdgeInsets.only(left: 4),
+                child: CircleAvatar(
+                  radius: 18,
+                  backgroundColor: SDColors.primary50,
+                  backgroundImage: (url != null &&
+                          url.isNotEmpty &&
+                          (url.startsWith('http://') ||
+                              url.startsWith('https://')))
+                      ? NetworkImage(url)
+                      : null,
+                  child: (url == null ||
+                          url.isEmpty ||
+                          (!url.startsWith('http://') &&
+                              !url.startsWith('https://')))
+                      ? Icon(Icons.person, color: SDColors.primary600, size: 20)
+                      : null,
+                ),
+              );
+            }
+            return const SizedBox.shrink();
+          },
+        ),
+        Container(
+          margin: const EdgeInsets.only(left: 4),
+          decoration: BoxDecoration(
+            color: SDColors.white,
+            shape: BoxShape.circle,
+            border: Border.all(color: SDColors.neutral200),
+          ),
+          child: IconButton(
+            onPressed: () => Navigator.of(context).maybePop(),
+            icon: const Icon(Icons.close, color: SDColors.neutral900),
+            tooltip: 'Fermer',
+            visualDensity: VisualDensity.compact,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Barre recherche — même style que Métiers / Freelance.
+  Widget _buildSearchField(BuildContext context) {
+    void openSearch() {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => const SearchPageScreenM(initialIndex: 4),
+        ),
+      );
     }
 
-    try {
-      // Déboguer les catégories récupérées du BLoC
-      print('Catégories récupérées du BLoC: ${categories?.length ?? 0}');
-      if (categories != null) {
-        for (var cat in categories) {
-          print('Catégorie: ${cat.nomcategorie}, Groupe: ${cat.groupe}');
-        }
-      }
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: SDSpacing.sm,
+        vertical: SDSpacing.xs,
+      ),
+      decoration: BoxDecoration(
+        color: SDColors.white,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: SDColors.primary100, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: SDColors.neutral900.withOpacity(0.05),
+            blurRadius: 6,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.search, color: SDColors.primary600, size: 20),
+          SizedBox(width: SDSpacing.xs),
+          Expanded(
+            child: GestureDetector(
+              onTap: openSearch,
+              behavior: HitTestBehavior.opaque,
+              child: Text(
+                'Que voulez-vous acheter ?',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: SDTypography.bodyMedium.copyWith(
+                  color: SDColors.neutral400,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ),
+          GestureDetector(
+            onTap: () => _showAdvancedFilterDialog(context),
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: SDColors.primary600,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.tune, color: SDColors.white, size: 17),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-      // Transformation des catégories récupérées - correction de l'opérateur null-aware inutile
-      return categories.map<Map<String, dynamic>>((category) {
-        // Attribution d'une icône selon le nom de la catégorie
-        IconData icon = Icons.category;
-        String name = "Catégorie";
+  Widget _buildPromoBanner(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.all(SDSpacing.md),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF5F0E8),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: SDColors.neutral200),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '-20% sur l\'électronique',
+                  style: SDTypography.titleSmall.copyWith(
+                    color: SDColors.neutral900,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                SizedBox(height: SDSpacing.sm),
+                FilledButton(
+                  onPressed: () => _openSearchShop(context),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: SDColors.primary600,
+                    foregroundColor: SDColors.white,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: SDSpacing.md,
+                      vertical: SDSpacing.xs,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(
+                    'Voir l\'offre',
+                    style: SDTypography.labelMedium.copyWith(
+                      color: SDColors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(width: SDSpacing.sm),
+          Icon(Icons.kitchen_outlined,
+              size: 52, color: SDColors.primary600.withOpacity(0.35)),
+        ],
+      ),
+    );
+  }
 
-        if (category != null) {
-          // Utiliser titre ou nom selon ce qui est disponible
-          name = category.nomcategorie ?? "Catégorie";
+  Widget _buildCategoryPreviewGrid(
+      BuildContext context, bloc_model.ShoppingPageStateM state) {
+    final all = _categoriesList(state);
+    final preview = all.take(_kShopCategoryPreviewCount).toList();
 
-          // Attribuer une icône selon le nom
-          if (name.toLowerCase().contains('auto') ||
-              name.toLowerCase().contains('moto')) {
-            icon = Icons.directions_car;
-          } else if (name.toLowerCase().contains('immobilier') ||
-              name.toLowerCase().contains('maison')) {
-            icon = Icons.house;
-          } else if (name.toLowerCase().contains('électronique')) {
-            icon = Icons.devices;
-          } else if (name.toLowerCase().contains('tech')) {
-            icon = Icons.electrical_services;
-          } else if (name.toLowerCase().contains('mode') ||
-              name.toLowerCase().contains('vêtement')) {
-            icon = Icons.style;
-          } else if (name.toLowerCase().contains('meuble')) {
-            icon = Icons.chair;
-          } else if (name.toLowerCase().contains('sport')) {
-            icon = Icons.sports_soccer;
-          } else if (name.toLowerCase().contains('jeu')) {
-            icon = Icons.videogame_asset;
-          } else if (name.toLowerCase().contains('santé')) {
-            icon = Icons.health_and_safety;
-          }
-        }
-
-        return {
-          'name': name,
-          'icon': icon,
-          'id': category?.idcategorie ?? '',
-          'groupe': category?.groupe ?? '',
-        };
-      }).toList();
-    } catch (e) {
-      print('Erreur lors de la conversion des catégories: $e');
-      return [
-        {'name': 'Erreur de chargement', 'icon': Icons.error},
-      ];
+    if (state.isLoading == true && preview.isEmpty) {
+      return SizedBox(
+        height: 180,
+        child: Center(
+          child: CircularProgressIndicator(color: SDColors.primary600),
+        ),
+      );
     }
+    if (preview.isEmpty) {
+      return Padding(
+        padding: EdgeInsets.symmetric(vertical: SDSpacing.md),
+        child: Text(
+          'Catégories en cours de chargement…',
+          style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral500),
+        ),
+      );
+    }
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 4,
+        mainAxisSpacing: 10,
+        crossAxisSpacing: 10,
+        childAspectRatio: 0.78,
+      ),
+      itemCount: preview.length,
+      itemBuilder: (context, index) {
+        final cat = preview[index];
+        return _ShopCategoryCell(
+          categorie: cat,
+          onTap: () {
+            context.read<ShoppingPageBlocM>().add(
+                  SearchProductsEvent(cat.nomcategorie),
+                );
+            _openSearchShop(context);
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildSeeAllCategoriesButton(
+      BuildContext context, bloc_model.ShoppingPageStateM state) {
+    final all = _categoriesList(state);
+    if (all.length <= _kShopCategoryPreviewCount) {
+      return const SizedBox.shrink();
+    }
+    return OutlinedButton(
+      onPressed: () async {
+        final selected = await Navigator.of(context).push<Categorie>(
+          MaterialPageRoute(
+            builder: (_) => BlocProvider.value(
+              value: context.read<ShoppingPageBlocM>(),
+              child: _ShopAllCategoriesPage(categories: all),
+            ),
+          ),
+        );
+        if (!mounted || selected == null) return;
+        context.read<ShoppingPageBlocM>().add(
+              SearchProductsEvent(selected.nomcategorie),
+            );
+        _openSearchShop(context);
+      },
+      style: OutlinedButton.styleFrom(
+        foregroundColor: SDColors.primary600,
+        side: BorderSide(color: SDColors.primary600.withOpacity(0.35)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+        ),
+        padding: EdgeInsets.symmetric(
+          horizontal: SDSpacing.lg,
+          vertical: SDSpacing.sm,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Voir toutes les catégories',
+            style: SDTypography.labelSmall.copyWith(
+              color: SDColors.primary600,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Icon(Icons.arrow_forward, size: 14, color: SDColors.primary600),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPopularProductsRow(
+      BuildContext context, bloc_model.ShoppingPageStateM state) {
+    final list = _displayProducts(state).take(10).toList();
+    if (state.isLoading == true && list.isEmpty) {
+      return SizedBox(
+        height: 210,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: 4,
+          separatorBuilder: (_, __) => SizedBox(width: SDSpacing.sm),
+          padding: EdgeInsets.zero,
+          itemBuilder: (_, __) => SkeletonWidget.rounded(
+            width: 148,
+            height: 200,
+            borderRadius: 16,
+          ),
+        ),
+      );
+    }
+    if (list.isEmpty) {
+      return Text(
+        'Aucun produit pour le moment.',
+        style: SDTypography.bodySmall.copyWith(color: SDColors.neutral500),
+      );
+    }
+    return SizedBox(
+      height: 210,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: list.length,
+        separatorBuilder: (_, __) => SizedBox(width: SDSpacing.sm),
+        itemBuilder: (context, i) {
+          return _CompactShopProductCard(product: list[i]);
+        },
+      ),
+    );
+  }
+
+  Widget _buildDealsRow(
+      BuildContext context, bloc_model.ShoppingPageStateM state) {
+    final all = _displayProducts(state);
+    final list = all.length > 1
+        ? all.sublist(0, all.length > 6 ? 6 : all.length)
+        : all;
+    if (list.isEmpty) {
+      return Text(
+        'Aucune promo à afficher.',
+        style: SDTypography.bodySmall.copyWith(color: SDColors.neutral500),
+      );
+    }
+    return SizedBox(
+      height: 228,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: list.length,
+        separatorBuilder: (_, __) => SizedBox(width: SDSpacing.sm),
+        itemBuilder: (context, i) {
+          final p = list[i];
+          final pct = 15 + (p.id.hashCode.abs() % 16);
+          return _CompactShopProductCard(
+            product: p,
+            discountPercent: pct,
+            strikePrice: p.price,
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildNearYouAndShops(
+      BuildContext context, bloc_model.ShoppingPageStateM state) {
+    final products = _displayProducts(state);
+    final near = products.take(5).toList();
+    final shops = state.filteredVendeurs ?? state.vendeurs ?? [];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionTitleOnly(
+          leadingIcon: Icons.storefront_outlined,
+          title: 'Boutiques recommandées',
+        ),
+        SizedBox(height: SDSpacing.sm),
+        if (shops.isEmpty)
+          Text(
+            'Boutiques en cours de chargement…',
+            style:
+                SDTypography.bodySmall.copyWith(color: SDColors.neutral500),
+          )
+        else
+          ...shops.take(4).map((v) => _ShopRecommendTile(vendeur: v)),
+        SizedBox(height: SDSpacing.xl),
+        _buildSectionTitleOnly(
+          leadingIcon: Icons.near_me_outlined,
+          title: 'Près de vous',
+        ),
+        SizedBox(height: SDSpacing.sm),
+        SizedBox(
+          height: 118,
+          child: near.isEmpty
+              ? Text(
+                  'Produits à proximité bientôt disponibles.',
+                  style: SDTypography.bodySmall
+                      .copyWith(color: SDColors.neutral500),
+                )
+              : ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: near.length,
+                  separatorBuilder: (_, __) => SizedBox(width: SDSpacing.xs),
+                  itemBuilder: (context, i) {
+                    final km = (0.5 + (i + 1) * 0.35).toStringAsFixed(1);
+                    return _NearYouTile(
+                      product: near[i],
+                      distanceKm: km,
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      // FloatingActionButton "Vendre sur Soutrali" (vert uniforme)
-      // FloatingActionButton "Vendre" discret (icône seule)
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          final authState = context.read<AuthCubit>().state;
-          if (authState is AuthAuthenticated) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const SellerRegistrationScreen(),
-              ),
-            );
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                  content: Text('Veuillez vous connecter pour continuer')),
-            );
-            context.push('/login');
-          }
-        },
-        backgroundColor: Colors.green,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: const Icon(Icons.storefront, color: Colors.white),
-      ),
-      body: BlocProvider(
-        create: (_) => ShoppingPageBlocM()
-          ..add(LoadCategorieDataM())
-          ..add(LoadProductsEvent()),
-        child: CustomScrollView(
-          slivers: [
-            // AppBar slim moderne
-            _buildModernSliverAppBar(),
-
-            // Banner promo sticky SUPPRIMÉE pour plus de clarté
-            // _buildPromoStickyBanner(context),
-
-            // Chips E-commerce spécialisées
-            _buildEcommerceChipsSliver(context),
-
-            // Contenu principal
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 16),
-                    // Titre des catégories avec style
-                    const Padding(
-                      padding: EdgeInsets.only(left: 4, bottom: 10),
-                      child: Text(
-                        'Catégories populaires',
-                        style: TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
+      backgroundColor: SDColors.white,
+      body: SafeArea(
+        top: true,
+        bottom: false,
+        child: BlocBuilder<ShoppingPageBlocM, bloc_model.ShoppingPageStateM>(
+          builder: (context, state) {
+            if ((state.isLoading == true) &&
+                (state.products == null || state.products!.isEmpty) &&
+                (state.error == null || state.error!.isEmpty)) {
+              return Center(
+                child: CircularProgressIndicator(color: SDColors.primary600),
+              );
+            }
+            return CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      SDSpacing.md,
+                      SDSpacing.xs,
+                      SDSpacing.md,
+                      SDSpacing.sm,
                     ),
-
-                    // Liste horizontale de catégories avec design amélioré - utilisation de BlocBuilder
-                    SizedBox(
-                      height: 120,
-                      child: BlocBuilder<ShoppingPageBlocM,
-                          bloc_model.ShoppingPageStateM>(
-                        builder: (context, state) {
-                          // Afficher message de chargement ou d'erreur si nécessaire
-                          if (state?.isLoading == true) {
-                            return const Center(
-                                child: CircularProgressIndicator());
-                          }
-
-                          if (state?.error?.isNotEmpty == true) {
-                            return Center(
-                                child: Text('Erreur: ${state!.error}',
-                                    style: const TextStyle(color: Colors.red)));
-                          }
-
-                          final categories = state?.listItems;
-                          if (categories == null || categories.isEmpty) {
-                            return const Center(
-                                child: Text('Aucune catégorie disponible'));
-                          }
-
-                          // Générer des couleurs et icônes pour les catégories
-                          return ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            padding: const EdgeInsets.symmetric(horizontal: 4),
-                            itemCount: categories.length,
-                            itemBuilder: (context, index) {
-                              final category = categories[index];
-                              final name = category.nomcategorie ?? "Catégorie";
-
-                              // Attribution d'une icône selon le nom
-                              IconData icon = _getCategoryIcon(name);
-
-                              return Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 8.0),
-                                child: _buildCategoryCard(name, icon),
-                              );
-                            },
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-
-                    // 3. Filtres avancés
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 8.0),
-                      child: Text(
-                        'Filtres avancés',
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 16),
-                      ),
-                    ),
-                    SizedBox(
-                      height: 40,
-                      child: ListView(
-                        scrollDirection: Axis.horizontal,
-                        children: [
-                          _buildFilterChip('Prix', Icons.monetization_on),
-                          _buildFilterChip('Marque', Icons.branding_watermark),
-                          _buildFilterChip('État', Icons.inventory_2),
-                          _buildFilterChip('Livraison', Icons.local_shipping),
-                          _buildFilterChip('Localisation', Icons.location_on),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-
-                    const SizedBox(height: 12),
-
-                    // Titre de la section produits
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Articles populaires',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        BlocBuilder<ShoppingPageBlocM,
-                            bloc_model.ShoppingPageStateM>(
-                          builder: (context, state) {
-                            return TextButton.icon(
-                              onPressed: () {
-                                // Ouvrir le dialog de comparaison uniquement si des produits sont sélectionnés
-                                if ((state.productsToCompare?.isNotEmpty ??
-                                    false)) {
-                                  setState(() {
-                                    isCompareDialogOpen = true;
-                                  });
-                                  _showCompareDialog(
-                                      context, state.productsToCompare!);
-                                } else {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                          'Sélectionnez des produits à comparer (max. 4)'),
-                                      duration: Duration(seconds: 2),
+                        if (state.error != null && state.error!.isNotEmpty) ...[
+                          Container(
+                            width: double.infinity,
+                            padding: SDSpacing.cardPadding,
+                            decoration: BoxDecoration(
+                              color: SDColors.error50,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: SDColors.error200),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.error_outline, color: SDColors.error600),
+                                SizedBox(width: SDSpacing.sm),
+                                Expanded(
+                                  child: Text(
+                                    state.error!,
+                                    style: SDTypography.bodySmall.copyWith(
+                                      color: SDColors.error600,
                                     ),
-                                  );
-                                }
-                              },
-                              icon: const Icon(Icons.compare_arrows, size: 18),
-                              label: Text(
-                                'Comparer ${state.productsToCompare?.length ?? 0}/4',
-                              ),
-                              style: TextButton.styleFrom(
-                                foregroundColor: Colors.green,
-                                padding: EdgeInsets.zero,
-                              ),
-                            );
-                          },
+                                  ),
+                                ),
+                                TextButton(
+                                  onPressed: () {
+                                    context
+                                        .read<ShoppingPageBlocM>()
+                                        .add(LoadProductsEvent());
+                                  },
+                                  child: const Text('Réessayer'),
+                                ),
+                              ],
+                            ),
+                          ),
+                          SizedBox(height: SDSpacing.md),
+                        ],
+                        _buildMarketplaceHeader(context),
+                        SizedBox(height: SDSpacing.md),
+                        _buildSearchField(context),
+                        SizedBox(height: SDSpacing.lg),
+                        _buildPromoBanner(context),
+                        SizedBox(height: SDSpacing.xl),
+                        _buildSectionHeaderRow(
+                          leadingIcon: Icons.local_mall_outlined,
+                          title: 'Produits populaires',
+                          actionLabel: 'Tout voir',
+                          onAction: () => _openSearchShop(context),
                         ),
+                        SizedBox(height: SDSpacing.sm),
+                        _buildPopularProductsRow(context, state),
+                        SizedBox(height: SDSpacing.xl),
+                        _buildCategoryPreviewGrid(context, state),
+                        SizedBox(height: SDSpacing.md),
+                        Center(
+                          child: _buildSeeAllCategoriesButton(context, state),
+                        ),
+                        SizedBox(height: SDSpacing.xl),
+                        _buildSectionHeaderRow(
+                          leadingIcon: Icons.local_offer_outlined,
+                          title: 'Bon plan',
+                          actionLabel: 'Tout voir',
+                          onAction: () => _openSearchShop(context),
+                        ),
+                        SizedBox(height: SDSpacing.sm),
+                        _buildDealsRow(context, state),
+                        SizedBox(height: SDSpacing.xl),
+                        _buildNearYouAndShops(context, state),
+                        SizedBox(height: SDSpacing.xxl),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    // Grille de produits scrollable avec BlocBuilder
-                    BlocBuilder<ShoppingPageBlocM,
-                        bloc_model.ShoppingPageStateM>(
-                        builder: (context, state) {
-                          if (state.isLoading ?? false) {
-                            return const Center(
-                                child: CircularProgressIndicator());
-                          }
-
-                          // Affichage de débogage pour comprendre l'erreur
-                          print('Débogage BlocBuilder ShoppingPage');
-                          print('state.error: ${state.error}');
-                          print('state.products: ${state.products?.length}');
-                          print(
-                              'state.filteredProducts: ${state.filteredProducts?.length}');
-                          print('state.isLoading: ${state.isLoading}');
-
-                          // Ignorer l'erreur si nous avons des produits à afficher
-                          if (state.error != null &&
-                              (state.products == null ||
-                                  state.products!.isEmpty)) {
-                            return Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  const Icon(Icons.error_outline,
-                                      size: 50, color: Colors.red),
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    'Erreur: ${state.error}',
-                                    style: const TextStyle(color: Colors.red),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                  const SizedBox(height: 16),
-                                  ElevatedButton(
-                                    onPressed: () {
-                                      // Recharger les produits
-                                      context
-                                          .read<ShoppingPageBlocM>()
-                                          .add(LoadProductsEvent());
-                                    },
-                                    child: const Text('Recharger'),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }
-
-                          // ✅ AFFICHAGE CONDITIONNEL : Vendeurs ou Produits
-                          if (state.showVendeurs ?? false) {
-                            // 👥 AFFICHAGE DES VENDEURS
-                            final displayVendeurs =
-                                state.filteredVendeurs ?? [];
-
-                            if (state.error?.isNotEmpty == true) {
-                              return Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(Icons.error_outline,
-                                        size: 64, color: Colors.red.shade300),
-                                    const SizedBox(height: 16),
-                                    Text(
-                                      'Erreur de chargement',
-                                      style: TextStyle(
-                                          fontSize: 18,
-                                          color: Colors.red.shade600),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      state.error!,
-                                      style: TextStyle(
-                                          fontSize: 14,
-                                          color: Colors.grey.shade600),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                    const SizedBox(height: 16),
-                                    ElevatedButton.icon(
-                                      onPressed: () => context
-                                          .read<ShoppingPageBlocM>()
-                                          .add(LoadVendeursEvent()),
-                                      icon: const Icon(Icons.refresh),
-                                      label: const Text('Réessayer'),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }
-
-                            return _buildVendeursGrid(context, displayVendeurs);
-                          } else {
-                            // 🛍️ AFFICHAGE DES PRODUITS (logique existante)
-
-                            // S'assurer que nous avons une liste valide même si elle est vide
-                            final displayProducts =
-                                state.filteredProducts ?? state.products ?? [];
-
-                            if (displayProducts.isEmpty) {
-                              return const Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(Icons.shopping_bag_outlined,
-                                        size: 64, color: Colors.grey),
-                                    SizedBox(height: 16),
-                                    Text(
-                                      'Aucun produit trouvé',
-                                      style: TextStyle(
-                                          fontSize: 18, color: Colors.grey),
-                                    ),
-                                    SizedBox(height: 8),
-                                    Text(
-                                      'Essayez de modifier vos critères de recherche',
-                                      style: TextStyle(
-                                          fontSize: 14, color: Colors.grey),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }
-
-                            return GridView.builder(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              itemCount: displayProducts.length,
-                              gridDelegate:
-                                  const SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 2, // 2 produits par ligne
-                                mainAxisSpacing: 16,
-                                crossAxisSpacing: 16,
-                                childAspectRatio:
-                                    0.72, // Ajuste la hauteur des cartes
-                              ),
-                              itemBuilder: (context, index) {
-                                final product = displayProducts[index];
-                                // ✅ PREMIUM : Utilisation de la nouvelle carte produit
-                                return ProductCardM(product: product);
-                              },
-                            );
-                          }
-                        },
-                      ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
-          ],
+              ],
+            );
+          },
         ),
       ),
     );
   }
+
 
   /// Widget pour une carte de catégorie avec design e-commerce moderne
   Widget _buildCategoryCard(String categoryName, IconData icon) {
@@ -584,12 +733,12 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
         children: [
           // Badge pour l'icône avec effet de gradient
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: EdgeInsets.all(SDSpacing.sm),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  Colors.green[300]!,
-                  Colors.green[600]!,
+                  SDColors.primary300,
+                  SDColors.primary600,
                 ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -599,22 +748,20 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
             child: Icon(
               icon,
               size: 30,
-              color: Colors.white,
+              color: SDColors.white,
             ),
           ),
-          const SizedBox(height: 10),
+          SizedBox(height: SDSpacing.xs),
           // Texte de la catégorie avec style amélioré
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
+            padding: EdgeInsets.symmetric(horizontal: SDSpacing.xxxs),
             child: Text(
               categoryName,
               textAlign: TextAlign.center,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                height: 1.2,
+              style: SDTypography.labelSmall.copyWith(
+                color: SDColors.neutral900,
               ),
             ),
           ),
@@ -630,14 +777,13 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
         bool isSelected = state.selectedFilter == label;
 
         return Container(
-          margin: const EdgeInsets.only(right: 8),
+          margin: EdgeInsets.only(right: SDSpacing.xxs),
           child: FilterChip(
             avatar: Icon(icon,
-                size: 16, color: isSelected ? Colors.white : Colors.green),
-            label: Text(label),
-            labelStyle: TextStyle(
-              color: isSelected ? Colors.white : Colors.black,
-              fontSize: 12,
+                size: 16, color: isSelected ? SDColors.white : SDColors.primary600),
+            label: Text(label, style: SDTypography.labelSmall),
+            labelStyle: SDTypography.labelSmall.copyWith(
+              color: isSelected ? SDColors.white : SDColors.neutral900,
             ),
             selected: isSelected,
             onSelected: (selected) {
@@ -646,8 +792,8 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                   .read<ShoppingPageBlocM>()
                   .add(ApplyFilterEvent(selected ? label : ''));
             },
-            backgroundColor: Colors.grey.shade200,
-            selectedColor: Colors.green,
+            backgroundColor: SDColors.neutral200,
+            selectedColor: SDColors.primary600,
           ),
         );
       },
@@ -677,21 +823,13 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                           children: [
                             product.image.startsWith('http') ||
                                     product.image.startsWith('https')
-                                ? Image.network(
-                                    product.image,
-                                    height: 80,
-                                    errorBuilder: (context, error, stackTrace) {
-                                      return Container(
+                                    ? AppImage(
+                                        imageUrl: product.image,
                                         height: 80,
                                         width: 80,
-                                        color: Colors.grey[200],
-                                        child: const Center(
-                                          child: Icon(Icons.image_not_supported,
-                                              size: 30, color: Colors.grey),
-                                        ),
-                                      );
-                                    },
-                                  )
+                                        fit: BoxFit.contain,
+                                        placeholderAsset: 'assets/products/default.png',
+                                      )
                                 : Image.asset(
                                     product.image.isNotEmpty
                                         ? product.image
@@ -740,7 +878,7 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
           ),
         ],
       ),
-    ).then((_) => setState(() => isCompareDialogOpen = false));
+    ).then((_) {});
   }
 
   /// Widget pour une carte produit minimaliste
@@ -845,18 +983,16 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: Colors.green,
-                          borderRadius: const BorderRadius.only(
-                            topLeft: Radius.circular(15),
-                            bottomRight: Radius.circular(10),
+                          color: SDColors.primary600,
+                          borderRadius: BorderRadius.only(
+                            topLeft: Radius.circular(SDSpacing.borderRadiusMedium),
+                            bottomRight: Radius.circular(SDSpacing.borderRadiusSmall),
                           ),
                         ),
                         child: Text(
                           product.brand,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
+                          style: SDTypography.labelSmall.copyWith(
+                            color: SDColors.white,
                           ),
                         ),
                       ),
@@ -868,7 +1004,7 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                       child: IconButton(
                         icon: Icon(
                           isFavorite ? Icons.favorite : Icons.favorite_border,
-                          color: isFavorite ? Colors.red : Colors.grey,
+                          color: isFavorite ? SDColors.error500 : SDColors.neutral400,
                         ),
                         onPressed: () {
                           // Utiliser le BLoC pour ajouter/retirer des favoris
@@ -909,58 +1045,56 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                   ],
                 ),
                 Padding(
-                  padding: const EdgeInsets.all(8.0),
+                  padding: SDSpacing.cardPadding,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Nom du produit
                       Text(
                         product.name,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 14),
+                        style: SDTypography.bodyMedium.copyWith(
+                            color: SDColors.neutral900),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 4),
+                      SizedBox(height: SDSpacing.xxxs),
                       // Taille du produit
                       Text(
-                        product.size,
-                        style:
-                            const TextStyle(fontSize: 12, color: Colors.grey),
-                      ),
-                      const SizedBox(height: 4),
-                      // Évaluation
-                      Row(
-                        children: [
-                          ...List.generate(
-                            5,
+                      product.size,
+                      style: SDTypography.bodySmall.copyWith(
+                          color: SDColors.neutral500),
+                    ),
+                    SizedBox(height: SDSpacing.xxxs),
+                    // Évaluation
+                    Row(
+                      children: [
+                        ...List.generate(
+                          5,
                             (index) => Icon(
                               index < product.rating.floor()
                                   ? Icons.star
                                   : Icons.star_border,
-                              color: Colors.amber,
+                              color: SDColors.warning500,
                               size: 14,
                             ),
                           ),
-                          const SizedBox(width: 4),
+                          SizedBox(width: SDSpacing.xxxs),
                           Text(
                             product.rating.toString(),
-                            style: const TextStyle(
-                                fontSize: 12, color: Colors.grey),
+                            style: SDTypography.bodySmall.copyWith(
+                                color: SDColors.neutral500),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 4),
+                      SizedBox(height: SDSpacing.xxxs),
                       // Prix
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
                             product.price,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.green,
-                              fontSize: 16,
+                            style: SDTypography.titleSmall.copyWith(
+                              color: SDColors.primary600,
                             ),
                           ),
                           // Rangée de boutons
@@ -997,17 +1131,17 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                                       );
                                     }
                                   },
-                                  child: Container(
-                                    padding: const EdgeInsets.all(4),
-                                    decoration: BoxDecoration(
-                                      color: isInCompare
-                                          ? Colors.blue
-                                          : Colors.grey.shade400,
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: const Icon(Icons.compare_arrows,
-                                        color: Colors.white, size: 16),
-                                  ),
+                          child: Container(
+                            padding: EdgeInsets.all(SDSpacing.xxxs),
+                            decoration: BoxDecoration(
+                              color: isInCompare
+                                  ? SDColors.info500
+                                  : SDColors.neutral400,
+                              borderRadius: BorderRadius.circular(SDSpacing.xxxs),
+                            ),
+                            child: Icon(Icons.compare_arrows,
+                                color: SDColors.white, size: 16),
+                          ),
                                 ),
                               ),
                               // 🛒 Bouton ajouter au panier CONNECTÉ AU BLOC
@@ -1086,12 +1220,12 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                                   builder: (context, state) {
                                     final isAdding = state.isAddingToCart;
                                     return Container(
-                                      padding: const EdgeInsets.all(4),
+                                      padding: EdgeInsets.all(SDSpacing.xxxs),
                                       decoration: BoxDecoration(
                                         color: isAdding
-                                            ? Colors.grey
-                                            : Colors.green,
-                                        borderRadius: BorderRadius.circular(4),
+                                            ? SDColors.neutral400
+                                            : SDColors.primary600,
+                                        borderRadius: BorderRadius.circular(SDSpacing.xxxs),
                                       ),
                                       child: isAdding
                                           ? const SizedBox(
@@ -1104,8 +1238,8 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                                                         Color>(Colors.white),
                                               ),
                                             )
-                                          : const Icon(Icons.add_shopping_cart,
-                                              color: Colors.white, size: 16),
+                                          : Icon(Icons.add_shopping_cart,
+                                              color: SDColors.white, size: 16),
                                     );
                                   },
                                 ),
@@ -1147,9 +1281,9 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                Colors.green.shade600,
-                Colors.green.shade700,
-                Colors.green.shade800,
+                SDColors.primary600,
+                SDColors.primary700,
+                SDColors.primary800,
               ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
@@ -1157,11 +1291,11 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
           ),
           child: SafeArea(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              padding: EdgeInsets.symmetric(horizontal: SDSpacing.sm),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SizedBox(height: 12),
+                  SizedBox(height: SDSpacing.sm),
                   // Top row: Actions uniquement (Alignées à droite)
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
@@ -1191,36 +1325,36 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                                   );
                                 },
                                 child: Container(
-                                  padding: const EdgeInsets.all(8),
+                                  padding: EdgeInsets.all(SDSpacing.xxs),
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.15),
+                                    color: SDColors.white.withOpacity(0.15),
                                     shape: BoxShape.circle,
                                     border: Border.all(
-                                      color: Colors.white.withOpacity(0.3),
+                                      color: SDColors.white.withOpacity(0.3),
                                       width: 1,
                                     ),
                                   ),
                                   child: Stack(
                                     alignment: Alignment.topRight,
                                     children: [
-                                      const Icon(Icons.shopping_cart,
-                                          color: Colors.white, size: 20),
+                                      Icon(Icons.shopping_cart,
+                                          color: SDColors.white, size: 20),
                                       if (cartCount > 0)
                                         Positioned(
                                           top: -4,
                                           right: -4,
                                           child: Container(
-                                            padding: const EdgeInsets.all(4),
-                                            constraints: const BoxConstraints(
+                                            padding: EdgeInsets.all(SDSpacing.xxxs),
+                                            constraints: BoxConstraints(
                                               minWidth: 16,
                                               minHeight: 16,
                                             ),
                                             decoration: BoxDecoration(
-                                              color: Colors.red,
+                                              color: SDColors.error500,
                                               shape: BoxShape.circle,
                                               boxShadow: [
                                                 BoxShadow(
-                                                  color: Colors.red
+                                                  color: SDColors.error500
                                                       .withOpacity(0.5),
                                                   blurRadius: 4,
                                                   spreadRadius: 1,
@@ -1232,10 +1366,8 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                                                 cartCount > 99
                                                     ? '99+'
                                                     : cartCount.toString(),
-                                                style: const TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 8,
-                                                  fontWeight: FontWeight.bold,
+                                                style: SDTypography.labelSmall.copyWith(
+                                                  color: SDColors.white,
                                                 ),
                                               ),
                                             ),
@@ -1247,76 +1379,79 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                               );
                             },
                           ),
-                          const SizedBox(width: 8),
+                          SizedBox(width: SDSpacing.xxs),
                           // Notifications
                           Container(
-                            padding: const EdgeInsets.all(8),
+                            padding: EdgeInsets.all(SDSpacing.xxs),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.15),
+                              color: SDColors.white.withOpacity(0.15),
                               shape: BoxShape.circle,
                               border: Border.all(
-                                color: Colors.white.withOpacity(0.3),
+                                color: SDColors.white.withOpacity(0.3),
                                 width: 1,
                               ),
                             ),
-                            child: const Icon(Icons.notifications_outlined,
-                                color: Colors.white, size: 20),
+                            child: Icon(Icons.notifications_outlined,
+                                color: SDColors.white, size: 20),
                           ),
                         ],
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: SDSpacing.sm),
                   // Barre de recherche avec Glassmorphism
                   Container(
                     height: 50,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
+                      color: SDColors.white.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(25),
                       border: Border.all(
-                        color: Colors.white.withOpacity(0.3),
+                        color: SDColors.white.withOpacity(0.3),
                         width: 1,
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
+                          color: SDColors.neutral900.withOpacity(0.1),
                           blurRadius: 10,
-                          offset: const Offset(0, 4),
+                          offset: Offset(0, 4),
                         ),
                       ],
                     ),
                     child: TextField(
-                      style: const TextStyle(color: Colors.white),
+                      readOnly: true,
+                      style: TextStyle(color: SDColors.white),
                       decoration: InputDecoration(
                         hintText: 'Rechercher un produit...',
-                        hintStyle: TextStyle(
-                          color: Colors.white.withOpacity(0.7),
-                          fontSize: 14,
+                        hintStyle: SDTypography.bodyMedium.copyWith(
+                          color: SDColors.white.withOpacity(0.7),
                         ),
                         prefixIcon: Icon(
                           Icons.search,
-                          color: Colors.white.withOpacity(0.9),
+                          color: SDColors.white.withOpacity(0.9),
                         ),
                         suffixIcon: IconButton(
                           icon: Icon(
                             Icons.filter_alt,
-                            color: Colors.white.withOpacity(0.9),
+                            color: SDColors.white.withOpacity(0.9),
                           ),
                           onPressed: () =>
                               _showAdvancedFilterDialog(context),
                         ),
                         border: InputBorder.none,
                         contentPadding:
-                            const EdgeInsets.symmetric(vertical: 15),
+                            EdgeInsets.symmetric(vertical: 15),
                       ),
-                      onChanged: (value) {
-                        context
-                            .read<ShoppingPageBlocM>()
-                            .add(SearchProductsEvent(value));
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const SearchPageScreenM(initialIndex: 3),
+                          ),
+                        );
                       },
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: SDSpacing.sm),
                 ],
               ),
             ),
@@ -1337,44 +1472,42 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                Colors.green.withOpacity(0.1),
-                Colors.green.withOpacity(0.15),
+                SDColors.primary600.withOpacity(0.1),
+                SDColors.primary600.withOpacity(0.15),
               ],
               begin: Alignment.centerLeft,
               end: Alignment.centerRight,
             ),
             border: Border(
               bottom:
-                  BorderSide(color: Colors.green.withOpacity(0.3), width: 1),
+                  BorderSide(color: SDColors.primary600.withOpacity(0.3), width: 1),
             ),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          padding: EdgeInsets.symmetric(horizontal: SDSpacing.sm, vertical: SDSpacing.xs),
           child: Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(4),
+                padding: EdgeInsets.all(SDSpacing.xxxs),
                 decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
+                  color: SDColors.primary600.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
                 ),
-                child: Icon(Icons.local_offer, color: Colors.green, size: 16),
+                child: Icon(Icons.local_offer, color: SDColors.primary600, size: 16),
               ),
-              const SizedBox(width: 10),
+              SizedBox(width: SDSpacing.xs),
               Expanded(
                 child: Text(
                   '🛒 Découvre nos meilleures offres et promotions !',
-                  style: TextStyle(
-                    color: Colors.green.withOpacity(0.9),
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
+                  style: SDTypography.labelSmall.copyWith(
+                    color: SDColors.primary600.withOpacity(0.9),
                   ),
                 ),
               ),
               Container(
-                padding: const EdgeInsets.all(2),
+                padding: EdgeInsets.all(SDSpacing.xxxs),
                 decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(10),
+                  color: SDColors.primary600.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
                 ),
                 child: InkWell(
                   onTap: () {
@@ -1382,7 +1515,7 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                   },
                   child: Icon(
                     Icons.close,
-                    color: Colors.green,
+                    color: SDColors.primary600,
                     size: 14,
                   ),
                 ),
@@ -1398,7 +1531,7 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
   Widget _buildEcommerceChipsSliver(BuildContext context) {
     return SliverToBoxAdapter(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+        padding: EdgeInsets.fromLTRB(SDSpacing.sm, SDSpacing.sm, SDSpacing.sm, SDSpacing.xxs),
         child: BlocBuilder<ShoppingPageBlocM, bloc_model.ShoppingPageStateM>(
           builder: (context, state) {
             return SingleChildScrollView(
@@ -1415,7 +1548,7 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                         .read<ShoppingPageBlocM>()
                         .add(const ToggleViewEvent(showVendeurs: false)),
                   ),
-                  const SizedBox(width: 8),
+                  SizedBox(width: SDSpacing.xxs),
 
                   // ✅ NOUVEAU : Chip Navigation Vendeurs
                   _buildNavigationChip(
@@ -1428,7 +1561,7 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                         .add(const ToggleViewEvent(showVendeurs: true)),
                   ),
 
-                  const SizedBox(width: 16), // Espacement fixe au lieu de Spacer
+                  SizedBox(width: SDSpacing.sm),
 
                 // Chip SoutraPay (gardé en jaune pour différenciation e-commerce)
                 InkWell(
@@ -1436,21 +1569,21 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                   borderRadius: BorderRadius.circular(20),
                   child: Container(
                     padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        EdgeInsets.symmetric(horizontal: SDSpacing.sm, vertical: SDSpacing.xxxs),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [Colors.amber.shade100, Colors.amber.shade200],
+                        colors: [SDColors.warning100, SDColors.warning200],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
                       borderRadius: BorderRadius.circular(20),
                       border:
-                          Border.all(color: Colors.amber.shade400, width: 1.2),
+                          Border.all(color: SDColors.warning500, width: 1.2),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.amber.withOpacity(0.15),
+                          color: SDColors.warning500.withOpacity(0.15),
                           blurRadius: 4,
-                          offset: const Offset(0, 2),
+                          offset: Offset(0, 2),
                         ),
                       ],
                     ),
@@ -1458,33 +1591,31 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(Icons.account_balance_wallet,
-                            color: Colors.amber.shade700, size: 16),
-                        const SizedBox(width: 4),
+                            color: SDColors.warning700, size: 16),
+                        SizedBox(width: SDSpacing.xxxs),
                         Text(
                           '💳 SoutraPay',
-                          style: TextStyle(
-                              color: Colors.amber.shade800,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 12),
+                          style: SDTypography.labelSmall.copyWith(
+                              color: SDColors.warning700),
                         ),
-                        // Badge conditionnel si solde disponible
-                        if (hasSoutraPayBalance)
+                        // Badge optionnel (solde SoutraPay — à brancher sur le wallet)
+                        if (true)
                           Container(
-                            margin: const EdgeInsets.only(left: 4),
-                            padding: const EdgeInsets.all(2),
-                            decoration: const BoxDecoration(
-                              color: Colors.red,
+                            margin: EdgeInsets.only(left: SDSpacing.xxxs),
+                            padding: EdgeInsets.all(SDSpacing.xxxs),
+                            decoration: BoxDecoration(
+                              color: SDColors.error500,
                               shape: BoxShape.circle,
                             ),
-                            child: const Text('!',
-                                style: TextStyle(
-                                    color: Colors.white, fontSize: 8)),
+                            child: Text('!',
+                                style: SDTypography.labelSmall.copyWith(
+                                    color: SDColors.white)),
                           ),
                       ],
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: SDSpacing.xxs),
                 // 🛒 Chip Panier avec badge connecté au BLoC
                 BlocBuilder<ShoppingPageBlocM, bloc_model.ShoppingPageStateM>(
                   builder: (context, state) {
@@ -1501,25 +1632,25 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                       },
                       borderRadius: BorderRadius.circular(20),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6),
+                        padding: EdgeInsets.symmetric(
+                            horizontal: SDSpacing.sm, vertical: SDSpacing.xxxs),
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: [
-                              Colors.green.withOpacity(0.1),
-                              Colors.green.withOpacity(0.15)
+                              SDColors.primary600.withOpacity(0.1),
+                              SDColors.primary600.withOpacity(0.15)
                             ],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                              color: Colors.green.withOpacity(0.4), width: 1.2),
+                              color: SDColors.primary600.withOpacity(0.4), width: 1.2),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.green.withOpacity(0.15),
+                              color: SDColors.primary600.withOpacity(0.15),
                               blurRadius: 4,
-                              offset: const Offset(0, 2),
+                              offset: Offset(0, 2),
                             ),
                           ],
                         ),
@@ -1529,19 +1660,19 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                             Stack(
                               children: [
                                 Icon(Icons.shopping_cart,
-                                    color: Colors.green, size: 16),
+                                    color: SDColors.primary600, size: 16),
                                 if (cartCount > 0)
                                   Positioned(
                                     top: -2,
                                     right: -2,
                                     child: Container(
-                                      padding: const EdgeInsets.all(2),
-                                      constraints: const BoxConstraints(
+                                      padding: EdgeInsets.all(SDSpacing.xxxs),
+                                      constraints: BoxConstraints(
                                         minWidth: 12,
                                         minHeight: 12,
                                       ),
-                                      decoration: const BoxDecoration(
-                                        color: Colors.red,
+                                      decoration: BoxDecoration(
+                                        color: SDColors.error500,
                                         shape: BoxShape.circle,
                                       ),
                                       child: Center(
@@ -1549,10 +1680,8 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                                           cartCount > 9
                                               ? '9+'
                                               : cartCount.toString(),
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 6,
-                                            fontWeight: FontWeight.bold,
+                                          style: SDTypography.labelSmall.copyWith(
+                                            color: SDColors.white,
                                           ),
                                         ),
                                       ),
@@ -1560,13 +1689,11 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                                   ),
                               ],
                             ),
-                            const SizedBox(width: 4),
-                            const Text(
+                            SizedBox(width: SDSpacing.xxxs),
+                            Text(
                               '🛒 Panier',
-                              style: TextStyle(
-                                  color: Colors.green,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 12),
+                              style: SDTypography.labelSmall.copyWith(
+                                  color: SDColors.primary600),
                             ),
                           ],
                         ),
@@ -1603,21 +1730,21 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 250),
               curve: Curves.easeOutCubic,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              padding: EdgeInsets.symmetric(horizontal: SDSpacing.md, vertical: SDSpacing.xs),
               decoration: BoxDecoration(
                 gradient: isSelected
                     ? LinearGradient(
                         colors: [
-                          Colors.green.shade500,
-                          Colors.green.shade600,
+                          SDColors.primary500,
+                          SDColors.primary600,
                         ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       )
                     : LinearGradient(
                         colors: [
-                          Colors.grey.shade50,
-                          Colors.grey.shade100,
+                          SDColors.neutral50,
+                          SDColors.neutral100,
                         ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
@@ -1625,13 +1752,13 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                 borderRadius: BorderRadius.circular(25),
                 border: Border.all(
                   color: isSelected
-                      ? Colors.green.shade300
-                      : Colors.grey.shade300,
+                      ? SDColors.primary300
+                      : SDColors.neutral300,
                   width: isSelected ? 2 : 1,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: (isSelected ? Colors.green : Colors.grey)
+                    color: (isSelected ? SDColors.primary600 : SDColors.neutral500)
                         .withOpacity(isSelected ? 0.3 : 0.1),
                     blurRadius: isSelected ? 8 : 4,
                     offset: Offset(0, isSelected ? 4 : 2),
@@ -1648,23 +1775,22 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                       ..scale(isSelected ? 1.1 : 1.0),
                     child: Icon(
                       icon,
-                      color: isSelected ? Colors.white : Colors.grey.shade700,
+                      color: isSelected ? SDColors.white : SDColors.neutral700,
                       size: 18,
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  SizedBox(width: SDSpacing.xxs),
                   AnimatedDefaultTextStyle(
                     duration: const Duration(milliseconds: 200),
-                    style: TextStyle(
-                      color: isSelected ? Colors.white : Colors.grey.shade800,
+                    style: SDTypography.bodyMedium.copyWith(
+                      color: isSelected ? SDColors.white : SDColors.neutral800,
                       fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
-                      fontSize: 14,
                       letterSpacing: isSelected ? 0.5 : 0,
                     ),
                     child: Text(label),
                   ),
                   if (isSelected) ...[
-                    const SizedBox(width: 4),
+                    SizedBox(width: SDSpacing.xxxs),
                     AnimatedOpacity(
                       duration: const Duration(milliseconds: 200),
                       opacity: isSelected ? 1.0 : 0.0,
@@ -1697,20 +1823,20 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
   // ✅ NOUVEAU : Widget pour afficher la grille des vendeurs
   Widget _buildVendeursGrid(BuildContext context, List<Vendeur> vendeurs) {
     if (vendeurs.isEmpty) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.storefront_outlined, size: 64, color: Colors.grey),
-            SizedBox(height: 16),
+            Icon(Icons.storefront_outlined, size: 64, color: SDColors.neutral400),
+            SizedBox(height: SDSpacing.sm),
             Text(
               'Aucun vendeur trouvé',
-              style: TextStyle(fontSize: 18, color: Colors.grey),
+              style: SDTypography.titleMedium.copyWith(color: SDColors.neutral500),
             ),
-            SizedBox(height: 8),
+            SizedBox(height: SDSpacing.xxs),
             Text(
               'Essayez de modifier vos critères de recherche',
-              style: TextStyle(fontSize: 14, color: Colors.grey),
+              style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral500),
             ),
           ],
         ),
@@ -1760,7 +1886,7 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
           }
         },
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: SDSpacing.cardPadding,
           child: Row(
             children: [
               // Logo/Avatar du vendeur
@@ -1768,12 +1894,12 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                 width: 60,
                 height: 60,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                  color: SDColors.neutral100,
                 ),
                 child: _buildVendeurAvatar(vendeur),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: SDSpacing.sm),
 
               // Informations du vendeur
               Expanded(
@@ -1784,112 +1910,108 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                     // Nom de la boutique
                     _buildSafeText(
                       vendeur.shopName,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                      style: SDTypography.titleSmall.copyWith(
+                        color: SDColors.neutral900,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 4),
+                    SizedBox(height: SDSpacing.xxxs),
 
                     // Propriétaire
                     if (vendeur.utilisateur != null)
                       _buildSafeText(
                         'Par ${vendeur.utilisateur!.fullName}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade600,
+                        style: SDTypography.bodySmall.copyWith(
+                          color: SDColors.neutral600,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                    const SizedBox(height: 6),
+                    SizedBox(height: SDSpacing.xxxs),
 
                     // Rating et badges
                     Row(
                       children: [
-                        Icon(Icons.star, color: Colors.amber, size: 16),
-                        const SizedBox(width: 2),
+                        Icon(Icons.star, color: SDColors.warning500, size: 16),
+                        SizedBox(width: SDSpacing.xxxs),
                         Text(
                           vendeur.rating.toStringAsFixed(1),
-                          style: const TextStyle(
-                              fontSize: 13, fontWeight: FontWeight.w500),
+                          style: SDTypography.bodyMedium.copyWith(
+                              color: SDColors.warning500),
                         ),
-                        const SizedBox(width: 8),
+                        SizedBox(width: SDSpacing.xxs),
                         _buildSafeText(
                           '${vendeur.completedOrders} ventes',
-                          style: TextStyle(
-                              fontSize: 12, color: Colors.grey.shade600),
+                          style: SDTypography.bodySmall.copyWith(
+                              color: SDColors.neutral600),
                         ),
-                        const SizedBox(width: 8),
+                        SizedBox(width: SDSpacing.xxs),
 
                         // Badges
                         if (vendeur.isTopRated)
                           Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
+                            padding: EdgeInsets.symmetric(
+                                horizontal: SDSpacing.xxxs, vertical: SDSpacing.xxxs),
                             decoration: BoxDecoration(
-                              color: Colors.orange.shade100,
-                              borderRadius: BorderRadius.circular(8),
+                              color: SDColors.warning100,
+                              borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
                             ),
                             child: Text(
                               '👑',
-                              style: TextStyle(fontSize: 10),
+                              style: SDTypography.labelSmall,
                             ),
                           ),
                         if (vendeur.isFeatured)
                           Container(
-                            margin: const EdgeInsets.only(left: 4),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
+                            margin: EdgeInsets.only(left: SDSpacing.xxxs),
+                            padding: EdgeInsets.symmetric(
+                                horizontal: SDSpacing.xxxs, vertical: SDSpacing.xxxs),
                             decoration: BoxDecoration(
-                              color: Colors.blue.shade100,
-                              borderRadius: BorderRadius.circular(8),
+                              color: SDColors.info100,
+                              borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
                             ),
                             child: Text(
                               '⭐',
-                              style: TextStyle(fontSize: 10),
+                              style: SDTypography.labelSmall,
                             ),
                           ),
                       ],
                     ),
-                    const SizedBox(height: 4),
+                    SizedBox(height: SDSpacing.xxxs),
 
                     // Localisation et livraison
                     Row(
                       children: [
                         Icon(Icons.location_on_outlined,
-                            size: 14, color: Colors.grey.shade500),
-                        const SizedBox(width: 2),
+                            size: 14, color: SDColors.neutral500),
+                        SizedBox(width: SDSpacing.xxxs),
                         Expanded(
                           child: _buildSafeText(
                             vendeur.businessAddress?.city ??
                                 (vendeur.deliveryZones.isNotEmpty
                                     ? vendeur.deliveryZones.first
                                     : 'Non spécifié'),
-                            style: TextStyle(
-                                fontSize: 12, color: Colors.grey.shade600),
+                            style: SDTypography.bodySmall.copyWith(
+                                color: SDColors.neutral600),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         if (vendeur.shippingMethods.isNotEmpty)
                           Container(
-                            margin: const EdgeInsets.only(left: 8),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
+                            margin: EdgeInsets.only(left: SDSpacing.xxs),
+                            padding: EdgeInsets.symmetric(
+                                horizontal: SDSpacing.xxxs, vertical: SDSpacing.xxxs),
                             decoration: BoxDecoration(
-                              color: Colors.green.shade50,
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: Colors.green.shade200),
+                              color: SDColors.success50,
+                              borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
+                              border: Border.all(color: SDColors.success200),
                             ),
                             child: _buildSafeText(
                               '🚚 ${vendeur.shippingMethods.first}',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: Colors.green.shade700,
-                                fontWeight: FontWeight.w500,
+                              style: SDTypography.labelSmall.copyWith(
+                                color: SDColors.success700,
                               ),
                             ),
                           ),
@@ -1911,7 +2033,7 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                     },
                     icon: Icon(
                       isFavorite ? Icons.favorite : Icons.favorite_border,
-                      color: isFavorite ? Colors.red : Colors.grey,
+                      color: isFavorite ? SDColors.error500 : SDColors.neutral400,
                       size: 20,
                     ),
                   ),
@@ -1919,23 +2041,21 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                   // Indicateur de statut
                   Container(
                     padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        EdgeInsets.symmetric(horizontal: SDSpacing.xxxs, vertical: SDSpacing.xxxs),
                     decoration: BoxDecoration(
                       color: vendeur.accountStatus == 'Active'
-                          ? Colors.green.shade50
-                          : Colors.orange.shade50,
-                      borderRadius: BorderRadius.circular(6),
+                          ? SDColors.success50
+                          : SDColors.warning50,
+                      borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
                     ),
                     child: _buildSafeText(
                       vendeur.accountStatus == 'Active'
                           ? 'Actif'
                           : 'En attente',
-                      style: TextStyle(
-                        fontSize: 10,
+                      style: SDTypography.labelSmall.copyWith(
                         color: vendeur.accountStatus == 'Active'
-                            ? Colors.green.shade700
-                            : Colors.orange.shade700,
-                        fontWeight: FontWeight.w500,
+                            ? SDColors.success700
+                            : SDColors.warning700,
                       ),
                     ),
                   ),
@@ -1954,25 +2074,9 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
       if (vendeur.shopLogo != null && vendeur.shopLogo!.isNotEmpty) {
         return ClipRRect(
           borderRadius: BorderRadius.circular(12),
-          child: Image.network(
-            vendeur.shopLogo!,
+          child: AppImage(
+            imageUrl: vendeur.shopLogo!,
             fit: BoxFit.cover,
-            loadingBuilder: (context, child, loadingProgress) {
-              if (loadingProgress == null) return child;
-              return Center(
-                child: CircularProgressIndicator(
-                  value: loadingProgress.expectedTotalBytes != null
-                      ? loadingProgress.cumulativeBytesLoaded /
-                          loadingProgress.expectedTotalBytes!
-                      : null,
-                ),
-              );
-            },
-            errorBuilder: (context, error, stackTrace) {
-              print('Erreur chargement image vendeur: $error');
-              return Icon(Icons.storefront,
-                  color: Colors.grey.shade400, size: 30);
-            },
           ),
         );
       } else {
@@ -2023,6 +2127,421 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
         overflow: overflow,
       );
     }
+  }
+}
+
+/// Carte produit horizontale (Marketplace Figma).
+class _CompactShopProductCard extends StatelessWidget {
+  final Product product;
+  final int? discountPercent;
+  final String? strikePrice;
+
+  const _CompactShopProductCard({
+    required this.product,
+    this.discountPercent,
+    this.strikePrice,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final oldPrice = strikePrice;
+    final showDeal = discountPercent != null && oldPrice != null;
+
+    return GestureDetector(
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => BlocProvider.value(
+            value: context.read<ShoppingPageBlocM>(),
+            child: ProductDetails(product: product),
+          ),
+        ),
+      ),
+      child: Container(
+        width: 152,
+        decoration: BoxDecoration(
+          color: SDColors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: SDColors.neutral200),
+          boxShadow: [
+            BoxShadow(
+              color: SDColors.neutral900.withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: Stack(
+                children: [
+                  Container(
+                    margin: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: SDColors.neutral50,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: product.image.startsWith('http')
+                          ? AppImage(
+                              imageUrl: product.image,
+                              width: double.infinity,
+                              height: double.infinity,
+                              fit: BoxFit.contain,
+                              placeholderAsset: 'assets/products/default.png',
+                            )
+                          : Image.asset(
+                              product.image.isNotEmpty
+                                  ? product.image
+                                  : 'assets/products/default.png',
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, __, ___) => const Center(
+                                child: Icon(Icons.image_not_supported, size: 32),
+                              ),
+                            ),
+                    ),
+                  ),
+                  if (discountPercent != null)
+                    Positioned(
+                      top: 6,
+                      right: 6,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: SDColors.error500,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '-$discountPercent%',
+                          style: SDTypography.labelSmall.copyWith(
+                            color: SDColors.white,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    product.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: SDTypography.labelSmall.copyWith(
+                      color: SDColors.neutral900,
+                      fontWeight: FontWeight.w600,
+                      height: 1.2,
+                    ),
+                  ),
+                  SizedBox(height: SDSpacing.xxxs),
+                  Row(
+                    children: [
+                      ...List.generate(
+                        5,
+                        (i) => Icon(
+                          i < product.rating.floor()
+                              ? Icons.star_rounded
+                              : Icons.star_outline_rounded,
+                          size: 14,
+                          color: SDColors.warning500,
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: SDSpacing.xxxs),
+                  if (showDeal) ...[
+                    Text(
+                      product.price,
+                      style: SDTypography.labelMedium.copyWith(
+                        color: SDColors.neutral900,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Text(
+                      oldPrice,
+                      style: SDTypography.labelSmall.copyWith(
+                        color: SDColors.neutral400,
+                        decoration: TextDecoration.lineThrough,
+                      ),
+                    ),
+                  ] else
+                    Text(
+                      product.price,
+                      style: SDTypography.labelMedium.copyWith(
+                        color: SDColors.primary600,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NearYouTile extends StatelessWidget {
+  final Product product;
+  final String distanceKm;
+
+  const _NearYouTile({
+    required this.product,
+    required this.distanceKm,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => BlocProvider.value(
+            value: context.read<ShoppingPageBlocM>(),
+            child: ProductDetails(product: product),
+          ),
+        ),
+      ),
+      child: SizedBox(
+        width: 72,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Container(
+              height: 64,
+              width: 64,
+              decoration: BoxDecoration(
+                color: SDColors.neutral50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: SDColors.neutral200),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: product.image.startsWith('http')
+                    ? AppImage(
+                        imageUrl: product.image,
+                        width: 64,
+                        height: 64,
+                        fit: BoxFit.cover,
+                        placeholderAsset: 'assets/products/default.png',
+                      )
+                    : Image.asset(
+                        product.image.isNotEmpty
+                            ? product.image
+                            : 'assets/products/default.png',
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) =>
+                            const Icon(Icons.image_not_supported, size: 24),
+                      ),
+              ),
+            ),
+            SizedBox(height: SDSpacing.xxxs),
+            Text(
+              '$distanceKm km',
+              style: SDTypography.labelSmall.copyWith(
+                color: SDColors.primary600,
+                fontWeight: FontWeight.w700,
+                fontSize: 10,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ShopRecommendTile extends StatelessWidget {
+  final Vendeur vendeur;
+
+  const _ShopRecommendTile({required this.vendeur});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: SDSpacing.xs),
+      child: InkWell(
+        onTap: () {
+          try {
+            context.push('/vendeurDetails', extra: vendeur);
+          } catch (_) {}
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: SizedBox(
+                width: 40,
+                height: 40,
+                child: vendeur.shopLogo != null && vendeur.shopLogo!.isNotEmpty
+                    ? AppImage(
+                        imageUrl: vendeur.shopLogo!,
+                        width: 40,
+                        height: 40,
+                        fit: BoxFit.cover,
+                      )
+                    : ColoredBox(
+                        color: SDColors.primary50,
+                        child: Icon(Icons.storefront,
+                            color: SDColors.primary600, size: 22),
+                      ),
+              ),
+            ),
+            SizedBox(width: SDSpacing.xs),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    vendeur.shopName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: SDTypography.labelSmall.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: SDColors.neutral900,
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      Icon(Icons.star_rounded,
+                          size: 12, color: SDColors.warning500),
+                      Text(
+                        vendeur.rating.toStringAsFixed(1),
+                        style: SDTypography.labelSmall.copyWith(
+                          color: SDColors.neutral600,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ShopCategoryCell extends StatelessWidget {
+  final Categorie categorie;
+  final VoidCallback onTap;
+
+  const _ShopCategoryCell({
+    required this.categorie,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final img = categorie.imagecategorie;
+    final hasNetworkImage = img.isNotEmpty &&
+        (img.startsWith('http://') || img.startsWith('https://'));
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            height: 52,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: SDColors.primary50.withOpacity(0.85),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: SDColors.primary100),
+            ),
+            child: Center(
+              child: hasNetworkImage
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: CachedNetworkImage(
+                        imageUrl: img,
+                        width: 36,
+                        height: 36,
+                        fit: BoxFit.cover,
+                        errorWidget: (_, __, ___) => Icon(
+                          _shopCategoryIcon(categorie.nomcategorie),
+                          color: SDColors.primary600,
+                          size: 28,
+                        ),
+                      ),
+                    )
+                  : Icon(
+                      _shopCategoryIcon(categorie.nomcategorie),
+                      color: SDColors.primary600,
+                      size: 28,
+                    ),
+            ),
+          ),
+          SizedBox(height: SDSpacing.xxxs),
+          Text(
+            categorie.nomcategorie,
+            maxLines: 2,
+            textAlign: TextAlign.center,
+            overflow: TextOverflow.ellipsis,
+            style: SDTypography.labelSmall.copyWith(
+              color: SDColors.neutral800,
+              fontWeight: FontWeight.w600,
+              fontSize: 11,
+              height: 1.15,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ShopAllCategoriesPage extends StatelessWidget {
+  final List<Categorie> categories;
+
+  const _ShopAllCategoriesPage({required this.categories});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: SDColors.white,
+      appBar: AppBar(
+        elevation: 0,
+        backgroundColor: SDColors.white,
+        surfaceTintColor: SDColors.white,
+        foregroundColor: SDColors.neutral900,
+        title: Text(
+          'Toutes les catégories',
+          style: SDTypography.titleLarge.copyWith(color: SDColors.neutral900),
+        ),
+      ),
+      body: GridView.builder(
+        padding: EdgeInsets.all(SDSpacing.md),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 3,
+          mainAxisSpacing: 12,
+          crossAxisSpacing: 12,
+          childAspectRatio: 0.78,
+        ),
+        itemCount: categories.length,
+        itemBuilder: (context, index) {
+          final cat = categories[index];
+          return _ShopCategoryCell(
+            categorie: cat,
+            onTap: () => Navigator.of(context).pop<Categorie>(cat),
+          );
+        },
+      ),
+    );
   }
 }
 

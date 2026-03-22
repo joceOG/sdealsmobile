@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../data/services/api_client.dart';
 import '../../../../data/services/authCubit.dart';
+import '../../../../design_system/design_system.dart';
 import '../profilpageblocm/edit_profile_bloc.dart';
 
 class EditProfileScreen extends StatefulWidget {
@@ -143,15 +144,21 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       create: (context) => EditProfileBloc(apiClient: ApiClient()),
       child: Scaffold(
         appBar: AppBar(
-          backgroundColor: Colors.green,
-          foregroundColor: Colors.white,
-          title: const Text('Modifier le profil'),
-          centerTitle: true,
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.only(
-              bottomLeft: Radius.circular(44),
-              bottomRight: Radius.circular(44),
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          backgroundColor: SDColors.white,
+          surfaceTintColor: Colors.transparent,
+          foregroundColor: SDColors.neutral900,
+          title: Text(
+            'Modifier le profil',
+            style: SDTypography.titleLarge.copyWith(
+              color: SDColors.neutral900,
+              fontWeight: FontWeight.w800,
             ),
+          ),
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(1),
+            child: Divider(height: 1, color: SDColors.neutral200),
           ),
         ),
         body: BlocConsumer<EditProfileBloc, EditProfileState>(
@@ -175,9 +182,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           },
           builder: (context, state) {
             if (state is EditProfileLoading) {
-              return const Center(
+              return Center(
                 child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
+                  valueColor:
+                      AlwaysStoppedAnimation<Color>(SDColors.primary600),
                 ),
               );
             }

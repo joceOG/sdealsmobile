@@ -7,8 +7,8 @@ plugins {
 
 android {
     namespace = "com.example.sdealsmobile"
-    compileSdk = flutter.compileSdkVersion
-    ndkVersion = "27.0.12077973"
+    compileSdk = 35
+    ndkVersion = "28.0.12433566"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -25,12 +25,9 @@ android {
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+        targetSdk = 35
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-        
-        // FIX: Ajout de la clé API pour Google Maps
-        manifestPlaceholders["GOOGLE_MAPS_API_KEY"] = "AIzaSyDO27pFOR7FnTBeM0LorESw6Dr4UvYo-iQ"
     }
 
     buildTypes {

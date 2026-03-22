@@ -27,17 +27,8 @@ class _ServicesListScreenState extends State<ServicesListScreen> {
       create: (_) => JobPageBlocM()..add(LoadServiceDataJobM()),
       child: Scaffold(
         backgroundColor: SDColors.white,
-        appBar: AppBar(
-          title: Text(
-            'Tous les Services',
-            style: SDTypography.titleMedium.copyWith(
-              fontWeight: FontWeight.bold,
-              color: SDColors.white,
-            ),
-          ),
-          backgroundColor: SDColors.primary700,
-          elevation: 0,
-          iconTheme: IconThemeData(color: SDColors.white),
+        appBar: SDWhiteAppBar.appBar(
+          title: 'Tous les Services',
         ),
         body: BlocBuilder<JobPageBlocM, JobPageStateM>(
           builder: (context, state) {

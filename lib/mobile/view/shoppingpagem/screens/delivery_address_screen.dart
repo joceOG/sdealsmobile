@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
+import 'package:sdealsmobile/mobile/view/common/utils/app_snackbar.dart';
 import 'package:sdealsmobile/data/services/authCubit.dart';
 import 'package:sdealsmobile/data/models/cart_model.dart';
 import '../shoppingpageblocm/shoppingPageBlocM.dart';
 import '../shoppingpageblocm/shoppingPageEventM.dart';
 import '../shoppingpageblocm/shoppingPageStateM.dart';
+// ✅ Design System
+import '../../../../design_system/design_system.dart';
 
 /// 📍 Écran de gestion de l'adresse de livraison
 class DeliveryAddressScreen extends StatefulWidget {
@@ -103,15 +108,16 @@ class _DeliveryAddressScreenState extends State<DeliveryAddressScreen> {
 
         // Feedback et retour
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Row(
               children: [
-                Icon(Icons.check_circle, color: Colors.white),
-                SizedBox(width: 8),
-                Text('Adresse de livraison enregistrée'),
+                Icon(Icons.check_circle, color: SDColors.white),
+                SizedBox(width: SDSpacing.xs),
+                Text('Adresse de livraison enregistrée',
+                    style: SDTypography.bodyMedium.copyWith(color: SDColors.white)),
               ],
             ),
-            backgroundColor: Colors.green,
+            backgroundColor: SDColors.success500,
             duration: Duration(seconds: 2),
           ),
         );
@@ -124,27 +130,17 @@ class _DeliveryAddressScreenState extends State<DeliveryAddressScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Adresse de livraison',
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-        ),
-        backgroundColor: Colors.green,
-        elevation: 0,
+      appBar: SDWhiteAppBar.appBar(
+        title: 'Adresse de livraison',
       ),
       body: BlocListener<ShoppingPageBlocM, ShoppingPageStateM>(
         listener: (context, state) {
           if (state.cartError != null) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.cartError!),
-                backgroundColor: Colors.red,
-              ),
-            );
+            AppSnackBar.error(context, state.cartError!);
           }
         },
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
+          padding: EdgeInsets.all(SDSpacing.sm),
           child: Form(
             key: _formKey,
             child: Column(
@@ -152,43 +148,41 @@ class _DeliveryAddressScreenState extends State<DeliveryAddressScreen> {
               children: [
                 // En-tête avec icône
                 Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: EdgeInsets.all(SDSpacing.sm),
                   decoration: BoxDecoration(
-                    color: Colors.green.shade50,
-                    borderRadius: BorderRadius.circular(12),
+                    color: SDColors.success50,
+                    borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
                   ),
                   child: Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(12),
+                        padding: EdgeInsets.all(SDSpacing.xs),
                         decoration: BoxDecoration(
-                          color: Colors.green.shade100,
+                          color: SDColors.success100,
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
                           Icons.location_on,
-                          color: Colors.green.shade700,
+                          color: SDColors.success700,
                           size: 32,
                         ),
                       ),
-                      const SizedBox(width: 16),
-                      const Expanded(
+                      SizedBox(width: SDSpacing.sm),
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               'Livraison à domicile',
-                              style: TextStyle(
-                                fontSize: 18,
+                              style: SDTypography.titleMedium.copyWith(
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            SizedBox(height: 4),
+                            SizedBox(height: SDSpacing.xxxs),
                             Text(
                               'Remplissez vos coordonnées de livraison',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey,
+                              style: SDTypography.bodySmall.copyWith(
+                                color: SDColors.neutral500,
                               ),
                             ),
                           ],
@@ -197,7 +191,7 @@ class _DeliveryAddressScreenState extends State<DeliveryAddressScreen> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 24),
+                SizedBox(height: SDSpacing.md),
 
                 // Formulaire
                 _buildTextField(
@@ -211,7 +205,7 @@ class _DeliveryAddressScreenState extends State<DeliveryAddressScreen> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: SDSpacing.sm),
 
                 _buildTextField(
                   controller: _telephoneController,
@@ -228,7 +222,7 @@ class _DeliveryAddressScreenState extends State<DeliveryAddressScreen> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: SDSpacing.sm),
 
                 _buildTextField(
                   controller: _adresseController,
@@ -242,7 +236,7 @@ class _DeliveryAddressScreenState extends State<DeliveryAddressScreen> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: SDSpacing.sm),
 
                 Row(
                   children: [
@@ -259,7 +253,7 @@ class _DeliveryAddressScreenState extends State<DeliveryAddressScreen> {
                         },
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: SDSpacing.xs),
                     Expanded(
                       child: _buildTextField(
                         controller: _codePostalController,
@@ -270,7 +264,7 @@ class _DeliveryAddressScreenState extends State<DeliveryAddressScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: SDSpacing.sm),
 
                 _buildTextField(
                   controller: _paysController,
@@ -283,7 +277,7 @@ class _DeliveryAddressScreenState extends State<DeliveryAddressScreen> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: SDSpacing.sm),
 
                 _buildTextField(
                   controller: _instructionsController,
@@ -293,7 +287,7 @@ class _DeliveryAddressScreenState extends State<DeliveryAddressScreen> {
                   hintText:
                       'Ex: Appartement 3, 2ème étage, sonnez au portail...',
                 ),
-                const SizedBox(height: 32),
+                SizedBox(height: SDSpacing.lg),
 
                 // Bouton de sauvegarde
                 BlocBuilder<ShoppingPageBlocM, ShoppingPageStateM>(
@@ -305,33 +299,32 @@ class _DeliveryAddressScreenState extends State<DeliveryAddressScreen> {
                       child: ElevatedButton(
                         onPressed: isLoading ? null : _saveAddress,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
+                          backgroundColor: SDColors.success500,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
                           ),
                           elevation: 2,
                         ),
                         child: isLoading
-                            ? const SizedBox(
+                            ? SizedBox(
                                 height: 24,
                                 width: 24,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
                                   valueColor: AlwaysStoppedAnimation<Color>(
-                                      Colors.white),
+                                      SDColors.white),
                                 ),
                               )
-                            : const Row(
+                            : Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(Icons.save, color: Colors.white),
-                                  SizedBox(width: 8),
+                                  Icon(Icons.save, color: SDColors.white),
+                                  SizedBox(width: SDSpacing.xs),
                                   Text(
                                     'Enregistrer l\'adresse',
-                                    style: TextStyle(
-                                      fontSize: 16,
+                                    style: SDTypography.labelMedium.copyWith(
                                       fontWeight: FontWeight.bold,
-                                      color: Colors.white,
+                                      color: SDColors.white,
                                     ),
                                   ),
                                 ],
@@ -362,28 +355,31 @@ class _DeliveryAddressScreenState extends State<DeliveryAddressScreen> {
       maxLines: maxLines,
       keyboardType: keyboardType,
       validator: validator,
+      style: SDTypography.bodyMedium,
       decoration: InputDecoration(
         labelText: label,
+        labelStyle: SDTypography.bodyMedium,
         hintText: hintText,
-        prefixIcon: Icon(icon, color: Colors.green),
+        hintStyle: SDTypography.bodyMedium.copyWith(color: SDColors.neutral400),
+        prefixIcon: Icon(icon, color: SDColors.primary600),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade300),
+          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+          borderSide: BorderSide(color: SDColors.neutral300),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade300),
+          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+          borderSide: BorderSide(color: SDColors.neutral300),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.green, width: 2),
+          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+          borderSide: BorderSide(color: SDColors.primary600, width: 2),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.red),
+          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+          borderSide: BorderSide(color: SDColors.error500),
         ),
         filled: true,
-        fillColor: Colors.grey.shade50,
+        fillColor: SDColors.neutral50,
       ),
     );
   }

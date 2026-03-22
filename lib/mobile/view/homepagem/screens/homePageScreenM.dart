@@ -133,8 +133,8 @@ class _HomePageScreenStateM extends State<HomePageScreenM> {
         final authState = context.watch<AuthCubit>().state;
         final firstName = authState is AuthAuthenticated
             ? (authState.utilisateur.prenom?.isNotEmpty == true
-            ? authState.utilisateur.prenom!
-            : authState.utilisateur.nom ?? 'Utilisateur')
+                ? authState.utilisateur.prenom!
+                : authState.utilisateur.nom ?? 'Utilisateur')
             : 'Invité';
 
         return Scaffold(
@@ -329,10 +329,10 @@ class _HomePageScreenStateM extends State<HomePageScreenM> {
                           radius: 1.25,
                           colors: [
                             Color.lerp(
-                              backgroundColor,
-                              SDColors.white,
-                              0.2,
-                            ) ??
+                                  backgroundColor,
+                                  SDColors.white,
+                                  0.2,
+                                ) ??
                                 backgroundColor,
                             backgroundColor,
                           ],

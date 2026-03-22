@@ -175,14 +175,11 @@ class _HistoryPageScreenMState extends State<HistoryPageScreenM>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Historique des Consultations', style: SDTypography.titleLarge.copyWith(color: SDColors.white)),
-        backgroundColor: SDColors.primary600,
-        foregroundColor: SDColors.white,
-        elevation: 0,
+      appBar: SDWhiteAppBar.appBar(
+        title: 'Historique des consultations',
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh_rounded),
             onPressed: () {
               _loadHistory();
               _loadStats();
@@ -191,13 +188,15 @@ class _HistoryPageScreenMState extends State<HistoryPageScreenM>
         ],
         bottom: TabBar(
           controller: _tabController,
-          labelColor: SDColors.white,
-          unselectedLabelColor: SDColors.white.withOpacity(0.7),
-          indicatorColor: SDColors.white,
+          labelColor: SDColors.primary700,
+          unselectedLabelColor: SDColors.neutral500,
+          indicatorColor: SDColors.primary600,
+          indicatorWeight: 3,
+          dividerColor: SDColors.neutral200,
           tabs: const [
             Tab(text: 'Toutes', icon: Icon(Icons.history)),
             Tab(text: 'Récentes', icon: Icon(Icons.schedule)),
-            Tab(text: 'Statistiques', icon: Icon(Icons.analytics)),
+            Tab(text: 'Statistiques', icon: Icon(Icons.analytics_outlined)),
           ],
         ),
       ),
