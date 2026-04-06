@@ -8,7 +8,9 @@ import '../../../../data/services/authCubit.dart';
 import '../loginpageblocm/loginPageBlocM.dart';
 import '../loginpageblocm/loginPageEventM.dart';
 import '../loginpageblocm/loginPageStateM.dart';
-// ✅ import du modèle utilisateur
+
+// ✅ Design System
+import '../../../../design_system/design_system.dart';
 
 class LoginPageScreenM extends StatefulWidget {
   const LoginPageScreenM({super.key});
@@ -47,16 +49,12 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
     return BlocProvider(
       create: (_) => LoginPageBlocM(),
       child: Scaffold(
-        backgroundColor: Colors.white, // Fond blanc épuré
-        appBar: AppBar(
-          backgroundColor: Colors.white,
-          elevation: 0,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.black87), // Icône sombre
-            onPressed: () {
-              Navigator.pop(context);
-            },
-          ),
+        backgroundColor: SDColors.white,
+        appBar: SDAppBar(
+          title: '', // Empty title for minimal look
+          useGradient: false,
+          backgroundColor: SDColors.white,
+          centerTitle: false,
         ),
         body: BlocListener<LoginPageBlocM, LoginPageStateM>(
           listener: (context, state) {
@@ -82,11 +80,11 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
           },
           child: SingleChildScrollView(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              padding: EdgeInsets.symmetric(horizontal: SDSpacing.md),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const SizedBox(height: 20),
+                  SDSpacing.verticalMediumGap,
                   Center(
                     child: AnimatedBuilder(
                       animation: _animationController,
@@ -99,121 +97,97 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
                       },
                       child: Image.asset(
                         'assets/logo1.png',
-                        height: 120, // Logo un peu plus grand
+                        height: 120,
                       ),
                     ),
                   ),
-                  const SizedBox(height: 40),
-                  const Text(
+                  SDSpacing.verticalLargeGap,
+                  Text(
                     "Bienvenue !",
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 28, 
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87
+                    style: SDTypography.displayMedium.copyWith(
+                      color: SDColors.neutral900,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  SDSpacing.verticalTinyGap,
                   Text(
                     "Connectez-vous pour continuer",
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 16, 
-                      color: Colors.grey.shade600
+                    style: SDTypography.bodyLarge.copyWith(
+                      color: SDColors.neutral600,
                     ),
                   ),
-                  const SizedBox(height: 40),
+                  SDSpacing.verticalLargeGap,
                   
-                  // Champs de texte modernes
-                  TextField(
+                  // Design System Inputs
+                  SDInput(
+                    label: "Mon identifiant",
+                    hint: "Email ou téléphone",
                     controller: identifiantController,
-                    decoration: InputDecoration(
-                      labelText: "Mon identifiant",
-                      hintText: "Email ou téléphone",
-                      prefixIcon: const Icon(Icons.person_outline),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(15),
-                        borderSide: BorderSide(color: Colors.grey.shade300),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(15),
-                        borderSide: BorderSide(color: Colors.grey.shade300),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(15),
-                        borderSide: const BorderSide(color: Colors.green, width: 2),
-                      ),
-                    ),
+                    prefixIcon: Icons.person_outline,
+                    keyboardType: TextInputType.emailAddress,
                   ),
-                  const SizedBox(height: 20),
-                  TextField(
+                  SDSpacing.verticalMediumGap,
+                  SDInput(
+                    label: "Mot de passe",
+                    hint: "Entrez votre mot de passe",
                     controller: passwordController,
-                    obscureText: !isPasswordVisible,
-                    decoration: InputDecoration(
-                      labelText: "Mot de passe",
-                      hintText: "Entrez votre mot de passe",
-                      prefixIcon: const Icon(Icons.lock_outline),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(15),
-                        borderSide: BorderSide(color: Colors.grey.shade300),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(15),
-                        borderSide: const BorderSide(color: Colors.green, width: 2),
-                      ),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          isPasswordVisible
-                              ? Icons.visibility
-                              : Icons.visibility_off,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            isPasswordVisible = !isPasswordVisible;
-                          });
-                        },
-                      ),
-                    ),
+                    obscureText: true,
+                    prefixIcon: Icons.lock_outline,
                   ),
                   
-                  const SizedBox(height: 10),
-                  Wrap(
-                    alignment: WrapAlignment.spaceBetween,
-                    crossAxisAlignment: WrapCrossAlignment.center,
+                  SDSpacing.verticalSmallGap,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Checkbox(
-                            value: rememberMe,
-                            activeColor: Colors.green,
-                            onChanged: (value) {
-                              setState(() {
-                                rememberMe = value ?? false;
-                              });
-                            },
-                          ),
-                          const Text("Se souvenir de moi"),
-                        ],
+                      Flexible(
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Checkbox(
+                              value: rememberMe,
+                              activeColor: SDColors.primary600,
+                              onChanged: (value) {
+                                setState(() {
+                                  rememberMe = value ?? false;
+                                });
+                              },
+                            ),
+                            Flexible(
+                              child: Text(
+                                "Se souvenir de moi",
+                                style: SDTypography.bodyMedium,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                       TextButton(
                         onPressed: () {},
+                        style: TextButton.styleFrom(
+                          padding: EdgeInsets.symmetric(horizontal: SDSpacing.xs, vertical: SDSpacing.xxxs),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
                         child: Text(
                           "Mot de passe oublié ?",
-                          style: TextStyle(color: Colors.green.shade700, fontWeight: FontWeight.bold),
+                          style: SDTypography.labelMedium.copyWith(
+                            color: SDColors.primary700,
+                          ),
                         ),
                       ),
                     ],
                   ),
                   
-                  const SizedBox(height: 24),
+                  SDSpacing.verticalMediumGap,
                   
                   BlocBuilder<LoginPageBlocM, LoginPageStateM>(
                     builder: (context, state) {
-                      return ElevatedButton(
+                      return SDButton(
+                        text: "SE CONNECTER",
+                        fullWidth: true,
+                        isLoading: state is LoginPageLoadingM,
                         onPressed: state is LoginPageLoadingM
                             ? null
                             : () {
@@ -225,10 +199,14 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
                                     password.isEmpty) {
                                   ScaffoldMessenger.of(context)
                                       .showSnackBar(
-                                    const SnackBar(
+                                    SnackBar(
                                       content: Text(
-                                          "Mot de passe ou identifiant requis"),
-                                      backgroundColor: Colors.red,
+                                        "Mot de passe ou identifiant requis",
+                                        style: SDTypography.bodyMedium.copyWith(
+                                          color: SDColors.white,
+                                        ),
+                                      ),
+                                      backgroundColor: SDColors.error500,
                                     ),
                                   );
                                   return;
@@ -241,52 +219,37 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
                                       ),
                                     );
                               },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green.shade600,
-                          elevation: 2,
-                          minimumSize: const Size(double.infinity, 56),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                        ),
-                        child: state is LoginPageLoadingM
-                            ? const CircularProgressIndicator(
-                                color: Colors.white,
-                              )
-                            : const Text(
-                                "SE CONNECTER",
-                                style: TextStyle(
-                                    fontSize: 16, 
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 1.2,
-                                    color: Colors.white),
-                              ),
                       );
                     },
                   ),
                   
-                  const SizedBox(height: 30),
-                  const Row(
+                  SDSpacing.verticalLargeGap,
+                  Row(
                     children: [
-                      Expanded(child: Divider(color: Colors.grey)),
+                      Expanded(child: Divider(color: SDColors.neutral300)),
                       Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 16),
+                        padding: EdgeInsets.symmetric(horizontal: SDSpacing.sm),
                         child: Text(
                           "OU",
-                          style: TextStyle(color: Colors.grey),
+                          style: SDTypography.bodySmall.copyWith(
+                            color: SDColors.neutral500,
+                          ),
                         ),
                       ),
-                      Expanded(child: Divider(color: Colors.grey)),
+                      Expanded(child: Divider(color: SDColors.neutral300)),
                     ],
                   ),
-                  const SizedBox(height: 20),
+                  SDSpacing.verticalMediumGap,
                   
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       Text(
                         'Vous n\'avez pas de compte ?',
-                        style: TextStyle(color: Colors.grey.shade800),
+                        style: SDTypography.bodyMedium.copyWith(
+                          color: SDColors.neutral800,
+                        ),
                       ),
                       TextButton(
                         onPressed: () {
@@ -294,18 +257,21 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
                             context.push("/register");
                           });
                         },
-                        child: const Text(
+                        style: TextButton.styleFrom(
+                          padding: EdgeInsets.symmetric(horizontal: SDSpacing.xs, vertical: SDSpacing.xxxs),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: Text(
                           'S\'inscrire',
-                          style: TextStyle(
-                            color: Colors.green, 
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16
+                          style: SDTypography.labelLarge.copyWith(
+                            color: SDColors.primary600,
                           ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 20),
+                  SDSpacing.verticalMediumGap,
                 ],
               ),
             ),

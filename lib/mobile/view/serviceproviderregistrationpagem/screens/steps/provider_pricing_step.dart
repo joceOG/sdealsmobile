@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../../../design_system/colors.dart';
+import '../../../../../design_system/typography.dart';
 
 class ProviderPricingStep extends StatefulWidget {
   final Map<String, dynamic> formData;
@@ -53,12 +55,12 @@ class _ProviderPricingStepState extends State<ProviderPricingStep> {
         children: [
           const Text(
             'Tarification',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            style: SDTypography.titleLarge,
           ),
           const SizedBox(height: 10),
-          const Text(
+          Text(
             'Définissez votre tarif pour une journée de travail',
-            style: TextStyle(fontSize: 14, color: Colors.grey),
+            style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral500),
           ),
           const SizedBox(height: 20),
 
@@ -105,21 +107,20 @@ class _ProviderPricingStepState extends State<ProviderPricingStep> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.blue.withOpacity(0.1),
+              color: SDColors.info50,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.blue.shade200),
+              border: Border.all(color: SDColors.info200),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Row(
+                Row(
                   children: [
-                    Icon(Icons.info, color: Colors.blue),
-                    SizedBox(width: 8),
+                    const Icon(Icons.info, color: SDColors.info500),
+                    const SizedBox(width: 8),
                     Text(
                       'Exemples de tarifs par jour',
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold, color: Colors.blue),
+                      style: SDTypography.titleSmall.copyWith(color: SDColors.info600),
                     ),
                   ],
                 ),
@@ -129,9 +130,12 @@ class _ProviderPricingStepState extends State<ProviderPricingStep> {
                 const Text('• Peintre : 10,000 - 20,000 FCFA'),
                 const Text('• Menuisier : 25,000 - 40,000 FCFA'),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Vous pourrez ajuster vos tarifs plus tard dans votre profil.',
-                  style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+                  style: SDTypography.bodySmall.copyWith(
+                    fontStyle: FontStyle.italic,
+                    color: SDColors.neutral600,
+                  ),
                 ),
               ],
             ),
@@ -142,18 +146,18 @@ class _ProviderPricingStepState extends State<ProviderPricingStep> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.green.withOpacity(0.1),
+              color: SDColors.success50,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.green.shade200),
+              border: Border.all(color: SDColors.success200),
             ),
-            child: const Row(
+            child: Row(
               children: [
-                Icon(Icons.check_circle, color: Colors.green),
+                Icon(Icons.check_circle, color: SDColors.success600),
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     'Parfait ! Votre profil prestataire est créé. Vous pouvez maintenant recevoir des demandes de clients.',
-                    style: TextStyle(fontSize: 13, color: Colors.black87),
+                    style: SDTypography.bodySmall.copyWith(color: SDColors.neutral900),
                   ),
                 ),
               ],

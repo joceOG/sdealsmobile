@@ -32,10 +32,10 @@ class ApiClient {
       {Map<String, dynamic>? body}) async {
     final response = await http
         .post(
-      Uri.parse('$apiUrl$endpoint'),
-      headers: {'Content-Type': 'application/json'},
-      body: body != null ? jsonEncode(body) : null,
-    )
+          Uri.parse('$apiUrl$endpoint'),
+          headers: {'Content-Type': 'application/json'},
+          body: body != null ? jsonEncode(body) : null,
+        )
         .timeout(const Duration(seconds: 30));
     return response;
   }
@@ -44,10 +44,10 @@ class ApiClient {
       {Map<String, dynamic>? body}) async {
     final response = await http
         .put(
-      Uri.parse('$apiUrl$endpoint'),
-      headers: {'Content-Type': 'application/json'},
-      body: body != null ? jsonEncode(body) : null,
-    )
+          Uri.parse('$apiUrl$endpoint'),
+          headers: {'Content-Type': 'application/json'},
+          body: body != null ? jsonEncode(body) : null,
+        )
         .timeout(const Duration(seconds: 30));
     return response;
   }
@@ -143,21 +143,21 @@ class ApiClient {
         List<dynamic> categoriesJson = cachedData;
         List<Categorie> allCategories = [];
         for (var json in categoriesJson) {
-          try {
-            if (json['groupe'] is Map<String, dynamic>) {
-              var groupeJson = json['groupe'];
-              var jsonCopy = Map<String, dynamic>.from(json);
-              jsonCopy['groupe'] = {
-                '_id': groupeJson['_id'] as String,
-                'nomgroupe': groupeJson['nomgroupe'] as String
-              };
-              allCategories.add(Categorie.fromJson(jsonCopy));
-            } else {
-              allCategories.add(Categorie.fromJson(json));
-            }
-          } catch (e) {
-            print('Erreur parsing catégorie cache: $e');
-          }
+           try {
+             if (json['groupe'] is Map<String, dynamic>) {
+               var groupeJson = json['groupe'];
+               var jsonCopy = Map<String, dynamic>.from(json);
+               jsonCopy['groupe'] = {
+                 '_id': groupeJson['_id'] as String,
+                 'nomgroupe': groupeJson['nomgroupe'] as String
+               };
+               allCategories.add(Categorie.fromJson(jsonCopy));
+             } else {
+               allCategories.add(Categorie.fromJson(json));
+             }
+           } catch (e) {
+             print('Erreur parsing catégorie cache: $e');
+           }
         }
         // Filtrage local (redondant si la clé est spécifique, mais sécurisé)
         final filteredCategories = allCategories.where((cat) {
@@ -165,7 +165,7 @@ class ApiClient {
           final targetNom = removeDiacritics(nomGroupe.toLowerCase());
           return groupeNom == targetNom;
         }).toList();
-
+        
         if (filteredCategories.isNotEmpty) return filteredCategories;
       }
     } catch (e) {
@@ -199,21 +199,21 @@ class ApiClient {
         }
 
         // 3️⃣ Mise en cache et retour
-        // On sauvegarde tout le json reçu pour pouvoir le filtrer plus tard si besoin,
+        // On sauvegarde tout le json reçu pour pouvoir le filtrer plus tard si besoin, 
         // ou juste ce qu'on a reçu. Ici on a reçu TOUTES les catégories.
         // On devrait peut-être cacher "toutes" les catégories sous une clé, ou filtrer avant.
-        // L'API renvoie TOUT. Donc on cache TOUT sous une clé générique ?
+        // L'API renvoie TOUT. Donc on cache TOUT sous une clé générique ? 
         // Non, fetchCategorie est appelé par nomGroupe.
         // Mais l'endpoint est `/categorie` (ALL).
         // Donc on devrait cacher sous 'all_categories'.
-
+        
         await CacheService().cacheData('all_categories', categoriesJson);
         await CacheService().cacheData(cacheKey, categoriesJson); // Aussi sous la clé spécifique pour simplifier mais c'est dupliqué
 
         // Filtrer les catégories par nom de groupe (insensible à casse et accents)
         final filteredCategories = allCategories.where((cat) {
           final groupeNom =
-          removeDiacritics(cat.groupe.nomgroupe.toLowerCase());
+              removeDiacritics(cat.groupe.nomgroupe.toLowerCase());
           final targetNom = removeDiacritics(nomGroupe.toLowerCase());
           return groupeNom == targetNom;
         }).toList();
@@ -234,9 +234,9 @@ class ApiClient {
   // ✅ Favoris: ajouter
   Future<void> addFavorite(
       {required String token,
-        String? serviceId,
-        required String title,
-        String? image}) async {
+      String? serviceId,
+      required String title,
+      String? image}) async {
     final uri = Uri.parse('$apiUrl/favorites');
     final response = await http.post(
       uri,
@@ -259,9 +259,9 @@ class ApiClient {
   // ✅ Signalement: créer
   Future<void> createReport(
       {required String token,
-        required String targetType,
-        required String targetId,
-        required String reason}) async {
+      required String targetType,
+      required String targetId,
+      required String reason}) async {
     final uri = Uri.parse('$apiUrl/reports');
     final response = await http.post(
       uri,
@@ -333,11 +333,11 @@ class ApiClient {
         List<dynamic> servicesJson = cachedData;
         List<Service> allServices = servicesJson
             .map((json) {
-          try { return Service.fromJson(json); } catch (e) { return null; }
-        })
+              try { return Service.fromJson(json); } catch (e) { return null; }
+            })
             .whereType<Service>()
             .toList();
-
+            
         List<Service> filteredServices = allServices.where((s) {
           final cat = s.categorie;
           final grp = cat == null ? null : cat.groupe;
@@ -345,7 +345,7 @@ class ApiClient {
           return groupeNom != null &&
               groupeNom.toLowerCase() == nomGroupe.toLowerCase();
         }).toList();
-
+        
         if (filteredServices.isNotEmpty) return filteredServices;
       }
     } catch (e) { print('Erreur cache services: $e'); }
@@ -360,19 +360,19 @@ class ApiClient {
       if (response.statusCode == 200) {
         List<dynamic> servicesJson = jsonDecode(response.body);
         print('Nombre total de services reçus: ${servicesJson.length}');
-
+        
         // 3️⃣ Save Cache
         await CacheService().cacheData(cacheKey, servicesJson);
 
         List<Service> allServices = servicesJson
             .map((json) {
-          try {
-            return Service.fromJson(json);
-          } catch (e) {
-            print('Erreur parsing service: $e pour $json');
-            return null;
-          }
-        })
+              try {
+                return Service.fromJson(json);
+              } catch (e) {
+                print('Erreur parsing service: $e pour $json');
+                return null;
+              }
+            })
             .whereType<Service>()
             .toList(); // filtre les null
 
@@ -415,7 +415,7 @@ class ApiClient {
       if (response.statusCode == 200) {
         List<dynamic> articlesJson = jsonDecode(response.body);
         List<Article> articles =
-        articlesJson.map((json) => Article.fromJson(json)).toList();
+            articlesJson.map((json) => Article.fromJson(json)).toList();
         print('Articles récupérés: ${articles.length}');
         return articles;
       } else {
@@ -441,9 +441,9 @@ class ApiClient {
 
   Future<Map<String, dynamic>> registerUser(
       {required String fullName,
-        required String phone,
-        required String password,
-        String role = "Client"}) async {
+      required String phone,
+      required String password,
+      String role = "Client"}) async {
     final url = Uri.parse("$apiUrl/register");
 
     // Découper le fullName en nom et prénom
@@ -544,7 +544,7 @@ class ApiClient {
   Future<Map<String, dynamic>> getUserRoles(String userId) async {
     try {
       final response =
-      await http.get(Uri.parse('$apiUrl/utilisateur/$userId/roles'));
+          await http.get(Uri.parse('$apiUrl/utilisateur/$userId/roles'));
       if (response.statusCode == 200) {
         return jsonDecode(response.body) as Map<String, dynamic>;
       }
@@ -637,11 +637,11 @@ class ApiClient {
 
     // 1️⃣ Cache
     try {
-      final cachedData = await CacheService().getCachedData(cacheKey);
-      if (cachedData != null) {
-        print('📦 Prestataires récupérés du cache');
-        return (cachedData as List).cast<Map<String, dynamic>>();
-      }
+       final cachedData = await CacheService().getCachedData(cacheKey);
+       if (cachedData != null) {
+         print('📦 Prestataires récupérés du cache');
+         return (cachedData as List).cast<Map<String, dynamic>>();
+       }
     } catch(e) { print('Erreur cache prestataires: $e'); }
 
     // 2️⃣ API
@@ -746,7 +746,7 @@ class ApiClient {
         'localisation': 'Abidjan, Côte d\'Ivoire',
         'localisationmaps': {'latitude': 5.3700, 'longitude': -4.0200},
         'description':
-        'Spécialiste en aménagement paysager et entretien jardins',
+            'Spécialiste en aménagement paysager et entretien jardins',
         'verifier': true,
         'note': '4.5', // ✅ String comme attendu
         'anneeExperience': '8',
@@ -774,7 +774,7 @@ class ApiClient {
 
     try {
       final response =
-      await http.get(Uri.parse('${dotenv.env['API_URL']}/vendeur'));
+          await http.get(Uri.parse('${dotenv.env['API_URL']}/vendeur'));
 
       if (response.statusCode == 200) {
         dynamic responseData = jsonDecode(response.body);
@@ -905,11 +905,11 @@ class ApiClient {
 
   // ✅ NOUVELLE MÉTHODE : Recherche Globale
   Future<Map<String, dynamic>> searchGlobal(
-      String query, {
-        int? minPrice,
-        int? maxPrice,
-        String? city
-      }) async {
+    String query, {
+    int? minPrice, 
+    int? maxPrice, 
+    String? city
+  }) async {
     print('🔍 Recherche globale pour: "$query" [Filtres: min=$minPrice, max=$maxPrice, city=$city]');
     try {
       final queryParams = {
@@ -1025,25 +1025,25 @@ class ApiClient {
       final all = await fetchPrestataires();
       return all
           .where((p) {
-        bool ok = true;
-        if (serviceName != null && serviceName.isNotEmpty) {
-          final svc = p['service'];
-          final svcName = (svc is Map<String, dynamic>)
-              ? (svc['nomservice'] ?? svc['name'] ?? '')
-              : (svc?.toString() ?? '');
-          ok = ok &&
-              svcName
-                  .toString()
-                  .toLowerCase()
-                  .contains(serviceName.toLowerCase());
-        }
-        if (verified != null) {
-          final isVerified =
-              (p['verifier'] == true) || (p['verified'] == true);
-          ok = ok && (verified ? isVerified : true);
-        }
-        return ok;
-      })
+            bool ok = true;
+            if (serviceName != null && serviceName.isNotEmpty) {
+              final svc = p['service'];
+              final svcName = (svc is Map<String, dynamic>)
+                  ? (svc['nomservice'] ?? svc['name'] ?? '')
+                  : (svc?.toString() ?? '');
+              ok = ok &&
+                  svcName
+                      .toString()
+                      .toLowerCase()
+                      .contains(serviceName.toLowerCase());
+            }
+            if (verified != null) {
+              final isVerified =
+                  (p['verifier'] == true) || (p['verified'] == true);
+              ok = ok && (verified ? isVerified : true);
+            }
+            return ok;
+          })
           .take(limit ?? 9999)
           .toList();
     } catch (e) {
@@ -1114,16 +1114,16 @@ class ApiClient {
 
   // ✅ NOUVELLE MÉTHODE : Récupérer freelances par catégorie avec options
   Future<List<Map<String, dynamic>>> getFreelancesByCategory(
-      String category, {
-        int limit = 10,
-        String sortBy = 'rating',
-      }) async {
+    String category, {
+    int limit = 10,
+    String sortBy = 'rating',
+  }) async {
     print('Récupération des freelances pour la catégorie: $category');
 
     try {
       final uri =
-      Uri.parse('${dotenv.env['API_URL']}/freelances/category/$category')
-          .replace(queryParameters: {
+          Uri.parse('${dotenv.env['API_URL']}/freelances/category/$category')
+              .replace(queryParameters: {
         'limit': limit.toString(),
         'sortBy': sortBy,
       });
@@ -1150,7 +1150,7 @@ class ApiClient {
 
     try {
       final response =
-      await http.get(Uri.parse('${dotenv.env['API_URL']}/freelance/$id'));
+          await http.get(Uri.parse('${dotenv.env['API_URL']}/freelance/$id'));
 
       if (response.statusCode == 200) {
         Map<String, dynamic> freelanceJson = jsonDecode(response.body);
@@ -1253,7 +1253,7 @@ extension ServiceRequestsApi on ApiClient {
       if (status != null) 'status': status
     };
     final uri =
-    Uri.parse('$apiUrl/prestations').replace(queryParameters: query);
+        Uri.parse('$apiUrl/prestations').replace(queryParameters: query);
     final res = await http.get(uri, headers: {
       'Authorization': 'Bearer $token',
     });
@@ -1276,7 +1276,7 @@ extension ServiceRequestsApi on ApiClient {
   }) async {
     final query = {'status': status};
     final uri =
-    Uri.parse('$apiUrl/prestations').replace(queryParameters: query);
+        Uri.parse('$apiUrl/prestations').replace(queryParameters: query);
     final res = await http.get(uri, headers: {
       'Authorization': 'Bearer $token',
     });
@@ -1580,15 +1580,15 @@ extension MessagerieApi on ApiClient {
 
   // 💬 Récupérer les messages d'une conversation
   Future<List<Map<String, dynamic>>> getConversationMessages(
-      String conversationId, {
-        int page = 1,
-        int limit = 100,
-      }) async {
+    String conversationId, {
+    int page = 1,
+    int limit = 100,
+  }) async {
     try {
       print('💬 Récupération messages pour conversation: $conversationId');
 
       final uri =
-      Uri.parse('$apiUrl/messages/conversation/$conversationId').replace(
+          Uri.parse('$apiUrl/messages/conversation/$conversationId').replace(
         queryParameters: {
           'page': page.toString(),
           'limit': limit.toString(),
@@ -1637,7 +1637,7 @@ extension MessagerieApi on ApiClient {
       if (pieceJointe != null) {
         // Upload avec fichier (multipart/form-data)
         var request =
-        http.MultipartRequest('POST', Uri.parse('$apiUrl/messages'));
+            http.MultipartRequest('POST', Uri.parse('$apiUrl/messages'));
 
         request.fields['expediteur'] = expediteur;
         request.fields['destinataire'] = destinataire;
@@ -1654,7 +1654,7 @@ extension MessagerieApi on ApiClient {
             await http.MultipartFile.fromPath('pieceJointe', pieceJointe.path));
 
         final streamedResponse =
-        await request.send().timeout(const Duration(seconds: 60));
+            await request.send().timeout(const Duration(seconds: 60));
         final response = await http.Response.fromStream(streamedResponse);
 
         if (response.statusCode == 201) {
@@ -1730,11 +1730,11 @@ extension MessagerieApi on ApiClient {
 
   // 🔍 Rechercher dans les messages
   Future<List<Map<String, dynamic>>> searchMessages(
-      String userId,
-      String query, {
-        int page = 1,
-        int limit = 50,
-      }) async {
+    String userId,
+    String query, {
+    int page = 1,
+    int limit = 50,
+  }) async {
     try {
       print('🔍 Recherche messages: "$query"');
 
@@ -1842,7 +1842,7 @@ extension MessagerieApi on ApiClient {
         'page': page.toString(),
         'limit': limit.toString(),
       };
-
+      
       if (status != null && status.isNotEmpty) {
         queryParams['status'] = status;
       }
@@ -1940,7 +1940,7 @@ extension MessagerieApi on ApiClient {
         'limit': limit.toString(),
         'offset': offset.toString(),
       };
-
+      
       if (statut != null && statut.isNotEmpty) {
         queryParams['statut'] = statut;
       }

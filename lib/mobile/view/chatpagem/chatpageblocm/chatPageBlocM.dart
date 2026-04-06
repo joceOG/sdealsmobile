@@ -23,7 +23,7 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
 
   ChatPageBlocM({String? userId})
       : _currentUserId =
-      userId ?? 'currentUser', // ⚠️ Fallback sur mock si non fourni
+            userId ?? 'currentUser', // ⚠️ Fallback sur mock si non fourni
         super(ChatPageStateM.initial()) {
     on<LoadConversations>(_onLoadConversations);
     on<SelectConversation>(_onSelectConversation);
@@ -57,7 +57,7 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
     try {
       var nomgroupe = "Métiers";
       List<Categorie> list_categorie =
-      await _apiClient.fetchCategorie(nomgroupe);
+          await _apiClient.fetchCategorie(nomgroupe);
       emit(state.copyWith(listItems: list_categorie, isLoading: false));
     } catch (error) {
       emit(state.copyWith(error: error.toString(), isLoading: false));
@@ -75,7 +75,7 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
       try {
         print('🔄 Tentative chargement conversations depuis API...');
         final conversationsData =
-        await _apiClient.getConversations(_currentUserId);
+            await _apiClient.getConversations(_currentUserId);
 
         // Convertir les données backend en modèles
         conversations = conversationsData
@@ -136,7 +136,7 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
         print(
             '🔄 Tentative chargement messages depuis API pour conversation: ${event.conversationId}');
         final messagesData =
-        await _apiClient.getConversationMessages(event.conversationId);
+            await _apiClient.getConversationMessages(event.conversationId);
 
         // Convertir les données backend en modèles
         messages =
@@ -168,7 +168,7 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
 
       // Mettre à jour les messages pour la conversation actuelle
       final updatedMessagesMap =
-      Map<String, List<MessageModel>>.from(state.messagesByConversation);
+          Map<String, List<MessageModel>>.from(state.messagesByConversation);
       updatedMessagesMap[event.conversationId] = messages;
 
       emit(state.copyWith(
@@ -208,7 +208,7 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
         ..add(newMessage);
 
       final updatedMessagesMap =
-      Map<String, List<MessageModel>>.from(state.messagesByConversation);
+          Map<String, List<MessageModel>>.from(state.messagesByConversation);
       updatedMessagesMap[event.conversationId] = updatedMessages;
 
       // Mettre à jour également la dernière conversation
@@ -294,7 +294,7 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
       }).toList();
 
       final updatedMessagesMap =
-      Map<String, List<MessageModel>>.from(state.messagesByConversation);
+          Map<String, List<MessageModel>>.from(state.messagesByConversation);
       updatedMessagesMap[event.conversationId] = updatedMessages;
 
       emit(state.copyWith(
@@ -318,7 +318,7 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
         return;
 
       final updatedMessages =
-      state.messagesByConversation[event.conversationId]!.map((msg) {
+          state.messagesByConversation[event.conversationId]!.map((msg) {
         if (msg.id == event.messageId) {
           return msg.copyWith(newStatus: MessageStatus.seen);
         }
@@ -326,7 +326,7 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
       }).toList();
 
       final updatedMessagesMap =
-      Map<String, List<MessageModel>>.from(state.messagesByConversation);
+          Map<String, List<MessageModel>>.from(state.messagesByConversation);
       updatedMessagesMap[event.conversationId] = updatedMessages;
 
       emit(state.copyWith(
@@ -375,26 +375,26 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
         }).toList();
 
         final updatedMessagesMap =
-        Map<String, List<MessageModel>>.from(state.messagesByConversation);
+            Map<String, List<MessageModel>>.from(state.messagesByConversation);
         updatedMessagesMap[event.conversationId] = updatedMessages;
 
         emit(state.copyWith(
           conversations: updatedConversations,
           messagesByConversation: updatedMessagesMap,
           selectedConversation:
-          state.selectedConversation?.id == event.conversationId
-              ? state.selectedConversation!
-              .copyWith(unread: false, unreadCount: 0)
-              : null,
+              state.selectedConversation?.id == event.conversationId
+                  ? state.selectedConversation!
+                      .copyWith(unread: false, unreadCount: 0)
+                  : null,
         ));
       } else {
         emit(state.copyWith(
           conversations: updatedConversations,
           selectedConversation:
-          state.selectedConversation?.id == event.conversationId
-              ? state.selectedConversation!
-              .copyWith(unread: false, unreadCount: 0)
-              : null,
+              state.selectedConversation?.id == event.conversationId
+                  ? state.selectedConversation!
+                      .copyWith(unread: false, unreadCount: 0)
+                  : null,
         ));
       }
     } catch (error) {
@@ -411,7 +411,7 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
     try {
       // Vérifier si une conversation existe déjà avec ce participant
       final existingConversation = state.conversations.firstWhere(
-            (conv) => conv.participantId == event.participantId,
+        (conv) => conv.participantId == event.participantId,
         orElse: () => ConversationModel(
           id: '',
           userId: '',
@@ -467,7 +467,7 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
 
       // Initialiser la liste des messages pour cette conversation
       final updatedMessagesMap =
-      Map<String, List<MessageModel>>.from(state.messagesByConversation);
+          Map<String, List<MessageModel>>.from(state.messagesByConversation);
       updatedMessagesMap[newConversation.id] = [];
 
       emit(state.copyWith(
@@ -587,7 +587,7 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
       final updatedMessages = [...currentMessages, newMessage];
 
       final updatedMessagesMap =
-      Map<String, List<MessageModel>>.from(state.messagesByConversation);
+          Map<String, List<MessageModel>>.from(state.messagesByConversation);
       updatedMessagesMap[conversationId] = updatedMessages;
 
       // Mettre à jour la conversation avec le dernier message
@@ -625,7 +625,7 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
       if (!state.messagesByConversation.containsKey(conversationId)) return;
 
       final updatedMessages =
-      state.messagesByConversation[conversationId]!.map((msg) {
+          state.messagesByConversation[conversationId]!.map((msg) {
         if (msg.id == messageId) {
           return msg.copyWith(newStatus: newStatus);
         }
@@ -633,7 +633,7 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
       }).toList();
 
       final updatedMessagesMap =
-      Map<String, List<MessageModel>>.from(state.messagesByConversation);
+          Map<String, List<MessageModel>>.from(state.messagesByConversation);
       updatedMessagesMap[conversationId] = updatedMessages;
 
       emit(state.copyWith(
@@ -646,9 +646,9 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
 
   // 🔔 ENVOYER NOTIFICATION CHAT
   Future<void> _onSendChatNotification(
-      SendChatNotification event,
-      Emitter<ChatPageStateM> emit,
-      ) async {
+    SendChatNotification event,
+    Emitter<ChatPageStateM> emit,
+  ) async {
     try {
       final success = await _notificationService.notifyNewMessage(
         userId: event.userId,
@@ -669,9 +669,9 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
 
   // 🔔 NOTIFICATION CHAT REÇUE
   Future<void> _onChatNotificationReceived(
-      ChatNotificationReceived event,
-      Emitter<ChatPageStateM> emit,
-      ) async {
+    ChatNotificationReceived event,
+    Emitter<ChatPageStateM> emit,
+  ) async {
     try {
       final notificationData = event.notificationData;
       final type = notificationData['type']?.toString() ?? '';
@@ -696,9 +696,9 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
 
   // 📨 TRAITER NOTIFICATION NOUVEAU MESSAGE
   void _handleNewMessageNotification(
-      Map<String, dynamic> data,
-      Emitter<ChatPageStateM> emit,
-      ) {
+    Map<String, dynamic> data,
+    Emitter<ChatPageStateM> emit,
+  ) {
     final conversationId = data['conversationId']?.toString() ?? '';
     final senderName = data['senderName']?.toString() ?? '';
     final message = data['message']?.toString() ?? '';
@@ -724,9 +724,9 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
 
   // 📊 TRAITER NOTIFICATION STATUT MESSAGE
   void _handleMessageStatusNotification(
-      Map<String, dynamic> data,
-      Emitter<ChatPageStateM> emit,
-      ) {
+    Map<String, dynamic> data,
+    Emitter<ChatPageStateM> emit,
+  ) {
     final messageId = data['messageId']?.toString() ?? '';
     final status = data['status']?.toString() ?? '';
     final conversationId = data['conversationId']?.toString() ?? '';
@@ -744,7 +744,7 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
       }).toList();
 
       final updatedMessagesMap =
-      Map<String, List<MessageModel>>.from(state.messagesByConversation);
+          Map<String, List<MessageModel>>.from(state.messagesByConversation);
       updatedMessagesMap[conversationId] = updatedMessages;
 
       emit(state.copyWith(
@@ -786,7 +786,7 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
       try {
         print('🔍 Recherche messages via API: "${event.query}"');
         final messagesData =
-        await _apiClient.searchMessages(_currentUserId, event.query);
+            await _apiClient.searchMessages(_currentUserId, event.query);
 
         // Grouper les messages par conversation
         final Map<String, List<MessageModel>> messagesByConv = {};
@@ -862,12 +862,12 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
           .toList();
 
       final updatedMessagesMap =
-      Map<String, List<MessageModel>>.from(state.messagesByConversation);
+          Map<String, List<MessageModel>>.from(state.messagesByConversation);
       updatedMessagesMap[event.conversationId] = updatedMessages;
 
       // Mettre à jour le dernier message de la conversation
       final lastMessage =
-      updatedMessages.isNotEmpty ? updatedMessages.last : null;
+          updatedMessages.isNotEmpty ? updatedMessages.last : null;
       final updatedConversations = state.conversations.map((conv) {
         if (conv.id == event.conversationId) {
           return conv.copyWith(
