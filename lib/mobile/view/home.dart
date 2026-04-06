@@ -242,7 +242,7 @@ class _HomeState extends State<Home> {
             unreadCount = 0;
           }
         }
-
+        
         return NavBadge(
           count: unreadCount,
           child: Icon(

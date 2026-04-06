@@ -4,6 +4,8 @@ import 'package:sdealsmobile/mobile/view/freelancepagem/freelancepageblocm/freel
 import 'package:sdealsmobile/mobile/view/freelancepagem/freelancepageblocm/freelancePageEventM.dart';
 import 'package:sdealsmobile/mobile/view/freelancepagem/freelancepageblocm/freelancePageStateM.dart';
 import 'package:sdealsmobile/mobile/view/freelance_registration/screens/freelance_form_screen.dart';
+import '../../../../design_system/colors.dart';
+import '../../../../design_system/typography.dart';
 
 class FreelanceRegistrationScreen extends StatelessWidget {
   const FreelanceRegistrationScreen({Key? key}) : super(key: key);
@@ -46,14 +48,14 @@ class _FreelanceRegistrationContentState extends State<_FreelanceRegistrationCon
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: SDColors.white,
       appBar: AppBar(
-        backgroundColor: Colors.green.shade700,
+        backgroundColor: SDColors.primary700,
         elevation: 0,
         title: const Text('Devenir Freelance', 
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          style: SDTypography.titleLarge),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: const Icon(Icons.arrow_back, color: SDColors.white),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
@@ -86,18 +88,14 @@ class _FreelanceRegistrationContentState extends State<_FreelanceRegistrationCon
 
   Widget _buildHeroSection() {
     return Container(
-      color: Colors.green.shade700,
+      color: SDColors.primary700,
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
             'Rejoignez notre communauté de freelances et vendez vos compétences',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
+            style: SDTypography.displaySmall,
           ),
           const SizedBox(height: 24),
           Row(
@@ -116,26 +114,19 @@ class _FreelanceRegistrationContentState extends State<_FreelanceRegistrationCon
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.2),
+        color: SDColors.white.withOpacity(0.2),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
         children: [
           Text(
             value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
+            style: SDTypography.titleLarge.copyWith(color: SDColors.white),
           ),
           const SizedBox(height: 4),
           Text(
             label,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.8),
-              fontSize: 14,
-            ),
+            style: SDTypography.bodySmall.copyWith(color: SDColors.white.withOpacity(0.8)),
           ),
         ],
       ),
@@ -150,18 +141,12 @@ class _FreelanceRegistrationContentState extends State<_FreelanceRegistrationCon
         children: [
           const Text(
             'Choisissez votre domaine',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
+            style: SDTypography.titleLarge,
           ),
           const SizedBox(height: 8),
           const Text(
             'Sélectionnez une ou plusieurs catégories qui correspondent à vos compétences',
-            style: TextStyle(
-              color: Colors.grey,
-              fontSize: 14,
-            ),
+            style: SDTypography.bodyMedium,
           ),
           const SizedBox(height: 24),
           GridView.builder(
@@ -192,10 +177,10 @@ class _FreelanceRegistrationContentState extends State<_FreelanceRegistrationCon
                 child: Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: isSelected ? Colors.green.shade100 : Colors.grey.shade100,
+                    color: isSelected ? SDColors.primary100 : SDColors.neutral100,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: isSelected ? Colors.green.shade700 : Colors.grey.shade300,
+                      color: isSelected ? SDColors.primary700 : SDColors.neutral300,
                       width: isSelected ? 2 : 1,
                     ),
                   ),
@@ -204,23 +189,22 @@ class _FreelanceRegistrationContentState extends State<_FreelanceRegistrationCon
                     children: [
                       Icon(
                         icon,
-                        color: isSelected ? Colors.green.shade700 : Colors.grey.shade700,
+                        color: isSelected ? SDColors.primary700 : SDColors.neutral700,
                         size: 28,
                       ),
                       const SizedBox(height: 8),
                       Text(
                         category.nomcategorie,
-                        style: TextStyle(
+                        style: SDTypography.bodyMedium.copyWith(
                           fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                          color: isSelected ? Colors.green.shade700 : Colors.black,
+                          color: isSelected ? SDColors.primary700 : SDColors.black,
                         ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         '15 services • ~5,000 FCFA/h',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade600,
+                        style: SDTypography.labelSmall.copyWith(
+                          color: SDColors.neutral600,
                         ),
                       ),
                     ],
@@ -257,20 +241,14 @@ class _FreelanceRegistrationContentState extends State<_FreelanceRegistrationCon
         children: [
           const Text(
             'Services populaires',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
+            style: SDTypography.titleLarge,
           ),
           const SizedBox(height: 8),
           Text(
             _selectedCategories.isEmpty
                 ? 'Sélectionnez une catégorie pour voir les services les plus demandés'
                 : 'Les services les plus demandés dans ${_selectedCategories.join(", ")}',
-            style: const TextStyle(
-              color: Colors.grey,
-              fontSize: 14,
-            ),
+            style: SDTypography.bodyMedium,
           ),
           const SizedBox(height: 16),
           ListView.builder(
@@ -296,12 +274,12 @@ class _FreelanceRegistrationContentState extends State<_FreelanceRegistrationCon
                 subtitle: Text('${service['categorie']} • Demande: ${service['demande']}'),
                 secondary: Text(
                   service['tarif'],
-                  style: const TextStyle(
+                  style: SDTypography.bodySmall.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: Colors.green,
+                    color: SDColors.primary600,
                   ),
                 ),
-                activeColor: Colors.green.shade700,
+                activeColor: SDColors.primary700,
               );
             },
           ),
@@ -319,54 +297,48 @@ class _FreelanceRegistrationContentState extends State<_FreelanceRegistrationCon
       margin: const EdgeInsets.all(24),
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.green.shade50,
+        color: SDColors.primary50,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.green.shade200),
+        border: Border.all(color: SDColors.primary200),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.calculate, color: Colors.orange.shade700),
+              const Icon(Icons.calculate, color: SDColors.secondary700),
               const SizedBox(width: 8),
               const Text(
                 'Simulateur de revenus',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: SDTypography.titleMedium,
               ),
             ],
           ),
           const SizedBox(height: 16),
           Text(
             'Avec ${_selectedServices.length} service${_selectedServices.length > 1 ? 's' : ''} sélectionné${_selectedServices.length > 1 ? 's' : ''} dans ${_selectedCategories.length} catégorie${_selectedCategories.length > 1 ? 's' : ''}:',
-            style: const TextStyle(fontSize: 14),
+            style: SDTypography.bodyMedium,
           ),
           const SizedBox(height: 8),
           Text(
             'Revenus estimés: ${minRevenue.toString()} - ${maxRevenue.toString()} FCFA/mois',
-            style: const TextStyle(
-              fontSize: 20,
+            style: SDTypography.titleLarge.copyWith(
               fontWeight: FontWeight.bold,
-              color: Colors.orange,
+              color: SDColors.secondary500,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             'Basé sur $_estimatedHoursPerWeek heures de travail/semaine',
-            style: TextStyle(
-              color: Colors.grey.shade700,
-              fontSize: 14,
+            style: SDTypography.bodySmall.copyWith(
+              color: SDColors.neutral700,
             ),
           ),
           const SizedBox(height: 16),
           Text(
             'Temps de travail hebdomadaire estimé:',
-            style: TextStyle(
-              color: Colors.grey.shade700,
-              fontSize: 14,
+            style: SDTypography.bodySmall.copyWith(
+              color: SDColors.neutral700,
             ),
           ),
           Slider(
@@ -375,7 +347,7 @@ class _FreelanceRegistrationContentState extends State<_FreelanceRegistrationCon
             max: 40,
             divisions: 7,
             label: '$_estimatedHoursPerWeek h',
-            activeColor: Colors.orange,
+            activeColor: SDColors.secondary500,
             onChanged: (value) {
               setState(() {
                 _estimatedHoursPerWeek = value.toInt();
@@ -407,8 +379,8 @@ class _FreelanceRegistrationContentState extends State<_FreelanceRegistrationCon
               );
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green.shade700,
-              foregroundColor: Colors.white,
+              backgroundColor: SDColors.primary700,
+              foregroundColor: SDColors.white,
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
@@ -416,10 +388,7 @@ class _FreelanceRegistrationContentState extends State<_FreelanceRegistrationCon
             ),
             child: const Text(
               'Commencer mon inscription freelance',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
+              style: SDTypography.titleMedium,
             ),
           ),
           const SizedBox(height: 12),
@@ -462,8 +431,8 @@ class _FreelanceRegistrationContentState extends State<_FreelanceRegistrationCon
               );
             },
             style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.green.shade700,
-              side: BorderSide(color: Colors.green.shade700),
+              foregroundColor: SDColors.primary700,
+              side: const BorderSide(color: SDColors.primary700),
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
@@ -471,9 +440,7 @@ class _FreelanceRegistrationContentState extends State<_FreelanceRegistrationCon
             ),
             child: const Text(
               'En savoir plus sur les conditions',
-              style: TextStyle(
-                fontSize: 16,
-              ),
+              style: SDTypography.bodyLarge,
             ),
           ),
         ],

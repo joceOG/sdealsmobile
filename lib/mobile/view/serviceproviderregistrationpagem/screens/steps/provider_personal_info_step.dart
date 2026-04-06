@@ -3,6 +3,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'dart:io';
+import '../../../../../design_system/colors.dart';
+import '../../../../../design_system/typography.dart';
 import '../../../../../data/services/api_client.dart';
 import '../../../../../data/models/categorie.dart';
 import '../../../../../data/models/service.dart';
@@ -258,12 +260,12 @@ class _ProviderPersonalInfoStepState extends State<ProviderPersonalInfoStep> {
         children: [
           const Text(
             'Informations de base',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            style: SDTypography.titleLarge,
           ),
           const SizedBox(height: 10),
-          const Text(
+          Text(
             'Remplissez ces informations essentielles pour commencer',
-            style: TextStyle(fontSize: 14, color: Colors.grey),
+            style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral500),
           ),
           const SizedBox(height: 20),
 
@@ -275,20 +277,20 @@ class _ProviderPersonalInfoStepState extends State<ProviderPersonalInfoStep> {
                   onTap: _pickImage,
                   child: CircleAvatar(
                     radius: 50,
-                    backgroundColor: Colors.grey[300],
+                    backgroundColor: SDColors.neutral200,
                     backgroundImage: _profileImage != null
                         ? FileImage(_profileImage!)
                         : null,
                     child: _profileImage == null
                         ? const Icon(Icons.add_a_photo,
-                            size: 30, color: Colors.grey)
+                            size: 30, color: SDColors.neutral500)
                         : null,
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Photo de profil (optionnelle)',
-                  style: TextStyle(fontSize: 14, color: Colors.grey),
+                  style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral500),
                 ),
               ],
             ),
@@ -430,7 +432,7 @@ class _ProviderPersonalInfoStepState extends State<ProviderPersonalInfoStep> {
           // Zones de service
           const Text(
             'Où travaillez-vous ? *',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+            style: SDTypography.titleMedium,
           ),
           const SizedBox(height: 8),
           Wrap(
@@ -451,8 +453,8 @@ class _ProviderPersonalInfoStepState extends State<ProviderPersonalInfoStep> {
                   });
                   _updateFormData();
                 },
-                selectedColor: Colors.green.shade700.withOpacity(0.3),
-                checkmarkColor: Colors.green.shade700,
+                selectedColor: SDColors.success100,
+                checkmarkColor: SDColors.success700,
               );
             }).toList(),
           ),
@@ -461,13 +463,13 @@ class _ProviderPersonalInfoStepState extends State<ProviderPersonalInfoStep> {
           // Position exacte
           const Text(
             'Votre position exacte *',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+            style: SDTypography.titleMedium,
           ),
           const SizedBox(height: 8),
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey.shade300),
+              border: Border.all(color: SDColors.neutral300),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Column(
@@ -475,12 +477,12 @@ class _ProviderPersonalInfoStepState extends State<ProviderPersonalInfoStep> {
                 if (_selectedPosition != null) ...[
                   Row(
                     children: [
-                      const Icon(Icons.location_on, color: Colors.red),
+                      const Icon(Icons.location_on, color: SDColors.error500),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           _selectedAddress ?? 'Position sélectionnée',
-                          style: const TextStyle(fontSize: 14),
+                          style: SDTypography.bodyMedium,
                         ),
                       ),
                       IconButton(
@@ -491,24 +493,24 @@ class _ProviderPersonalInfoStepState extends State<ProviderPersonalInfoStep> {
                           });
                           _updateFormData();
                         },
-                        icon: const Icon(Icons.close, color: Colors.red),
+                        icon: const Icon(Icons.close, color: SDColors.error500),
                       ),
                     ],
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'Lat: ${_selectedPosition!.latitude.toStringAsFixed(6)}, Lng: ${_selectedPosition!.longitude.toStringAsFixed(6)}',
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    style: SDTypography.bodySmall.copyWith(color: SDColors.neutral600),
                   ),
                 ] else ...[
                   Row(
                     children: [
-                      const Icon(Icons.location_off, color: Colors.grey),
+                      const Icon(Icons.location_off, color: SDColors.neutral500),
                       const SizedBox(width: 8),
-                      const Expanded(
+                      Expanded(
                         child: Text(
                           'Aucune position sélectionnée',
-                          style: TextStyle(fontSize: 14, color: Colors.grey),
+                          style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral500),
                         ),
                       ),
                     ],
@@ -530,8 +532,8 @@ class _ProviderPersonalInfoStepState extends State<ProviderPersonalInfoStep> {
                         ? 'Récupération...'
                         : 'Utiliser ma position actuelle'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      foregroundColor: Colors.white,
+                      backgroundColor: SDColors.primary600,
+                      foregroundColor: SDColors.white,
                     ),
                   ),
                 ),
@@ -545,18 +547,18 @@ class _ProviderPersonalInfoStepState extends State<ProviderPersonalInfoStep> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.red.withOpacity(0.1),
+                color: SDColors.error50,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.red.shade200),
+                border: Border.all(color: SDColors.error200),
               ),
-              child: const Row(
+              child: Row(
                 children: [
-                  Icon(Icons.warning, color: Colors.red),
-                  SizedBox(width: 8),
+                  const Icon(Icons.warning, color: SDColors.error500),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       'Veuillez sélectionner votre position exacte pour continuer',
-                      style: TextStyle(fontSize: 13, color: Colors.red),
+                      style: SDTypography.bodySmall.copyWith(color: SDColors.error600),
                     ),
                   ),
                 ],
@@ -568,18 +570,18 @@ class _ProviderPersonalInfoStepState extends State<ProviderPersonalInfoStep> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.green.withOpacity(0.1),
+              color: SDColors.success50,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.green.shade200),
+              border: Border.all(color: SDColors.success200),
             ),
-            child: const Row(
+            child: Row(
               children: [
-                Icon(Icons.check_circle, color: Colors.green),
+                Icon(Icons.check_circle, color: SDColors.success600),
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     'Profil de base créé ! Vous pourrez le compléter plus tard pour être vérifié.',
-                    style: TextStyle(fontSize: 13, color: Colors.black87),
+                    style: SDTypography.bodySmall.copyWith(color: SDColors.neutral900),
                   ),
                 ),
               ],
