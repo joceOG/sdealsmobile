@@ -52,11 +52,11 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
           if (state.isSuccess) {
             if (state.utilisateur != null && state.token != null) {
               context.read<AuthCubit>().setAuthenticated(
-                token: state.token!,
-                utilisateur: state.utilisateur!,
-                roles: [state.utilisateur!.role],
-                activeRole: state.utilisateur!.role,
-              );
+                    token: state.token!,
+                    utilisateur: state.utilisateur!,
+                    roles: [state.utilisateur!.role],
+                    activeRole: state.utilisateur!.role,
+                  );
 
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
@@ -168,7 +168,7 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
                       RegisterConfirmPasswordChanged(v),
                     ),
                   ),
-
+                  
                   SDSpacing.verticalSmallGap,
                   Row(
                     children: [
@@ -191,22 +191,22 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
                       ),
                     ],
                   ),
-
+                  
                   SDSpacing.verticalMediumGap,
-
+                  
                   SDButton(
                     text: "CRÉER MON COMPTE",
                     fullWidth: true,
                     isLoading: state.isSubmitting,
                     onPressed: agreeToTerms && !state.isSubmitting
                         ? () {
-                      context.read<RegisterPageBlocM>().add(
-                        RegisterSubmitted(),
-                      );
-                    }
+                            context.read<RegisterPageBlocM>().add(
+                                  RegisterSubmitted(),
+                                );
+                          }
                         : null,
                   ),
-
+                  
                   SDSpacing.verticalMediumGap,
                   Wrap(
                     alignment: WrapAlignment.center,
@@ -220,7 +220,7 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
                       ),
                       TextButton(
                         onPressed: () {
-                          context.go("/login");
+                          context.go("/login"); 
                         },
                         child: Text(
                           'Connectez-vous',

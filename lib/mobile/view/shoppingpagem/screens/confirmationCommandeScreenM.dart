@@ -87,19 +87,9 @@ class _ConfirmationCommandeScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: SDColors.white),
-          onPressed: () {
-            Navigator.of(context).pop();
-          },
-        ),
-        title: Text(
-          "Passez votre commande",
-          style: SDTypography.titleMedium.copyWith(color: SDColors.white, fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: SDColors.primary600,
+      appBar: SDWhiteAppBar.appBar(
         centerTitle: true,
+        title: 'Passez votre commande',
       ),
       body: BlocConsumer<ShoppingPageBlocM, ShoppingPageStateM>(
         listener: (context, state) {

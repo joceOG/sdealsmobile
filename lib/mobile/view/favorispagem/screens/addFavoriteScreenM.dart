@@ -46,17 +46,18 @@ class _AddFavoriteScreenMState extends State<AddFavoriteScreenM> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: SDColors.primary600,
-        title: Text('Ajouter un Favori', style: SDTypography.titleMedium.copyWith(color: SDColors.white)),
+      appBar: SDWhiteAppBar.appBar(
         centerTitle: true,
-        iconTheme: IconThemeData(color: SDColors.white),
+        title: 'Ajouter un Favori',
         actions: [
           TextButton(
             onPressed: _saveFavorite,
             child: Text(
               'Enregistrer',
-              style: SDTypography.labelLarge.copyWith(color: SDColors.white, fontWeight: FontWeight.bold),
+              style: SDTypography.labelLarge.copyWith(
+                color: SDColors.primary700,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ],

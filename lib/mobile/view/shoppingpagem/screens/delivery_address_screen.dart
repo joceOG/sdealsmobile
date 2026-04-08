@@ -130,13 +130,8 @@ class _DeliveryAddressScreenState extends State<DeliveryAddressScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'Adresse de livraison',
-          style: SDTypography.titleMedium.copyWith(fontWeight: FontWeight.bold, color: SDColors.white),
-        ),
-        backgroundColor: SDColors.primary600,
-        elevation: 0,
+      appBar: SDWhiteAppBar.appBar(
+        title: 'Adresse de livraison',
       ),
       body: BlocListener<ShoppingPageBlocM, ShoppingPageStateM>(
         listener: (context, state) {

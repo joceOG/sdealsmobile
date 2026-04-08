@@ -37,19 +37,15 @@ class _PanierProductScreenMState extends State<PanierProductScreenM> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          "Votre panier",
-          style: SDTypography.titleMedium.copyWith(fontWeight: FontWeight.bold, color: SDColors.white),
-        ),
-        backgroundColor: SDColors.primary600,
+      appBar: SDWhiteAppBar.appBar(
+        title: 'Votre panier',
         actions: [
           // Bouton vider le panier
           BlocBuilder<ShoppingPageBlocM, ShoppingPageStateM>(
             builder: (context, state) {
               if (state.cart != null && state.cart!.isNotEmpty) {
                 return IconButton(
-                  icon: Icon(Icons.delete_outline, color: SDColors.white),
+                  icon: const Icon(Icons.delete_outline),
                   onPressed: () {
                     showDialog(
                       context: context,

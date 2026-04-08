@@ -21,7 +21,7 @@ import 'mobile/view/serviceproviderwelcomepagem/screens/serviceProviderWelcomeSc
 import 'mobile/view/shoppingpagem/screens/productDetailsScreenM.dart';
 import 'mobile/view/shoppingpagem/shoppingpageblocm/shoppingPageBlocM.dart';
 import 'mobile/view/shoppingpagem/shoppingpageblocm/shoppingPageEventM.dart'
-as shoppingPageEventM;
+    as shoppingPageEventM;
 import 'mobile/view/splashcreenm/screens/splashScreenM.dart';
 import 'mobile/view/splashcreenm/splashscreenblocm/splashscreenBlocM.dart';
 import 'mobile/view/splashcreenm/splashscreenblocm/splashscreenEventM.dart';
@@ -243,7 +243,7 @@ class MyApp extends StatelessWidget {
             scaffoldBackgroundColor: SDColors.neutral50,
             cardColor: SDColors.white,
             dividerColor: SDColors.neutral300,
-
+            
             colorScheme: ColorScheme.light(
               primary: SDColors.primary600,
               secondary: SDColors.secondary500,
@@ -256,7 +256,7 @@ class MyApp extends StatelessWidget {
               onBackground: SDColors.neutral900,
               onError: SDColors.white,
             ),
-
+            
             // ═══════════════════════════════════════
             // TYPOGRAPHY
             // ═══════════════════════════════════════
@@ -275,7 +275,7 @@ class MyApp extends StatelessWidget {
               labelMedium: SDTypography.labelMedium,
               labelSmall: SDTypography.labelSmall,
             ),
-
+            
             // ═══════════════════════════════════════
             // APPBAR
             // ═══════════════════════════════════════
@@ -291,7 +291,7 @@ class MyApp extends StatelessWidget {
                 size: 24,
               ),
             ),
-
+            
             // ═══════════════════════════════════════
             // BUTTONS
             // ═══════════════════════════════════════
@@ -308,7 +308,7 @@ class MyApp extends StatelessWidget {
                 elevation: 2,
               ),
             ),
-
+            
             outlinedButtonTheme: OutlinedButtonThemeData(
               style: OutlinedButton.styleFrom(
                 foregroundColor: SDColors.primary600,
@@ -321,7 +321,7 @@ class MyApp extends StatelessWidget {
                 ),
               ),
             ),
-
+            
             textButtonTheme: TextButtonThemeData(
               style: TextButton.styleFrom(
                 foregroundColor: SDColors.primary600,
@@ -329,7 +329,7 @@ class MyApp extends StatelessWidget {
                 padding: SDSpacing.buttonPadding,
               ),
             ),
-
+            
             // ═══════════════════════════════════════
             // INPUT FIELDS
             // ═══════════════════════════════════════
@@ -337,7 +337,7 @@ class MyApp extends StatelessWidget {
               filled: true,
               fillColor: SDColors.white,
               contentPadding: SDSpacing.inputPadding,
-
+              
               labelStyle: SDTypography.bodyMedium.copyWith(
                 color: SDColors.neutral600,
               ),
@@ -347,7 +347,7 @@ class MyApp extends StatelessWidget {
               errorStyle: SDTypography.bodySmall.copyWith(
                 color: SDColors.error500,
               ),
-
+              
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
                 borderSide: const BorderSide(color: SDColors.neutral300, width: 1),
@@ -365,7 +365,7 @@ class MyApp extends StatelessWidget {
                 borderSide: const BorderSide(color: SDColors.error500, width: 1),
               ),
             ),
-
+            
             // ═══════════════════════════════════════
             // CARDS
             // ═══════════════════════════════════════
@@ -377,7 +377,7 @@ class MyApp extends StatelessWidget {
                 borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
               ),
             ),
-
+            
             // ═══════════════════════════════════════
             // LIST TILES
             // ═══════════════════════════════════════
@@ -388,7 +388,7 @@ class MyApp extends StatelessWidget {
                 color: SDColors.neutral600,
               ),
             ),
-
+            
             // ═══════════════════════════════════════
             // FLOATING ACTION BUTTON
             // ═══════════════════════════════════════
@@ -397,7 +397,7 @@ class MyApp extends StatelessWidget {
               foregroundColor: SDColors.white,
               elevation: 4,
             ),
-
+            
             // ═══════════════════════════════════════
             // BOTTOM NAVIGATION BAR
             // ═══════════════════════════════════════

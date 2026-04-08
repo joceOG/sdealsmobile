@@ -33,17 +33,12 @@ class _AvisPageScreenMState extends State<AvisPageScreenM> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: SDColors.primary600,
-        title: Text(
-          'Mes Avis & Évaluations',
-          style: SDTypography.titleLarge.copyWith(color: SDColors.white),
-        ),
+      appBar: SDWhiteAppBar.appBar(
         centerTitle: true,
-        leading: const BackButton(color: SDColors.white),
+        title: 'Mes Avis & Évaluations',
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh, color: SDColors.white),
+            icon: const Icon(Icons.refresh_rounded),
             onPressed: () {
               context.read<AvisPageBlocM>().add(RefreshAvisM());
             },

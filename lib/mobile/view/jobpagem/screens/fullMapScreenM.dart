@@ -281,18 +281,16 @@ class _FullMapScreenMState extends State<FullMapScreenM> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Carte Complète', style: SDTypography.titleMedium.copyWith(color: SDColors.white)),
-        backgroundColor: SDColors.primary500,
-        foregroundColor: SDColors.white,
+      appBar: SDWhiteAppBar.appBar(
+        title: 'Carte complète',
         actions: [
           IconButton(
-            icon: Icon(Icons.my_location, color: SDColors.white),
+            icon: const Icon(Icons.my_location_outlined),
             onPressed: _getCurrentLocation,
             tooltip: 'Ma position',
           ),
           IconButton(
-            icon: Icon(Icons.refresh, color: SDColors.white),
+            icon: const Icon(Icons.refresh_rounded),
             onPressed: _searchNearbyProviders,
             tooltip: 'Actualiser',
           ),

@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../morepageblocm/morePageBlocM.dart';
 import '../../../../data/services/authCubit.dart';
 import 'package:go_router/go_router.dart';
+import '../../searchpagem/screens/searchPageScreenM.dart';
+import '../../common/widgets/standard_screen_header.dart';
 
 // ✅ Design System
 import '../../../../design_system/design_system.dart';
@@ -15,12 +17,21 @@ class MorePageScreenM extends StatefulWidget {
 
 class _MorePagePageScreenStateM extends State<MorePageScreenM> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  final TextEditingController _headerSearchController = TextEditingController();
+
   @override
   void initState() {
     BlocProvider.of<MorePageBlocM>(context);
     super.initState();
   }
 
+  @override
+  void dispose() {
+    _headerSearchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       key: _scaffoldKey,
@@ -44,193 +55,111 @@ class _MorePagePageScreenStateM extends State<MorePageScreenM> {
           ],
         ),
       ),
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(170),
-        child: AppBar(
-          backgroundColor: Colors.transparent,
-          surfaceTintColor: Colors.transparent,
-          elevation: 0,
-          automaticallyImplyLeading: false,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.only(
-              bottomLeft: Radius.circular(SDSpacing.xxxl),
-              bottomRight: Radius.circular(SDSpacing.xxxl),
-            ),
-          ),
-          flexibleSpace: Container(
-            decoration: BoxDecoration(
-              gradient: SDGradients.primaryGradient,
-              boxShadow: [
-                BoxShadow(
-                  color: SDColors.neutral900.withOpacity(0.26),
-                  blurRadius: 18,
-                  offset: Offset(0, 8),
-                ),
-              ],
-              borderRadius: BorderRadius.only(
-                bottomLeft: Radius.circular(SDSpacing.xxxl),
-                bottomRight: Radius.circular(SDSpacing.xxxl),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                SDSpacing.md,
+                SDSpacing.sm,
+                SDSpacing.md,
+                0,
               ),
-            ),
-            child: SafeArea(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
-                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Padding(
-                    padding: EdgeInsets.symmetric(
-                        horizontal: SDSpacing.sm, vertical: SDSpacing.xxxs),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        GestureDetector(
-                          onTap: () {
-                            _scaffoldKey.currentState?.openDrawer();
-                          },
-                          child: Icon(Icons.menu,
-                              color: SDColors.white, size: 32),
-                        ),
-                        IconButton(
-                          icon: Icon(Icons.notifications,
-                              color: SDColors.white, size: 32),
-                          onPressed: () {},
-                        ),
-                      ],
+                  StandardScreenHeader(
+                    title: 'Plus',
+                    leading: SdCircleIconButton(
+                      icon: Icons.menu_rounded,
+                      tooltip: 'Menu',
+                      onPressed: () =>
+                          _scaffoldKey.currentState?.openDrawer(),
                     ),
-                  ),
-                  SizedBox(height: SDSpacing.xxxs),
-                  TweenAnimationBuilder<double>(
-                    tween: Tween(begin: 0, end: 1),
-                    duration: Duration(milliseconds: 700),
-                    builder: (context, value, child) => Opacity(
-                      opacity: value,
-                      child: child,
-                    ),
-                    child: Center(
-                      child: Text(
-                          'SOUTRALI DEALS',
-                          style: SDTypography.titleLarge.copyWith(
-                            color: SDColors.primary600,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.5,
-                          ),
-                        ),
-                    ),
-                  ),
-                  Padding(
-                    padding: EdgeInsets.symmetric(vertical: SDSpacing.xs),
-                    child: Align(
-                      alignment: Alignment.center,
-                      child: FractionallySizedBox(
-                        widthFactor: 0.8,
-                        child: Container(
-                          height: 52,
-                          decoration: BoxDecoration(
-                            color: SDColors.white,
-                            borderRadius: BorderRadius.circular(SDSpacing.xxxl),
-                            border: Border.all(
-                                color: SDColors.primary200, width: 1.4),
-                            boxShadow: [
-                              BoxShadow(
-                                color: SDColors.primary600.withOpacity(0.07),
-                                blurRadius: 10,
-                                offset: Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            children: [
-                              SizedBox(width: SDSpacing.sm),
-                              Material(
-                                color: SDColors.primary600,
-                                shape: CircleBorder(),
-                                elevation: 2,
-                                child: Padding(
-                                  padding: EdgeInsets.all(SDSpacing.xxs),
-                                  child: Icon(Icons.search_rounded,
-                                      color: SDColors.white, size: 22),
-                                ),
-                              ),
-                              SizedBox(width: SDSpacing.xs),
-                              Expanded(
-                                child: TextField(
-                                  style: SDTypography.bodyMedium,
-                                  cursorColor: SDColors.primary600,
-                                  decoration: InputDecoration(
-                                    hintText: 'Rechercher sur soutralideals',
-                                    hintStyle: SDTypography.bodyMedium.copyWith(
-                                      color: SDColors.primary600,
-                                    ),
-                                    border: InputBorder.none,
-                                    enabledBorder: InputBorder.none,
-                                    focusedBorder: InputBorder.none,
-                                    isDense: true,
-                                    contentPadding:
-                                        EdgeInsets.symmetric(vertical: SDSpacing.sm),
-                                  ),
-                                ),
-                              ),
-                              SizedBox(width: SDSpacing.sm),
-                            ],
-                          ),
-                        ),
+                    actions: [
+                      SdCircleIconButton(
+                        icon: Icons.notifications_outlined,
+                        tooltip: 'Notifications',
+                        onPressed: () {},
                       ),
-                    ),
+                    ],
+                  ),
+                  SizedBox(height: SDSpacing.md),
+                  FreelanceStyleSearchBar(
+                    controller: _headerSearchController,
+                    hintText: 'Rechercher sur soutralideals',
+                    onTunePressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const SearchPageScreenM(),
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),
             ),
           ),
-        ),
-      ),
-      body: Padding(
-        padding: EdgeInsets.symmetric(horizontal: SDSpacing.lg, vertical: SDSpacing.xs),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(height: SDSpacing.lg),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                Expanded(
-                  child: _AnimatedCardWithBadge(
-                    icon: Icons.article_rounded,
-                    label: 'Soutra News',
-                    badge: 'Nouveau',
-                    gradient: LinearGradient(
-                      colors: [SDColors.success500, SDColors.success600],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    onTap: () {
-                      // TODO: Naviguer vers Soutra News
-                    },
+          Expanded(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.symmetric(
+                  horizontal: SDSpacing.lg, vertical: SDSpacing.xs),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(height: SDSpacing.lg),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      Expanded(
+                        child: _AnimatedCardWithBadge(
+                          icon: Icons.article_rounded,
+                          label: 'Soutra News',
+                          badge: 'Nouveau',
+                          gradient: LinearGradient(
+                            colors: [
+                              SDColors.success500,
+                              SDColors.success600
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          onTap: () {
+                            // TODO: Naviguer vers Soutra News
+                          },
+                        ),
+                      ),
+                      SizedBox(width: SDSpacing.md),
+                      Expanded(
+                        child: _AnimatedCardWithBadge(
+                          icon: Icons.account_balance_wallet_rounded,
+                          label: 'Soutra Pay',
+                          badge: 'Nouveau',
+                          gradient: LinearGradient(
+                            colors: [
+                              SDColors.success500,
+                              SDColors.success600
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          onTap: () {
+                            // TODO: Naviguer vers Soutra Pay
+                          },
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                SizedBox(width: SDSpacing.md),
-                Expanded(
-                  child: _AnimatedCardWithBadge(
-                    icon: Icons.account_balance_wallet_rounded,
-                    label: 'Soutra Pay',
-                    badge: 'Nouveau',
-                    gradient: LinearGradient(
-                      colors: [SDColors.success500, SDColors.success600],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    onTap: () {
-                      // TODO: Naviguer vers Soutra Pay
-                    },
-                  ),
-                ),
-              ],
+                  SizedBox(height: SDSpacing.md),
+                  _buildPrestataireModeCard(),
+                  SizedBox(height: SDSpacing.lg),
+                ],
+              ),
             ),
-            SizedBox(height: SDSpacing.md),
-            // 🎯 CARTE MODE PRESTATAIRE
-            _buildPrestataireModeCard(),
-            SizedBox(height: SDSpacing.lg),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

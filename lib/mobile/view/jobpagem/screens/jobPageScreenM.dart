@@ -13,6 +13,7 @@ import 'package:sdealsmobile/mobile/view/jobpagem/screens/providers_list_screen.
 import 'package:sdealsmobile/mobile/view/common/widgets/ai_price_estimator_widget.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:flutter/foundation.dart';
 import '../services/custom_marker_service.dart';
 import '../utils/navigation_helper.dart';
@@ -42,6 +43,7 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
   // GoogleMapController? _mapController; // Supprimé car non utilisé
   Set<Marker> _markers = {};
   LatLng? _userLocation;
+  String _locationLabel = 'Localisation...';
   double _searchRadius = 5.0;
   String _selectedCategory = '';
   String _selectedService = '';
@@ -184,6 +186,7 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
       setState(() {
         _userLocation = LatLng(position.latitude, position.longitude);
       });
+      await _updateLocationLabel(position.latitude, position.longitude);
 
       // Charger les prestataires à proximité (remplace les prestataires par défaut)
       if (_userLocation != null) {
@@ -199,6 +202,38 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
     } catch (e) {
       print('❌ Erreur géolocalisation: $e - utilisation des prestataires par défaut');
     }
+  }
+
+  Future<void> _updateLocationLabel(double latitude, double longitude) async {
+    try {
+      final placemarks = await placemarkFromCoordinates(latitude, longitude);
+      if (!mounted) return;
+      if (placemarks.isNotEmpty) {
+        final p = placemarks.first;
+        final area = (p.subLocality?.isNotEmpty == true)
+            ? p.subLocality
+            : (p.locality?.isNotEmpty == true ? p.locality : null);
+        final city = (p.locality?.isNotEmpty == true) ? p.locality : p.country;
+        setState(() {
+          _locationLabel = [area, city]
+              .where((part) => part != null && part!.trim().isNotEmpty)
+              .map((part) => part!.trim())
+              .take(2)
+              .join(', ');
+          if (_locationLabel.isEmpty) {
+            _locationLabel = 'Position actuelle';
+          }
+        });
+        return;
+      }
+    } catch (e) {
+      print('Erreur geocoding localisation: $e');
+    }
+    if (!mounted) return;
+    setState(() {
+      _locationLabel =
+          '${latitude.toStringAsFixed(3)}, ${longitude.toStringAsFixed(3)}';
+    });
   }
 
   void _updateMapMarkers(List<dynamic> providers) async {
@@ -271,46 +306,18 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
           ..add(LoadServiceDataJobM()),
         child: Scaffold(
           backgroundColor: SDColors.white,
-          floatingActionButton: FloatingActionButton(
-            onPressed: () {
-              final authState = context.read<AuthCubit>().state;
-              if (authState is! AuthAuthenticated) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content: Text('Veuillez vous connecter pour continuer')),
-                );
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const LoginPageScreenM()),
-                );
-                return;
-              }
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) =>
-                      const ServiceProviderWelcomeScreenM(categories: []),
-                ),
-              );
-            },
-            backgroundColor: SDColors.primary600,
-            child: const Icon(Icons.handyman, color: SDColors.white),
-            tooltip: 'Devenir Prestataire',
-          ),
-          body: BlocListener<JobPageBlocM, JobPageStateM>(
-            listener: (context, state) {
-              if (state.nearbyProviders.isNotEmpty) {
-                _updateMapMarkers(state.nearbyProviders);
-              }
-            },
-            child: CustomScrollView(
+          floatingActionButton: null,
+          body: SafeArea(
+            top: true,
+            bottom: false,
+            child: BlocListener<JobPageBlocM, JobPageStateM>(
+              listener: (context, state) {
+                if (state.nearbyProviders.isNotEmpty) {
+                  _updateMapMarkers(state.nearbyProviders);
+                }
+              },
+              child: CustomScrollView(
               slivers: [
-                // Banner promo sticky (si newbie)
-                _buildPromoStickyBanner(context),
-
-                // Bannière (remplace SoutraPay + IA)
-                _buildHomeBannerSliver(context),
-
                 // Contenu principal
                 SliverToBoxAdapter(
                   child: Padding(
@@ -318,7 +325,9 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        SizedBox(height: SDSpacing.lg),
+                        SizedBox(height: SDSpacing.sm),
+                        _buildMetiersTopHeader(),
+                        SizedBox(height: SDSpacing.sm),
                         
                         // 🎯 SECTION 1 : HERO SEARCH BAR
                         _buildHeroSearchBar(),
@@ -332,7 +341,7 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                             Expanded(
                               child: Text(
                                 'Catégories',
-                                style: SDTypography.titleLarge.copyWith(color: SDColors.neutral900),
+                                style: SDTypography.titleMedium.copyWith(color: SDColors.neutral900),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
@@ -370,7 +379,7 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                             }
 
                             return SizedBox(
-                              height: 120,
+                              height: 108,
                               child: ListView.separated(
                                 scrollDirection: Axis.horizontal,
                                 itemCount: state.listItems.length,
@@ -397,7 +406,7 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                             Expanded(
                               child: Text(
                                 'Services populaires',
-                                style: SDTypography.titleLarge.copyWith(color: SDColors.neutral900),
+                                style: SDTypography.titleMedium.copyWith(color: SDColors.neutral900),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
@@ -569,15 +578,16 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                         ),
                         SizedBox(height: SDSpacing.lg),
 
-                        // Prestataires
+                        // Artisans proches de vous
                         Row(
                           children: [
                             Icon(Icons.people, color: SDColors.primary600, size: 22),
                             SizedBox(width: SDSpacing.xs),
                             Expanded(
                               child: Text(
-                                'Prestataires',
-                                style: SDTypography.titleLarge.copyWith(color: SDColors.neutral900),
+                                'Artisans proches de vous',
+                                style: SDTypography.titleMedium.copyWith(color: SDColors.neutral900),
+                                maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
@@ -591,7 +601,7 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                                 );
                               },
                               icon: const Icon(Icons.arrow_forward, size: 14),
-                              label: Text('Tout', style: SDTypography.labelSmall),
+                              label: Text('Voir tout', style: SDTypography.labelSmall),
                               style: TextButton.styleFrom(
                                 foregroundColor: SDColors.primary600,
                                 padding: SDSpacing.chipPadding,
@@ -632,7 +642,7 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                                     children: const [
                                       CircularProgressIndicator(color: Color(0xFF2E7D32)),
                                       SizedBox(height: 8),
-                                      Text('Chargement des prestataires...'),
+                                      Text('Chargement des artisans...'),
                                     ],
                                   ),
                                 ),
@@ -642,7 +652,7 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                             return SizedBox(
                               height: 150,
                               child: Center(
-                                child: Text('Aucun prestataire trouvé',
+                                child: Text('Aucun artisan trouvé',
                                     style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral500)),
                               ),
                             );
@@ -858,13 +868,6 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                         // 📍 AUTOUR DE MOI (Carte interactive + liste)
                         _buildAroundMeSection(),
                         SizedBox(height: SDSpacing.xl),
-
-                        // 🔥 Promotions
-                        _buildActivePromotionsSection(),
-                        SizedBox(height: SDSpacing.xl),
-
-                        // Actions rapides (en dernier)
-                        _buildQuickActionsSection(),
                         
                         SizedBox(height: SDSpacing.xxl), // Espacement final pour FAB
                       ],
@@ -872,12 +875,53 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                   ),
                 ),
               ],
+              ),
             ),
           ),
         ));
   }
-
-
+  Widget _buildMetiersTopHeader() {
+    return Row(
+      children: [
+        Container(
+          padding: EdgeInsets.symmetric(
+              horizontal: SDSpacing.xs, vertical: SDSpacing.xxxs),
+          decoration: BoxDecoration(
+            color: SDColors.primary50.withOpacity(0.9),
+            borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
+            border: Border.all(color: SDColors.primary100),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.location_on, color: SDColors.primary600, size: 16),
+              SizedBox(width: SDSpacing.xxxs),
+              Text(
+                _locationLabel,
+                style:
+                    SDTypography.labelSmall.copyWith(color: SDColors.neutral700),
+              ),
+              Icon(Icons.keyboard_arrow_down,
+                  color: SDColors.neutral600, size: 16),
+            ],
+          ),
+        ),
+        const Spacer(),
+        Container(
+          decoration: BoxDecoration(
+            color: SDColors.white,
+            shape: BoxShape.circle,
+            border: Border.all(color: SDColors.neutral200),
+          ),
+          child: IconButton(
+            onPressed: () => Navigator.of(context).maybePop(),
+            icon: const Icon(Icons.close, color: SDColors.neutral900),
+            tooltip: 'Fermer',
+            visualDensity: VisualDensity.compact,
+          ),
+        ),
+      ],
+    );
+  }
 
   // ✅ NOUVEAU : Banner promo sticky pour newbies
   Widget _buildPromoStickyBanner(BuildContext context) {
@@ -1169,23 +1213,23 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
   // 🎯 Hero Search Bar — réduit pour laisser place à la bannière
   Widget _buildHeroSearchBar() {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: SDSpacing.md, vertical: SDSpacing.sm),
+      padding: EdgeInsets.symmetric(horizontal: SDSpacing.sm, vertical: SDSpacing.xs),
       decoration: BoxDecoration(
         color: SDColors.white,
-        borderRadius: BorderRadius.circular(SDSpacing.lg),
+        borderRadius: BorderRadius.circular(28),
         border: Border.all(color: SDColors.primary100, width: 1),
         boxShadow: [
           BoxShadow(
             color: SDColors.neutral900.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            blurRadius: 6,
+            offset: const Offset(0, 1),
           ),
         ],
       ),
       child: Row(
         children: [
-          Icon(Icons.search, color: SDColors.primary600, size: 22),
-          SizedBox(width: SDSpacing.sm),
+          Icon(Icons.search, color: SDColors.primary600, size: 20),
+          SizedBox(width: SDSpacing.xs),
           Expanded(
             child: GestureDetector(
               onTap: () {
@@ -1194,9 +1238,10 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                 );
               },
               child: Text(
-                'Rechercher un service, prestataire...',
+                'Quel artisan cherchez-vous ?',
                 style: SDTypography.bodyMedium.copyWith(
                   color: SDColors.neutral400,
+                  fontSize: 13,
                 ),
               ),
             ),
@@ -1208,12 +1253,13 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
               );
             },
             child: Container(
-              padding: EdgeInsets.all(SDSpacing.xs),
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
                 color: SDColors.primary600,
-                borderRadius: BorderRadius.circular(SDSpacing.sm),
+                borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(Icons.tune, color: SDColors.white, size: 20),
+              child: Icon(Icons.tune, color: SDColors.white, size: 17),
             ),
           ),
         ],
@@ -1345,7 +1391,7 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                     SizedBox(width: SDSpacing.xs),
                     Text(
                       'Autour de moi',
-                      style: SDTypography.titleLarge.copyWith(
+                      style: SDTypography.titleMedium.copyWith(
                         color: SDColors.neutral900,
                         fontWeight: FontWeight.bold,
                       ),
@@ -2040,11 +2086,11 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
   Widget _buildCategoryCardWithImage(
       String name, String? imageUrl, IconData fallbackIcon) {
     return Container(
-      width: 100,
+      width: 88,
       margin: EdgeInsets.symmetric(vertical: SDSpacing.xxxs),
       decoration: BoxDecoration(
         color: SDColors.primary50,
-        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
+        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
         boxShadow: [
           BoxShadow(color: SDColors.neutral900.withOpacity(0.05), blurRadius: 4)
         ],
@@ -2056,19 +2102,20 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
             ClipOval(
             child: AppImage(
                 imageUrl: imageUrl,
-                width: 60,
-                height: 60,
+                width: 46,
+                height: 46,
                 fit: BoxFit.cover,
                 // Error icon handled by AppImage
               ),
             )
           else
-            Icon(fallbackIcon, color: SDColors.primary600, size: 40),
+            Icon(fallbackIcon, color: SDColors.primary600, size: 28),
           SizedBox(height: SDSpacing.xxs),
           Text(
             name,
             style: SDTypography.labelSmall.copyWith(
               color: SDColors.neutral900,
+              fontSize: 11,
             ),
             textAlign: TextAlign.center,
             maxLines: 1,

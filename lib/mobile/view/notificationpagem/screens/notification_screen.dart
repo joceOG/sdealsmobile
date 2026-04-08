@@ -91,17 +91,8 @@ class _NotificationScreenState extends State<NotificationScreen>
 
   // 🎨 APP BAR MAGNIFIQUE
   PreferredSizeWidget _buildAppBar() {
-    return AppBar(
-      elevation: 0,
-      backgroundColor: SDColors.primary600,
-      foregroundColor: SDColors.white,
-      title: Text(
-        'Mes Notifications',
-        style: SDTypography.titleMedium.copyWith(
-          color: SDColors.white,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
+    return SDWhiteAppBar.appBar(
+      title: 'Mes Notifications',
       actions: [
         BlocBuilder<NotificationBloc, NotificationState>(
           builder: (context, state) {
@@ -109,7 +100,7 @@ class _NotificationScreenState extends State<NotificationScreen>
               return Stack(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.mark_email_read),
+                    icon: const Icon(Icons.mark_email_read_outlined),
                     onPressed: _markAllAsRead,
                   ),
                   Positioned(
@@ -139,7 +130,7 @@ class _NotificationScreenState extends State<NotificationScreen>
               );
             }
             return IconButton(
-              icon: const Icon(Icons.mark_email_read),
+              icon: const Icon(Icons.mark_email_read_outlined),
               onPressed: _markAllAsRead,
             );
           },
