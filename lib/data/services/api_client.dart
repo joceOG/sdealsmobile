@@ -9,8 +9,17 @@ import '../models/article.dart';
 import '../models/groupe.dart';
 import '../models/service.dart';
 import 'cache_service.dart';
+import 'token_store.dart';
 
 // http://180.149.197.115:3000/
+
+// Exception spéciale pour forcer le re-login côté UI
+class UnauthorizedException implements Exception {
+  final String message;
+  const UnauthorizedException([this.message = 'Session expirée. Veuillez vous reconnecter.']);
+  @override
+  String toString() => message;
+}
 
 class ApiClient {
   // URL de production
@@ -19,44 +28,160 @@ class ApiClient {
 
   var apiUrl = dotenv.env['API_URL'];
 
+  // Callback déclenché quand le token est invalide/expiré — pour forcer logout
+  static void Function()? onUnauthorized;
+
+  bool _refreshInFlight = false;
+
   // 🔧 MÉTHODES HTTP GÉNÉRIQUES
-  Future<http.Response> get(String endpoint) async {
+  Map<String, String> _headers({String? token}) {
+    return {
+      'Content-Type': 'application/json',
+      if (token != null) 'Authorization': 'Bearer $token',
+    };
+  }
+
+  Future<String?> _resolveAccessToken({String? token}) async {
+    if (token != null && token.isNotEmpty) return token;
+    return TokenStore.getAccessToken();
+  }
+
+  /// Rotation refresh token (aligné backend `/api/refresh-token`).
+  Future<String?> refreshAccessToken() async {
+    if (_refreshInFlight) return TokenStore.getAccessToken();
+    _refreshInFlight = true;
+    try {
+      final refresh = await TokenStore.getRefreshToken();
+      if (refresh == null || refresh.isEmpty) return null;
+
+      final response = await http
+          .post(
+            Uri.parse('$apiUrl/refresh-token'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'refreshToken': refresh}),
+          )
+          .timeout(const Duration(seconds: 15));
+
+      if (response.statusCode != 200) return null;
+
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final newAccess = data['token']?.toString();
+      final newRefresh = data['refreshToken']?.toString();
+      if (newAccess == null || newAccess.isEmpty) return null;
+
+      await TokenStore.saveTokens(
+        accessToken: newAccess,
+        refreshToken: newRefresh,
+      );
+      return newAccess;
+    } catch (_) {
+      return null;
+    } finally {
+      _refreshInFlight = false;
+    }
+  }
+
+  /// JWT court Socket.io (`POST /socket-token`).
+  Future<String> createSocketToken(String accessToken) async {
+    final response = await http
+        .post(
+          Uri.parse('$apiUrl/socket-token'),
+          headers: _headers(token: accessToken),
+        )
+        .timeout(const Duration(seconds: 10));
+
+    if (response.statusCode == 401) {
+      final refreshed = await refreshAccessToken();
+      if (refreshed != null) {
+        final retry = await http
+            .post(
+              Uri.parse('$apiUrl/socket-token'),
+              headers: _headers(token: refreshed),
+            )
+            .timeout(const Duration(seconds: 10));
+        if (retry.statusCode == 200) {
+          final data = jsonDecode(retry.body) as Map<String, dynamic>;
+          final socketToken = data['socketToken']?.toString();
+          if (socketToken != null && socketToken.isNotEmpty) return socketToken;
+        }
+      }
+      _checkUnauthorized(response);
+    }
+
+    if (response.statusCode != 200) {
+      throw Exception('Erreur socket-token ${response.statusCode}');
+    }
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    final socketToken = data['socketToken']?.toString();
+    if (socketToken == null || socketToken.isEmpty) {
+      throw Exception('socketToken manquant');
+    }
+    return socketToken;
+  }
+
+  // Vérifie si une réponse 401 doit déclencher un logout
+  void _checkUnauthorized(http.Response response) {
+    if (response.statusCode == 401) {
+      onUnauthorized?.call();
+      throw const UnauthorizedException();
+    }
+  }
+
+  Future<http.Response> get(String endpoint, {String? token}) async {
     final response = await http.get(
       Uri.parse('$apiUrl$endpoint'),
-      headers: {'Content-Type': 'application/json'},
+      headers: _headers(token: token),
     ).timeout(const Duration(seconds: 30));
+    if (token != null) _checkUnauthorized(response);
     return response;
   }
 
   Future<http.Response> post(String endpoint,
-      {Map<String, dynamic>? body}) async {
+      {Map<String, dynamic>? body, String? token}) async {
     final response = await http
         .post(
           Uri.parse('$apiUrl$endpoint'),
-          headers: {'Content-Type': 'application/json'},
+          headers: _headers(token: token),
           body: body != null ? jsonEncode(body) : null,
         )
         .timeout(const Duration(seconds: 30));
+    if (token != null) _checkUnauthorized(response);
     return response;
   }
 
   Future<http.Response> put(String endpoint,
-      {Map<String, dynamic>? body}) async {
+      {Map<String, dynamic>? body, String? token}) async {
     final response = await http
         .put(
           Uri.parse('$apiUrl$endpoint'),
-          headers: {'Content-Type': 'application/json'},
+          headers: _headers(token: token),
           body: body != null ? jsonEncode(body) : null,
         )
         .timeout(const Duration(seconds: 30));
+    if (token != null) _checkUnauthorized(response);
     return response;
   }
 
-  Future<http.Response> delete(String endpoint) async {
+  Future<http.Response> delete(String endpoint, {String? token, Map<String, dynamic>? body}) async {
     final response = await http.delete(
       Uri.parse('$apiUrl$endpoint'),
-      headers: {'Content-Type': 'application/json'},
+      headers: _headers(token: token),
+      body: body != null ? jsonEncode(body) : null,
     ).timeout(const Duration(seconds: 30));
+    if (token != null) _checkUnauthorized(response);
+    return response;
+  }
+
+  Future<http.Response> patch(String endpoint,
+      {Map<String, dynamic>? body, String? token}) async {
+    final response = await http
+        .patch(
+          Uri.parse('$apiUrl$endpoint'),
+          headers: _headers(token: token),
+          body: body != null ? jsonEncode(body) : null,
+        )
+        .timeout(const Duration(seconds: 30));
+    if (token != null) _checkUnauthorized(response);
     return response;
   }
 
@@ -119,16 +244,6 @@ class ApiClient {
     } catch (e) {
       throw Exception('Erreur API: $e');
     }
-  }
-
-  Future<http.Response> patch(String endpoint,
-      {Map<String, dynamic>? body}) async {
-    final response = await http.patch(
-      Uri.parse('$apiUrl$endpoint'),
-      headers: {'Content-Type': 'application/json'},
-      body: body != null ? jsonEncode(body) : null,
-    );
-    return response;
   }
 
   Future<List<Categorie>> fetchCategorie(String nomGroupe) async {
@@ -443,10 +558,10 @@ class ApiClient {
       {required String fullName,
       required String phone,
       required String password,
+      String? email,
       String role = "Client"}) async {
     final url = Uri.parse("$apiUrl/register");
 
-    // Découper le fullName en nom et prénom
     final parts = fullName.trim().split(" ");
     final nom = parts.isNotEmpty ? parts.first : "";
     final prenom = parts.length > 1 ? parts.sublist(1).join(" ") : "";
@@ -455,16 +570,19 @@ class ApiClient {
     print(
         "📤 Données envoyées: { nom: $nom, prenom: $prenom, telephone: $phone, password: *****, role: $role }");
 
+    final body = <String, dynamic>{
+      "nom": nom,
+      "prenom": prenom,
+      "telephone": phone,
+      "password": password,
+      "role": role,
+    };
+    if (email != null && email.isNotEmpty) body["email"] = email;
+
     final response = await http.post(
       url,
       headers: {"Content-Type": "application/json"},
-      body: jsonEncode({
-        "nom": nom,
-        "prenom": prenom,
-        "telephone": phone,
-        "password": password, // 👈 correspond à ton backend
-        "role": role, // ✅ Ajouter le rôle
-      }),
+      body: jsonEncode(body),
     );
 
     print("📥 StatusCode: ${response.statusCode}");
@@ -475,15 +593,16 @@ class ApiClient {
       print("✅ Succès Register: $data");
       return data;
     } else {
+      String message;
       try {
         final error = jsonDecode(response.body);
         print("❌ Erreur API Register: $error");
-        throw Exception(
-            error["error"] ?? error["message"] ?? "Erreur d'inscription");
-      } catch (e) {
+        message = error["error"] ?? error["message"] ?? "Erreur d'inscription";
+      } catch (_) {
         print("⚠️ Impossible de parser l'erreur: ${response.body}");
-        throw Exception("Erreur inconnue (${response.statusCode})");
+        message = "Erreur inconnue (${response.statusCode})";
       }
+      throw Exception(message);
     }
   }
 
@@ -553,6 +672,32 @@ class ApiClient {
     } catch (e) {
       throw Exception('Erreur getUserRoles: $e');
     }
+  }
+
+  /// Offres « service » pour l’accueil (GET /freelance-services/home).
+  Future<Map<String, dynamic>> fetchHomeFreelanceServices({int limit = 12}) async {
+    final base = dotenv.env['API_URL'] ?? '';
+    final uri = Uri.parse('$base/freelance-services/home').replace(
+      queryParameters: {'limit': limit.toString()},
+    );
+    final response = await http.get(uri);
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception(
+        'Échec freelance-services/home: ${response.statusCode} ${response.body}');
+  }
+
+  /// Détail d’une offre catalogue freelance (GET /freelance-services/:id).
+  Future<Map<String, dynamic>> fetchFreelanceServiceById(String id) async {
+    final base = dotenv.env['API_URL'] ?? '';
+    final uri = Uri.parse('$base/freelance-services/$id');
+    final response = await http.get(uri);
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception(
+        'Échec freelance-services/$id: ${response.statusCode} ${response.body}');
   }
 
   // ✅ NOUVELLE MÉTHODE : Récupérer tous les freelances (avec pagination)
@@ -630,19 +775,23 @@ class ApiClient {
   }
 
   // ✅ NOUVELLE MÉTHODE : Récupérer tous les prestataires
-  Future<List<Map<String, dynamic>>> fetchPrestataires() async {
+  Future<List<Map<String, dynamic>>> fetchPrestataires({bool forceRefresh = false}) async {
     print('🚀 Récupération des prestataires depuis le backend');
     print('🌐 URL complète: ${dotenv.env['API_URL']}/prestataire');
     const cacheKey = 'all_prestataires';
 
-    // 1️⃣ Cache
-    try {
-       final cachedData = await CacheService().getCachedData(cacheKey);
-       if (cachedData != null) {
-         print('📦 Prestataires récupérés du cache');
-         return (cachedData as List).cast<Map<String, dynamic>>();
-       }
-    } catch(e) { print('Erreur cache prestataires: $e'); }
+    // 1️⃣ Cache (sauf si refresh forcé)
+    if (!forceRefresh) {
+      try {
+        final cachedData = await CacheService().getCachedData(cacheKey);
+        if (cachedData != null) {
+          print('📦 Prestataires récupérés du cache');
+          return (cachedData as List).cast<Map<String, dynamic>>();
+        }
+      } catch (e) {
+        print('Erreur cache prestataires: $e');
+      }
+    }
 
     // 2️⃣ API
 
@@ -664,7 +813,11 @@ class ApiClient {
 
         // Retourner la liste de Map pour que le BLoC puisse la convertir
         List<Map<String, dynamic>> result = prestatairesJson.cast<Map<String, dynamic>>();
-        await CacheService().cacheData(cacheKey, result);
+        await CacheService().cacheData(
+          cacheKey,
+          result,
+          ttl: const Duration(minutes: 2),
+        );
         return result;
       } else {
         print('❌ Erreur HTTP ${response.statusCode}: ${response.body}');
@@ -673,6 +826,16 @@ class ApiClient {
       }
     } catch (e) {
       print('🔥 Erreur dans fetchPrestataires: $e');
+      // Si refresh forcé échoue, tenter quand même le cache
+      if (forceRefresh) {
+        try {
+          final cachedData = await CacheService().getCachedData(cacheKey);
+          if (cachedData != null) {
+            print('📦 Fallback cache prestataires (après échec refresh)');
+            return (cachedData as List).cast<Map<String, dynamic>>();
+          }
+        } catch (_) {}
+      }
       // Utiliser les données de fallback en cas d'erreur
       return _getFallbackPrestataires();
     }
@@ -846,9 +1009,16 @@ class ApiClient {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return data['distance']?.toDouble() ?? 0.0;
+        // Le backend renvoie { success, distance: { text, value }, duration: { text, value } }
+        // distance.value est en mètres, on convertit en km
+        final distanceObj = data['distance'];
+        if (distanceObj is Map) {
+          final meters = (distanceObj['value'] as num?)?.toDouble() ?? 0.0;
+          return meters / 1000.0;
+        }
+        // Fallback si format inattendu
+        return _calculateLocalDistance(lat1, lng1, lat2, lng2);
       } else {
-        // Fallback vers calcul local si l'API échoue
         return _calculateLocalDistance(lat1, lng1, lat2, lng2);
       }
     } catch (e) {
@@ -968,10 +1138,20 @@ class ApiClient {
     String keyword = '',
   }) async {
     try {
-      final response = await http.get(
-        Uri.parse('${dotenv.env['API_URL']}/maps/nearby'),
-        headers: {'Content-Type': 'application/json'},
+      // Correction : lat et lng sont obligatoires côté backend
+      final uri = Uri.parse('${dotenv.env['API_URL']}/maps/nearby').replace(
+        queryParameters: {
+          'lat': lat.toString(),
+          'lng': lng.toString(),
+          'radius': radius.toString(),
+          'type': type,
+          if (keyword.isNotEmpty) 'keyword': keyword,
+        },
       );
+      final response = await http.get(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -1208,7 +1388,7 @@ extension ServiceRequestsApi on ApiClient {
     String? serviceId,
     String? adresse,
     String? ville,
-    DateTime? dateHeure,
+    DateTime? datePrestation,
     String? notesClient,
     String? moyenPaiement,
     num? montant,
@@ -1220,7 +1400,7 @@ extension ServiceRequestsApi on ApiClient {
       if (serviceId != null) 'service': serviceId,
       if (adresse != null) 'adresse': adresse,
       if (ville != null) 'ville': ville,
-      if (dateHeure != null) 'dateHeure': dateHeure.toIso8601String(),
+      if (datePrestation != null) 'datePrestation': datePrestation.toIso8601String(),
       if (notesClient != null) 'notesClient': notesClient,
       if (moyenPaiement != null) 'moyenPaiement': moyenPaiement,
       // 💰 SYSTÈME GRATUIT - Montant toujours 0
@@ -1269,12 +1449,35 @@ extension ServiceRequestsApi on ApiClient {
     throw Exception('Erreur getMyPrestations: ${res.statusCode}');
   }
 
+  // ✅ Récupérer un prestataire par l'ID de son utilisateur
+  Future<Map<String, dynamic>?> getPrestataireByUserId(String userId, String token) async {
+    try {
+      final uri = Uri.parse('$apiUrl/prestataire').replace(queryParameters: {'utilisateur': userId});
+      final res = await http.get(uri, headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      }).timeout(const Duration(seconds: 10));
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        final list = data is List ? data : (data['prestataires'] ?? []);
+        if ((list as List).isEmpty) return null;
+        return list[0] as Map<String, dynamic>;
+      }
+      return null;
+    } catch (e) {
+      print('Erreur getPrestataireByUserId: $e');
+      return null;
+    }
+  }
+
   // ✅ Récupérer prestations par statut (pour prestataires)
   Future<List<Map<String, dynamic>>> getPrestationsByStatus({
     required String token,
     required String status,
+    String? prestataireId,
   }) async {
-    final query = {'status': status};
+    final query = <String, String>{'statut': status};
+    if (prestataireId != null) query['prestataireId'] = prestataireId;
     final uri =
         Uri.parse('$apiUrl/prestations').replace(queryParameters: query);
     final res = await http.get(uri, headers: {
@@ -1540,9 +1743,60 @@ extension CartApi on ApiClient {
 
 // 💬 MESSAGERIE API
 extension MessagerieApi on ApiClient {
+  Future<http.Response> _authedGet(Uri uri, {String? token}) async {
+    var access = await _resolveAccessToken(token: token);
+    var response = await http
+        .get(uri, headers: _headers(token: access))
+        .timeout(const Duration(seconds: 30));
+    if (response.statusCode == 401) {
+      final refreshed = await refreshAccessToken();
+      if (refreshed != null) {
+        response = await http
+            .get(uri, headers: _headers(token: refreshed))
+            .timeout(const Duration(seconds: 30));
+      }
+    }
+    if (response.statusCode == 401) _checkUnauthorized(response);
+    return response;
+  }
+
+  Future<http.Response> _authedPatch(
+    String endpoint, {
+    Map<String, dynamic>? body,
+    String? token,
+  }) async {
+    var access = await _resolveAccessToken(token: token);
+    var response = await patch(endpoint, body: body, token: access);
+    if (response.statusCode == 401) {
+      final refreshed = await refreshAccessToken();
+      if (refreshed != null) {
+        response = await patch(endpoint, body: body, token: refreshed);
+      }
+    }
+    if (response.statusCode == 401) _checkUnauthorized(response);
+    return response;
+  }
+
+  Future<http.Response> _authedPostJson(
+    String endpoint, {
+    Map<String, dynamic>? body,
+    String? token,
+  }) async {
+    var access = await _resolveAccessToken(token: token);
+    var response = await post(endpoint, body: body, token: access);
+    if (response.statusCode == 401) {
+      final refreshed = await refreshAccessToken();
+      if (refreshed != null) {
+        response = await post(endpoint, body: body, token: refreshed);
+      }
+    }
+    if (response.statusCode == 401) _checkUnauthorized(response);
+    return response;
+  }
+
   // 📋 Récupérer les conversations d'un utilisateur
   Future<List<Map<String, dynamic>>> getConversations(String userId,
-      {int page = 1, int limit = 50}) async {
+      {int page = 1, int limit = 50, String? token}) async {
     try {
       print('📋 Récupération conversations pour utilisateur: $userId');
 
@@ -1553,12 +1807,11 @@ extension MessagerieApi on ApiClient {
         },
       );
 
-      final response = await http.get(uri).timeout(const Duration(seconds: 30));
+      final response = await _authedGet(uri, token: token);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
 
-        // Gérer structure paginée ou array direct
         if (data is Map && data.containsKey('conversations')) {
           final List<dynamic> conversations = data['conversations'];
           print('✅ ${conversations.length} conversations récupérées (paginé)');
@@ -1583,24 +1836,30 @@ extension MessagerieApi on ApiClient {
     String conversationId, {
     int page = 1,
     int limit = 100,
+    String? userId,
+    String? token,
   }) async {
     try {
       print('💬 Récupération messages pour conversation: $conversationId');
 
+      final query = <String, String>{
+        'page': page.toString(),
+        'limit': limit.toString(),
+      };
+      if (userId != null && userId.isNotEmpty) {
+        query['userId'] = userId;
+      }
+
       final uri =
           Uri.parse('$apiUrl/messages/conversation/$conversationId').replace(
-        queryParameters: {
-          'page': page.toString(),
-          'limit': limit.toString(),
-        },
+        queryParameters: query,
       );
 
-      final response = await http.get(uri).timeout(const Duration(seconds: 30));
+      final response = await _authedGet(uri, token: token);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
 
-        // Gérer structure paginée ou array direct
         if (data is Map && data.containsKey('messages')) {
           final List<dynamic> messages = data['messages'];
           print('✅ ${messages.length} messages récupérés (paginé)');
@@ -1630,32 +1889,45 @@ extension MessagerieApi on ApiClient {
     String typeMessage = 'NORMAL',
     String? referenceId,
     String? referenceType,
+    String? token,
   }) async {
     try {
       print('📨 Envoi message de $expediteur à $destinataire');
+      var access = await _resolveAccessToken(token: token);
 
       if (pieceJointe != null) {
-        // Upload avec fichier (multipart/form-data)
-        var request =
-            http.MultipartRequest('POST', Uri.parse('$apiUrl/messages'));
+        Future<http.Response> sendMultipart(String? bearer) async {
+          var request =
+              http.MultipartRequest('POST', Uri.parse('$apiUrl/message'));
+          if (bearer != null) {
+            request.headers['Authorization'] = 'Bearer $bearer';
+          }
+          request.fields['expediteur'] = expediteur;
+          request.fields['destinataire'] = destinataire;
+          request.fields['contenu'] = contenu;
+          request.fields['typeMessage'] = typeMessage;
+          if (typePieceJointe != null) {
+            request.fields['typePieceJointe'] = typePieceJointe;
+          }
+          if (referenceId != null) request.fields['referenceId'] = referenceId;
+          if (referenceType != null) {
+            request.fields['referenceType'] = referenceType;
+          }
+          request.files.add(await http.MultipartFile.fromPath(
+              'pieceJointe', pieceJointe.path));
+          final streamed =
+              await request.send().timeout(const Duration(seconds: 60));
+          return http.Response.fromStream(streamed);
+        }
 
-        request.fields['expediteur'] = expediteur;
-        request.fields['destinataire'] = destinataire;
-        request.fields['contenu'] = contenu;
-        request.fields['typeMessage'] = typeMessage;
-
-        if (typePieceJointe != null)
-          request.fields['typePieceJointe'] = typePieceJointe;
-        if (referenceId != null) request.fields['referenceId'] = referenceId;
-        if (referenceType != null)
-          request.fields['referenceType'] = referenceType;
-
-        request.files.add(
-            await http.MultipartFile.fromPath('pieceJointe', pieceJointe.path));
-
-        final streamedResponse =
-            await request.send().timeout(const Duration(seconds: 60));
-        final response = await http.Response.fromStream(streamedResponse);
+        var response = await sendMultipart(access);
+        if (response.statusCode == 401) {
+          final refreshed = await refreshAccessToken();
+          if (refreshed != null) {
+            response = await sendMultipart(refreshed);
+          }
+        }
+        if (response.statusCode == 401) _checkUnauthorized(response);
 
         if (response.statusCode == 201) {
           print('✅ Message avec fichier envoyé');
@@ -1664,15 +1936,14 @@ extension MessagerieApi on ApiClient {
 
         throw Exception('Erreur ${response.statusCode}: ${response.body}');
       } else {
-        // Message texte simple (JSON)
-        final response = await post('/messages', body: {
+        final response = await _authedPostJson('/message', body: {
           'expediteur': expediteur,
           'destinataire': destinataire,
           'contenu': contenu,
           'typeMessage': typeMessage,
           if (referenceId != null) 'referenceId': referenceId,
           if (referenceType != null) 'referenceType': referenceType,
-        });
+        }, token: access);
 
         if (response.statusCode == 201) {
           print('✅ Message texte envoyé');
@@ -1688,14 +1959,15 @@ extension MessagerieApi on ApiClient {
   }
 
   // ✅ Marquer les messages comme lus
-  Future<void> markMessagesAsRead(String conversationId, String userId) async {
+  Future<void> markMessagesAsRead(String conversationId, String userId,
+      {String? token}) async {
     try {
       print('✅ Marquage messages comme lus: $conversationId');
 
-      final response = await patch('/messages/mark-read', body: {
+      final response = await _authedPatch('/messages/mark-read', body: {
         'conversationId': conversationId,
         'userId': userId,
-      });
+      }, token: token);
 
       if (response.statusCode == 200) {
         print('✅ Messages marqués comme lus');
@@ -1710,11 +1982,28 @@ extension MessagerieApi on ApiClient {
   }
 
   // 🗑️ Supprimer un message pour un utilisateur
-  Future<void> deleteMessageForUser(String messageId, String userId) async {
+  Future<void> deleteMessageForUser(String messageId, String userId,
+      {String? token}) async {
     try {
       print('🗑️ Suppression message: $messageId pour $userId');
+      var access = await _resolveAccessToken(token: token);
+      var response = await http.delete(
+        Uri.parse('$apiUrl/message/$messageId/user'),
+        headers: _headers(token: access),
+        body: jsonEncode({'userId': userId}),
+      ).timeout(const Duration(seconds: 30));
 
-      final response = await delete('/messages/$messageId/user/$userId');
+      if (response.statusCode == 401) {
+        final refreshed = await refreshAccessToken();
+        if (refreshed != null) {
+          response = await http.delete(
+            Uri.parse('$apiUrl/message/$messageId/user'),
+            headers: _headers(token: refreshed),
+            body: jsonEncode({'userId': userId}),
+          ).timeout(const Duration(seconds: 30));
+        }
+      }
+      if (response.statusCode == 401) _checkUnauthorized(response);
 
       if (response.statusCode == 200) {
         print('✅ Message supprimé');
@@ -1775,8 +2064,14 @@ extension MessagerieApi on ApiClient {
   Future<Map<String, dynamic>> getMessageStats(String userId) async {
     try {
       print('📊 Récupération statistiques messages');
-
-      final response = await get('/messages/stats/$userId');
+      // Correction : route backend = /api/messages/stats?userId=... (query param, pas path param)
+      final uri = Uri.parse('$apiUrl/messages/stats').replace(
+        queryParameters: {'userId': userId},
+      );
+      final response = await http.get(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
         print('✅ Statistiques récupérées');
@@ -1927,6 +2222,37 @@ extension MessagerieApi on ApiClient {
   // 🔔 NOTIFICATIONS API
   // ========================
 
+  /// Enregistre le token FCM appareil sur le backend.
+  Future<void> registerFcmToken({
+    required String token,
+    required String platform,
+    required String accessToken,
+  }) async {
+    final response = await post(
+      '/utilisateur/fcm-token',
+      body: {'token': token, 'platform': platform},
+      token: accessToken,
+    );
+    if (response.statusCode != 200) {
+      throw Exception('FCM register ${response.statusCode}: ${response.body}');
+    }
+  }
+
+  /// Retire le token FCM (logout).
+  Future<void> unregisterFcmToken({
+    required String token,
+    required String accessToken,
+  }) async {
+    final response = await delete(
+      '/utilisateur/fcm-token',
+      token: accessToken,
+      body: {'token': token},
+    );
+    if (response.statusCode != 200) {
+      throw Exception('FCM unregister ${response.statusCode}: ${response.body}');
+    }
+  }
+
   /// Récupère les notifications d'un utilisateur
   Future<List<Map<String, dynamic>>> getUserNotifications({
     required String token,
@@ -1957,6 +2283,7 @@ extension MessagerieApi on ApiClient {
         },
       ).timeout(const Duration(seconds: 10));
 
+      _checkUnauthorized(response);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         return List<Map<String, dynamic>>.from(data['notifications'] ?? []);
@@ -1985,6 +2312,7 @@ extension MessagerieApi on ApiClient {
         },
       ).timeout(const Duration(seconds: 5));
 
+      _checkUnauthorized(response);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         return data['count'] ?? 0;
@@ -2070,15 +2398,84 @@ extension MessagerieApi on ApiClient {
       ).timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 200) {
-        print('✅ Notification supprimée');
         return true;
       } else {
         return false;
       }
     } catch (e) {
-      print('❌ Erreur deleteNotification: $e');
       return false;
     }
+  }
+
+  // ✅ WALLET — récupérer le solde et les transactions
+  Future<Map<String, dynamic>> getWallet({
+    required String token,
+    required String userId,
+  }) async {
+    final response = await http.get(
+      Uri.parse('$apiUrl/wallet/$userId'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    ).timeout(const Duration(seconds: 30));
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception('Erreur wallet: ${response.statusCode} — ${response.body}');
+  }
+
+  // ✅ WALLET — effectuer un transfert
+  Future<Map<String, dynamic>> walletTransfert({
+    required String token,
+    required String payeurId,
+    required String beneficiaireId,
+    required double montant,
+    String? description,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$apiUrl/wallet/transfert'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({
+        'payeurId': payeurId,
+        'beneficiaireId': beneficiaireId,
+        'montant': montant,
+        if (description != null) 'description': description,
+      }),
+    ).timeout(const Duration(seconds: 30));
+
+    if (response.statusCode == 201) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception('Erreur transfert: ${response.statusCode} — ${response.body}');
+  }
+
+  // ✅ WALLET — historique des transactions
+  Future<Map<String, dynamic>> getWalletTransactions({
+    required String token,
+    required String userId,
+    int page = 1,
+    int limit = 20,
+  }) async {
+    final uri = Uri.parse('$apiUrl/wallet/$userId/transactions').replace(
+      queryParameters: {'page': '$page', 'limit': '$limit'},
+    );
+    final response = await http.get(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    ).timeout(const Duration(seconds: 30));
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception('Erreur transactions: ${response.statusCode}');
   }
 }
 

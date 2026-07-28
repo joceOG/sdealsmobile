@@ -23,6 +23,7 @@ class ChatPageStateM extends Equatable {
 
   // 🔌 WebSocket et notifications
   final bool isWebSocketConnected;
+  final bool partnerTyping;
 
   const ChatPageStateM({
     this.status = ChatPageStatus.initial,
@@ -33,6 +34,7 @@ class ChatPageStateM extends Equatable {
     this.isLoading,
     this.listItems,
     this.isWebSocketConnected = false,
+    this.partnerTyping = false,
   });
 
   factory ChatPageStateM.initial() {
@@ -42,6 +44,7 @@ class ChatPageStateM extends Equatable {
       listItems: null,
       error: '',
       isWebSocketConnected: false,
+      partnerTyping: false,
     );
   }
 
@@ -54,6 +57,7 @@ class ChatPageStateM extends Equatable {
     bool? isLoading,
     List<Categorie>? listItems,
     bool? isWebSocketConnected,
+    bool? partnerTyping,
     bool clearSelectedConversation = false,
   }) {
     return ChatPageStateM(
@@ -68,6 +72,7 @@ class ChatPageStateM extends Equatable {
       isLoading: isLoading ?? this.isLoading,
       listItems: listItems ?? this.listItems,
       isWebSocketConnected: isWebSocketConnected ?? this.isWebSocketConnected,
+      partnerTyping: partnerTyping ?? this.partnerTyping,
     );
   }
 
@@ -108,5 +113,6 @@ class ChatPageStateM extends Equatable {
         isLoading,
         listItems,
         isWebSocketConnected,
+        partnerTyping,
       ];
 }

@@ -29,6 +29,7 @@ import '../jobpageblocm/jobPageEventM.dart';
 import '../../../../design_system/colors.dart';
 import '../../../../design_system/typography.dart';
 import '../../../../design_system/spacing.dart';
+import '../../../../design_system/widgets/sd_entity_card.dart';
 
 class JobPageScreenM extends StatefulWidget {
   final List<dynamic> categories;
@@ -458,6 +459,9 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
                                           builder: (_) => DetailPage(
                                             title: service.nomservice,
                                             image: service.imageservice,
+                                            serviceId: service.idservice.isNotEmpty
+                                                ? service.idservice
+                                                : null,
                                           ),
                                         ),
                                       );
@@ -1806,132 +1810,36 @@ class _JobPageScreenMState extends State<JobPageScreenM> {
 
   // ✅ NOUVEAU : Carte de prestataire à proximité
   Widget _buildNearbyProviderCard(dynamic provider, int index) {
-    return Container(
-      width: 280,
-      margin: EdgeInsets.only(right: SDSpacing.sm),
-      child: Card(
-        elevation: 4,
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge)),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-          onTap: () {
-            // ✅ Navigation vers le profil complet du prestataire
-            NavigationHelper.navigateToProviderProfile(
-              context,
-              providerId: provider.idprestataire,
-              providerData: provider.toJson(),
-            );
-          },
-          child: Padding(
-            padding: SDSpacing.cardPadding,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // En-tête avec avatar et statut
-                Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 20,
-                      backgroundImage: AssetImage(
-                          'assets/categories/Image${(index % 5) + 1}.png'),
-                    ),
-                    SizedBox(width: SDSpacing.xxs),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            provider.utilisateur?.fullName ?? 'Prestataire',
-                            style: SDTypography.bodyMedium.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: SDColors.neutral900,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          Text(
-                            provider.service?.nomservice ?? 'Service',
-                            style: SDTypography.bodySmall.copyWith(
-                              color: SDColors.neutral500,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (provider.verifier)
-                      Icon(Icons.verified, color: SDColors.primary600, size: 16),
-                  ],
-                ),
-                SizedBox(height: SDSpacing.xxs),
+    final fullName = provider.utilisateur?.fullName ?? 'Prestataire';
+    final serviceName = provider.service?.nomservice ?? 'Service';
+    final note = provider.note?.toString() ?? 'N/A';
+    final isVerified = provider.verifier == true;
+    final distance = '${(index + 1) * 0.5} km';
+    final price = provider.prixprestataire != null
+        ? '${provider.prixprestataire.toString()} FCFA /h'
+        : null;
+    final photo = provider.utilisateur?.photoProfil?.toString();
 
-                // Note et distance
-                Row(
-                  children: [
-                    Icon(Icons.star, color: SDColors.warning500, size: 14),
-                    SizedBox(width: SDSpacing.xxxs),
-                    Flexible(
-                      flex: 2,
-                      child: Text(
-                        provider.note ?? 'N/A',
-                        style: SDTypography.labelSmall.copyWith(
-                          color: SDColors.warning500,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    SizedBox(width: SDSpacing.xxs),
-                    Icon(Icons.location_on,
-                        color: SDColors.primary600, size: 14),
-                    SizedBox(width: SDSpacing.xxxs),
-                    Flexible(
-                      flex: 3,
-                      child: Text(
-                        '${(index + 1) * 0.5} km',
-                        style: SDTypography.labelSmall.copyWith(
-                          color: SDColors.primary600,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: SDSpacing.xxs),
-
-                // Description
-                Text(
-                  provider.description ?? 'Prestataire professionnel',
-                  style: SDTypography.bodySmall.copyWith(
-                    color: SDColors.neutral500,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                SizedBox(height: SDSpacing.xxs),
-
-                // Bouton d'action
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      // Action contacter
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: SDColors.primary600,
-                      foregroundColor: SDColors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
-                      ),
-                    ),
-                    child: Text('Contacter', style: SDTypography.labelSmall),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+    return Padding(
+      padding: EdgeInsets.only(right: SDSpacing.sm),
+      child: SDEntityCard(
+        type: SDEntityCardType.provider,
+        title: fullName,
+        subtitle: serviceName,
+        fallbackIcon: Icons.handyman_rounded,
+        imageUrl: (photo != null && photo.startsWith('http')) ? photo : null,
+        ratingText: '$note/5',
+        metaText: isVerified ? '$distance • Vérifié' : distance,
+        statusText: 'Disponible',
+        priceText: price,
+        ctaLabel: 'Voir profil',
+        onTap: () {
+          NavigationHelper.navigateToProviderProfile(
+            context,
+            providerId: provider.idprestataire,
+            providerData: provider.toJson(),
+          );
+        },
       ),
     );
   }

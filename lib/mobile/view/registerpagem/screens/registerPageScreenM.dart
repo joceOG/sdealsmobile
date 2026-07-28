@@ -8,6 +8,7 @@ import '../registerpageblocm/registerPageStateM.dart';
 
 // ✅ Design System
 import '../../../../design_system/design_system.dart';
+import '../../common/utils/app_snackbar.dart';
 
 class RegisterPageScreenM extends StatefulWidget {
   const RegisterPageScreenM({super.key});
@@ -21,233 +22,384 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
   bool agreeToTerms = false;
   bool obscurePassword = true;
   late AnimationController _animationController;
+  late Animation<double> _logoScale;
+
+  late final TextEditingController _fullNameController;
+  late final TextEditingController _emailController;
+  late final TextEditingController _phoneController;
+  late final TextEditingController _passwordController;
+  late final TextEditingController _confirmPasswordController;
+  late final ValueNotifier<bool> _canSubmitNotifier;
 
   @override
   void initState() {
     super.initState();
+    _fullNameController = TextEditingController();
+    _emailController = TextEditingController();
+    _phoneController = TextEditingController();
+    _passwordController = TextEditingController();
+    _confirmPasswordController = TextEditingController();
+    _canSubmitNotifier = ValueNotifier(false);
+
+    void syncCanSubmit() {
+      final v = _computeCanSubmit();
+      if (_canSubmitNotifier.value != v) {
+        _canSubmitNotifier.value = v;
+      }
+    }
+
+    _fullNameController.addListener(syncCanSubmit);
+    _emailController.addListener(syncCanSubmit);
+    _phoneController.addListener(syncCanSubmit);
+    _passwordController.addListener(syncCanSubmit);
+    _confirmPasswordController.addListener(syncCanSubmit);
+
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 2),
-    )..repeat(reverse: true);
+      duration: const Duration(milliseconds: 900),
+    );
+    _logoScale = Tween<double>(begin: 1.0, end: 1.04).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.easeOutCubic,
+      ),
+    );
+    _animationController.forward();
   }
 
   @override
   void dispose() {
+    _fullNameController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    _canSubmitNotifier.dispose();
     _animationController.dispose();
     super.dispose();
   }
 
+  bool _computeCanSubmit() {
+    return agreeToTerms &&
+        _fullNameController.text.trim().isNotEmpty &&
+        _phoneController.text.trim().isNotEmpty &&
+        _passwordController.text.isNotEmpty &&
+        _confirmPasswordController.text.isNotEmpty &&
+        _passwordController.text == _confirmPasswordController.text;
+  }
+
+  void _handleBack() {
+    if (!mounted) return;
+    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
+    if (keyboardOpen) {
+      FocusManager.instance.primaryFocus?.unfocus();
+      return;
+    }
+    if (!context.mounted) return;
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/login');
+    }
+  }
+
+  void _submit(BuildContext context) {
+    context.read<RegisterPageBlocM>().add(
+          RegisterSubmitted(
+            fullName: _fullNameController.text.trim(),
+            email: _emailController.text.trim(),
+            phone: _phoneController.text.trim(),
+            password: _passwordController.text,
+            confirmPassword: _confirmPasswordController.text,
+          ),
+        );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: SDColors.white,
-      appBar: SDAppBar(
-        title: '',
-        useGradient: false,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (bool didPop, Object? result) {
+        if (didPop) return;
+        if (!context.mounted) return;
+        _handleBack();
+      },
+      child: Scaffold(
         backgroundColor: SDColors.white,
-        centerTitle: false,
-      ),
-      body: BlocConsumer<RegisterPageBlocM, RegisterPageStateM>(
-        listener: (context, state) {
-          if (state.isSuccess) {
-            if (state.utilisateur != null && state.token != null) {
-              context.read<AuthCubit>().setAuthenticated(
-                    token: state.token!,
-                    utilisateur: state.utilisateur!,
-                    roles: [state.utilisateur!.role],
-                    activeRole: state.utilisateur!.role,
-                  );
-
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    "Inscription réussie ✅ Vous êtes maintenant connecté !",
-                    style: SDTypography.bodyMedium.copyWith(color: SDColors.white),
-                  ),
-                  backgroundColor: SDColors.success500,
-                ),
-              );
-            } else {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("Inscription réussie ✅")),
-              );
-            }
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              context.push("/homepage");
-            });
-          }
-          if (state.errorMessage != null) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  state.errorMessage!,
-                  style: SDTypography.bodyMedium.copyWith(color: SDColors.white),
-                ),
-                backgroundColor: SDColors.error500,
-              ),
-            );
-          }
-        },
-        builder: (context, state) {
-          return SingleChildScrollView(
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: SDSpacing.md),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  SDSpacing.verticalSmallGap,
-                  Center(
-                    child: AnimatedBuilder(
-                      animation: _animationController,
-                      builder: (context, child) {
-                        return ScaleTransition(
-                          scale: Tween<double>(
-                            begin: 1.0,
-                            end: 1.1,
-                          ).animate(_animationController),
-                          child: child,
-                        );
-                      },
-                      child: Image.asset('assets/logo1.png', height: 100),
-                    ),
-                  ),
-                  SDSpacing.verticalLargeGap,
-                  Text(
-                    "Créer un compte",
-                    textAlign: TextAlign.center,
-                    style: SDTypography.displayMedium.copyWith(
-                      color: SDColors.neutral900,
-                    ),
-                  ),
-                  SDSpacing.verticalTinyGap,
-                  Text(
-                    "Rejoignez Soutrali Deals pour commencer",
-                    textAlign: TextAlign.center,
-                    style: SDTypography.bodyLarge.copyWith(
-                      color: SDColors.neutral600,
-                    ),
-                  ),
-                  SDSpacing.verticalLargeGap,
-
-                  // Design System Form
-                  SDInput(
-                    label: "Nom complet",
-                    hint: "Entrez votre nom complet",
-                    prefixIcon: Icons.person_outline,
-                    onChanged: (v) => context.read<RegisterPageBlocM>().add(
-                      RegisterFullNameChanged(v),
-                    ),
-                  ),
-                  SDSpacing.verticalDefaultGap,
-                  SDInput(
-                    label: "Numéro de Téléphone",
-                    hint: "Ex: 0102030405",
-                    keyboardType: TextInputType.phone,
-                    prefixIcon: Icons.phone_android,
-                    onChanged: (v) => context.read<RegisterPageBlocM>().add(
-                      RegisterPhoneChanged(v),
-                    ),
-                  ),
-                  SDSpacing.verticalDefaultGap,
-                  SDInput(
-                    label: "Mot de passe",
-                    hint: "Créez un mot de passe",
-                    obscureText: true,
-                    prefixIcon: Icons.lock_outline,
-                    onChanged: (v) => context.read<RegisterPageBlocM>().add(
-                      RegisterPasswordChanged(v),
-                    ),
-                  ),
-                  SDSpacing.verticalDefaultGap,
-                  SDInput(
-                    label: "Confirmez le mot de passe",
-                    hint: "Répétez le mot de passe",
-                    obscureText: true,
-                    prefixIcon: Icons.lock_reset,
-                    onChanged: (v) => context.read<RegisterPageBlocM>().add(
-                      RegisterConfirmPasswordChanged(v),
-                    ),
-                  ),
-                  
-                  SDSpacing.verticalSmallGap,
-                  Row(
-                    children: [
-                      Checkbox(
-                        value: agreeToTerms,
-                        activeColor: SDColors.primary600,
-                        onChanged: (value) {
-                          setState(() {
-                            agreeToTerms = value ?? false;
-                          });
-                        },
-                      ),
-                      Expanded(
-                        child: Text(
-                          "J'accepte les termes et conditions",
-                          style: SDTypography.bodyMedium.copyWith(
-                            color: SDColors.neutral800,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  
-                  SDSpacing.verticalMediumGap,
-                  
-                  SDButton(
-                    text: "CRÉER MON COMPTE",
-                    fullWidth: true,
-                    isLoading: state.isSubmitting,
-                    onPressed: agreeToTerms && !state.isSubmitting
-                        ? () {
-                            context.read<RegisterPageBlocM>().add(
-                                  RegisterSubmitted(),
-                                );
-                          }
-                        : null,
-                  ),
-                  
-                  SDSpacing.verticalMediumGap,
-                  Wrap(
-                    alignment: WrapAlignment.center,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      Text(
-                        'Vous avez déjà un compte ?',
-                        style: SDTypography.bodyMedium.copyWith(
-                          color: SDColors.neutral800,
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          context.go("/login"); 
-                        },
-                        child: Text(
-                          'Connectez-vous',
-                          style: SDTypography.labelLarge.copyWith(
-                            color: SDColors.primary600,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  SDSpacing.verticalSmallGap,
-                  Padding(
-                    padding: EdgeInsets.only(bottom: SDSpacing.md),
-                    child: Text(
-                      "En vous inscrivant, vous acceptez nos conditions d'utilisation et notre politique de confidentialité.",
-                      textAlign: TextAlign.center,
-                      style: SDTypography.bodySmall.copyWith(
-                        color: SDColors.neutral500,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+        appBar: SDAppBar(
+          title: '',
+          useGradient: false,
+          backgroundColor: SDColors.white,
+          centerTitle: false,
+          leading: IconButton(
+            icon: const Icon(
+              Icons.arrow_back,
+              size: 24,
+              color: SDColors.neutral900,
             ),
-          );
-        },
+            onPressed: _handleBack,
+            tooltip: 'Retour',
+          ),
+        ),
+        body: BlocListener<RegisterPageBlocM, RegisterPageStateM>(
+          listener: (context, state) {
+            if (state.isSuccess) {
+              if (state.utilisateur != null && state.token != null) {
+                context.read<AuthCubit>().setAuthenticated(
+                      token: state.token!,
+                      utilisateur: state.utilisateur!,
+                      roles: [state.utilisateur!.role],
+                      activeRole: state.utilisateur!.role,
+                    );
+
+                AppSnackBar.success(
+                  context,
+                  'Inscription réussie',
+                  subtitle: 'Vous êtes maintenant connecté.',
+                );
+              } else {
+                AppSnackBar.success(context, 'Inscription réussie');
+              }
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (context.mounted) context.push("/homepage");
+              });
+            }
+            if (state.errorMessage != null) {
+              AppSnackBar.error(context, state.errorMessage!);
+            }
+          },
+          child: Builder(
+            builder: (context) {
+              final mq = MediaQuery.of(context);
+              return SingleChildScrollView(
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    SDSpacing.md,
+                    0,
+                    SDSpacing.md,
+                    SDSpacing.lg +
+                        mq.viewPadding.bottom +
+                        mq.viewInsets.bottom,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      SDSpacing.verticalSmallGap,
+                      Center(
+                        child: ScaleTransition(
+                          scale: _logoScale,
+                          child:
+                              Image.asset('assets/logo1.png', height: 100),
+                        ),
+                      ),
+                      SDSpacing.verticalLargeGap,
+                      Text(
+                        "Créer un compte",
+                        textAlign: TextAlign.center,
+                        style: SDTypography.displayMedium.copyWith(
+                          color: SDColors.neutral900,
+                        ),
+                      ),
+                      SDSpacing.verticalTinyGap,
+                      Text(
+                        "Rejoignez Soutrali Deals pour commencer",
+                        textAlign: TextAlign.center,
+                        style: SDTypography.bodyLarge.copyWith(
+                          color: SDColors.neutral600,
+                        ),
+                      ),
+                      SDSpacing.verticalLargeGap,
+                      SDInput(
+                        label: "Nom complet",
+                        hint: "Entrez votre nom complet",
+                        prefixIcon: Icons.person_outline,
+                        controller: _fullNameController,
+                      ),
+                      SDSpacing.verticalDefaultGap,
+                      SDInput(
+                        label: "Email (optionnel)",
+                        hint: "Ex: nom@exemple.com",
+                        keyboardType: TextInputType.emailAddress,
+                        prefixIcon: Icons.email_outlined,
+                        controller: _emailController,
+                      ),
+                      SDSpacing.verticalDefaultGap,
+                      SDInput(
+                        label: "Numéro de Téléphone",
+                        hint: "Ex: 0102030405",
+                        keyboardType: TextInputType.phone,
+                        prefixIcon: Icons.phone_android,
+                        controller: _phoneController,
+                      ),
+                      SDSpacing.verticalDefaultGap,
+                      SDInput(
+                        label: "Mot de passe",
+                        hint: "Créez un mot de passe",
+                        obscureText: true,
+                        prefixIcon: Icons.lock_outline,
+                        controller: _passwordController,
+                      ),
+                      SDSpacing.verticalDefaultGap,
+                      SDInput(
+                        label: "Confirmez le mot de passe",
+                        hint: "Répétez le mot de passe",
+                        obscureText: true,
+                        prefixIcon: Icons.lock_reset,
+                        controller: _confirmPasswordController,
+                      ),
+                      SDSpacing.verticalSmallGap,
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Checkbox(
+                              value: agreeToTerms,
+                              activeColor: SDColors.primary600,
+                              onChanged: (value) {
+                                setState(() {
+                                  agreeToTerms = value ?? false;
+                                });
+                                final v = _computeCanSubmit();
+                                if (_canSubmitNotifier.value != v) {
+                                  _canSubmitNotifier.value = v;
+                                }
+                              },
+                            ),
+                          ),
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.only(top: 14),
+                              child: Text(
+                                "J'accepte les termes et conditions",
+                                style: SDTypography.bodyMedium.copyWith(
+                                  color: SDColors.neutral800,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      SDSpacing.verticalMediumGap,
+                      BlocBuilder<RegisterPageBlocM, RegisterPageStateM>(
+                        buildWhen: (prev, curr) =>
+                            prev.isSubmitting != curr.isSubmitting,
+                        builder: (context, state) {
+                          return ValueListenableBuilder<bool>(
+                            valueListenable: _canSubmitNotifier,
+                            builder: (context, canSubmit, _) {
+                              return SDButton(
+                                text: "CRÉER MON COMPTE",
+                                fullWidth: true,
+                                isLoading: state.isSubmitting,
+                                onPressed: state.isSubmitting || !canSubmit
+                                    ? null
+                                    : () => _submit(context),
+                              );
+                            },
+                          );
+                        },
+                      ),
+                      SDSpacing.verticalLargeGap,
+                      Row(
+                        children: [
+                          Expanded(
+                              child: Divider(color: SDColors.neutral300)),
+                          Padding(
+                            padding: EdgeInsets.symmetric(
+                                horizontal: SDSpacing.sm),
+                            child: Text(
+                              "OU",
+                              style: SDTypography.bodySmall.copyWith(
+                                color: SDColors.neutral500,
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                              child: Divider(color: SDColors.neutral300)),
+                        ],
+                      ),
+                      SDSpacing.verticalMediumGap,
+                      BlocBuilder<RegisterPageBlocM, RegisterPageStateM>(
+                        buildWhen: (prev, curr) =>
+                            prev.isSubmitting != curr.isSubmitting,
+                        builder: (context, state) {
+                          return SDGoogleSignInButton(
+                            onPressed: state.isSubmitting
+                                ? null
+                                : () {
+                                    ScaffoldMessenger.of(context)
+                                        .showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          'Inscription avec Google : bientôt disponible.',
+                                          style: SDTypography.bodyMedium
+                                              .copyWith(
+                                                  color: SDColors.white),
+                                        ),
+                                        backgroundColor: SDColors.neutral700,
+                                      ),
+                                    );
+                                  },
+                          );
+                        },
+                      ),
+                      SDSpacing.verticalMediumGap,
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Text(
+                            'Vous avez déjà un compte ?',
+                            style: SDTypography.bodyMedium.copyWith(
+                              color: SDColors.neutral800,
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              context.go("/login");
+                            },
+                            style: TextButton.styleFrom(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: SDSpacing.xs,
+                                vertical: SDSpacing.xxxs,
+                              ),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: Text(
+                              'Connectez-vous',
+                              style: SDTypography.labelLarge.copyWith(
+                                color: SDColors.primary600,
+                                decoration: TextDecoration.underline,
+                                decorationColor: SDColors.primary600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      SDSpacing.verticalMediumGap,
+                      Text(
+                        "En vous inscrivant, vous reconnaissez avoir pris connaissance de nos documents légaux.",
+                        textAlign: TextAlign.center,
+                        style: SDTypography.bodySmall.copyWith(
+                          color: SDColors.neutral500,
+                        ),
+                      ),
+                      SDSpacing.verticalSmallGap,
+                      const SDLegalFooterLinks(),
+                      SDSpacing.verticalSmallGap,
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
       ),
     );
   }
 }
+

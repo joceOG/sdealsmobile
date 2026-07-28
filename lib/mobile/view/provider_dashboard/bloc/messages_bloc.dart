@@ -9,14 +9,25 @@ import 'messages_state.dart';
 class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
   final ApiClient _apiClient = ApiClient();
   final WebSocketService _webSocketService = WebSocketService();
+  String? _currentToken;
+  String? _userId;
+
+  void setToken(String token) {
+    _currentToken = token;
+  }
+
+  void setUserId(String userId) {
+    _userId = userId;
+  }
 
   MessagesBloc() : super(MessagesInitial()) {
     // 📨 CHARGER LES CONVERSATIONS DU PRESTATAIRE
     on<LoadPrestataireConversations>((event, emit) async {
       emit(MessagesLoading());
+      _userId = event.prestataireId;
       try {
         final response = await _apiClient
-            .get('/messages/conversations/${event.prestataireId}');
+            .get('/messages/conversations/${event.prestataireId}', token: _currentToken);
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
           final List<dynamic> conversations = data['conversations'] ?? [];
@@ -41,7 +52,7 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
       emit(MessagesLoading());
       try {
         final response = await _apiClient.get(
-            '/messages/conversation/${event.conversationId}?userId=${event.prestataireId}');
+            '/messages/conversation/${event.conversationId}?userId=${event.prestataireId}', token: _currentToken);
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
           final List<dynamic> messages = data['messages'] ?? [];
@@ -88,12 +99,13 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
     // 📨 MARQUER LES MESSAGES COMME LUS
     on<MarkMessagesAsRead>((event, emit) async {
       try {
-        final response = await _apiClient.put(
+        final response = await _apiClient.patch(
           '/messages/mark-read',
           body: {
             'conversationId': event.conversationId,
             'userId': event.prestataireId,
           },
+          token: _currentToken,
         );
 
         if (response.statusCode == 200) {
@@ -153,7 +165,9 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
     on<DeleteMessage>((event, emit) async {
       try {
         final response = await _apiClient.delete(
-          '/messages/${event.messageId}?userId=${event.prestataireId}',
+          '/message/${event.messageId}/user',
+          body: {'userId': event.prestataireId},
+          token: _currentToken,
         );
 
         if (response.statusCode == 200) {
@@ -262,7 +276,11 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
     // 🔌 GESTIONNAIRES WEBSOCKET
     on<ConnectWebSocket>((event, emit) async {
       try {
-        await _webSocketService.connect();
+        if (_userId != null && _userId!.isNotEmpty) {
+          await _webSocketService.authenticate(userId: _userId!);
+        } else {
+          await _webSocketService.connect();
+        }
         print('🔌 WebSocket connecté pour MessagesBloc');
       } catch (e) {
         print('❌ Erreur connexion WebSocket: $e');

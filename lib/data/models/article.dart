@@ -24,10 +24,13 @@ class Article{
   } */
 
   factory Article.fromJson(dynamic json) {
+    final prix = json['prixArticle'];
+    final prixText = prix == null ? '' : prix.toString();
+    final quantite = json['quantiteArticle'];
     return Article(
         nomArticle : json['nomArticle'] as String,
-        prixArticle: json['prixArticle'] as String,
-        quantiteArticle: json['quantiteArticle']! as int,
+        prixArticle: prixText,
+        quantiteArticle: quantite is int ? quantite : int.tryParse(quantite.toString()) ?? 0,
         photoArticle : json['photoArticle'] as String
         //categorie: json['categorie'] as Object
         );

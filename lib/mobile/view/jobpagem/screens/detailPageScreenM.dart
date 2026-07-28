@@ -1,14 +1,17 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:sdealsmobile/data/services/api_client.dart';
 import 'package:sdealsmobile/data/services/authCubit.dart';
-import 'package:sdealsmobile/mobile/view/common/widgets/ai_provider_matcher_widget.dart';
 import 'package:sdealsmobile/mobile/view/loginpagem/screens/loginPageScreenM.dart';
 import 'package:sdealsmobile/mobile/view/orderpagem/screens/service_request_summary_screen.dart';
+import 'package:sdealsmobile/mobile/view/jobpagem/screens/provider_profile_screen.dart';
+import 'package:sdealsmobile/mobile/view/common/widgets/app_image.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import '../widgets/mini_map_widget.dart';
+import 'package:url_launcher/url_launcher.dart';
 // ✅ Design System
 import '../../../../design_system/design_system.dart';
 
@@ -16,10 +19,13 @@ import '../../../../design_system/design_system.dart';
 class DetailPage extends StatefulWidget {
   final String title;
   final String image;
+  /// ID Mongo du service — filtre `/prestataire?service=` (recommandé).
+  final String? serviceId;
 
   const DetailPage({
     required this.title,
     required this.image,
+    this.serviceId,
     super.key,
   });
 
@@ -34,14 +40,35 @@ class _DetailPageState extends State<DetailPage> {
   bool _filterVerifiedOnly = false;
   bool _isFavorited = false;
   LatLng? _userLocation;
-  String? _serviceId;
+  /// ID service résolu (paramètre ou premier prestataire chargé).
+  String? _effectiveServiceId;
   String? _selectedProviderId;
+
+  final TextEditingController _searchController = TextEditingController();
+  bool _showSearchField = false;
+  bool _mapMode = false;
+  double? _filterMaxDistanceKm;
+  double? _filterMinNote;
+  double? _filterMaxPrice;
+  bool _filterActiveOnly = false;
+  String? _filterSpecialite;
 
   @override
   void initState() {
     super.initState();
+    _effectiveServiceId =
+        widget.serviceId != null && widget.serviceId!.trim().isNotEmpty
+            ? widget.serviceId!.trim()
+            : null;
+    _searchController.addListener(() => setState(() {}));
     _loadProviders();
     _getCurrentLocation();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _getCurrentLocation() async {
@@ -66,16 +93,21 @@ class _DetailPageState extends State<DetailPage> {
     });
     try {
       final results = await _api.fetchPrestatairesByService(
-        serviceName: widget.title,
-        verified: _filterVerifiedOnly ? true : null,
-        limit: 10,
+        serviceId: _effectiveServiceId,
+        serviceName: _effectiveServiceId == null ? widget.title : null,
+        verified: null,
+        limit: 50,
       );
       if (!mounted) return;
       setState(() {
         _providers = results;
-        // Récupérer l'ID du service depuis le premier prestataire
-        if (_providers.isNotEmpty && _providers.first['service'] != null) {
-          _serviceId = _providers.first['service']['_id']?.toString();
+        if (_effectiveServiceId == null &&
+            _providers.isNotEmpty &&
+            _providers.first['service'] != null) {
+          final svc = _providers.first['service'];
+          if (svc is Map<String, dynamic>) {
+            _effectiveServiceId = svc['_id']?.toString();
+          }
         }
       });
     } catch (e) {
@@ -93,102 +125,951 @@ class _DetailPageState extends State<DetailPage> {
 
   @override
   Widget build(BuildContext context) {
+    final filtered = _filteredSortedProviders;
     return Scaffold(
+      backgroundColor: SDColors.neutral50,
       appBar: SDWhiteAppBar.appBar(
         title: widget.title,
         actions: [
           IconButton(
-            icon: const Icon(Icons.ios_share_rounded),
-            onPressed: _onShareTap,
+            tooltip: 'Rechercher',
+            icon: Icon(_showSearchField ? Icons.close : Icons.search),
+            onPressed: () => setState(() {
+              _showSearchField = !_showSearchField;
+              if (!_showSearchField) _searchController.clear();
+            }),
           ),
-          IconButton(
-            icon: Icon(
-              _isFavorited
-                  ? Icons.favorite_rounded
-                  : Icons.favorite_border_rounded,
+          PopupMenuButton<String>(
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: SDSpacing.xs),
+              child: Icon(Icons.more_horiz, color: SDColors.neutral900),
             ),
-            onPressed: _onFavoriteTap,
+            onSelected: (value) {
+              switch (value) {
+                case 'share':
+                  _onShareTap();
+                  break;
+                case 'fav':
+                  _onFavoriteTap();
+                  break;
+                case 'report':
+                  _onReportTap();
+                  break;
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(value: 'share', child: Text('Partager')),
+              const PopupMenuItem(value: 'fav', child: Text('Favori')),
+              const PopupMenuItem(value: 'report', child: Text('Signaler')),
+            ],
           ),
-          IconButton(
-            icon: const Icon(Icons.flag_outlined),
-            onPressed: _onReportTap,
+        ],
+        bottom: _showSearchField
+            ? PreferredSize(
+                preferredSize: const Size.fromHeight(52),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(
+                        SDSpacing.md,
+                        0,
+                        SDSpacing.md,
+                        SDSpacing.sm,
+                      ),
+                      child: TextField(
+                        controller: _searchController,
+                        style: SDTypography.bodyMedium,
+                        decoration: InputDecoration(
+                          hintText: 'Nom, ville, spécialité…',
+                          prefixIcon: Icon(Icons.search, color: SDColors.neutral500),
+                          filled: true,
+                          fillColor: SDColors.neutral100,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(
+                              SDSpacing.borderRadiusMedium,
+                            ),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: SDSpacing.sm,
+                            vertical: SDSpacing.xs,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Divider(height: 1, thickness: 1, color: SDColors.neutral200),
+                  ],
+                ),
+              )
+            : null,
+      ),
+      body: _loading
+          ? Center(
+              child: CircularProgressIndicator(color: SDColors.primary700),
+            )
+          : CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(child: _buildCompactServiceHeader()),
+                SliverToBoxAdapter(child: _buildQuickFilters()),
+                SliverToBoxAdapter(child: _buildAggregatedSpecialitesRow()),
+                SliverToBoxAdapter(child: _buildListMapToggle()),
+                if (_providers.isEmpty)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.all(SDSpacing.xl),
+                      child: Center(
+                        child: Text(
+                          'Aucun prestataire pour ce service pour le moment.',
+                          textAlign: TextAlign.center,
+                          style: SDTypography.bodyMedium.copyWith(
+                            color: SDColors.neutral600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  )
+                else if (filtered.isEmpty)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.all(SDSpacing.xl),
+                      child: Center(
+                        child: Text(
+                          'Aucun résultat avec ces filtres. Modifiez la recherche ou les filtres.',
+                          textAlign: TextAlign.center,
+                          style: SDTypography.bodyMedium.copyWith(
+                            color: SDColors.neutral600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  )
+                else if (_mapMode)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: SDSpacing.md),
+                      child: _DetailProvidersMap(
+                        providers: filtered,
+                        userLocation: _userLocation,
+                        onMarkerTap: (p) {
+                          final id = p['_id']?.toString();
+                          if (id == null || id.isEmpty) return;
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ProviderProfileScreen(
+                                providerId: id,
+                                providerData: p,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  )
+                else
+                  SliverPadding(
+                    padding: EdgeInsets.fromLTRB(
+                      SDSpacing.md,
+                      SDSpacing.xs,
+                      SDSpacing.md,
+                      SDSpacing.sm,
+                    ),
+                    sliver: SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                          return Padding(
+                            padding: EdgeInsets.only(bottom: SDSpacing.sm),
+                            child: _buildProviderCard(filtered[index]),
+                          );
+                        },
+                        childCount: filtered.length,
+                      ),
+                    ),
+                  ),
+                SliverToBoxAdapter(child: SizedBox(height: SDSpacing.xxl)),
+              ],
+            ),
+      bottomNavigationBar:
+          _providers.isEmpty ? null : _buildStickyCta(context),
+    );
+  }
+
+  /// Données issues du backend uniquement — filtres & tri côté client.
+  List<Map<String, dynamic>> get _filteredSortedProviders {
+    var list = List<Map<String, dynamic>>.from(_providers);
+    final q = _searchController.text.trim().toLowerCase();
+    if (q.isNotEmpty) {
+      list = list.where((p) {
+        final u = p['utilisateur'];
+        final nom = u is Map
+            ? '${u['nom'] ?? ''} ${u['prenom'] ?? ''}'.toLowerCase()
+            : '';
+        final loc = (p['localisation'] ?? '').toString().toLowerCase();
+        final specs = p['specialite'] is List
+            ? (p['specialite'] as List).map((e) => e.toString().toLowerCase()).join(' ')
+            : '';
+        return nom.contains(q) || loc.contains(q) || specs.contains(q);
+      }).toList();
+    }
+    if (_filterSpecialite != null) {
+      list = list.where((p) {
+        final s = p['specialite'];
+        if (s is! List) return false;
+        return s.map((e) => e.toString()).contains(_filterSpecialite);
+      }).toList();
+    }
+    if (_filterActiveOnly) {
+      list = list.where((p) => p['status']?.toString() == 'active').toList();
+    }
+    if (_filterVerifiedOnly) {
+      list = list.where((p) {
+        return p['verifier'] == true || p['verified'] == true;
+      }).toList();
+    }
+    if (_filterMinNote != null) {
+      list = list.where((p) => _noteAsDouble(p) >= _filterMinNote!).toList();
+    }
+    if (_filterMaxPrice != null) {
+      list = list.where((p) {
+        final price = _priceAsDouble(p);
+        return price != null && price <= _filterMaxPrice!;
+      }).toList();
+    }
+    if (_filterMaxDistanceKm != null && _userLocation != null) {
+      list = list.where((p) {
+        final d = _distanceToProviderKm(p);
+        return d != null && d <= _filterMaxDistanceKm!;
+      }).toList();
+    }
+    _sortProvidersInPlace(list);
+    return list;
+  }
+
+  LatLng? _providerLatLng(Map<String, dynamic> p) {
+    final m = p['localisationmaps'];
+    if (m is! Map) return null;
+    final lat = m['latitude'];
+    final lng = m['longitude'];
+    if (lat == null || lng == null) return null;
+    final la = lat is num ? lat.toDouble() : double.tryParse('$lat');
+    final lo = lng is num ? lng.toDouble() : double.tryParse('$lng');
+    if (la == null || lo == null) return null;
+    return LatLng(la, lo);
+  }
+
+  double? _distanceToProviderKm(Map<String, dynamic> p) {
+    final pos = _providerLatLng(p);
+    if (pos == null || _userLocation == null) return null;
+    final m = Geolocator.distanceBetween(
+      _userLocation!.latitude,
+      _userLocation!.longitude,
+      pos.latitude,
+      pos.longitude,
+    );
+    return m / 1000.0;
+  }
+
+  double _noteAsDouble(Map<String, dynamic> p) {
+    final v = p['note'];
+    if (v is num) return v.toDouble();
+    return double.tryParse(v?.toString() ?? '') ?? 0;
+  }
+
+  double? _priceAsDouble(Map<String, dynamic> p) {
+    final v = p['prixprestataire'];
+    if (v is num) return v.toDouble();
+    return double.tryParse(v?.toString() ?? '');
+  }
+
+  int _nbAvisInt(Map<String, dynamic> p) {
+    final v = p['nbAvis'];
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    return int.tryParse(v?.toString() ?? '') ?? 0;
+  }
+
+  int _nbMissionInt(Map<String, dynamic> p) {
+    final v = p['nbMission'];
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    return int.tryParse(v?.toString() ?? '') ?? 0;
+  }
+
+  bool _isActiveStatus(Map<String, dynamic> p) =>
+      p['status']?.toString() == 'active';
+
+  bool _isVerified(Map<String, dynamic> p) =>
+      p['verifier'] == true || p['verified'] == true;
+
+  /// Heuristique « Top » : champs backend uniquement (pas de délai fictif).
+  bool _showTopBadge(Map<String, dynamic> p) {
+    return _isVerified(p) &&
+        _noteAsDouble(p) >= 4.0 &&
+        _nbMissionInt(p) >= 3;
+  }
+
+  void _sortProvidersInPlace(List<Map<String, dynamic>> list) {
+    list.sort((a, b) {
+      final sa = _isActiveStatus(a) ? 1 : 0;
+      final sb = _isActiveStatus(b) ? 1 : 0;
+      if (sa != sb) return sb.compareTo(sa);
+      final da = _distanceToProviderKm(a);
+      final db = _distanceToProviderKm(b);
+      if (da != null && db != null && (da - db).abs() > 1e-6) {
+        return da.compareTo(db);
+      }
+      if (da != null && db == null) return -1;
+      if (da == null && db != null) return 1;
+      final na = _noteAsDouble(a);
+      final nb = _noteAsDouble(b);
+      if (nb != na) return nb.compareTo(na);
+      final va = _isVerified(a) ? 1 : 0;
+      final vb = _isVerified(b) ? 1 : 0;
+      return vb.compareTo(va);
+    });
+  }
+
+  String _metierLine(Map<String, dynamic> p) {
+    final spec = p['specialite'];
+    if (spec is List && spec.isNotEmpty) {
+      return spec.first.toString();
+    }
+    final svc = p['service'];
+    if (svc is Map) {
+      return (svc['nomservice'] ?? widget.title).toString();
+    }
+    return widget.title;
+  }
+
+  String? _photoUrl(Map<String, dynamic> p) {
+    final selfie = p['selfie']?.toString().trim() ?? '';
+    final u = p['utilisateur'];
+    final profil = u is Map
+        ? (u['photoProfil']?.toString().trim() ?? '')
+        : '';
+    final raw = (selfie.isNotEmpty && selfie.toLowerCase().startsWith('http'))
+        ? selfie
+        : profil;
+    if (raw.isEmpty || !raw.toLowerCase().startsWith('http')) return null;
+    return raw;
+  }
+
+  String _displayName(Map<String, dynamic> p) {
+    final u = p['utilisateur'];
+    if (u is Map) {
+      final s =
+          '${u['prenom'] ?? ''} ${u['nom'] ?? ''}'.trim();
+      if (s.isNotEmpty) return s;
+    }
+    return 'Prestataire';
+  }
+
+  List<String> _aggregatedSpecialites() {
+    final set = <String>{};
+    for (final p in _providers) {
+      final s = p['specialite'];
+      if (s is List) {
+        for (final e in s) {
+          final t = e.toString().trim();
+          if (t.isNotEmpty) set.add(t);
+        }
+      }
+    }
+    final out = set.toList()..sort();
+    if (out.length > 14) return out.sublist(0, 14);
+    return out;
+  }
+
+  Widget _buildCompactServiceHeader() {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(SDSpacing.md, SDSpacing.sm, SDSpacing.md, 0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+            child: SizedBox(
+              width: 88,
+              height: 88,
+              child: _buildServiceThumb(widget.image),
+            ),
+          ),
+          SizedBox(width: SDSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.title,
+                  style: SDTypography.titleMedium.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: SDColors.neutral900,
+                  ),
+                ),
+                SizedBox(height: SDSpacing.xxxs),
+                Text(
+                  _providers.isEmpty
+                      ? 'Chargement des professionnels…'
+                      : '${_providers.length} prestataire${_providers.length > 1 ? 's' : ''}',
+                  style: SDTypography.bodySmall.copyWith(
+                    color: SDColors.neutral600,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
-      body: CustomScrollView(
-        slivers: [
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.all(SDSpacing.md),
-              child: Column(
+    );
+  }
+
+  Widget _buildServiceThumb(String path) {
+    final isUrl = path.toLowerCase().startsWith('http');
+    if (isUrl) {
+      return Image.network(
+        path,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => Container(
+          color: SDColors.primary100,
+          child: Icon(Icons.handyman_outlined, color: SDColors.primary700),
+        ),
+      );
+    }
+    return Image.asset(
+      path,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => Container(
+        color: SDColors.primary100,
+        child: Icon(Icons.handyman_outlined, color: SDColors.primary700),
+      ),
+    );
+  }
+
+  Widget _buildQuickFilters() {
+    return Padding(
+      padding: EdgeInsets.only(top: SDSpacing.sm),
+      child: SizedBox(
+        height: 40,
+        child: ListView(
+          scrollDirection: Axis.horizontal,
+          padding: EdgeInsets.symmetric(horizontal: SDSpacing.md),
+          children: [
+            _filterChip(
+              label: 'Dist. : toutes',
+              selected: _filterMaxDistanceKm == null,
+              onTap: () => setState(() => _filterMaxDistanceKm = null),
+            ),
+            _filterChip(
+              label: '≤ 5 km',
+              selected: _filterMaxDistanceKm == 5,
+              onTap: () => setState(() => _filterMaxDistanceKm = 5),
+            ),
+            _filterChip(
+              label: '≤ 10 km',
+              selected: _filterMaxDistanceKm == 10,
+              onTap: () => setState(() => _filterMaxDistanceKm = 10),
+            ),
+            _filterChip(
+              label: '≤ 20 km',
+              selected: _filterMaxDistanceKm == 20,
+              onTap: () => setState(() => _filterMaxDistanceKm = 20),
+            ),
+            _filterChip(
+              label: 'Prix : tous',
+              selected: _filterMaxPrice == null,
+              onTap: () => setState(() => _filterMaxPrice = null),
+            ),
+            _filterChip(
+              label: '≤ 25k F',
+              selected: _filterMaxPrice == 25000,
+              onTap: () => setState(() => _filterMaxPrice = 25000),
+            ),
+            _filterChip(
+              label: '≤ 50k F',
+              selected: _filterMaxPrice == 50000,
+              onTap: () => setState(() => _filterMaxPrice = 50000),
+            ),
+            _filterChip(
+              label: '≤ 100k F',
+              selected: _filterMaxPrice == 100000,
+              onTap: () => setState(() => _filterMaxPrice = 100000),
+            ),
+            _filterChip(
+              label: 'Note : toutes',
+              selected: _filterMinNote == null,
+              onTap: () => setState(() => _filterMinNote = null),
+            ),
+            _filterChip(
+              label: '≥ 3 ★',
+              selected: _filterMinNote == 3,
+              onTap: () => setState(() => _filterMinNote = 3),
+            ),
+            _filterChip(
+              label: '≥ 4 ★',
+              selected: _filterMinNote == 4,
+              onTap: () => setState(() => _filterMinNote = 4),
+            ),
+            _filterChip(
+              label: 'Actifs',
+              selected: _filterActiveOnly,
+              onTap: () =>
+                  setState(() => _filterActiveOnly = !_filterActiveOnly),
+            ),
+            _filterChip(
+              label: 'Vérifiés',
+              selected: _filterVerifiedOnly,
+              onTap: () =>
+                  setState(() => _filterVerifiedOnly = !_filterVerifiedOnly),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _filterChip({
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return Padding(
+      padding: EdgeInsets.only(right: SDSpacing.xs),
+      child: FilterChip(
+        label: Text(
+          label,
+          style: SDTypography.labelSmall.copyWith(
+            color: selected ? SDColors.primary800 : SDColors.neutral700,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+          ),
+        ),
+        selected: selected,
+        onSelected: (_) => onTap(),
+        selectedColor: SDColors.primary100,
+        checkmarkColor: SDColors.primary800,
+        backgroundColor: SDColors.white,
+        side: BorderSide(
+          color: selected ? SDColors.primary600 : SDColors.neutral300,
+        ),
+        showCheckmark: false,
+        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        visualDensity: VisualDensity.compact,
+      ),
+    );
+  }
+
+  Widget _buildAggregatedSpecialitesRow() {
+    final items = _aggregatedSpecialites();
+    if (items.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: EdgeInsets.only(top: SDSpacing.sm),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: SDSpacing.md),
+            child: Text(
+              'Spécialités proposées',
+              style: SDTypography.labelMedium.copyWith(
+                color: SDColors.neutral600,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          SizedBox(height: SDSpacing.xs),
+          SizedBox(
+            height: 34,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: EdgeInsets.symmetric(horizontal: SDSpacing.md),
+              itemCount: items.length + 1,
+              itemBuilder: (context, i) {
+                if (i == 0) {
+                  return Padding(
+                    padding: EdgeInsets.only(right: SDSpacing.xs),
+                    child: ActionChip(
+                      label: Text(
+                        'Toutes',
+                        style: SDTypography.labelSmall,
+                      ),
+                      onPressed: () =>
+                          setState(() => _filterSpecialite = null),
+                      backgroundColor: _filterSpecialite == null
+                          ? SDColors.primary100
+                          : SDColors.white,
+                    ),
+                  );
+                }
+                final s = items[i - 1];
+                final sel = _filterSpecialite == s;
+                return Padding(
+                  padding: EdgeInsets.only(right: SDSpacing.xs),
+                  child: ActionChip(
+                    label: Text(s, style: SDTypography.labelSmall),
+                    onPressed: () => setState(() {
+                      _filterSpecialite = sel ? null : s;
+                    }),
+                    backgroundColor:
+                        sel ? SDColors.primary100 : SDColors.white,
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildListMapToggle() {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        SDSpacing.md,
+        SDSpacing.md,
+        SDSpacing.md,
+        SDSpacing.xs,
+      ),
+      child: Container(
+        padding: EdgeInsets.all(SDSpacing.xxxs),
+        decoration: BoxDecoration(
+          color: SDColors.white,
+          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
+          border: Border.all(color: SDColors.neutral200),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: _segmentButton(
+                label: 'Liste',
+                icon: Icons.view_list_rounded,
+                selected: !_mapMode,
+                onTap: () => setState(() => _mapMode = false),
+              ),
+            ),
+            Expanded(
+              child: _segmentButton(
+                label: 'Carte',
+                icon: Icons.map_outlined,
+                selected: _mapMode,
+                onTap: () => setState(() => _mapMode = true),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _segmentButton({
+    required String label,
+    required IconData icon,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: selected ? SDColors.primary700 : Colors.transparent,
+      borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: SDSpacing.sm),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 20,
+                color: selected ? SDColors.white : SDColors.neutral600,
+              ),
+              SizedBox(width: SDSpacing.xs),
+              Text(
+                label,
+                style: SDTypography.labelMedium.copyWith(
+                  color: selected ? SDColors.white : SDColors.neutral700,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _contactProvider(Map<String, dynamic> p) async {
+    final u = p['utilisateur'];
+    final tel = u is Map ? (u['telephone']?.toString().trim() ?? '') : '';
+    if (tel.isNotEmpty) {
+      final uri = Uri.parse('tel:$tel');
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri);
+        return;
+      }
+    }
+    if (!mounted) return;
+    final id = p['_id']?.toString();
+    if (id == null || id.isEmpty) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ProviderProfileScreen(
+          providerId: id,
+          providerData: p,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProviderCard(Map<String, dynamic> p) {
+    final id = p['_id']?.toString() ?? '';
+    final name = _displayName(p);
+    final metier = _metierLine(p);
+    final note = _noteAsDouble(p);
+    final nbAvis = _nbAvisInt(p);
+    final price = _priceAsDouble(p);
+    final distKm = _distanceToProviderKm(p);
+    final verified = _isVerified(p);
+    final active = _isActiveStatus(p);
+    final top = _showTopBadge(p);
+    final photo = _photoUrl(p);
+
+    return Material(
+      color: SDColors.white,
+      elevation: 0,
+      borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
+        onTap: id.isEmpty
+            ? null
+            : () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ProviderProfileScreen(
+                      providerId: id,
+                      providerData: p,
+                    ),
+                  ),
+                );
+              },
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
+            border: Border.all(color: SDColors.neutral200),
+          ),
+          padding: EdgeInsets.all(SDSpacing.sm),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildServiceImage(widget.image),
-                  SizedBox(height: SDSpacing.sm),
-                  Text(
-                    widget.title,
-                    style: SDTypography.titleLarge.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: SDColors.neutral900,
+                  ClipRRect(
+                    borderRadius:
+                        BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                    child: SizedBox(
+                      width: 72,
+                      height: 72,
+                      child: photo != null
+                          ? AppImage(imageUrl: photo, fit: BoxFit.cover)
+                          : Container(
+                              color: SDColors.primary50,
+                              child: Icon(
+                                Icons.person,
+                                color: SDColors.primary600,
+                                size: 36,
+                              ),
+                            ),
                     ),
                   ),
-                  SizedBox(height: SDSpacing.sm),
-                  _buildServiceDescription(),
-                  SizedBox(height: SDSpacing.md),
-                  SizedBox(height: SDSpacing.lg),
-
-                  // Mini carte avec emplacement du prestataire
-                  if (_providers.isNotEmpty && _userLocation != null)
-                    ConstrainedBox(
-                      constraints: BoxConstraints(
-                        minHeight: 100,
-                        maxHeight: 200,
-                      ),
-                      child: MiniMapWidget(
-                        provider: _providers.first,
-                        userLocation: _userLocation,
-                      ),
+                  SizedBox(width: SDSpacing.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                name,
+                                style: SDTypography.titleSmall.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (verified)
+                              Icon(
+                                Icons.verified,
+                                color: SDColors.primary600,
+                                size: 20,
+                              ),
+                          ],
+                        ),
+                        SizedBox(height: SDSpacing.xxxs),
+                        Text(
+                          metier,
+                          style: SDTypography.bodySmall.copyWith(
+                            color: SDColors.neutral600,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        SizedBox(height: SDSpacing.xs),
+                        Wrap(
+                          spacing: SDSpacing.xs,
+                          runSpacing: SDSpacing.xxxs,
+                          children: [
+                            if (top)
+                              _miniBadge(
+                                'Top prestataire',
+                                SDColors.warning100,
+                                SDColors.warning700,
+                              ),
+                            if (active)
+                              _miniBadge(
+                                'Profil actif',
+                                SDColors.success50,
+                                SDColors.success700,
+                              ),
+                          ],
+                        ),
+                      ],
                     ),
-
-                  SizedBox(height: SDSpacing.md),
-                  AIProviderMatcherWidget(
-                    serviceType: widget.title,
-                    location: "Abidjan",
-                    preferences: const [],
                   ),
-                  SizedBox(height: SDSpacing.md),
                 ],
               ),
-            ),
+              SizedBox(height: SDSpacing.sm),
+              Row(
+                children: [
+                  Icon(Icons.star_rounded,
+                      size: 18, color: Colors.amber.shade700),
+                  SizedBox(width: SDSpacing.xxxs),
+                  Text(
+                    note > 0 ? note.toStringAsFixed(1) : '—',
+                    style: SDTypography.labelMedium.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    nbAvis > 0 ? ' ($nbAvis avis)' : '',
+                    style: SDTypography.bodySmall.copyWith(
+                      color: SDColors.neutral600,
+                    ),
+                  ),
+                  if (distKm != null) ...[
+                    SizedBox(width: SDSpacing.sm),
+                    Icon(Icons.near_me_outlined,
+                        size: 16, color: SDColors.neutral500),
+                    SizedBox(width: SDSpacing.xxxs),
+                    Text(
+                      '${distKm.toStringAsFixed(distKm < 10 ? 1 : 0)} km',
+                      style: SDTypography.bodySmall.copyWith(
+                        color: SDColors.neutral700,
+                      ),
+                    ),
+                  ],
+                  const Spacer(),
+                  if (price != null && price > 0)
+                    Text(
+                      '${price.toInt()} FCFA',
+                      style: SDTypography.titleSmall.copyWith(
+                        color: SDColors.primary700,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                ],
+              ),
+              SizedBox(height: SDSpacing.sm),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => _contactProvider(p),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: SDColors.primary700,
+                        side: BorderSide(color: SDColors.primary700),
+                        padding: EdgeInsets.symmetric(vertical: SDSpacing.xs),
+                      ),
+                      child: Text(
+                        'Contacter',
+                        style: SDTypography.labelMedium.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: SDSpacing.sm),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: id.isEmpty
+                          ? null
+                          : () {
+                              setState(() => _selectedProviderId = id);
+                              final auth =
+                                  context.read<AuthCubit>().state;
+                              if (auth is! AuthAuthenticated) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Connectez-vous pour commander.',
+                                      style: SDTypography.bodyMedium,
+                                    ),
+                                  ),
+                                );
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        const LoginPageScreenM(),
+                                  ),
+                                );
+                                return;
+                              }
+                              _openCheckoutSheet();
+                            },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: SDColors.primary700,
+                        foregroundColor: SDColors.white,
+                        padding: EdgeInsets.symmetric(vertical: SDSpacing.xs),
+                      ),
+                      child: Text(
+                        'Commander',
+                        style: SDTypography.labelMedium.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: SDColors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
-          if (_loading)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.only(top: SDSpacing.xs),
-                child: Center(
-                    child: CircularProgressIndicator(
-                        color: SDColors.primary700)),
-              ),
-            )
-          else if (_providers.isEmpty)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: SDSpacing.md, vertical: SDSpacing.xs),
-                child: Text('Aucun prestataire trouvé pour ce service.',
-                    style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral600)),
-              ),
-            )
-          else
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: SDSpacing.md),
-                child: _buildProvidersStories(),
-              ),
-            ),
-          SliverToBoxAdapter(child: SizedBox(height: SDSpacing.xxl)),
-        ],
+        ),
       ),
-      bottomNavigationBar: _buildStickyCta(context),
+    );
+  }
+
+  Widget _miniBadge(String text, Color bg, Color fg) {
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: SDSpacing.xs,
+        vertical: SDSpacing.xxxs,
+      ),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        text,
+        style: SDTypography.labelSmall.copyWith(
+          color: fg,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 
@@ -272,16 +1153,18 @@ class _DetailPageState extends State<DetailPage> {
                 // envoyer au backend si connecté
                 final auth = context.read<AuthCubit>().state;
                 if (auth is AuthAuthenticated) {
-                  try {
-                    await _api.createReport(
-                      token: auth.token,
-                      targetType: 'SERVICE',
-                      targetId: 'unknown',
-                      reason: controller.text.trim(),
-                    );
-                    // succès
-                  } catch (e) {
-                    debugPrint('Erreur signalement: $e');
+                  final sid = _effectiveServiceId;
+                  if (sid != null && sid.isNotEmpty) {
+                    try {
+                      await _api.createReport(
+                        token: auth.token,
+                        targetType: 'SERVICE',
+                        targetId: sid,
+                        reason: controller.text.trim(),
+                      );
+                    } catch (e) {
+                      debugPrint('Erreur signalement: $e');
+                    }
                   }
                 }
                 Navigator.pop(context, true);
@@ -449,7 +1332,14 @@ class _DetailPageState extends State<DetailPage> {
                           borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
                         ),
                         child: DropdownButtonFormField<String>(
-                          value: _selectedProviderId,
+                          value: _selectedProviderId != null &&
+                                  _filteredSortedProviders.any(
+                                    (p) =>
+                                        p['_id']?.toString() ==
+                                        _selectedProviderId,
+                                  )
+                              ? _selectedProviderId
+                              : null,
                           style: SDTypography.bodyMedium,
                           decoration: InputDecoration(
                             border: InputBorder.none,
@@ -457,7 +1347,7 @@ class _DetailPageState extends State<DetailPage> {
                             prefixIcon: Icon(Icons.person_pin_circle, color: SDColors.primary700),
                           ),
                           hint: Text('Sélectionnez un prestataire', style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral500)),
-                          items: _providers.map((provider) {
+                          items: _filteredSortedProviders.map((provider) {
                             final prenom = provider['utilisateur']?['prenom'] ?? '';
                             final nom = provider['utilisateur']?['nom'] ?? 'Inconnu';
                             final price = provider['prixprestataire'] ?? 0;
@@ -775,10 +1665,10 @@ class _DetailPageState extends State<DetailPage> {
                               token: auth.token,
                               utilisateurId: auth.utilisateur.idutilisateur,
                               prestataireId: _selectedProviderId,
-                              serviceId: _serviceId,
+                              serviceId: _effectiveServiceId,
                               adresse: adresseCtrl.text.trim(),
                               ville: villeCtrl.text.trim(),
-                              dateHeure: dateTimeToUse,
+                              datePrestation: dateTimeToUse,
                               notesClient: notesCtrl.text.trim().isEmpty
                                   ? null
                                   : notesCtrl.text.trim(),
@@ -795,7 +1685,7 @@ class _DetailPageState extends State<DetailPage> {
                                   children: [
                                     Icon(Icons.check_circle, color: SDColors.white),
                                     SizedBox(width: SDSpacing.xs),
-                                    Expanded(child: Text('Commande confirmée ! 🎉',
+                                    Expanded(child: Text('Commande confirmée',
                                         style: SDTypography.bodyMedium.copyWith(color: SDColors.white))),
                                   ],
                                 ),
@@ -867,218 +1757,182 @@ class _DetailPageState extends State<DetailPage> {
     );
   }
 
-  Widget _buildServiceImage(String path) {
-    final isUrl = path.toLowerCase().startsWith('http');
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
-      child: isUrl
-          ? Image.network(
-              path,
-              height: 200,
-              width: double.infinity,
-              fit: BoxFit.cover,
-              loadingBuilder: (context, child, loadingProgress) {
-                if (loadingProgress == null) return child;
-                return Container(
-                  height: 200,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: SDColors.neutral200,
-                    borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
-                  ),
-                  child:
-                      CircularProgressIndicator(color: SDColors.primary700),
-                );
-              },
-              errorBuilder: (context, error, stackTrace) {
-                return Container(
-                  height: 200,
-                  width: double.infinity,
-                  color: SDColors.neutral200,
-                  alignment: Alignment.center,
-                  child: Icon(Icons.image_not_supported,
-                      size: 48, color: SDColors.neutral500),
-                );
-              },
-            )
-          : Image.asset(
-              path,
-              height: 200,
-              width: double.infinity,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => Container(
-                height: 200,
-                color: SDColors.neutral200,
-                alignment: Alignment.center,
-                child: Icon(Icons.image_not_supported,
-                    size: 48, color: SDColors.neutral500),
-              ),
-            ),
+}
+
+/// Carte inline : marqueurs uniquement si `localisationmaps` présent (données réelles).
+class _DetailProvidersMap extends StatefulWidget {
+  final List<Map<String, dynamic>> providers;
+  final LatLng? userLocation;
+  final void Function(Map<String, dynamic> p) onMarkerTap;
+
+  const _DetailProvidersMap({
+    required this.providers,
+    required this.userLocation,
+    required this.onMarkerTap,
+  });
+
+  @override
+  State<_DetailProvidersMap> createState() => _DetailProvidersMapState();
+}
+
+class _DetailProvidersMapState extends State<_DetailProvidersMap> {
+  GoogleMapController? _controller;
+  late Set<Marker> _markers;
+
+  static LatLng? _latLng(Map<String, dynamic> p) {
+    final m = p['localisationmaps'];
+    if (m is! Map) return null;
+    final lat = m['latitude'];
+    final lng = m['longitude'];
+    if (lat == null || lng == null) return null;
+    final la = lat is num ? lat.toDouble() : double.tryParse('$lat');
+    final lo = lng is num ? lng.toDouble() : double.tryParse('$lng');
+    if (la == null || lo == null) return null;
+    return LatLng(la, lo);
+  }
+
+  static String _name(Map<String, dynamic> p) {
+    final u = p['utilisateur'];
+    if (u is Map) {
+      final s = '${u['prenom'] ?? ''} ${u['nom'] ?? ''}'.trim();
+      if (s.isNotEmpty) return s;
+    }
+    return 'Prestataire';
+  }
+
+  Set<Marker> _buildMarkers() {
+    final markers = <Marker>{};
+    var i = 0;
+    for (final p in widget.providers) {
+      final pos = _latLng(p);
+      if (pos == null) continue;
+      final id = p['_id']?.toString() ?? 'p$i';
+      final price = p['prixprestataire'];
+      final snippet = price != null ? '$price FCFA' : '';
+      markers.add(
+        Marker(
+          markerId: MarkerId(id),
+          position: pos,
+          infoWindow: InfoWindow(title: _name(p), snippet: snippet),
+          onTap: () => widget.onMarkerTap(p),
+        ),
+      );
+      i++;
+    }
+    if (widget.userLocation != null) {
+      markers.add(
+        Marker(
+          markerId: const MarkerId('__user__'),
+          position: widget.userLocation!,
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+          infoWindow: const InfoWindow(title: 'Votre position'),
+        ),
+      );
+    }
+    return markers;
+  }
+
+  void _fitCamera() {
+    if (!mounted || _controller == null) return;
+    if (_markers.isEmpty) {
+      final fallback = widget.userLocation ?? const LatLng(5.3599, -4.0083);
+      _controller!.animateCamera(
+        CameraUpdate.newLatLngZoom(fallback, 12),
+      );
+      return;
+    }
+    if (_markers.length == 1) {
+      _controller!.animateCamera(
+        CameraUpdate.newLatLngZoom(_markers.first.position, 13),
+      );
+      return;
+    }
+    double minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
+    for (final m in _markers) {
+      final p = m.position;
+      minLat = math.min(minLat, p.latitude);
+      maxLat = math.max(maxLat, p.latitude);
+      minLng = math.min(minLng, p.longitude);
+      maxLng = math.max(maxLng, p.longitude);
+    }
+    if ((maxLat - minLat).abs() < 1e-5 && (maxLng - minLng).abs() < 1e-5) {
+      _controller!.animateCamera(
+        CameraUpdate.newLatLngZoom(LatLng(minLat, minLng), 14),
+      );
+      return;
+    }
+    _controller!.animateCamera(
+      CameraUpdate.newLatLngBounds(
+        LatLngBounds(
+          southwest: LatLng(minLat, minLng),
+          northeast: LatLng(maxLat, maxLng),
+        ),
+        56,
+      ),
     );
   }
 
-  Widget _buildServiceDescription() {
-    // Utiliser la description du premier prestataire si disponible
-    String description = "Ce service est assuré par un professionnel qualifié.";
-    if (_providers.isNotEmpty && _providers.first['description'] != null) {
-      description = _providers.first['description'];
+  @override
+  void initState() {
+    super.initState();
+    _markers = _buildMarkers();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _fitCamera());
+  }
+
+  @override
+  void didUpdateWidget(covariant _DetailProvidersMap oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.providers != widget.providers ||
+        oldWidget.userLocation != widget.userLocation) {
+      setState(() => _markers = _buildMarkers());
+      WidgetsBinding.instance.addPostFrameCallback((_) => _fitCamera());
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final h = (MediaQuery.sizeOf(context).height * 0.42).clamp(280.0, 420.0);
+    final providerMarkers =
+        _markers.where((m) => m.markerId.value != '__user__').toList();
+    final target = widget.userLocation ??
+        (providerMarkers.isNotEmpty
+            ? providerMarkers.first.position
+            : const LatLng(5.3599, -4.0083));
+
+    if (providerMarkers.isEmpty) {
+      return Container(
+        height: h,
+        alignment: Alignment.center,
+        padding: EdgeInsets.all(SDSpacing.lg),
+        decoration: BoxDecoration(
+          color: SDColors.white,
+          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
+          border: Border.all(color: SDColors.neutral200),
+        ),
+        child: Text(
+          'Aucune position précise sur la carte pour ces prestataires '
+          '(coordonnées non renseignées).',
+          textAlign: TextAlign.center,
+          style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral600),
+        ),
+      );
     }
 
-    return Text(
-      description,
-      style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral600),
-    );
-  }
-
-  Widget _buildProvidersStories() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Prestataires disponibles',
-          style: SDTypography.titleMedium.copyWith(
-            fontWeight: FontWeight.bold,
-            color: SDColors.neutral900,
-          ),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
+      child: SizedBox(
+        height: h,
+        child: GoogleMap(
+          initialCameraPosition: CameraPosition(target: target, zoom: 12),
+          markers: _markers,
+          myLocationButtonEnabled: false,
+          zoomControlsEnabled: true,
+          mapToolbarEnabled: false,
+          onMapCreated: (c) {
+            _controller = c;
+            _fitCamera();
+          },
         ),
-        SizedBox(height: SDSpacing.sm),
-        SizedBox(
-          height: 120, // Hauteur pour les stories
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            itemCount: _providers.length,
-            itemBuilder: (context, index) {
-              final provider = _providers[index];
-              return _buildProviderStory(provider);
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildProviderStory(Map<String, dynamic> provider) {
-    final utilisateur = provider['utilisateur'];
-    final nom = (utilisateur is Map<String, dynamic>)
-        ? '${utilisateur['nom'] ?? ''} ${utilisateur['prenom'] ?? ''}'.trim()
-        : 'Prestataire';
-    final photo = (utilisateur is Map<String, dynamic>)
-        ? (utilisateur['photoProfil'] ?? '')
-        : '';
-    final isUrl = photo.toString().toLowerCase().startsWith('http');
-    final verified =
-        provider['verifier'] == true || provider['verified'] == true;
-    final price = provider['prixprestataire']?.toString() ?? '-';
-
-    return Container(
-      width: 80,
-      margin: EdgeInsets.only(right: SDSpacing.sm),
-      child: Column(
-        children: [
-          // Story ronde avec photo
-          GestureDetector(
-            onTap: () {
-              // Action pour voir le profil du prestataire
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Profil de $nom',
-                    style: SDTypography.bodyMedium)),
-              );
-            },
-            child: Stack(
-              children: [
-                // Cercle principal
-                Container(
-                  width: 70,
-                  height: 70,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: verified
-                          ? SDColors.primary700
-                          : SDColors.neutral300,
-                      width: 3,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: SDColors.neutral900.withOpacity(0.1),
-                        blurRadius: 8,
-                        offset: Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: ClipOval(
-                    child: isUrl && photo.isNotEmpty
-                        ? Image.network(
-                            photo,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
-                                color: SDColors.primary700.withOpacity(0.1),
-                                child: Icon(
-                                  Icons.person,
-                                  color: SDColors.primary700,
-                                  size: 30,
-                                ),
-                              );
-                            },
-                          )
-                        : Container(
-                            color: SDColors.primary700.withOpacity(0.1),
-                            child: Icon(
-                              Icons.person,
-                              color: SDColors.primary700,
-                              size: 30,
-                            ),
-                          ),
-                  ),
-                ),
-                // Badge vérifié
-                if (verified)
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: Container(
-                      width: 20,
-                      height: 20,
-                      decoration: BoxDecoration(
-                        color: SDColors.primary700,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.verified,
-                        color: SDColors.white,
-                        size: 12,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          SizedBox(height: SDSpacing.xs),
-          // Nom du prestataire
-          Text(
-            nom.length > 10 ? '${nom.substring(0, 10)}...' : nom,
-            style: SDTypography.labelSmall.copyWith(
-              fontWeight: FontWeight.w600,
-              color: SDColors.neutral900,
-            ),
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          SizedBox(height: SDSpacing.xxxs),
-          // Prix
-          Text(
-            '$price FCFA',
-            style: SDTypography.labelSmall.copyWith(
-              color: SDColors.primary700,
-              fontWeight: FontWeight.w500,
-            ),
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
       ),
     );
   }

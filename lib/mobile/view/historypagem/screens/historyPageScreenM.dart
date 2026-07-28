@@ -6,6 +6,8 @@ import '../historypageblocm/historyPageStateM.dart';
 import '../../../../data/models/history.dart';
 import '../../../../design_system/design_system.dart';
 import 'historyDetailScreenM.dart';
+import '../../common/widgets/unauthenticated_banner.dart';
+import '../../../../data/services/authCubit.dart';
 
 class HistoryPageScreenM extends StatefulWidget {
   const HistoryPageScreenM({super.key});
@@ -174,6 +176,16 @@ class _HistoryPageScreenMState extends State<HistoryPageScreenM>
 
   @override
   Widget build(BuildContext context) {
+    final authState = context.watch<AuthCubit>().state;
+    if (authState is! AuthAuthenticated) {
+      return const UnauthenticatedBanner(
+        appBarTitle: 'Historique',
+        icon: Icons.history_rounded,
+        title: 'Votre historique',
+        description: 'Connectez-vous pour retrouver tous vos achats, consultations de services et activités passées.',
+      );
+    }
+
     return Scaffold(
       appBar: SDWhiteAppBar.appBar(
         title: 'Historique des consultations',

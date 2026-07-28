@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:sdealsmobile/data/models/utilisateur.dart';
@@ -44,6 +45,12 @@ class _ProviderMainScreenState extends State<ProviderMainScreen> {
   double _acceptanceRate = 0.0;
   bool _isLoadingStats = true;
 
+  // 🆔 ID du document prestataire (différent de l'ID utilisateur)
+  String? _prestataireDocId;
+  String _prestataireStatus = 'incomplete'; // 'incomplete', 'pending', 'active'
+  int _unreadNotificationsCount = 0;
+  Timer? _notifPollTimer;
+
   // Titres des écrans pour l'AppBar
   final List<String> _titles = [
     'Espace Prestataire',
@@ -56,7 +63,63 @@ class _ProviderMainScreenState extends State<ProviderMainScreen> {
   @override
   void initState() {
     super.initState();
-    _loadDashboardStats();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _initPrestataireData();
+    });
+  }
+
+  @override
+  void dispose() {
+    _notifPollTimer?.cancel();
+    super.dispose();
+  }
+
+  // 🆔 Initialiser les données prestataire (id réel + stats)
+  Future<void> _initPrestataireData() async {
+    final auth = context.read<AuthCubit>().state;
+    if (auth is! AuthAuthenticated) return;
+
+    final userId = auth.utilisateur.idutilisateur;
+    final token = auth.token;
+
+    // Récupérer le document prestataire par userId
+    try {
+      final prestataireDoc = await _apiClient.getPrestataireByUserId(userId!, token);
+      if (prestataireDoc != null && mounted) {
+        setState(() {
+          _prestataireDocId = prestataireDoc['_id']?.toString();
+          _prestataireStatus = prestataireDoc['status']?.toString() ?? 'pending';
+        });
+      }
+    } catch (e) {
+      print('Erreur récupération prestataire doc: $e');
+    }
+
+    // Charger les stats dashboard
+    await _loadDashboardStats();
+
+    // Charger le nombre de notifications non lues
+    await _loadUnreadNotificationsCount();
+    _notifPollTimer?.cancel();
+    _notifPollTimer = Timer.periodic(const Duration(seconds: 90), (_) {
+      _loadUnreadNotificationsCount();
+    });
+  }
+
+  // 🔔 Charger le nombre de notifications non lues
+  Future<void> _loadUnreadNotificationsCount() async {
+    final auth = context.read<AuthCubit>().state;
+    if (auth is! AuthAuthenticated) return;
+    try {
+      final count = await _apiClient.getUserUnreadNotificationCount(
+        token: auth.token,
+        userId: auth.utilisateur.idutilisateur,
+      );
+      if (mounted) setState(() => _unreadNotificationsCount = count);
+    } catch (e) {
+      print('Erreur unread count: $e');
+    }
   }
 
   // 🚀 Charger les statistiques du dashboard
@@ -67,46 +130,51 @@ class _ProviderMainScreenState extends State<ProviderMainScreen> {
       final auth = context.read<AuthCubit>().state;
       if (auth is AuthAuthenticated) {
         final token = auth.token;
-        final utilisateurId = auth.utilisateur.idutilisateur;
+        final prestataireId = _prestataireDocId ?? auth.utilisateur.idutilisateur;
         
-        // Charger les missions en attente
+        // Charger les missions en attente pour ce prestataire
         final pendingMissions = await _apiClient.getPrestationsByStatus(
           token: token,
           status: 'EN_ATTENTE',
+          prestataireId: _prestataireDocId,
         );
         
         // Charger les missions en cours
         final ongoingMissions = await _apiClient.getPrestationsByStatus(
           token: token,
           status: 'EN_COURS',
+          prestataireId: _prestataireDocId,
         );
         
-        // Filtrer par prestataire
-        final filteredPending = pendingMissions.where((m) =>
-          m['prestataire']?['utilisateur']?.toString() == utilisateurId ||
-          m['prestataire']?.toString() == utilisateurId
-        ).toList();
+        // Charger les statistiques (endpoint correct)
+        Map<String, dynamic> stats = {};
+        if (prestataireId != null) {
+          try {
+            final statsResponse = await _apiClient.get(
+              '/prestations/stats?prestataireId=$prestataireId',
+              token: token,
+            );
+            if (statsResponse.statusCode == 200) {
+              stats = jsonDecode(statsResponse.body) as Map<String, dynamic>;
+            }
+          } catch (e) {
+            print('Erreur stats: $e');
+          }
+        }
         
-        final filteredOngoing = ongoingMissions.where((m) =>
-          m['prestataire']?['utilisateur']?.toString() == utilisateurId ||
-          m['prestataire']?.toString() == utilisateurId
-        ).toList();
-        
-        // Charger les statistiques
-        final statsResponse = await _apiClient.get('/prestation/stats?prestataireId=$utilisateurId');
-        final stats = jsonDecode(statsResponse.body) as Map<String, dynamic>;
-        
-        setState(() {
-          _pendingMissionsCount = filteredPending.length;
-          _ongoingMissionsCount = filteredOngoing.length;
-          _monthlyRevenue = stats['revenueTotal']?.toDouble() ?? 0.0;
-          _acceptanceRate = _calculateAcceptanceRate(stats);
-          _isLoadingStats = false;
-        });
+        if (mounted) {
+          setState(() {
+            _pendingMissionsCount = pendingMissions.length;
+            _ongoingMissionsCount = ongoingMissions.length;
+            _monthlyRevenue = (stats['revenueTotal'] ?? 0).toDouble();
+            _acceptanceRate = _calculateAcceptanceRate(stats);
+            _isLoadingStats = false;
+          });
+        }
       }
     } catch (e) {
       print('Erreur chargement stats dashboard: $e');
-      setState(() => _isLoadingStats = false);
+      if (mounted) setState(() => _isLoadingStats = false);
     }
   }
   
@@ -207,7 +275,7 @@ class _ProviderMainScreenState extends State<ProviderMainScreen> {
               width: double.infinity,
               child: ElevatedButton.icon(
                 onPressed: () {
-                  context.push('/prestataire-finalization');
+                  context.push('/prestataire-finalization', extra: _prestataireDocId);
                 },
                 icon: Icon(Icons.check_circle, color: Colors.white),
                 label: Text(
@@ -1184,28 +1252,47 @@ class _ProviderMainScreenState extends State<ProviderMainScreen> {
   Widget _buildSimpleMissions() {
     return BlocProvider(
       create: (context) => MissionsBloc(),
-      child: const ProviderMissionsScreen(),
+      child: ProviderMissionsScreen(prestataireDocId: _prestataireDocId),
     );
   }
 
   Widget _buildSimplePlanning() {
+    final auth = context.read<AuthCubit>().state;
+    final token = auth is AuthAuthenticated ? auth.token : null;
     return BlocProvider<PlanningBloc>(
-      create: (context) => PlanningBloc(),
-      child: const ProviderPlanningScreen(),
+      create: (context) {
+        final bloc = PlanningBloc();
+        if (token != null) bloc.setToken(token);
+        if (_prestataireDocId != null) bloc.setPrestataireId(_prestataireDocId!);
+        return bloc;
+      },
+      child: ProviderPlanningScreen(prestataireDocId: _prestataireDocId),
     );
   }
 
   Widget _buildSimpleMessages() {
+    final auth = context.read<AuthCubit>().state;
+    final token = auth is AuthAuthenticated ? auth.token : null;
     return BlocProvider<MessagesBloc>(
-      create: (context) => MessagesBloc(),
+      create: (context) {
+        final bloc = MessagesBloc();
+        if (token != null) bloc.setToken(token);
+        return bloc;
+      },
       child: const ProviderMessagesScreen(),
     );
   }
 
   Widget _buildSimpleProfile() {
+    final auth = context.read<AuthCubit>().state;
+    final token = auth is AuthAuthenticated ? auth.token : null;
     return BlocProvider<ProviderProfileBloc>(
-      create: (context) => ProviderProfileBloc(),
-      child: const ProviderProfileScreen(),
+      create: (context) {
+        final bloc = ProviderProfileBloc();
+        if (token != null) bloc.setToken(token);
+        return bloc;
+      },
+      child: ProviderProfileScreen(prestataireDocId: _prestataireDocId),
     );
   }
 
@@ -1345,37 +1432,38 @@ class _ProviderMainScreenState extends State<ProviderMainScreen> {
             padding: EdgeInsets.zero,
           ),
         ),
-        Positioned(
-          right: 8,
-          top: 8,
-          child: Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: Colors.red,
-              borderRadius: BorderRadius.circular(10),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.red.withOpacity(0.3),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            constraints: const BoxConstraints(
-              minWidth: 18,
-              minHeight: 18,
-            ),
-            child: const Text(
-              '3',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
+        if (_unreadNotificationsCount > 0)
+          Positioned(
+            right: 8,
+            top: 8,
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: Colors.red,
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.red.withOpacity(0.3),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-              textAlign: TextAlign.center,
+              constraints: const BoxConstraints(
+                minWidth: 18,
+                minHeight: 18,
+              ),
+              child: Text(
+                '$_unreadNotificationsCount',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
             ),
           ),
-        ),
       ],
     );
   }
@@ -1500,7 +1588,7 @@ class _ProviderMainScreenState extends State<ProviderMainScreen> {
             onPressed: () {
               Navigator.pop(context);
               context.read<AuthCubit>().logout();
-              context.push('/login');
+              context.go('/login');
             },
             child: const Text('Déconnexion'),
           ),
@@ -1620,15 +1708,21 @@ class _ProviderMainScreenState extends State<ProviderMainScreen> {
 
   // 🔔 AFFICHER L'ÉCRAN DE NOTIFICATIONS
   void _showNotificationsScreen() {
+    final auth = context.read<AuthCubit>().state;
+    final token = auth is AuthAuthenticated ? auth.token : null;
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => BlocProvider<NotificationsBloc>(
-          create: (context) => NotificationsBloc(),
+          create: (context) {
+            final bloc = NotificationsBloc();
+            if (token != null) bloc.setToken(token);
+            return bloc;
+          },
           child: const ProviderNotificationsScreen(),
         ),
       ),
-    );
+    ).then((_) => _loadUnreadNotificationsCount());
   }
 
   // 💰 AFFICHER L'ÉCRAN SOUTRAPAY
@@ -1646,12 +1740,18 @@ class _ProviderMainScreenState extends State<ProviderMainScreen> {
 
   // 👤 AFFICHER L'ÉCRAN PROFIL PRESTATAIRE
   void _showProviderProfile() {
+    final auth = context.read<AuthCubit>().state;
+    final token = auth is AuthAuthenticated ? auth.token : null;
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => BlocProvider<ProviderProfileBloc>(
-          create: (context) => ProviderProfileBloc(),
-          child: const ProviderProfileScreen(),
+          create: (context) {
+            final bloc = ProviderProfileBloc();
+            if (token != null) bloc.setToken(token);
+            return bloc;
+          },
+          child: ProviderProfileScreen(prestataireDocId: _prestataireDocId),
         ),
       ),
     );
@@ -1659,11 +1759,17 @@ class _ProviderMainScreenState extends State<ProviderMainScreen> {
 
   // ⚙️ AFFICHER L'ÉCRAN PARAMÈTRES
   void _showProviderSettings() {
+    final auth = context.read<AuthCubit>().state;
+    final token = auth is AuthAuthenticated ? auth.token : null;
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => BlocProvider<ProviderProfileBloc>(
-          create: (context) => ProviderProfileBloc(),
+          create: (context) {
+            final bloc = ProviderProfileBloc();
+            if (token != null) bloc.setToken(token);
+            return bloc;
+          },
           child: const ProviderSettingsScreen(),
         ),
       ),
@@ -1672,12 +1778,18 @@ class _ProviderMainScreenState extends State<ProviderMainScreen> {
 
   // 📊 AFFICHER L'ÉCRAN STATISTIQUES
   void _showProviderStatistics() {
+    final auth = context.read<AuthCubit>().state;
+    final token = auth is AuthAuthenticated ? auth.token : null;
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => BlocProvider<ProviderStatisticsBloc>(
-          create: (context) => ProviderStatisticsBloc(),
-          child: const ProviderStatisticsScreen(),
+          create: (context) {
+            final bloc = ProviderStatisticsBloc();
+            if (token != null) bloc.setToken(token);
+            return bloc;
+          },
+          child: ProviderStatisticsScreen(prestataireDocId: _prestataireDocId),
         ),
       ),
     );
@@ -1685,8 +1797,6 @@ class _ProviderMainScreenState extends State<ProviderMainScreen> {
 
   // 🎯 MÉTHODE POUR VÉRIFIER LE STATUT DU PRESTATAIRE
   String _getPrestataireStatus() {
-    // TODO: Récupérer le statut depuis l'API
-    // Pour l'instant, on simule avec 'incomplete' pour tester
-    return 'incomplete'; // 'incomplete', 'pending', 'active'
+    return _prestataireStatus;
   }
 }

@@ -32,6 +32,7 @@ class LoginPageBlocM extends Bloc<LoginPageEventM, LoginPageStateM> {
       print("🔍 Réponse API login: $response");
 
       final token = response["token"] ?? "";
+      final refreshToken = response["refreshToken"]?.toString();
       final utilisateurData = response["utilisateur"] ?? {};
 
       print("🔍 Token extrait: '$token'");
@@ -51,16 +52,17 @@ class LoginPageBlocM extends Bloc<LoginPageEventM, LoginPageStateM> {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString("token", token);
         await prefs.setString("utilisateur", jsonEncode(utilisateur.toMap()));
+        if (refreshToken != null) {
+          await prefs.setString("refresh_token", refreshToken);
+        }
       }
-
-      // ✅ Mettre à jour l'AuthCubit après connexion réussie
-      // Note: L'AuthCubit sera mis à jour dans l'écran de connexion
 
       // ✅ Émettre l'état succès avec flag pour mise à jour AuthCubit
       emit(LoginPageSuccessM(
         token: token,
         utilisateur: utilisateur.toMap(),
-        shouldUpdateAuth: true, // ✅ Flag pour mise à jour AuthCubit
+        shouldUpdateAuth: true,
+        refreshToken: refreshToken,
       ));
     } catch (error) {
       final errorMessage = (error is Exception)

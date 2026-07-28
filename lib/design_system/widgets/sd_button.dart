@@ -140,12 +140,16 @@ class _SDButtonState extends State<SDButton> {
                 Icon(widget.icon, size: _iconSize),
                 const SizedBox(width: SDSpacing.xxs),
               ],
-              Text(
-                widget.text,
-                style: TextStyle(
-                  fontSize: _fontSize,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.5,
+              Flexible(
+                child: Text(
+                  widget.text,
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                  style: TextStyle(
+                    fontSize: _fontSize,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.5,
+                  ),
                 ),
               ),
               if (widget.icon != null && widget.iconRight) ...[

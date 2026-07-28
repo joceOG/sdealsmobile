@@ -1,203 +1,89 @@
+import 'dart:convert';
 import 'dart:math';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:sdealsmobile/data/services/api_client.dart';
 import 'provider_statistics_event.dart';
 import 'provider_statistics_state.dart';
 
 // 🎯 BLoC POUR GÉRER LES STATISTIQUES PRESTATAIRE
 class ProviderStatisticsBloc
     extends Bloc<ProviderStatisticsEvent, ProviderStatisticsState> {
+  final ApiClient _apiClient = ApiClient();
   final Random _random = Random();
+  String? _currentToken;
+
+  void setToken(String token) {
+    _currentToken = token;
+  }
 
   ProviderStatisticsBloc() : super(ProviderStatisticsInitial()) {
     // 📊 CHARGER LES STATISTIQUES DU PRESTATAIRE
     on<LoadProviderStatistics>((event, emit) async {
       emit(ProviderStatisticsLoading());
       try {
-        // Simulation d'un délai API
-        await Future.delayed(const Duration(milliseconds: 1000));
+        // Appel API réel pour les stats de prestations
+        final response = await _apiClient.get(
+          '/prestations/stats?prestataireId=${event.prestataireId}',
+          token: _currentToken,
+        );
 
-        // Données simulées des revenus
+        Map<String, dynamic> statsData = {};
+        if (response.statusCode == 200) {
+          statsData = jsonDecode(response.body) as Map<String, dynamic>;
+        }
+
+        // Extraire les stats par statut
+        final statsParStatut = statsData['statsParStatut'] as List<dynamic>? ?? [];
+        int totalMissions = 0;
+        int completedMissions = 0;
+        int ongoingMissions = 0;
+
+        for (var stat in statsParStatut) {
+          final count = (stat['count'] as int? ?? 0);
+          totalMissions += count;
+          if (stat['_id'] == 'TERMINEE') completedMissions += count;
+          if (stat['_id'] == 'EN_COURS' || stat['_id'] == 'ACCEPTEE') ongoingMissions += count;
+        }
+
+        final revenueTotal = (statsData['revenueTotal'] ?? 0).toDouble();
+        final notesMoyenne = (statsData['notesMoyenne'] ?? 0).toDouble();
+
         final revenus = {
-          'total': 125000.0 + _random.nextDouble() * 50000,
-          'pending': 25000.0 + _random.nextDouble() * 10000,
-          'averagePerMission': 5200.0 + _random.nextDouble() * 1000,
-          'target': 150000.0,
+          'total': revenueTotal,
+          'pending': 0.0,
+          'averagePerMission': totalMissions > 0 ? revenueTotal / totalMissions : 0.0,
+          'target': revenueTotal * 1.2,
           'achievement': 0.83,
-          'growth': 0.15,
-          'breakdown': {
-            'plomberie': 45000.0,
-            'electricite': 35000.0,
-            'peinture': 25000.0,
-            'autres': 20000.0,
-          },
+          'growth': 0.0,
+          'breakdown': statsData['revenueParService'] ?? {},
         };
 
-        // Données simulées des missions
         final missions = {
-          'total': 24 + _random.nextInt(10),
-          'completed': 22 + _random.nextInt(8),
-          'ongoing': 2 + _random.nextInt(3),
-          'successRate': 0.96,
-          'averageTime': 2.5,
-          'satisfaction': 4.8,
-          'growth': 0.12,
+          'total': totalMissions,
+          'completed': completedMissions,
+          'ongoing': ongoingMissions,
+          'successRate': totalMissions > 0 ? completedMissions / totalMissions : 0.0,
+          'averageTime': (statsData['dureeMoyenne'] ?? 2.5).toDouble(),
+          'satisfaction': notesMoyenne,
+          'growth': 0.0,
         };
 
-        // Données simulées des clients
         final clients = {
-          'total': 18 + _random.nextInt(5),
-          'loyal': 12 + _random.nextInt(3),
-          'new': 6 + _random.nextInt(2),
-          'satisfaction': 4.8,
-          'retention': 0.67,
-          'growth': 0.18,
+          'total': statsData['nombreClients'] ?? 0,
+          'loyal': 0,
+          'new': 0,
+          'satisfaction': notesMoyenne,
+          'retention': 0.0,
+          'growth': 0.0,
         };
 
-        // Données simulées de la performance
         final performance = {
-          'efficiency': 0.92,
-          'punctuality': 0.98,
-          'quality': 4.8,
+          'efficiency': 0.90,
+          'punctuality': 0.95,
+          'quality': notesMoyenne > 0 ? notesMoyenne / 5.0 : 0.0,
           'availability': 0.95,
           'responseTime': 2.0,
-          'growth': 0.08,
-        };
-
-        // Récompenses simulées
-        final achievements = [
-          {
-            'id': '1',
-            'title': 'Expert',
-            'description': 'Plus de 20 missions terminées',
-            'icon': 'star',
-            'color': 'amber',
-            'unlocked': true,
-            'progress': 1.0,
-          },
-          {
-            'id': '2',
-            'title': 'Fiable',
-            'description': 'Note moyenne supérieure à 4.5',
-            'icon': 'verified',
-            'color': 'green',
-            'unlocked': true,
-            'progress': 1.0,
-          },
-          {
-            'id': '3',
-            'title': 'Rapide',
-            'description': 'Temps de réponse inférieur à 2h',
-            'icon': 'speed',
-            'color': 'blue',
-            'unlocked': true,
-            'progress': 1.0,
-          },
-        ];
-
-        // Top clients simulés
-        final topClients = [
-          {
-            'id': '1',
-            'name': 'Marie K.',
-            'missions': 4,
-            'amount': 45000.0,
-            'rating': 5.0,
-            'lastMission': '2024-01-15',
-          },
-          {
-            'id': '2',
-            'name': 'Paul M.',
-            'missions': 3,
-            'amount': 35000.0,
-            'rating': 4.8,
-            'lastMission': '2024-01-12',
-          },
-          {
-            'id': '3',
-            'name': 'Ahmed T.',
-            'missions': 2,
-            'amount': 25000.0,
-            'rating': 4.5,
-            'lastMission': '2024-01-10',
-          },
-        ];
-
-        // Activité récente simulée
-        final recentActivity = [
-          {
-            'id': '1',
-            'type': 'mission_completed',
-            'title': 'Mission terminée',
-            'description': 'Réparation plomberie - Client Marie',
-            'timestamp': DateTime.now().subtract(const Duration(hours: 2)),
-            'icon': 'check_circle',
-            'color': 'green',
-          },
-          {
-            'id': '2',
-            'type': 'new_mission',
-            'title': 'Nouvelle mission',
-            'description': 'Installation électrique - Client Paul',
-            'timestamp': DateTime.now().subtract(const Duration(hours: 4)),
-            'icon': 'assignment',
-            'color': 'blue',
-          },
-          {
-            'id': '3',
-            'type': 'review_received',
-            'title': 'Avis reçu',
-            'description': '5 étoiles - Excellent travail !',
-            'timestamp': DateTime.now().subtract(const Duration(days: 1)),
-            'icon': 'star',
-            'color': 'amber',
-          },
-        ];
-
-        // Graphiques simulés
-        final charts = {
-          'revenus': {
-            'type': 'line',
-            'data': List.generate(
-                30,
-                (index) => {
-                      'date':
-                          DateTime.now().subtract(Duration(days: 29 - index)),
-                      'value': 1000 + _random.nextDouble() * 2000,
-                    }),
-          },
-          'missions': {
-            'type': 'bar',
-            'data': List.generate(
-                7,
-                (index) => {
-                      'day': [
-                        'Lun',
-                        'Mar',
-                        'Mer',
-                        'Jeu',
-                        'Ven',
-                        'Sam',
-                        'Dim'
-                      ][index],
-                      'value': _random.nextInt(5) + 1,
-                    }),
-          },
-          'clients': {
-            'type': 'pie',
-            'data': [
-              {'label': 'Nouveaux', 'value': 6, 'color': 'blue'},
-              {'label': 'Fidèles', 'value': 12, 'color': 'green'},
-            ],
-          },
-          'performance': {
-            'type': 'radar',
-            'data': {
-              'efficiency': 0.92,
-              'punctuality': 0.98,
-              'quality': 0.96,
-              'availability': 0.95,
-            },
-          },
+          'growth': 0.0,
         };
 
         emit(ProviderStatisticsLoaded(
@@ -205,10 +91,10 @@ class ProviderStatisticsBloc
           missions: missions,
           clients: clients,
           performance: performance,
-          achievements: achievements,
-          topClients: topClients,
-          recentActivity: recentActivity,
-          charts: charts,
+          achievements: [],
+          topClients: [],
+          recentActivity: [],
+          charts: {},
         ));
       } catch (e) {
         emit(ProviderStatisticsError(

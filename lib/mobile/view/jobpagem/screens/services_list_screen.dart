@@ -138,6 +138,9 @@ class _ServicesListScreenState extends State<ServicesListScreen> {
                 image: service.imageservice.isNotEmpty
                     ? service.imageservice
                     : 'assets/categories/Image1.png',
+                serviceId: service.idservice.isNotEmpty
+                    ? service.idservice
+                    : null,
               ),
             ),
           );

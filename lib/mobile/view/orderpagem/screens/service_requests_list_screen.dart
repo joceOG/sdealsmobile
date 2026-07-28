@@ -4,16 +4,20 @@ import 'package:sdealsmobile/data/services/authCubit.dart';
 import 'package:sdealsmobile/design_system/design_system.dart';
 import '../servicerequestcubit/service_request_cubit.dart';
 import 'service_request_summary_screen.dart';
+import '../../common/widgets/unauthenticated_banner.dart';
 
 class ServiceRequestsListScreen extends StatelessWidget {
   const ServiceRequestsListScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final auth = context.read<AuthCubit>().state;
+    final auth = context.watch<AuthCubit>().state;
     if (auth is! AuthAuthenticated) {
-      return const Scaffold(
-        body: Center(child: Text('Veuillez vous connecter.')),
+      return const UnauthenticatedBanner(
+        appBarTitle: 'Mes demandes',
+        icon: Icons.assignment_outlined,
+        title: 'Vos demandes de service',
+        description: 'Connectez-vous pour consulter et suivre toutes vos demandes de prestations en cours.',
       );
     }
     return BlocProvider(
@@ -22,7 +26,9 @@ class ServiceRequestsListScreen extends StatelessWidget {
             token: auth.token, utilisateurId: auth.utilisateur.idutilisateur),
       child: Scaffold(
         backgroundColor: SDColors.white,
-        appBar: AppBar(
+        appBar: SDAppBarIconThemed(
+          style: SDAppBarIconStyles.onLightSurface,
+          bar: AppBar(
           elevation: 0,
           scrolledUnderElevation: 0,
           backgroundColor: SDColors.white,
@@ -39,6 +45,7 @@ class ServiceRequestsListScreen extends StatelessWidget {
             preferredSize: const Size.fromHeight(1),
             child: Divider(height: 1, color: SDColors.neutral200),
           ),
+        ),
         ),
         body: BlocBuilder<ServiceRequestCubit, ServiceRequestState>(
           builder: (context, state) {

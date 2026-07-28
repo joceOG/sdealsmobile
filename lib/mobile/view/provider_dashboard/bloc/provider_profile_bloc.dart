@@ -1,108 +1,109 @@
+import 'dart:convert';
 import 'dart:math';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:sdealsmobile/data/services/api_client.dart';
 import 'provider_profile_event.dart';
 import 'provider_profile_state.dart';
 
 // 🎯 BLoC POUR GÉRER LE PROFIL PRESTATAIRE
 class ProviderProfileBloc
     extends Bloc<ProviderProfileEvent, ProviderProfileState> {
+  final ApiClient _apiClient = ApiClient();
   final Random _random = Random();
+  String? _currentToken;
+
+  double _asDouble(dynamic value, {double fallback = 0.0}) {
+    if (value is num) return value.toDouble();
+    if (value is String) {
+      final normalized = value.replaceAll(',', '.').trim();
+      return double.tryParse(normalized) ?? fallback;
+    }
+    return fallback;
+  }
+
+  void setToken(String token) {
+    _currentToken = token;
+  }
 
   ProviderProfileBloc() : super(ProviderProfileInitial()) {
     // 👤 CHARGER LE PROFIL DU PRESTATAIRE
     on<LoadProviderProfile>((event, emit) async {
       emit(ProviderProfileLoading());
       try {
-        // Simulation d'un délai API
-        await Future.delayed(const Duration(milliseconds: 1000));
+        // Appel API réel
+        final response = await _apiClient.get(
+          '/prestataire/${event.prestataireId}',
+          token: _currentToken,
+        );
 
-        // Données simulées du profil
-        final profile = {
-          'id': event.prestataireId,
-          'fullName': 'Jean Dupont',
-          'email': 'jean.dupont@email.com',
-          'phone': '+225 07 12 34 56 78',
-          'joinDate': '2024-01-15',
-          'status': 'Actif',
-          'profileImage': null,
-          'bio':
-              'Expert en plomberie et électricité avec plus de 5 ans d\'expérience.',
-          'location': 'Abidjan, Côte d\'Ivoire',
-          'serviceRadius': 15.0,
-          'availability': '7j/7, 24h/24',
-        };
+        Map<String, dynamic> profile;
+        Map<String, dynamic> stats;
+        List<String> services;
+        Map<String, dynamic> serviceZone;
 
-        // Statistiques simulées
-        final stats = {
-          'missionsCompleted': 24 + _random.nextInt(10),
-          'averageRating': 4.8 + _random.nextDouble() * 0.2,
-          'totalReviews': 18 + _random.nextInt(5),
-          'monthlyEarnings': 125000.0 + _random.nextDouble() * 50000,
-          'successRate': 96.0 + _random.nextDouble() * 4,
-          'responseTime': '2h',
-          'completionRate': 98.0 + _random.nextDouble() * 2,
-        };
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body) as Map<String, dynamic>;
+          final utilisateur = data['utilisateur'] as Map<String, dynamic>? ?? {};
 
-        // Activité récente simulée
-        final recentActivity = [
-          {
-            'id': '1',
-            'type': 'mission_completed',
-            'title': 'Mission terminée',
-            'description': 'Réparation plomberie - Client Marie',
-            'timestamp': DateTime.now().subtract(const Duration(hours: 2)),
-            'icon': 'check_circle',
-            'color': 'green',
-          },
-          {
-            'id': '2',
-            'type': 'new_mission',
-            'title': 'Nouvelle mission',
-            'description': 'Installation électrique - Client Paul',
-            'timestamp': DateTime.now().subtract(const Duration(hours: 4)),
-            'icon': 'assignment',
-            'color': 'blue',
-          },
-          {
-            'id': '3',
-            'type': 'review_received',
-            'title': 'Avis reçu',
-            'description': '5 étoiles - Excellent travail !',
-            'timestamp': DateTime.now().subtract(const Duration(days: 1)),
-            'icon': 'star',
-            'color': 'amber',
-          },
-        ];
+          profile = {
+            'id': data['_id'] ?? event.prestataireId,
+            'fullName': '${utilisateur['prenom'] ?? ''} ${utilisateur['nom'] ?? ''}'.trim(),
+            'email': utilisateur['email'] ?? '',
+            'phone': utilisateur['telephone'] ?? '',
+            'joinDate': data['createdAt'] ?? '',
+            'status': data['status'] ?? 'pending',
+            'profileImage': utilisateur['photoProfil'],
+            'bio': data['description'] ?? '',
+            'location': data['localisation'] is Map
+                ? '${data['localisation']['ville'] ?? ''}, ${data['localisation']['pays'] ?? ''}'.trim()
+                : (data['localisation']?.toString() ?? 'Abidjan'),
+            'serviceRadius': _asDouble(data['rayonIntervention'], fallback: 10),
+            'availability': '7j/7',
+            'note': _asDouble(data['note']),
+            'nbMission': data['nbMission'] ?? 0,
+            'verifier': data['verifier'] ?? false,
+            'prixprestataire': data['prixprestataire'] ?? 0,
+            'anneeExperience': data['anneeExperience'] ?? 0,
+          };
 
-        // Récompenses simulées
-        final achievements = [
-          {
-            'id': '1',
-            'title': 'Expert',
-            'description': 'Plus de 20 missions terminées',
-            'icon': 'star',
-            'color': 'amber',
-            'unlocked': true,
-          },
-          {
-            'id': '2',
-            'title': 'Fiable',
-            'description': 'Note moyenne supérieure à 4.5',
-            'icon': 'verified',
-            'color': 'green',
-            'unlocked': true,
-          },
-          {
-            'id': '3',
-            'title': 'Rapide',
-            'description': 'Temps de réponse inférieur à 2h',
-            'icon': 'speed',
-            'color': 'blue',
-            'unlocked': true,
-          },
-        ];
+          stats = {
+            'missionsCompleted': data['nbMission'] ?? 0,
+            'averageRating': _asDouble(data['note']),
+            'totalReviews': data['nbMission'] ?? 0,
+            'monthlyEarnings': _asDouble(data['revenus']),
+            'successRate': 90.0,
+            'responseTime': '2h',
+            'completionRate': 95.0,
+          };
 
-        // Paramètres simulés
+          services = data['specialite'] is List
+              ? (data['specialite'] as List).map((e) => e.toString()).toList()
+              : <String>[];
+
+          serviceZone = {
+            'address': data['localisation'] is Map
+                ? data['localisation']['adresse'] ?? 'Abidjan'
+                : (data['localisation']?.toString() ?? 'Abidjan'),
+            'latitude': _asDouble(data['localisationmaps']?['latitude'], fallback: 5.3600),
+            'longitude': _asDouble(data['localisationmaps']?['longitude'], fallback: -4.0083),
+            'radius': _asDouble(data['rayonIntervention'], fallback: 10),
+            'coverage': 'Zone d\'intervention',
+          };
+        } else {
+          // Fallback avec données vides
+          profile = {'id': event.prestataireId, 'fullName': '', 'status': 'unknown'};
+          stats = {'missionsCompleted': 0, 'averageRating': 0.0, 'monthlyEarnings': 0.0};
+          services = <String>[];
+          serviceZone = {'address': 'Abidjan', 'radius': 10.0};
+        }
+
+        // Activité récente (placeholder — pas d'API dédiée)
+        final recentActivity = <Map<String, dynamic>>[];
+
+        // Récompenses (placeholder)
+        final achievements = <Map<String, dynamic>>[];
+
+        // Paramètres par défaut
         final settings = {
           'language': 'fr',
           'currency': 'FCFA',
@@ -112,7 +113,7 @@ class ProviderProfileBloc
           'maxDistance': 15.0,
         };
 
-        // Paramètres de notification simulés
+        // Paramètres de notification par défaut
         final notificationSettings = {
           'newMissions': true,
           'messages': true,
@@ -122,42 +123,8 @@ class ProviderProfileBloc
           'system': true,
         };
 
-        // Services simulés
-        final services = ['Plomberie', 'Électricité', 'Peinture', 'Menuiserie'];
-
-        // Zone de service simulée
-        final serviceZone = {
-          'address': 'Abidjan, Côte d\'Ivoire',
-          'latitude': 5.3600,
-          'longitude': -4.0083,
-          'radius': 15.0,
-          'coverage': 'Toute la ville d\'Abidjan',
-        };
-
-        // Documents simulés
-        final documents = [
-          {
-            'id': '1',
-            'type': 'cni',
-            'name': 'Carte d\'identité',
-            'status': 'verified',
-            'uploadDate': '2024-01-15',
-          },
-          {
-            'id': '2',
-            'type': 'selfie',
-            'name': 'Photo de profil',
-            'status': 'verified',
-            'uploadDate': '2024-01-15',
-          },
-          {
-            'id': '3',
-            'type': 'certificate',
-            'name': 'Certificat de formation',
-            'status': 'pending',
-            'uploadDate': '2024-01-20',
-          },
-        ];
+        // Documents (placeholder — à connecter via /prestataire/:id/documents)
+        final documents = <Map<String, dynamic>>[];
 
         emit(ProviderProfileLoaded(
           profile: profile,
@@ -179,15 +146,17 @@ class ProviderProfileBloc
     on<UpdateProviderProfile>((event, emit) async {
       emit(ProviderProfileLoading());
       try {
-        await Future.delayed(const Duration(milliseconds: 800));
-
-        // Simulation de la mise à jour
-        final updatedProfile = {
-          ...event.profileData,
-          'updatedAt': DateTime.now().toIso8601String(),
-        };
-
-        emit(ProviderProfileUpdated(updatedProfile));
+        final response = await _apiClient.put(
+          '/prestataire/${event.prestataireId}',
+          body: event.profileData,
+          token: _currentToken,
+        );
+        if (response.statusCode == 200) {
+          final updatedProfile = jsonDecode(response.body) as Map<String, dynamic>;
+          emit(ProviderProfileUpdated(updatedProfile));
+        } else {
+          emit(ProviderProfileError('Erreur mise à jour (${response.statusCode})'));
+        }
       } catch (e) {
         emit(ProviderProfileError('Erreur lors de la mise à jour: $e'));
       }

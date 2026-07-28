@@ -1,6 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/freelance_model.dart';
+import '../../chatpagem/screens/chatPageScreenM.dart';
+import '../../chatpagem/chatpageblocm/chatPageBlocM.dart';
+import '../../../data/models/conversation_model.dart';
+import '../../../../data/services/authCubit.dart';
+import '../../../../data/utils/conversation_id.dart';
+import 'package:go_router/go_router.dart';
 
 /// 📄 Page de détails d'un freelance
 class FreelanceDetailsScreen extends StatelessWidget {
@@ -768,14 +775,55 @@ class FreelanceDetailsScreen extends StatelessWidget {
 
   /// Contacter le freelancer
   void _contactFreelancer(BuildContext context) {
-    // TODO: Implémenter le système de messagerie
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          '💬 Système de messagerie à venir ! Pour l\'instant, utilisez le bouton "Appeler".',
+    final authState = context.read<AuthCubit>().state;
+    if (authState is! AuthAuthenticated) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Connectez-vous pour envoyer un message'),
         ),
-        duration: Duration(seconds: 3),
-        backgroundColor: Colors.blue,
+      );
+      context.push('/login');
+      return;
+    }
+
+    final destinataireUserId = freelance.utilisateurId;
+    if (destinataireUserId == null || destinataireUserId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+              'Impossible de démarrer la conversation (utilisateur manquant).'),
+        ),
+      );
+      return;
+    }
+
+    final currentUserId = authState.utilisateur.idutilisateur ?? '';
+    if (destinataireUserId == currentUserId) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Vous ne pouvez pas vous envoyer un message.'),
+        ),
+      );
+      return;
+    }
+
+    final conversationId =
+        buildConversationId(currentUserId, destinataireUserId);
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => BlocProvider(
+          create: (_) => ChatPageBlocM(userId: currentUserId),
+          child: ChatPageScreenM(
+            conversationId: conversationId,
+            participantId: destinataireUserId,
+            participantName: freelance.name,
+            participantImage: freelance.imagePath.isNotEmpty
+                ? freelance.imagePath
+                : 'assets/images/default_user.png',
+            type: ConversationType.freelance,
+          ),
+        ),
       ),
     );
   }

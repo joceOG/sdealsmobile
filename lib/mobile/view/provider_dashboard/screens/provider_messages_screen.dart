@@ -5,6 +5,10 @@ import '../bloc/messages_bloc.dart';
 import '../bloc/messages_event.dart';
 import '../bloc/messages_state.dart';
 import '../../../../data/services/authCubit.dart';
+import '../../chatpagem/screens/chatPageScreenM.dart';
+import '../../chatpagem/chatpageblocm/chatPageBlocM.dart';
+import '../../../data/models/conversation_model.dart';
+import '../../../../data/utils/conversation_id.dart';
 
 // 🎯 ÉCRAN MESSAGES PRESTATAIRE MAGNIFIQUE
 class ProviderMessagesScreen extends StatefulWidget {
@@ -32,12 +36,15 @@ class _ProviderMessagesScreenState extends State<ProviderMessagesScreen>
     final authState = context.read<AuthCubit>().state;
     if (authState is AuthAuthenticated) {
       _prestataireId = authState.utilisateur.idutilisateur;
+      // Passer le token au bloc
+      context.read<MessagesBloc>().setToken(authState.token);
+      context.read<MessagesBloc>().setUserId(_prestataireId!);
       // 🔌 Connecter au WebSocket pour les messages en temps réel
       context.read<MessagesBloc>().add(ConnectWebSocket());
       // Charger les conversations du prestataire
-      context
-          .read<MessagesBloc>()
-          .add(LoadPrestataireConversations(_prestataireId!));
+      if (_prestataireId != null) {
+        context.read<MessagesBloc>().add(LoadPrestataireConversations(_prestataireId!));
+      }
     }
   }
 
@@ -847,23 +854,87 @@ class _ProviderMessagesScreenState extends State<ProviderMessagesScreen>
 
   // 💬 OUVRIR UNE CONVERSATION
   void _openConversation(Map<String, dynamic> conversation) {
-    // TODO: Ouvrir l'interface de chat
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Interface de chat en développement'),
-        backgroundColor: Colors.orange,
+    final authState = context.read<AuthCubit>().state;
+    if (authState is! AuthAuthenticated) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Connectez-vous pour ouvrir le chat')),
+      );
+      return;
+    }
+
+    final currentUserId = authState.utilisateur.idutilisateur ?? '';
+    String? conversationId =
+        conversation['conversationId']?.toString() ??
+            conversation['_id']?.toString();
+
+    final expediteurInfo = conversation['expediteurInfo']?.isNotEmpty == true
+        ? conversation['expediteurInfo'][0]
+        : null;
+    final destinataireInfo =
+        conversation['destinataireInfo']?.isNotEmpty == true
+            ? conversation['destinataireInfo'][0]
+            : null;
+    final other = (expediteurInfo?['_id']?.toString() == currentUserId)
+        ? destinataireInfo
+        : (destinataireInfo?['_id']?.toString() == currentUserId)
+            ? expediteurInfo
+            : (expediteurInfo ?? destinataireInfo);
+
+    final participantId = other?['_id']?.toString() ??
+        getOtherParticipantId(conversationId ?? '', currentUserId) ??
+        '';
+
+    if ((conversationId == null || conversationId.isEmpty) &&
+        participantId.isNotEmpty) {
+      conversationId = buildConversationId(currentUserId, participantId);
+    }
+
+    if (conversationId == null || conversationId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Conversation introuvable')),
+      );
+      return;
+    }
+
+    final participantName =
+        '${other?['prenom'] ?? ''} ${other?['nom'] ?? ''}'.trim();
+    final participantImage =
+        other?['photoProfil']?.toString() ?? 'assets/images/default_user.png';
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => BlocProvider(
+          create: (_) => ChatPageBlocM(userId: currentUserId),
+          child: ChatPageScreenM(
+            conversationId: conversationId,
+            participantId: participantId.isNotEmpty ? participantId : null,
+            participantName:
+                participantName.isNotEmpty ? participantName : 'Conversation',
+            participantImage: participantImage,
+            type: ConversationType.prestataire,
+          ),
+        ),
       ),
     );
   }
 
   // 📨 OUVRIR UN MESSAGE
   void _openMessage(Map<String, dynamic> message) {
-    // TODO: Ouvrir le message dans son contexte
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Ouverture du message en développement'),
-        backgroundColor: Colors.orange,
-      ),
-    );
+    final conversationId = message['conversationId']?.toString();
+    if (conversationId == null || conversationId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Conversation introuvable')),
+      );
+      return;
+    }
+    _openConversation({
+      'conversationId': conversationId,
+      'expediteurInfo': [
+        if (message['expediteur'] is Map) message['expediteur'],
+      ],
+      'destinataireInfo': [
+        if (message['destinataire'] is Map) message['destinataire'],
+      ],
+    });
   }
 }

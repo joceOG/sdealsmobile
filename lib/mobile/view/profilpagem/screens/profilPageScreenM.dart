@@ -1,3 +1,4 @@
+import 'package:characters/characters.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../design_system/design_system.dart'; // ✅ Import DS
@@ -773,9 +774,8 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
     );
   }
 
-  // En-tête du profil avec photo, nom et statut - DESIGN AMÉLIORÉ
+  // En-tête identité : avatar à gauche, texte à droite (compact, lisible)
   Widget _buildProfileHeader(BuildContext context) {
-    // ✅ Récupérer l'utilisateur connecté
     final authState = context.read<AuthCubit>().state;
     final String userName = authState is AuthAuthenticated
         ? authState.utilisateur.fullName
@@ -787,74 +787,84 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
         ? authState.utilisateur.photoProfil
         : null;
 
+    final hasNetworkPhoto = userPhoto != null &&
+        userPhoto.isNotEmpty &&
+        userPhoto.startsWith('http');
+
     return Container(
-      margin: EdgeInsets.all(SDSpacing.md),
-      padding: EdgeInsets.all(SDSpacing.lg),
+      margin: EdgeInsets.fromLTRB(SDSpacing.md, SDSpacing.sm, SDSpacing.md, SDSpacing.xs),
+      padding: EdgeInsets.all(SDSpacing.md),
       decoration: BoxDecoration(
         color: SDColors.white,
-        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
+        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
         boxShadow: [
           BoxShadow(
-            color: SDColors.neutral200.withOpacity(0.5),
-            blurRadius: 10,
-            offset: Offset(0, 2),
+            color: SDColors.neutral900.withOpacity(0.06),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
-      child: Column(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Photo de profil (sans photo mock)
           CircleAvatar(
-            radius: 50,
+            radius: 36,
             backgroundColor: SDColors.primary600,
-            backgroundImage: userPhoto != null && userPhoto.isNotEmpty && userPhoto.startsWith('http')
-                ? NetworkImage(userPhoto) as ImageProvider
-                : null,
-            child: userPhoto == null || userPhoto.isEmpty || !userPhoto.startsWith('http')
+            backgroundImage:
+                hasNetworkPhoto ? NetworkImage(userPhoto!) as ImageProvider : null,
+            child: !hasNetworkPhoto
                 ? Text(
-                    userName.isNotEmpty ? userName[0].toUpperCase() : 'U',
-                    style: SDTypography.headlineMedium.copyWith(
+                    userName.isNotEmpty ? userName.characters.first.toUpperCase() : 'U',
+                    style: SDTypography.titleLarge.copyWith(
                       color: SDColors.white,
                       fontWeight: FontWeight.bold,
                     ),
                   )
                 : null,
           ),
-          SizedBox(height: SDSpacing.md),
-          // Nom d'utilisateur
-          Text(
-            userName,
-            style: SDTypography.titleMedium.copyWith(
-              fontWeight: FontWeight.bold,
-              color: SDColors.neutral900,
-            ),
-          ),
-          SizedBox(height: SDSpacing.xxxs),
-          // Email
-          Text(
-            userEmail,
-            style: SDTypography.bodyMedium.copyWith(
-              color: SDColors.neutral600,
-            ),
-          ),
-          SizedBox(height: SDSpacing.md),
-          // Bouton Éditer
-          ElevatedButton(
-            onPressed: () => _navigateToEditProfile(),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: SDColors.primary600,
-              foregroundColor: SDColors.white,
-              padding: EdgeInsets.symmetric(horizontal: SDSpacing.lg, vertical: SDSpacing.sm),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-              ),
-            ),
-            child: Text(
-              'Éditer',
-              style: SDTypography.labelMedium.copyWith(
-                color: SDColors.white,
-                fontWeight: FontWeight.w600,
-              ),
+          SizedBox(width: SDSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  userName,
+                  style: SDTypography.titleLarge.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: SDColors.neutral900,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                SizedBox(height: SDSpacing.xxxs),
+                Text(
+                  userEmail,
+                  style: SDTypography.bodyMedium.copyWith(
+                    color: SDColors.neutral600,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                SizedBox(height: SDSpacing.xs),
+                TextButton(
+                  onPressed: () => _navigateToEditProfile(),
+                  style: TextButton.styleFrom(
+                    foregroundColor: SDColors.primary600,
+                    padding: EdgeInsets.zero,
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: Text(
+                    'Éditer le profil',
+                    style: SDTypography.labelLarge.copyWith(
+                      color: SDColors.primary600,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -1179,9 +1189,6 @@ class SectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Nettoyer le titre (enlever emoji) et garder la casse normale
-    final String cleanTitle = title.replaceAll(RegExp(r'[^\w\s]'), '').trim();
-    
     return Padding(
       padding: EdgeInsets.only(
         top: SDSpacing.md,
@@ -1192,12 +1199,14 @@ class SectionTitle extends StatelessWidget {
       child: Align(
         alignment: Alignment.centerLeft,
         child: Text(
-          cleanTitle,
+          title,
           style: SDTypography.labelLarge.copyWith(
             fontWeight: FontWeight.bold,
             color: SDColors.primary600,
             letterSpacing: 0.3,
           ),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
         ),
       ),
     );

@@ -34,7 +34,7 @@ class NotificationService {
         return false;
       }
 
-      final url = Uri.parse('$_apiUrl/notifications/send');
+      final url = Uri.parse('$_apiUrl/notification/send');
 
       final payload = {
         'userId': userId,
@@ -209,7 +209,7 @@ class NotificationService {
         return [];
       }
 
-      final url = Uri.parse('$_apiUrl/notifications/user/$userId');
+      final url = Uri.parse('$_apiUrl/notification/user/$userId');
 
       final response = await http.get(url);
 
@@ -234,7 +234,7 @@ class NotificationService {
         return false;
       }
 
-      final url = Uri.parse('$_apiUrl/notifications/$notificationId/read');
+      final url = Uri.parse('$_apiUrl/notification/$notificationId/read');
 
       final response = await http.patch(url);
 

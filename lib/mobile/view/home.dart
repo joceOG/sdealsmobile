@@ -5,6 +5,7 @@ import 'package:sdealsmobile/mobile/view/profilpagem/profilpageblocm/profilPageB
 import 'package:sdealsmobile/mobile/view/profilpagem/screens/profilPageScreenM.dart';
 import 'package:sdealsmobile/mobile/view/explorer/screens/explorer_page_screen.dart';
 import 'package:sdealsmobile/mobile/view/common/widgets/nav_badge.dart';
+import 'package:sdealsmobile/data/services/api_client.dart';
 import '../../data/services/authCubit.dart'; // ✅ Import AuthCubit
 import 'package:go_router/go_router.dart';
 
@@ -28,6 +29,26 @@ class Home extends StatefulWidget {
 class _HomeState extends State<Home> {
   int _currentIndex = 0;
   bool _isBottomNavVisible = true;
+  final ChatPageBlocM _chatBloc = ChatPageBlocM(userId: '');
+  final ApiClient _apiClient = ApiClient();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final authState = context.read<AuthCubit>().state;
+      if (authState is AuthAuthenticated) {
+        _chatBloc.setUserId(authState.utilisateur.idutilisateur ?? '');
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _chatBloc.close();
+    super.dispose();
+  }
 
   void _updateBottomNavVisibility(bool visible) {
     if (_isBottomNavVisible != visible) {
@@ -39,17 +60,12 @@ class _HomeState extends State<Home> {
 
   @override
   Widget build(BuildContext context) {
-    // ✅ Récupérer l'utilisateur connecté depuis AuthCubit
     final authState = context.watch<AuthCubit>().state;
-    final String? userId = authState is AuthAuthenticated
-        ? authState.utilisateur.idutilisateur
-        : null;
 
     // ✅ NOUVEAU : Redirection automatique selon le rôle actif
     if (authState is AuthAuthenticated) {
       final activeRole = authState.activeRole;
       if (activeRole == 'PRESTATAIRE') {
-        // Rediriger vers l'interface prestataire
         WidgetsBinding.instance.addPostFrameCallback((_) {
           context.push('/providermain', extra: authState.utilisateur);
         });
@@ -65,24 +81,35 @@ class _HomeState extends State<Home> {
     final List<Widget> _pageList = [
       BlocProvider(
         create: (_) => HomePageBlocM(),
-        child: HomePageScreenM(onScrollUpdate: _updateBottomNavVisibility),
+        child: HomePageScreenM(
+          onScrollUpdate: _updateBottomNavVisibility,
+          bottomNavVisible: _isBottomNavVisible,
+        ),
       ),
       const ExplorerPageScreen(),
-      const ChatPageScreenM(), // ✅ Provider déplacé au niveau du Scaffold pour accès global (Badge)
+      const ChatPageScreenM(),
       BlocProvider(
           create: (_) => ProfilPageBlocM(), child: ProfilPageScreenM()),
     ];
 
-    return BlocProvider(
-      create: (_) => ChatPageBlocM(userId: userId),
-      child: Scaffold(
-        body: Center(child: _pageList[_currentIndex]),
-        bottomNavigationBar: AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          height: _isBottomNavVisible ? null : 0,
-          child: _isBottomNavVisible
-              ? _buildBottomNavBar()
-              : const SizedBox.shrink(),
+    return BlocListener<AuthCubit, AuthState>(
+      listener: (context, newAuthState) {
+        final newId = newAuthState is AuthAuthenticated
+            ? (newAuthState.utilisateur.idutilisateur ?? '')
+            : '';
+        _chatBloc.setUserId(newId);
+      },
+      child: BlocProvider.value(
+        value: _chatBloc,
+        child: Scaffold(
+          body: _pageList[_currentIndex],
+          bottomNavigationBar: AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            height: _isBottomNavVisible ? null : 0,
+            child: _isBottomNavVisible
+                ? _buildBottomNavBar()
+                : const SizedBox.shrink(),
+          ),
         ),
       ),
     );
@@ -192,28 +219,39 @@ class _HomeState extends State<Home> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Transform.translate(
-            offset: const Offset(0, -14),
-            child: GestureDetector(
-              onTap: _showPublishOptions,
-              child: Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: SDColors.primary700,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: SDColors.white, width: 3),
-                  boxShadow: [
-                    BoxShadow(
-                      color: SDColors.primary700.withOpacity(0.3),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
+            offset: const Offset(0, -16),
+            child: Material(
+              color: Colors.transparent,
+              elevation: 6,
+              shadowColor: SDColors.primary700.withOpacity(0.35),
+              shape: const CircleBorder(),
+              child: InkWell(
+                onTap: _showPublishOptions,
+                customBorder: const CircleBorder(),
+                child: Ink(
+                  width: 62,
+                  height: 62,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [SDColors.primary600, SDColors.primary800],
                     ),
-                  ],
-                ),
-                child: const Icon(
-                  Icons.add,
-                  color: SDColors.white,
-                  size: 30,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: SDColors.white, width: 3.5),
+                    boxShadow: [
+                      BoxShadow(
+                        color: SDColors.primary700.withOpacity(0.28),
+                        blurRadius: 14,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.add_rounded,
+                    color: SDColors.white,
+                    size: 32,
+                  ),
                 ),
               ),
             ),
@@ -222,8 +260,9 @@ class _HomeState extends State<Home> {
             'Publier',
             style: SDTypography.labelMedium.copyWith(
               color: SDColors.neutral900,
-              fontWeight: FontWeight.w600,
-              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
+              letterSpacing: 0.2,
             ),
           ),
         ],
@@ -259,84 +298,149 @@ class _HomeState extends State<Home> {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 44,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: SDColors.neutral300,
-                    borderRadius: BorderRadius.circular(8),
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => Container(
+        decoration: BoxDecoration(
+          color: SDColors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
+          boxShadow: [
+            BoxShadow(
+              color: SDColors.neutral900.withOpacity(0.12),
+              blurRadius: 28,
+              offset: const Offset(0, -6),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 22),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: SDColors.neutral300,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Que voulez-vous faire ?',
-                style: SDTypography.titleLarge.copyWith(
-                  fontWeight: FontWeight.w700,
+                const SizedBox(height: 20),
+                Text(
+                  'Que voulez-vous faire ?',
+                  style: SDTypography.titleLarge.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: SDColors.neutral900,
+                    height: 1.2,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              _buildPublishActionTile(
-                icon: Icons.handyman_rounded,
-                title: 'Proposer un service (Metiers)',
-                subtitle: 'Inscription ou publication cote prestataire',
-                onTap: () {
-                  Navigator.pop(context);
-                  context.push('/serviceProviderRegistration');
-                },
-              ),
-              _buildPublishActionTile(
-                icon: Icons.work_outline_rounded,
-                title: 'Devenir freelance',
-                subtitle: 'Publiez vos competences en freelance',
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    this.context,
-                    MaterialPageRoute(
-                      builder: (_) => const FreelanceRegistrationScreen(),
-                    ),
-                  );
-                },
-              ),
-              _buildPublishActionTile(
-                icon: Icons.storefront_outlined,
-                title: 'Vendre un produit',
-                subtitle: 'Creez votre espace vendeur',
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    this.context,
-                    MaterialPageRoute(
-                      builder: (_) => const SellerRegistrationScreen(),
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Annuler'),
+                const SizedBox(height: 6),
+                Text(
+                  'Choisissez comment vous lancer sur Soutrali Deals',
+                  style: SDTypography.bodySmall.copyWith(
+                    color: SDColors.neutral600,
+                    height: 1.35,
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 18),
+                _buildPublishActionTile(
+                  icon: Icons.handyman_rounded,
+                  title: 'Proposer un service (Métiers)',
+                  subtitle: 'Inscription ou publication côté prestataire',
+                  onTap: () async {
+                    Navigator.pop(sheetContext);
+                    await _openProviderPublishFlow();
+                  },
+                ),
+                _buildPublishActionTile(
+                  icon: Icons.work_outline_rounded,
+                  title: 'Devenir freelance',
+                  subtitle: 'Publiez vos compétences en freelance',
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const FreelanceRegistrationScreen(),
+                      ),
+                    );
+                  },
+                ),
+                _buildPublishActionTile(
+                  icon: Icons.storefront_outlined,
+                  title: 'Vendre un produit',
+                  subtitle: 'Créez votre espace vendeur',
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const SellerRegistrationScreen(),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 6),
+                OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: SDColors.primary700,
+                    side: const BorderSide(color: SDColors.primary600, width: 1.5),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  onPressed: () => Navigator.pop(sheetContext),
+                  child: Text(
+                    'Annuler',
+                    style: SDTypography.labelLarge.copyWith(
+                      color: SDColors.primary700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
+  }
+
+  Future<void> _openProviderPublishFlow() async {
+    final authState = context.read<AuthCubit>().state;
+    if (authState is! AuthAuthenticated) {
+      if (!mounted) return;
+      context.push('/serviceProviderRegistration');
+      return;
+    }
+
+    final userId = authState.utilisateur.idutilisateur;
+    if (userId == null || userId.isEmpty) {
+      if (!mounted) return;
+      context.push('/serviceProviderRegistration');
+      return;
+    }
+
+    final existingProvider =
+        await _apiClient.getPrestataireByUserId(userId, authState.token);
+
+    if (!mounted) return;
+    if (existingProvider != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Vous avez deja un compte prestataire. Redirection vers votre dashboard.',
+          ),
+        ),
+      );
+      context.push('/providermain', extra: authState.utilisateur);
+      return;
+    }
+
+    context.push('/serviceProviderRegistration');
   }
 
   Widget _buildPublishActionTile({
@@ -345,27 +449,65 @@ class _HomeState extends State<Home> {
     required String subtitle,
     required VoidCallback onTap,
   }) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      elevation: 0,
-      color: SDColors.neutral50,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: SDColors.neutral200),
-      ),
-      child: ListTile(
-        onTap: onTap,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-        leading: CircleAvatar(
-          backgroundColor: SDColors.primary50,
-          child: Icon(icon, color: SDColors.primary700),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Material(
+        color: SDColors.neutral50,
+        elevation: 1,
+        shadowColor: SDColors.neutral900.withOpacity(0.07),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: SDColors.neutral200),
         ),
-        title: Text(
-          title,
-          style: SDTypography.labelLarge.copyWith(fontWeight: FontWeight.w700),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: SDColors.primary50,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(icon, color: SDColors.primary700, size: 26),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: SDTypography.titleSmall.copyWith(
+                          color: SDColors.neutral900,
+                          fontWeight: FontWeight.w700,
+                          height: 1.25,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: SDTypography.bodySmall.copyWith(
+                          color: SDColors.neutral600,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: SDColors.neutral400,
+                  size: 24,
+                ),
+              ],
+            ),
+          ),
         ),
-        subtitle: Text(subtitle, style: SDTypography.bodySmall),
-        trailing: const Icon(Icons.chevron_right),
       ),
     );
   }

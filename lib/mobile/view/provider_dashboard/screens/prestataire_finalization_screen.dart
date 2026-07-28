@@ -6,8 +6,13 @@ import 'dart:io';
 import '../bloc/prestataire_finalization_bloc.dart';
 import '../../../../data/services/authCubit.dart';
 
+import 'package:geolocator/geolocator.dart';
+
 class PrestataireFinalizationScreen extends StatefulWidget {
-  const PrestataireFinalizationScreen({Key? key}) : super(key: key);
+  final String? prestataireId;
+
+  const PrestataireFinalizationScreen({Key? key, this.prestataireId})
+      : super(key: key);
 
   @override
   _PrestataireFinalizationScreenState createState() =>
@@ -638,19 +643,41 @@ class _PrestataireFinalizationScreenState
 
   Future<void> _getCurrentLocation() async {
     try {
-      // TODO: Implémenter la géolocalisation avec Google Maps
-      // Pour l'instant, on simule avec des coordonnées
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Permission de localisation refusée')),
+          );
+          return;
+        }
+      }
+      if (permission == LocationPermission.deniedForever) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Activez la localisation dans les paramètres'),
+          ),
+        );
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
       setState(() {
         _formData['location'] = {
-          'latitude': 4.0511, // Yaoundé
-          'longitude': 9.7679,
+          'latitude': position.latitude,
+          'longitude': position.longitude,
         };
-        _formData['address'] = 'Yaoundé, Cameroun';
+        _formData['address'] =
+            'Lat ${position.latitude.toStringAsFixed(4)}, Lng ${position.longitude.toStringAsFixed(4)}';
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Position obtenue: Yaoundé, Cameroun'),
+        const SnackBar(
+          content: Text('Position GPS enregistrée'),
           backgroundColor: Colors.green,
         ),
       );
@@ -665,16 +692,15 @@ class _PrestataireFinalizationScreenState
   }
 
   void _submitForm() {
-    // 🎯 RÉCUPÉRER L'ID DU PRESTATAIRE
     final auth = context.read<AuthCubit>().state;
-    String? prestataireId;
+    String? prestataireId = widget.prestataireId;
+    String? authToken;
 
     if (auth is AuthAuthenticated) {
-      // TODO: Récupérer l'ID du prestataire depuis l'utilisateur
-      prestataireId = auth.utilisateur.idutilisateur; // Temporaire
+      authToken = auth.token;
     }
 
-    if (prestataireId == null) {
+    if (prestataireId == null || authToken == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Erreur: ID prestataire non trouvé')),
       );
@@ -684,6 +710,7 @@ class _PrestataireFinalizationScreenState
     // 🎯 PRÉPARER LES DONNÉES
     final formData = Map<String, dynamic>.from(_formData);
     formData['prestataireId'] = prestataireId;
+    formData['authToken'] = authToken;
 
     // 🎯 SOUMETTRE AU BLOC
     context.read<PrestataireFinalizationBloc>().add(

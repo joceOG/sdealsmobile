@@ -613,6 +613,12 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
     final String name = service['nomservice'] ?? 'Service';
     final String image = service['imageservice'] ?? '';
     final int price = int.tryParse(service['prixmoyen']?.toString() ?? '0') ?? 0;
+    final String? sid = () {
+      final a = service['_id']?.toString().trim();
+      final b = service['idservice']?.toString().trim();
+      final v = (a != null && a.isNotEmpty) ? a : (b ?? '');
+      return v.isNotEmpty ? v : null;
+    }();
     
     return Container(
       margin: EdgeInsets.only(bottom: SDSpacing.xs),
@@ -642,6 +648,7 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
               builder: (context) => DetailPage(
                 title: name,
                 image: image,
+                serviceId: sid,
               ),
             ),
           );

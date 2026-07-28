@@ -98,12 +98,17 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
       print("🚀 Chargement des prestataires depuis le backend...");
 
       final List<Map<String, dynamic>> prestatairesData =
-          await apiClient.fetchPrestataires();
+          await apiClient.fetchPrestataires(forceRefresh: true);
 
-      // Convertir vers le modèle Prestataire
-      List<Prestataire> providers = prestatairesData
-          .map((data) => Prestataire.fromBackend(data))
-          .toList();
+      // Convertir vers le modèle Prestataire (tolérant aux enregistrements partiels)
+      List<Prestataire> providers = [];
+      for (final data in prestatairesData) {
+        try {
+          providers.add(Prestataire.fromBackend(data));
+        } catch (e) {
+          print('⚠️ Prestataire ignoré (mapping invalide): $e');
+        }
+      }
 
       print("✅ Prestataires chargés depuis le backend: ${providers.length}");
 
@@ -146,9 +151,9 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
         return expB.compareTo(expA);
       });
 
-      // 🎯 Limiter les résultats à 5 maximum
-      if (providers.length > 5) {
-        providers = providers.take(5).toList();
+      // 🎯 Montrer plus de prestataires pour éviter de masquer les nouveaux profils
+      if (providers.length > 20) {
+        providers = providers.take(20).toList();
       }
 
       // ✅ Créer l'explication du matching
@@ -280,7 +285,7 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
       // Charger tous les prestataires
       print("📡 Appel API fetchPrestataires()...");
       final List<Map<String, dynamic>> prestatairesData =
-          await apiClient.fetchPrestataires();
+          await apiClient.fetchPrestataires(forceRefresh: true);
       
       print("✅ API Response: ${prestatairesData.length} prestataires reçus");
       if (prestatairesData.isNotEmpty) {
@@ -385,11 +390,16 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
       print("🏷️ Chargement prestataires pour catégorie: ${event.category}");
 
       final List<Map<String, dynamic>> prestatairesData =
-          await apiClient.fetchPrestataires();
+          await apiClient.fetchPrestataires(forceRefresh: true);
 
-      List<Prestataire> providers = prestatairesData
-          .map((data) => Prestataire.fromBackend(data))
-          .toList();
+      List<Prestataire> providers = [];
+      for (final data in prestatairesData) {
+        try {
+          providers.add(Prestataire.fromBackend(data));
+        } catch (e) {
+          print('⚠️ Prestataire ignoré (mapping invalide): $e');
+        }
+      }
 
       // Filtrer par catégorie
       providers = providers
@@ -447,11 +457,16 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
       print("🚨 Chargement prestataires d'urgence...");
 
       final List<Map<String, dynamic>> prestatairesData =
-          await apiClient.fetchPrestataires();
+          await apiClient.fetchPrestataires(forceRefresh: true);
 
-      List<Prestataire> providers = prestatairesData
-          .map((data) => Prestataire.fromBackend(data))
-          .toList();
+      List<Prestataire> providers = [];
+      for (final data in prestatairesData) {
+        try {
+          providers.add(Prestataire.fromBackend(data));
+        } catch (e) {
+          print('⚠️ Prestataire ignoré (mapping invalide): $e');
+        }
+      }
 
       // Filtrer les prestataires d'urgence (disponibles 24h/24)
       // Note: Le champ 'disponibilite' n'existe pas dans le modèle Prestataire

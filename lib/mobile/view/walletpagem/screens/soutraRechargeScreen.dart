@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:sdealsmobile/design_system/widgets/sd_app_bar_icon_button.dart';
 import 'package:intl/intl.dart';
 
 class SoutraRechargeScreen extends StatefulWidget {
@@ -49,7 +50,9 @@ class _SoutraRechargeScreenState extends State<SoutraRechargeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
+      appBar: SDAppBarIconThemed(
+        style: SDAppBarIconStyles.onLightSurface,
+        bar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
         title: const Text(
@@ -63,6 +66,7 @@ class _SoutraRechargeScreenState extends State<SoutraRechargeScreen> {
           icon: const Icon(Icons.arrow_back, color: Colors.black87),
           onPressed: () => Navigator.pop(context),
         ),
+      ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),

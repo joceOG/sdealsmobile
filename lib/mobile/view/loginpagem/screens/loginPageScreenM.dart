@@ -24,20 +24,41 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
   bool rememberMe = false;
   bool isPasswordVisible = false;
   late AnimationController _animationController;
+  late Animation<double> _logoScale;
+  late final VoidCallback _fieldsListener;
   final TextEditingController identifiantController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
+
+  bool get _canSubmit =>
+      identifiantController.text.trim().isNotEmpty &&
+      passwordController.text.trim().isNotEmpty;
 
   @override
   void initState() {
     super.initState();
+    _fieldsListener = () {
+      if (mounted) setState(() {});
+    };
+    identifiantController.addListener(_fieldsListener);
+    passwordController.addListener(_fieldsListener);
+
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 2),
-    )..repeat(reverse: true);
+      duration: const Duration(milliseconds: 900),
+    );
+    _logoScale = Tween<double>(begin: 1.0, end: 1.04).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.easeOutCubic,
+      ),
+    );
+    _animationController.forward();
   }
 
   @override
   void dispose() {
+    identifiantController.removeListener(_fieldsListener);
+    passwordController.removeListener(_fieldsListener);
     _animationController.dispose();
     identifiantController.dispose();
     passwordController.dispose();
@@ -55,6 +76,9 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
           useGradient: false,
           backgroundColor: SDColors.white,
           centerTitle: false,
+          leading: SDCircleCloseButton(
+            onPressed: () => Navigator.of(context).maybePop(),
+          ),
         ),
         body: BlocListener<LoginPageBlocM, LoginPageStateM>(
           listener: (context, state) {
@@ -69,6 +93,7 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
                     utilisateur: utilisateur,
                     roles: roles,
                     activeRole: activeRole,
+                    refreshToken: state.refreshToken,
                   );
 
               context.push('/homepage');
@@ -79,22 +104,23 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
             }
           },
           child: SingleChildScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: SDSpacing.md),
+              padding: EdgeInsets.fromLTRB(
+                SDSpacing.md,
+                0,
+                SDSpacing.md,
+                SDSpacing.lg +
+                    MediaQuery.viewPaddingOf(context).bottom +
+                    MediaQuery.viewInsetsOf(context).bottom,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   SDSpacing.verticalMediumGap,
                   Center(
-                    child: AnimatedBuilder(
-                      animation: _animationController,
-                      builder: (context, child) {
-                        return ScaleTransition(
-                          scale: Tween<double>(begin: 1.0, end: 1.1)
-                              .animate(_animationController),
-                          child: child,
-                        );
-                      },
+                    child: ScaleTransition(
+                      scale: _logoScale,
                       child: Image.asset(
                         'assets/logo1.png',
                         height: 120,
@@ -121,8 +147,8 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
                   
                   // Design System Inputs
                   SDInput(
-                    label: "Mon identifiant",
-                    hint: "Email ou téléphone",
+                    label: "Téléphone ou Email",
+                    hint: "Ex: 0102030405 ou nom@exemple.com",
                     controller: identifiantController,
                     prefixIcon: Icons.person_outline,
                     keyboardType: TextInputType.emailAddress,
@@ -137,43 +163,46 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
                   ),
                   
                   SDSpacing.verticalSmallGap,
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Flexible(
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Checkbox(
-                              value: rememberMe,
-                              activeColor: SDColors.primary600,
-                              onChanged: (value) {
-                                setState(() {
-                                  rememberMe = value ?? false;
-                                });
-                              },
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Checkbox(
+                            value: rememberMe,
+                            activeColor: SDColors.primary600,
+                            onChanged: (value) {
+                              setState(() {
+                                rememberMe = value ?? false;
+                              });
+                            },
+                          ),
+                          Expanded(
+                            child: Text(
+                              "Se souvenir de moi",
+                              style: SDTypography.bodyMedium,
                             ),
-                            Flexible(
-                              child: Text(
-                                "Se souvenir de moi",
-                                style: SDTypography.bodyMedium,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                      TextButton(
-                        onPressed: () {},
-                        style: TextButton.styleFrom(
-                          padding: EdgeInsets.symmetric(horizontal: SDSpacing.xs, vertical: SDSpacing.xxxs),
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        child: Text(
-                          "Mot de passe oublié ?",
-                          style: SDTypography.labelMedium.copyWith(
-                            color: SDColors.primary700,
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: () {},
+                          style: TextButton.styleFrom(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: SDSpacing.xs,
+                              vertical: SDSpacing.xxxs,
+                            ),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: Text(
+                            "Mot de passe oublié ?",
+                            style: SDTypography.labelMedium.copyWith(
+                              color: SDColors.primary700,
+                            ),
                           ),
                         ),
                       ),
@@ -184,37 +213,20 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
                   
                   BlocBuilder<LoginPageBlocM, LoginPageStateM>(
                     builder: (context, state) {
+                      final loading = state is LoginPageLoadingM;
                       return SDButton(
                         text: "SE CONNECTER",
                         fullWidth: true,
-                        isLoading: state is LoginPageLoadingM,
-                        onPressed: state is LoginPageLoadingM
+                        isLoading: loading,
+                        onPressed: loading || !_canSubmit
                             ? null
                             : () {
-                                final identifiant =
-                                    identifiantController.text.trim();
-                                final password =
-                                    passwordController.text.trim();
-                                if (identifiant.isEmpty ||
-                                    password.isEmpty) {
-                                  ScaffoldMessenger.of(context)
-                                      .showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        "Mot de passe ou identifiant requis",
-                                        style: SDTypography.bodyMedium.copyWith(
-                                          color: SDColors.white,
-                                        ),
-                                      ),
-                                      backgroundColor: SDColors.error500,
-                                    ),
-                                  );
-                                  return;
-                                }
                                 context.read<LoginPageBlocM>().add(
                                       LoginSubmittedM(
-                                        identifiant: identifiant,
-                                        password: password,
+                                        identifiant:
+                                            identifiantController.text.trim(),
+                                        password:
+                                            passwordController.text.trim(),
                                         rememberMe: rememberMe,
                                       ),
                                     );
@@ -240,7 +252,22 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
                     ],
                   ),
                   SDSpacing.verticalMediumGap,
-                  
+                  SDGoogleSignInButton(
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Connexion Google : bientôt disponible.',
+                            style: SDTypography.bodyMedium.copyWith(
+                              color: SDColors.white,
+                            ),
+                          ),
+                          backgroundColor: SDColors.neutral700,
+                        ),
+                      );
+                    },
+                  ),
+                  SDSpacing.verticalMediumGap,
                   Wrap(
                     alignment: WrapAlignment.center,
                     crossAxisAlignment: WrapCrossAlignment.center,
@@ -266,12 +293,24 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
                           'S\'inscrire',
                           style: SDTypography.labelLarge.copyWith(
                             color: SDColors.primary600,
+                            decoration: TextDecoration.underline,
+                            decorationColor: SDColors.primary600,
                           ),
                         ),
                       ),
                     ],
                   ),
                   SDSpacing.verticalMediumGap,
+                  Text(
+                    'En utilisant l’application, vous pouvez consulter nos documents légaux ci-dessous.',
+                    textAlign: TextAlign.center,
+                    style: SDTypography.bodySmall.copyWith(
+                      color: SDColors.neutral500,
+                    ),
+                  ),
+                  SDSpacing.verticalSmallGap,
+                  const SDLegalFooterLinks(),
+                  SDSpacing.verticalSmallGap,
                 ],
               ),
             ),

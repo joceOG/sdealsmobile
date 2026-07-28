@@ -7,8 +7,10 @@ import 'package:sdealsmobile/mobile/view/freelancepagem/freelancepageblocm/freel
 import 'package:sdealsmobile/mobile/view/searchpagem/screens/searchPageScreenM.dart';
 
 import '../../../../design_system/colors.dart';
+import '../../../../design_system/widgets/sd_app_bar_icon_button.dart';
 import '../../../../design_system/spacing.dart';
 import '../../../../design_system/typography.dart';
+import '../../../../design_system/widgets/sd_entity_card.dart';
 import '../freelancepageblocm/freelancePageBlocM.dart';
 import '../freelancepageblocm/freelancePageEventM.dart';
 import '../models/freelance_model.dart';
@@ -788,19 +790,30 @@ class _FreelanceAvailabilityCard extends StatelessWidget {
     required this.forceAvailableBadge,
   });
 
-  ImageProvider _avatar() {
-    final p = freelancer.imagePath;
-    if (p.startsWith('http')) return NetworkImage(p);
-    if (p.isNotEmpty) return AssetImage(p);
-    return const AssetImage('assets/profile_picture.jpg');
-  }
-
   @override
   Widget build(BuildContext context) {
     final showBadge = forceAvailableBadge ||
         freelancer.availabilityStatus.toLowerCase().contains('disponible');
+    final responseText = 'Répond en ${freelancer.responseTime}h';
+    final ratingText = '${freelancer.rating.toStringAsFixed(1)}/5';
+    final imageUrl = freelancer.imagePath.startsWith('http')
+        ? freelancer.imagePath
+        : null;
+    final meta = freelancer.isTopRated
+        ? 'Top Rated • $responseText'
+        : '${freelancer.completedJobs} projets • $responseText';
 
-    return GestureDetector(
+    return SDEntityCard(
+      type: SDEntityCardType.freelance,
+      title: freelancer.name,
+      subtitle: freelancer.job,
+      fallbackIcon: Icons.laptop_mac_rounded,
+      imageUrl: imageUrl,
+      ratingText: ratingText,
+      metaText: meta,
+      statusText: showBadge ? 'Disponible' : freelancer.availabilityStatus,
+      priceText: _formatFcfaHour(freelancer.hourlyRate),
+      ctaLabel: 'Contacter',
       onTap: () {
         Navigator.of(context).push(
           MaterialPageRoute(
@@ -808,145 +821,8 @@ class _FreelanceAvailabilityCard extends StatelessWidget {
           ),
         );
       },
-      child: Container(
-        width: 168,
-        padding: EdgeInsets.all(SDSpacing.sm),
-        decoration: BoxDecoration(
-          color: SDColors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: SDColors.neutral200),
-          boxShadow: [
-            BoxShadow(
-              color: SDColors.neutral900.withOpacity(0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                CircleAvatar(radius: 22, backgroundImage: _avatar()),
-                SizedBox(width: SDSpacing.xs),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        freelancer.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: SDTypography.labelLarge.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: SDColors.neutral900,
-                        ),
-                      ),
-                      Text(
-                        freelancer.job,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: SDTypography.labelSmall.copyWith(
-                          color: SDColors.neutral600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            if (showBadge) ...[
-              SizedBox(height: SDSpacing.xs),
-              Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: SDSpacing.xs,
-                  vertical: 2,
-                ),
-                decoration: BoxDecoration(
-                  color: SDColors.success50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: SDColors.success200),
-                ),
-                child: Text(
-                  'Disponible',
-                  style: SDTypography.labelSmall.copyWith(
-                    color: SDColors.success700,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 10,
-                  ),
-                ),
-              ),
-            ],
-            const Spacer(),
-            Row(
-              children: [
-                Icon(Icons.star_rounded,
-                    size: 14, color: SDColors.warning600),
-                Text(
-                  freelancer.rating.toStringAsFixed(1),
-                  style: SDTypography.labelSmall.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                SizedBox(width: SDSpacing.xs),
-                Expanded(
-                  child: Text(
-                    _formatFcfaHour(freelancer.hourlyRate),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: SDTypography.labelSmall.copyWith(
-                      color: SDColors.primary700,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                Icon(Icons.schedule, size: 14, color: SDColors.primary500),
-                Text(
-                  '${freelancer.responseTime}h',
-                  style: SDTypography.labelSmall.copyWith(
-                    color: SDColors.neutral600,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: SDSpacing.xxs),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          FreelanceDetailsScreen(freelance: freelancer),
-                    ),
-                  );
-                },
-                style: FilledButton.styleFrom(
-                  backgroundColor: SDColors.primary600,
-                  foregroundColor: SDColors.white,
-                  padding: EdgeInsets.symmetric(vertical: SDSpacing.xxs),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                child: Text(
-                  'Contacter',
-                  style: SDTypography.labelMedium.copyWith(
-                    color: SDColors.white,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
-
 }
 
 class _QuickOfferTile extends StatelessWidget {
@@ -1012,7 +888,9 @@ class _FreelanceAllCategoriesPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: SDColors.white,
-      appBar: AppBar(
+      appBar: SDAppBarIconThemed(
+        style: SDAppBarIconStyles.onLightSurface,
+        bar: AppBar(
         elevation: 0,
         backgroundColor: SDColors.white,
         surfaceTintColor: SDColors.white,
@@ -1020,6 +898,7 @@ class _FreelanceAllCategoriesPage extends StatelessWidget {
         title: Text(
           'Toutes les catégories',
           style: SDTypography.titleLarge.copyWith(color: SDColors.neutral900),
+        ),
         ),
       ),
       body: GridView.builder(
@@ -1054,7 +933,9 @@ class _FreelanceCategoryResultsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: SDColors.white,
-      appBar: AppBar(
+      appBar: SDAppBarIconThemed(
+        style: SDAppBarIconStyles.onLightSurface,
+        bar: AppBar(
         elevation: 0,
         backgroundColor: SDColors.white,
         surfaceTintColor: SDColors.white,
@@ -1062,6 +943,7 @@ class _FreelanceCategoryResultsPage extends StatelessWidget {
         title: Text(
           categoryName,
           style: SDTypography.titleLarge.copyWith(color: SDColors.neutral900),
+        ),
         ),
       ),
       body: BlocBuilder<FreelancePageBlocM, FreelancePageStateM>(
@@ -1129,7 +1011,9 @@ class _FreelanceAllListPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: SDColors.white,
-      appBar: AppBar(
+      appBar: SDAppBarIconThemed(
+        style: SDAppBarIconStyles.onLightSurface,
+        bar: AppBar(
         elevation: 0,
         backgroundColor: SDColors.white,
         surfaceTintColor: SDColors.white,
@@ -1137,6 +1021,7 @@ class _FreelanceAllListPage extends StatelessWidget {
         title: Text(
           title,
           style: SDTypography.titleLarge.copyWith(color: SDColors.neutral900),
+        ),
         ),
       ),
       body: BlocBuilder<FreelancePageBlocM, FreelancePageStateM>(

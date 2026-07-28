@@ -7,7 +7,8 @@ import 'package:sdealsmobile/data/services/authCubit.dart';
 import '../../../../design_system/design_system.dart';
 
 class ProviderMissionsScreen extends StatefulWidget {
-  const ProviderMissionsScreen({Key? key}) : super(key: key);
+  final String? prestataireDocId;
+  const ProviderMissionsScreen({Key? key, this.prestataireDocId}) : super(key: key);
 
   @override
   _ProviderMissionsScreenState createState() => _ProviderMissionsScreenState();
@@ -59,71 +60,62 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen>
     try {
       final auth = context.read<AuthCubit>().state;
       if (auth is AuthAuthenticated) {
-        // Récupérer l'ID de l'utilisateur pour filtrer les missions
+        final prestataireDocId = widget.prestataireDocId;
         final utilisateurId = auth.utilisateur.idutilisateur;
 
-        // Charger les missions disponibles (EN_ATTENTE) pour ce prestataire
-        final available = await _apiClient.getPrestationsByStatus(
-          token: auth.token,
-          status: 'EN_ATTENTE',
-        );
+        if (prestataireDocId != null) {
+          // Utiliser l'endpoint direct par prestataireId (plus efficace)
+          final available = await _apiClient.getPrestationsByStatus(
+            token: auth.token,
+            status: 'EN_ATTENTE',
+            prestataireId: prestataireDocId,
+          );
+          final accepted = await _apiClient.getPrestationsByStatus(
+            token: auth.token,
+            status: 'ACCEPTEE',
+            prestataireId: prestataireDocId,
+          );
+          final ongoing = await _apiClient.getPrestationsByStatus(
+            token: auth.token,
+            status: 'EN_COURS',
+            prestataireId: prestataireDocId,
+          );
+          final completed = await _apiClient.getPrestationsByStatus(
+            token: auth.token,
+            status: 'TERMINEE',
+            prestataireId: prestataireDocId,
+          );
+          setState(() {
+            _availableMissions = available;
+            _ongoingMissions = [...accepted, ...ongoing];
+            _completedMissions = completed;
+            _isLoading = false;
+          });
+        } else {
+          // Fallback : filtrage client-side par userId
+          final available = await _apiClient.getPrestationsByStatus(
+            token: auth.token, status: 'EN_ATTENTE');
+          final accepted = await _apiClient.getPrestationsByStatus(
+            token: auth.token, status: 'ACCEPTEE');
+          final ongoing = await _apiClient.getPrestationsByStatus(
+            token: auth.token, status: 'EN_COURS');
+          final completed = await _apiClient.getPrestationsByStatus(
+            token: auth.token, status: 'TERMINEE');
 
-        // Charger les missions acceptées (ACCEPTEE) pour ce prestataire
-        final accepted = await _apiClient.getPrestationsByStatus(
-          token: auth.token,
-          status: 'ACCEPTEE',
-        );
+          bool matchUser(m) =>
+              m['prestataire']?['utilisateur']?.toString() == utilisateurId ||
+              m['prestataire']?.toString() == utilisateurId;
 
-        // Charger les missions en cours (EN_COURS) pour ce prestataire
-        final ongoing = await _apiClient.getPrestationsByStatus(
-          token: auth.token,
-          status: 'EN_COURS',
-        );
-
-        // Charger les missions terminées (TERMINEE) pour ce prestataire
-        final completed = await _apiClient.getPrestationsByStatus(
-          token: auth.token,
-          status: 'TERMINEE',
-        );
-
-        // Filtrer les missions par utilisateur (via le champ prestataire.utilisateur)
-        final filteredAvailable = available
-            .where((mission) =>
-                mission['prestataire']?['utilisateur']?.toString() ==
-                    utilisateurId ||
-                mission['prestataire']?.toString() == utilisateurId)
-            .toList();
-
-        final filteredAccepted = accepted
-            .where((mission) =>
-                mission['prestataire']?['utilisateur']?.toString() ==
-                    utilisateurId ||
-                mission['prestataire']?.toString() == utilisateurId)
-            .toList();
-
-        final filteredOngoing = ongoing
-            .where((mission) =>
-                mission['prestataire']?['utilisateur']?.toString() ==
-                    utilisateurId ||
-                mission['prestataire']?.toString() == utilisateurId)
-            .toList();
-
-        final filteredCompleted = completed
-            .where((mission) =>
-                mission['prestataire']?['utilisateur']?.toString() ==
-                    utilisateurId ||
-                mission['prestataire']?.toString() == utilisateurId)
-            .toList();
-
-        setState(() {
-          _availableMissions = filteredAvailable;
-          _ongoingMissions = [
-            ...filteredAccepted,
-            ...filteredOngoing
-          ]; // Accepter + En cours
-          _completedMissions = filteredCompleted;
-          _isLoading = false;
-        });
+          setState(() {
+            _availableMissions = available.where(matchUser).toList();
+            _ongoingMissions = [
+              ...accepted.where(matchUser),
+              ...ongoing.where(matchUser)
+            ];
+            _completedMissions = completed.where(matchUser).toList();
+            _isLoading = false;
+          });
+        }
       }
     } catch (e) {
       setState(() {
@@ -268,54 +260,79 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen>
               unselectedLabelStyle: SDTypography.labelMedium,
               tabs: [
                 Tab(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text('Disponibles'),
-                      if (_availableMissions.isNotEmpty)
-                        Container(
-                          margin: EdgeInsets.only(left: SDSpacing.xxxs),
-                          padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: SDColors.warning500,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            '${_availableMissions.length}',
-                            style: SDTypography.labelSmall.copyWith(
-                              color: SDColors.white,
-                              fontWeight: FontWeight.bold,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Disponibles',
+                          maxLines: 1,
+                          style: SDTypography.labelMedium.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                        if (_availableMissions.isNotEmpty)
+                          Container(
+                            margin: EdgeInsets.only(left: SDSpacing.xxxs),
+                            padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: SDColors.warning500,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              '${_availableMissions.length}',
+                              style: SDTypography.labelSmall.copyWith(
+                                color: SDColors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
-                        ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
                 Tab(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text('En cours'),
-                      if (_ongoingMissions.isNotEmpty)
-                        Container(
-                          margin: EdgeInsets.only(left: SDSpacing.xxxs),
-                          padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: SDColors.info500,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            '${_ongoingMissions.length}',
-                            style: SDTypography.labelSmall.copyWith(
-                              color: SDColors.white,
-                              fontWeight: FontWeight.bold,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'En cours',
+                          maxLines: 1,
+                          style: SDTypography.labelMedium.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                        if (_ongoingMissions.isNotEmpty)
+                          Container(
+                            margin: EdgeInsets.only(left: SDSpacing.xxxs),
+                            padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: SDColors.info500,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              '${_ongoingMissions.length}',
+                              style: SDTypography.labelSmall.copyWith(
+                                color: SDColors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
-                        ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-                Tab(text: 'Terminées'),
+                Tab(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      'Terminées',
+                      maxLines: 1,
+                      style: SDTypography.labelMedium.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -435,11 +452,15 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                '${_filterMissions(_availableMissions).length} missions trouvées',
-                style: SDTypography.bodySmall.copyWith(
-                  color: SDColors.primary700,
-                  fontWeight: FontWeight.bold,
+              Expanded(
+                child: Text(
+                  '${_filterMissions(_availableMissions).length} missions trouvées',
+                  style: SDTypography.bodySmall.copyWith(
+                    color: SDColors.primary700,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               TextButton.icon(
@@ -448,6 +469,11 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen>
                 label: Text(
                   'Actualiser',
                   style: SDTypography.labelMedium.copyWith(color: SDColors.primary600),
+                ),
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.symmetric(horizontal: SDSpacing.xs),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
               ),
             ],
@@ -863,6 +889,8 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen>
                                 fontWeight: FontWeight.bold,
                                 color: SDColors.neutral900,
                               ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           if (isNew)
@@ -905,8 +933,10 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen>
                 ),
                 SizedBox(width: SDSpacing.xs),
                 Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Container(
+                      constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.32),
                       padding: EdgeInsets.symmetric(horizontal: SDSpacing.sm, vertical: SDSpacing.xs),
                       decoration: BoxDecoration(
                         color: _getStatusColor(type),
@@ -918,6 +948,9 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen>
                           color: SDColors.white,
                           fontWeight: FontWeight.bold,
                         ),
+                        maxLines: 2,
+                        textAlign: TextAlign.center,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     if (priorite == 'HAUTE')
@@ -950,10 +983,14 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen>
                 children: [
                   Icon(Icons.calendar_today, size: 16, color: SDColors.neutral500),
                   SizedBox(width: SDSpacing.xs),
-                  Text(
-                    'Date: ${DateFormat('dd/MM/yyyy').format(DateTime.parse(datePrestation))}',
-                    style: SDTypography.bodySmall.copyWith(
-                      color: SDColors.neutral700,
+                  Expanded(
+                    child: Text(
+                      'Date: ${DateFormat('dd/MM/yyyy').format(DateTime.parse(datePrestation))}',
+                      style: SDTypography.bodySmall.copyWith(
+                        color: SDColors.neutral700,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
@@ -963,6 +1000,7 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen>
 
             // Message GRATUIT au lieu du montant
             Container(
+              width: double.infinity,
               padding: EdgeInsets.all(SDSpacing.xs),
               decoration: BoxDecoration(
                 color: SDColors.success50,
@@ -970,15 +1008,18 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen>
                 border: Border.all(color: SDColors.success200),
               ),
               child: Row(
-                mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(Icons.check_circle, size: 14, color: SDColors.success600),
                   SizedBox(width: SDSpacing.xxxs),
-                  Text(
-                    'Service 100% GRATUIT',
-                    style: SDTypography.bodySmall.copyWith(
-                      color: SDColors.success700,
-                      fontWeight: FontWeight.w600,
+                  Expanded(
+                    child: Text(
+                      'Service 100% GRATUIT',
+                      style: SDTypography.bodySmall.copyWith(
+                        color: SDColors.success700,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
@@ -1092,11 +1133,15 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen>
             children: [
               Icon(Icons.check_circle, color: SDColors.success600, size: 20),
               SizedBox(width: SDSpacing.xs),
-              Text(
-                'Mission terminée avec succès',
-                style: SDTypography.bodySmall.copyWith(
-                  color: SDColors.success700,
-                  fontWeight: FontWeight.bold,
+              Expanded(
+                child: Text(
+                  'Mission terminée avec succès',
+                  style: SDTypography.bodySmall.copyWith(
+                    color: SDColors.success700,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],

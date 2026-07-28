@@ -143,7 +143,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     return BlocProvider(
       create: (context) => EditProfileBloc(apiClient: ApiClient()),
       child: Scaffold(
-        appBar: AppBar(
+        appBar: SDAppBarIconThemed(
+          style: SDAppBarIconStyles.onLightSurface,
+          bar: AppBar(
           elevation: 0,
           scrolledUnderElevation: 0,
           backgroundColor: SDColors.white,
@@ -160,6 +162,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             preferredSize: const Size.fromHeight(1),
             child: Divider(height: 1, color: SDColors.neutral200),
           ),
+        ),
         ),
         body: BlocConsumer<EditProfileBloc, EditProfileState>(
           listener: (context, state) {

@@ -45,7 +45,7 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
       emit(NotificationsLoading());
       try {
         final response = await _apiClient.get(
-            '/notification/user/${event.prestataireId}?nonLuesUniquement=true');
+            '/notification/user/${event.prestataireId}?nonLuesUniquement=true', token: _currentToken);
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
           final List<dynamic> notifications = data['notifications'] ?? [];
@@ -126,7 +126,7 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
     on<MarkNotificationAsRead>((event, emit) async {
       try {
         final response =
-            await _apiClient.put('/notification/${event.notificationId}/read');
+            await _apiClient.put('/notification/${event.notificationId}/read', token: _currentToken);
         if (response.statusCode == 200) {
           emit(NotificationMarkedAsRead(event.notificationId));
           // Recharger les notifications
@@ -144,7 +144,7 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
     on<MarkAllNotificationsAsRead>((event, emit) async {
       try {
         final response = await _apiClient
-            .put('/notification/user/${event.prestataireId}/mark-all-read');
+            .put('/notification/user/${event.prestataireId}/read-all', token: _currentToken);
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
           emit(AllNotificationsMarkedAsRead(data['modifiedCount'] ?? 0));
@@ -162,7 +162,7 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
     on<ArchiveNotification>((event, emit) async {
       try {
         final response = await _apiClient
-            .put('/notification/${event.notificationId}/archive');
+            .put('/notification/${event.notificationId}/archive', token: _currentToken);
         if (response.statusCode == 200) {
           emit(NotificationArchived(event.notificationId));
           // Recharger les notifications
@@ -179,7 +179,7 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
     on<DeleteNotification>((event, emit) async {
       try {
         final response =
-            await _apiClient.delete('/notification/${event.notificationId}');
+            await _apiClient.delete('/notification/${event.notificationId}', token: _currentToken);
         if (response.statusCode == 200) {
           emit(NotificationDeleted(event.notificationId));
           // Recharger les notifications
@@ -312,7 +312,7 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
     on<RefreshNotifications>((event, emit) async {
       try {
         final response =
-            await _apiClient.get('/notification/user/${event.prestataireId}');
+            await _apiClient.get('/notification/user/${event.prestataireId}', token: _currentToken);
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
           final List<dynamic> notifications = data['notifications'] ?? [];

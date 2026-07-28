@@ -7,14 +7,28 @@ import 'planning_state.dart';
 // 🎯 BLoC POUR GÉRER LE PLANNING PRESTATAIRE
 class PlanningBloc extends Bloc<PlanningEvent, PlanningState> {
   final ApiClient _apiClient = ApiClient();
+  String? _currentPrestataireId;
+  String? _currentToken;
+
+  void setToken(String token) {
+    _currentToken = token;
+  }
+
+  void setPrestataireId(String prestataireId) {
+    _currentPrestataireId = prestataireId;
+  }
 
   PlanningBloc() : super(PlanningInitial()) {
     // 📅 CHARGER LES PRESTATIONS DU PRESTATAIRE
     on<LoadPrestationsPlanning>((event, emit) async {
       emit(PlanningLoading());
       try {
+        // Mémoriser le prestataireId pour les recharges ultérieures
+        if (event.prestataireId.isNotEmpty) {
+          _currentPrestataireId = event.prestataireId;
+        }
         final response = await _apiClient
-            .get('/prestations/prestataire/${event.prestataireId}');
+            .get('/prestations/prestataire/${event.prestataireId}', token: _currentToken);
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
           final List<dynamic> prestations = data['prestations'] ?? data;
@@ -95,12 +109,16 @@ class PlanningBloc extends Bloc<PlanningEvent, PlanningState> {
           if (event.notes != null) 'notesPrestataire': event.notes,
         };
         final response = await _apiClient
-            .put('/prestation/${event.prestationId}', body: body);
+            .put('/prestation/${event.prestationId}', body: body, token: _currentToken);
         if (response.statusCode == 200) {
           final prestation = jsonDecode(response.body);
           emit(PrestationUpdated(prestation));
-          // Recharger les prestations
-          add(LoadPrestationsPlanning(prestation['prestataire']['_id']));
+          // Recharger avec le prestataireId mémorisé
+          final reloadId = _currentPrestataireId ??
+              (prestation['prestataire'] is Map
+                  ? prestation['prestataire']['_id']?.toString()
+                  : prestation['prestataire']?.toString()) ?? '';
+          if (reloadId.isNotEmpty) add(LoadPrestationsPlanning(reloadId));
         } else {
           emit(PlanningError('Erreur lors de la mise à jour'));
         }
@@ -116,11 +134,14 @@ class PlanningBloc extends Bloc<PlanningEvent, PlanningState> {
         final response = await _apiClient.put(
           '/prestation/${event.prestationId}',
           body: {'notesPrestataire': event.notes},
+          token: _currentToken,
         );
         if (response.statusCode == 200) {
           emit(NotesAdded(event.prestationId, event.notes));
-          // Recharger les prestations
-          add(LoadPrestationsPlanning(event.prestationId));
+          // Recharger avec le prestataireId mémorisé (pas le prestationId)
+          if (_currentPrestataireId != null && _currentPrestataireId!.isNotEmpty) {
+            add(LoadPrestationsPlanning(_currentPrestataireId!));
+          }
         } else {
           emit(PlanningError('Erreur lors de l\'ajout des notes'));
         }

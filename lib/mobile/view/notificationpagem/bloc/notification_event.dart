@@ -96,3 +96,37 @@ class LoadMoreNotifications extends NotificationEvent {
   @override
   List<Object?> get props => [userId];
 }
+
+/// Démarre le polling (badge 90s / liste 120s — aligné web).
+class StartNotificationPolling extends NotificationEvent {
+  final String userId;
+
+  const StartNotificationPolling(this.userId);
+
+  @override
+  List<Object?> get props => [userId];
+}
+
+class StopNotificationPolling extends NotificationEvent {
+  const StopNotificationPolling();
+}
+
+/// Tick interne : rafraîchir uniquement le badge unread.
+class PollUnreadCountTick extends NotificationEvent {
+  final String userId;
+
+  const PollUnreadCountTick(this.userId);
+
+  @override
+  List<Object?> get props => [userId];
+}
+
+/// Tick interne : rafraîchir la liste complète.
+class PollNotificationsTick extends NotificationEvent {
+  final String userId;
+
+  const PollNotificationsTick(this.userId);
+
+  @override
+  List<Object?> get props => [userId];
+}

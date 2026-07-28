@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../data/models/prestataire.dart';
-import '../screens/detailPageScreenM.dart';
 import '../utils/navigation_helper.dart';
-import '../../common/widgets/app_image.dart';
+import '../../../../design_system/design_system.dart';
 
 class ProviderPopup extends StatelessWidget {
   final dynamic provider; // Peut être Prestataire ou Map
@@ -96,303 +95,107 @@ class ProviderPopup extends StatelessWidget {
                   () {}, // Empêcher la fermeture quand on clique sur le popup
               child: Container(
                 margin: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: SDColors.white,
                   borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.3),
-                      blurRadius: 10,
-                      offset: const Offset(0, 5),
-                    ),
-                  ],
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // En-tête avec photo et nom
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.green.shade50,
-                        borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(16),
-                          topRight: Radius.circular(16),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          // Photo du prestataire
-                          Container(
-                            width: 60,
-                            height: 60,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(30),
-                              border: Border.all(color: Colors.green, width: 2),
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(30),
-                              child: data['photoProfil'] != null
-                                  ? AppImage(
-                                      imageUrl: data['photoProfil'],
-                                      fit: BoxFit.cover,
-                                    )
-                                  : Container(
-                                      color: Colors.green.shade100,
-                                      child: Icon(
-                                        Icons.person,
-                                        color: Colors.green,
-                                        size: 30,
-                                      ),
-                                    ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          // Informations du prestataire
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  data['fullName'],
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.black87,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  data['serviceName'],
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.green.shade700,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(height: 4),
-                                Row(
-                                  children: [
-                                    Icon(
-                                      Icons.star,
-                                      color: Colors.amber,
-                                      size: 14,
-                                    ),
-                                    const SizedBox(width: 3),
-                                    Flexible(
-                                      flex: 2,
-                                      child: Text(
-                                        data['note'],
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    if (data['isVerified'] == true)
-                                      Flexible(
-                                        flex: 3,
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 6,
-                                            vertical: 2,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: Colors.orange,
-                                            borderRadius:
-                                                BorderRadius.circular(12),
-                                          ),
-                                          child: const Text(
-                                            'Vérifié',
-                                            style: TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 9,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                                const SizedBox(height: 6),
-                                // Prix comme dans l'exemple immobilier
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 5,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.green,
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  child: Text(
-                                    data['price'],
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          // Bouton fermer
-                          IconButton(
-                            onPressed: onClose,
-                            icon: const Icon(Icons.close),
-                            color: Colors.grey,
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // Description du service
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Description du service',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            data['description'],
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: Colors.black54,
-                              height: 1.4,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-
-                          // Informations supplémentaires
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.location_on,
-                                color: Colors.green,
-                                size: 14,
-                              ),
-                              const SizedBox(width: 3),
-                              Flexible(
-                                flex: 2,
-                                child: Text(
-                                  'À ${_calculateDistance()} km',
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    color: Colors.black54,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Icon(
-                                Icons.access_time,
-                                color: Colors.blue,
-                                size: 14,
-                              ),
-                              const SizedBox(width: 3),
-                              Flexible(
-                                flex: 3,
-                                child: Text(
-                                  'Disponible maintenant',
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    color: Colors.black54,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // Boutons d'action
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade50,
-                        borderRadius: const BorderRadius.only(
-                          bottomLeft: Radius.circular(16),
-                          bottomRight: Radius.circular(16),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          // Bouton Contacter
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: () {
-                                // TODO: Implémenter la fonction de contact
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                        'Fonction de contact à implémenter'),
-                                  ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: SDEntityCard(
+                            type: SDEntityCardType.provider,
+                            title: data['fullName']?.toString() ?? 'Prestataire',
+                            subtitle: data['serviceName']?.toString() ?? 'Service',
+                            fallbackIcon: Icons.handyman_rounded,
+                            imageUrl: (data['photoProfil']?.toString().startsWith('http') ?? false)
+                                ? data['photoProfil']?.toString()
+                                : null,
+                            ratingText: '${data['note'] ?? 'N/A'}/5',
+                            metaText: data['isVerified'] == true
+                                ? '${data['location'] ?? ''} • Vérifié'
+                                : (data['location']?.toString() ?? ''),
+                            statusText: 'Disponible maintenant',
+                            priceText: data['price']?.toString(),
+                            ctaLabel: 'Voir profil',
+                            onTap: () {
+                              final providerId = _getProviderId();
+                              if (providerId.isNotEmpty) {
+                                NavigationHelper.navigateToProviderProfile(
+                                  context,
+                                  providerId: providerId,
+                                  providerData: _getProviderDataForCache(),
                                 );
-                              },
-                              icon: const Icon(Icons.phone, size: 18),
-                              label: const Text('Contacter'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green,
-                                foregroundColor: Colors.white,
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 12),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                            ),
+                              }
+                            },
                           ),
-                          const SizedBox(width: 12),
-                          // Bouton Voir détails
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: () {
-                                onClose(); // Fermer le popup
-                                // ✅ Naviguer vers le profil complet du prestataire
-                                final providerId = _getProviderId();
-                                if (providerId.isNotEmpty) {
-                                  NavigationHelper.navigateToProviderProfile(
-                                    context,
-                                    providerId: providerId,
-                                    providerData: _getProviderDataForCache(),
-                                  );
-                                }
-                              },
-                              icon: const Icon(Icons.info_outline, size: 18),
-                              label: const Text('Détails'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.blue,
-                                foregroundColor: Colors.white,
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 12),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
+                        ),
+                        IconButton(
+                          onPressed: onClose,
+                          icon: const Icon(Icons.close),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Description du service',
+                        style: SDTypography.titleSmall.copyWith(
+                          color: SDColors.neutral900,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      data['description']?.toString() ?? '',
+                      style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral600),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Fonction de contact à implémenter')),
+                              );
+                            },
+                            icon: const Icon(Icons.phone, size: 18),
+                            label: const Text('Contacter'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: SDColors.primary600,
+                              foregroundColor: SDColors.white,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              onClose();
+                              final providerId = _getProviderId();
+                              if (providerId.isNotEmpty) {
+                                NavigationHelper.navigateToProviderProfile(
+                                  context,
+                                  providerId: providerId,
+                                  providerData: _getProviderDataForCache(),
+                                );
+                              }
+                            },
+                            icon: const Icon(Icons.info_outline, size: 18),
+                            label: const Text('Détails'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: SDColors.info600,
+                              foregroundColor: SDColors.white,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -404,10 +207,6 @@ class ProviderPopup extends StatelessWidget {
     );
   }
 
-  String _calculateDistance() {
-    // Simulation de distance (à remplacer par le vrai calcul)
-    return (2.5 + (provider.hashCode % 10) * 0.5).toStringAsFixed(1);
-  }
 }
 
 

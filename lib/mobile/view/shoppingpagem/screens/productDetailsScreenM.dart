@@ -99,6 +99,7 @@ class _ProductDetailsState extends State<ProductDetails> {
             final isFavorite =
                 state.favoriteProductIds?.contains(widget.product.id) ?? false;
             return IconButton(
+              style: SDAppBarIconStyles.onPrimary,
               icon: Icon(
                 isFavorite ? Icons.favorite : Icons.favorite_border,
                 color: isFavorite ? SDColors.error500 : SDColors.white,
@@ -118,6 +119,7 @@ class _ProductDetailsState extends State<ProductDetails> {
         ),
         // Bouton partage
         IconButton(
+          style: SDAppBarIconStyles.onPrimary,
           icon: Icon(Icons.share, color: SDColors.white),
           onPressed: () {
             // TODO: Implémenter le partage

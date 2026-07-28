@@ -1,6 +1,7 @@
-import 'dart:convert';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:sdealsmobile/data/services/api_client.dart';
+import 'package:sdealsmobile/data/services/token_store.dart';
 
 class WebSocketService {
   static final WebSocketService _instance = WebSocketService._internal();
@@ -10,61 +11,105 @@ class WebSocketService {
   IO.Socket? _socket;
   bool _isConnected = false;
   String? _currentUserId;
+  String? _socketToken;
+  DateTime? _socketTokenExpiresAt;
+  bool _authenticating = false;
 
-  // Getters
   bool get isConnected => _isConnected;
   IO.Socket? get socket => _socket;
+  String? get currentUserId => _currentUserId;
 
-  // 🔌 CONNEXION AU WEBSOCKET
   Future<void> connect() async {
+    if (_isConnected && _socket != null) return;
+
     try {
-      final apiUrl = dotenv.env['API_URL'] ?? 'http://localhost:3000';
-      final wsUrl = apiUrl.replaceFirst('http', 'ws');
+      final apiUrl = dotenv.env['API_URL'] ?? 'http://localhost:3000/api';
+      final serverUrl = apiUrl.replaceFirst(RegExp(r'/api/?$'), '');
 
-      print('🔌 Connexion WebSocket vers: $wsUrl');
-
+      _socket?.dispose();
       _socket = IO.io(
-          wsUrl,
-          IO.OptionBuilder()
-              .setTransports(['websocket'])
-              .enableAutoConnect()
-              .build());
+        serverUrl,
+        IO.OptionBuilder()
+            .setTransports(['websocket', 'polling'])
+            .enableAutoConnect()
+            .enableReconnection()
+            .setReconnectionAttempts(5)
+            .build(),
+      );
 
       _setupEventListeners();
-
       _socket!.connect();
-      print('🔌 Tentative de connexion WebSocket...');
     } catch (e) {
       print('❌ Erreur connexion WebSocket: $e');
+      rethrow;
     }
   }
 
-  // 📱 AUTHENTIFICATION UTILISATEUR
-  void authenticate(String userId) {
-    if (_socket != null && _isConnected) {
-      _currentUserId = userId;
-      _socket!.emit('authenticate', userId);
-      print('👤 Utilisateur authentifié: $userId');
+  /// Auth JWT court (`POST /socket-token`) — aligné web / backend prod.
+  Future<void> authenticate({
+    required String userId,
+    String? accessToken,
+  }) async {
+    _currentUserId = userId;
+    if (_socket == null || !_isConnected) {
+      await connect();
+    }
+    await _emitSocketAuth(accessToken: accessToken);
+  }
+
+  Future<void> _emitSocketAuth({String? accessToken}) async {
+    if (_socket == null || !_isConnected || _currentUserId == null) return;
+    if (_authenticating) return;
+    _authenticating = true;
+    try {
+      final token = await _ensureSocketToken(accessToken: accessToken);
+      if (token == null || token.isEmpty) {
+        print('❌ Impossible d\'obtenir un socket token');
+        return;
+      }
+      _socket!.emit('authenticate', {'token': token});
+      print('👤 Socket authentifié (JWT court) pour $_currentUserId');
+    } finally {
+      _authenticating = false;
     }
   }
 
-  // 💬 REJOINDRE UNE CONVERSATION
+  Future<String?> _ensureSocketToken({String? accessToken}) async {
+    final stillValid = _socketToken != null &&
+        _socketTokenExpiresAt != null &&
+        DateTime.now().isBefore(
+          _socketTokenExpiresAt!.subtract(const Duration(seconds: 30)),
+        );
+    if (stillValid) return _socketToken;
+
+    final bearer = accessToken ?? await TokenStore.getAccessToken();
+    if (bearer == null || bearer.isEmpty) return null;
+
+    try {
+      final api = ApiClient();
+      final socketToken = await api.createSocketToken(bearer);
+      _socketToken = socketToken;
+      // TTL backend = 5 min
+      _socketTokenExpiresAt = DateTime.now().add(const Duration(minutes: 4));
+      return socketToken;
+    } catch (e) {
+      print('❌ createSocketToken: $e');
+      return null;
+    }
+  }
+
   void joinConversation(String conversationId) {
     if (_socket != null && _isConnected) {
       _socket!.emit('join-conversation', conversationId);
-      print('💬 Rejoint la conversation: $conversationId');
     }
   }
 
-  // 💬 QUITTER UNE CONVERSATION
   void leaveConversation(String conversationId) {
     if (_socket != null && _isConnected) {
       _socket!.emit('leave-conversation', conversationId);
-      print('💬 Quitté la conversation: $conversationId');
     }
   }
 
-  // 📨 ENVOYER UN MESSAGE
   void sendMessage({
     required String expediteur,
     required String destinataire,
@@ -75,7 +120,7 @@ class WebSocketService {
     String? referenceType,
   }) {
     if (_socket != null && _isConnected) {
-      final messageData = {
+      _socket!.emit('send-message', {
         'expediteur': expediteur,
         'destinataire': destinataire,
         'contenu': contenu,
@@ -83,141 +128,81 @@ class WebSocketService {
         'typeMessage': typeMessage,
         if (referenceId != null) 'referenceId': referenceId,
         if (referenceType != null) 'referenceType': referenceType,
-      };
-
-      _socket!.emit('send-message', messageData);
-      print('📨 Message envoyé: $contenu');
+      });
     }
   }
 
-  // 📦 MISE À JOUR STATUT COMMANDE
-  void updateOrderStatus({
-    required String orderId,
-    required String status,
-    required String clientId,
-  }) {
+  void startTyping(String conversationId, {String? userId}) {
     if (_socket != null && _isConnected) {
-      final orderData = {
-        'orderId': orderId,
-        'status': status,
-        'clientId': clientId,
-      };
-
-      _socket!.emit('update-order-status', orderData);
-      print('📦 Statut commande mis à jour: $orderId -> $status');
+      _socket!.emit('typing-start', {
+        'conversationId': conversationId,
+        if (userId != null) 'userId': userId,
+      });
     }
   }
 
-  // 🔔 ENVOYER NOTIFICATION
-  void sendNotification({
-    required String userId,
-    required String type,
-    required String title,
-    required String message,
-    Map<String, dynamic>? data,
-  }) {
+  void stopTyping(String conversationId, {String? userId}) {
     if (_socket != null && _isConnected) {
-      final notificationData = {
-        'userId': userId,
-        'type': type,
-        'title': title,
-        'message': message,
-        if (data != null) 'data': data,
-      };
-
-      _socket!.emit('send-notification', notificationData);
-      print('🔔 Notification envoyée à $userId');
+      _socket!.emit('typing-stop', {
+        'conversationId': conversationId,
+        if (userId != null) 'userId': userId,
+      });
     }
   }
 
-  // 👤 INDICATEUR DE TYPING
-  void startTyping(String conversationId) {
-    if (_socket != null && _isConnected) {
-      _socket!.emit('typing-start', {'conversationId': conversationId});
-    }
-  }
-
-  void stopTyping(String conversationId) {
-    if (_socket != null && _isConnected) {
-      _socket!.emit('typing-stop', {'conversationId': conversationId});
-    }
-  }
-
-  // 🎧 ÉCOUTEURS D'ÉVÉNEMENTS
   void _setupEventListeners() {
     if (_socket == null) return;
 
-    // Connexion établie
-    _socket!.onConnect((_) {
+    _socket!.onConnect((_) async {
       _isConnected = true;
       print('✅ WebSocket connecté');
-
-      // Ré-authentifier si nécessaire
       if (_currentUserId != null) {
-        authenticate(_currentUserId!);
+        await _emitSocketAuth();
       }
     });
 
-    // Déconnexion
     _socket!.onDisconnect((_) {
       _isConnected = false;
       print('❌ WebSocket déconnecté');
     });
 
-    // Erreur de connexion
     _socket!.onConnectError((error) {
       print('❌ Erreur connexion WebSocket: $error');
     });
 
-    // Nouveau message reçu
     _socket!.on('new-message', (data) {
-      print('📨 Nouveau message reçu: $data');
       _onNewMessage?.call(data);
     });
 
-    // Notification de message
     _socket!.on('message-notification', (data) {
-      print('🔔 Notification message: $data');
       _onMessageNotification?.call(data);
     });
 
-    // Statut commande mis à jour
     _socket!.on('order-status-updated', (data) {
-      print('📦 Statut commande mis à jour: $data');
       _onOrderStatusUpdated?.call(data);
     });
 
-    // Mise à jour commande
     _socket!.on('order-update', (data) {
-      print('📦 Mise à jour commande: $data');
       _onOrderUpdate?.call(data);
     });
 
-    // Notification générale
     _socket!.on('notification', (data) {
-      print('🔔 Notification reçue: $data');
       _onNotification?.call(data);
     });
 
-    // Indicateur de frappe
     _socket!.on('user-typing', (data) {
-      print('👤 Utilisateur en train de taper: $data');
       _onUserTyping?.call(data);
     });
 
-    // Erreurs
     _socket!.on('message-error', (data) {
-      print('❌ Erreur message: $data');
       _onMessageError?.call(data);
     });
 
     _socket!.on('order-error', (data) {
-      print('❌ Erreur commande: $data');
       _onOrderError?.call(data);
     });
   }
 
-  // 🎧 CALLBACKS POUR LES ÉVÉNEMENTS
   Function(dynamic)? _onNewMessage;
   Function(dynamic)? _onMessageNotification;
   Function(dynamic)? _onOrderStatusUpdated;
@@ -227,7 +212,6 @@ class WebSocketService {
   Function(dynamic)? _onMessageError;
   Function(dynamic)? _onOrderError;
 
-  // Configuration des callbacks
   void onNewMessage(Function(dynamic) callback) => _onNewMessage = callback;
   void onMessageNotification(Function(dynamic) callback) =>
       _onMessageNotification = callback;
@@ -239,7 +223,6 @@ class WebSocketService {
   void onMessageError(Function(dynamic) callback) => _onMessageError = callback;
   void onOrderError(Function(dynamic) callback) => _onOrderError = callback;
 
-  // 🔌 DÉCONNEXION
   void disconnect() {
     if (_socket != null) {
       _socket!.disconnect();
@@ -247,12 +230,10 @@ class WebSocketService {
       _socket = null;
       _isConnected = false;
       _currentUserId = null;
-      print('🔌 WebSocket déconnecté');
+      _socketToken = null;
+      _socketTokenExpiresAt = null;
     }
   }
 
-  // 🧹 NETTOYAGE
-  void dispose() {
-    disconnect();
-  }
+  void dispose() => disconnect();
 }

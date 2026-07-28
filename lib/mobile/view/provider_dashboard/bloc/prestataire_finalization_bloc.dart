@@ -123,13 +123,15 @@ class PrestataireFinalizationBloc
       }
 
       // 2. Upload des documents
-      final uploadResults = await _uploadAllDocuments(event.formData);
+      final authToken = event.formData['authToken'] as String?;
+      final uploadResults = await _uploadAllDocuments(event.formData, authToken);
 
       // 3. Mettre à jour le prestataire
       final updateResult = await _updatePrestataireStatus(
         event.formData['prestataireId'],
         uploadResults,
         event.formData,
+        event.formData['authToken'] as String?,
       );
 
       if (updateResult['success']) {
@@ -158,6 +160,7 @@ class PrestataireFinalizationBloc
         event.file,
         event.documentType,
         event.prestataireId,
+        null,
       );
 
       if (uploadResult['success']) {
@@ -197,7 +200,7 @@ class PrestataireFinalizationBloc
 
   // 🎯 UPLOAD DE TOUS LES DOCUMENTS
   Future<Map<String, dynamic>> _uploadAllDocuments(
-      Map<String, dynamic> formData) async {
+      Map<String, dynamic> formData, String? authToken) async {
     final results = <String, String>{};
 
     try {
@@ -207,6 +210,7 @@ class PrestataireFinalizationBloc
           formData['cniRecto'],
           'cni_recto',
           formData['prestataireId'],
+          authToken,
         );
         if (result['success']) results['cniRecto'] = result['url'];
       }
@@ -217,6 +221,7 @@ class PrestataireFinalizationBloc
           formData['cniVerso'],
           'cni_verso',
           formData['prestataireId'],
+          authToken,
         );
         if (result['success']) results['cniVerso'] = result['url'];
       }
@@ -227,6 +232,7 @@ class PrestataireFinalizationBloc
           formData['selfie'],
           'selfie',
           formData['prestataireId'],
+          authToken,
         );
         if (result['success']) results['selfie'] = result['url'];
       }
@@ -240,6 +246,7 @@ class PrestataireFinalizationBloc
             (formData['certificates'] as List)[i],
             'certificate_$i',
             formData['prestataireId'],
+            authToken,
           );
           if (result['success']) certificates.add(result['url']);
         }
@@ -253,6 +260,7 @@ class PrestataireFinalizationBloc
           formData['insurance'],
           'insurance',
           formData['prestataireId'],
+          authToken,
         );
         if (result['success']) results['insurance'] = result['url'];
       }
@@ -266,6 +274,7 @@ class PrestataireFinalizationBloc
             (formData['portfolio'] as List)[i],
             'portfolio_$i',
             formData['prestataireId'],
+            authToken,
           );
           if (result['success']) portfolio.add(result['url']);
         }
@@ -289,12 +298,17 @@ class PrestataireFinalizationBloc
     File file,
     String documentType,
     String prestataireId,
+    String? authToken,
   ) async {
     try {
       final request = http.MultipartRequest(
         'POST',
         Uri.parse('$apiUrl/upload/document'),
       );
+
+      if (authToken != null && authToken.isNotEmpty) {
+        request.headers['Authorization'] = 'Bearer $authToken';
+      }
 
       request.fields['prestataireId'] = prestataireId;
       request.fields['documentType'] = documentType;
@@ -333,19 +347,10 @@ class PrestataireFinalizationBloc
     String prestataireId,
     Map<String, dynamic> uploadResults,
     Map<String, dynamic> formData,
+    String? authToken,
   ) async {
     try {
       final updateData = {
-        'finalizationStatus': {
-          'cniUploaded': uploadResults['results']['cniRecto'] != null &&
-              uploadResults['results']['cniVerso'] != null,
-          'selfieUploaded': uploadResults['results']['selfie'] != null,
-          'locationSet': formData['location'] != null,
-          'certificatesUploaded':
-              uploadResults['results']['certificates'] != null,
-          'insuranceUploaded': uploadResults['results']['insurance'] != null,
-          'portfolioUploaded': uploadResults['results']['portfolio'] != null,
-        },
         'cni1': uploadResults['results']['cniRecto'],
         'cni2': uploadResults['results']['cniVerso'],
         'selfie': uploadResults['results']['selfie'],
@@ -356,9 +361,14 @@ class PrestataireFinalizationBloc
         'localisationmaps': formData['location'],
       };
 
+      final headers = <String, String>{'Content-Type': 'application/json'};
+      if (authToken != null && authToken.isNotEmpty) {
+        headers['Authorization'] = 'Bearer $authToken';
+      }
+
       final response = await http.put(
         Uri.parse('$apiUrl/prestataire/$prestataireId/finalize'),
-        headers: {'Content-Type': 'application/json'},
+        headers: headers,
         body: jsonEncode(updateData),
       );
 

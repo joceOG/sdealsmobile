@@ -7,6 +7,7 @@ import '../bloc/notification_bloc.dart';
 import '../bloc/notification_event.dart';
 import '../bloc/notification_state.dart';
 import '../../../../data/services/authCubit.dart';
+import '../../common/widgets/unauthenticated_banner.dart';
 
 // 🎯 ÉCRAN NOTIFICATIONS CLIENT MAGNIFIQUE
 class NotificationScreen extends StatefulWidget {
@@ -67,6 +68,16 @@ class _NotificationScreenState extends State<NotificationScreen>
 
   @override
   Widget build(BuildContext context) {
+    final authState = context.watch<AuthCubit>().state;
+    if (authState is! AuthAuthenticated) {
+      return const UnauthenticatedBanner(
+        appBarTitle: 'Notifications',
+        icon: Icons.notifications_outlined,
+        title: 'Restez informé',
+        description: 'Connectez-vous pour recevoir vos notifications de missions, commandes et messages en temps réel.',
+      );
+    }
+
     return Scaffold(
       backgroundColor: SDColors.neutral50,
       appBar: _buildAppBar(),
@@ -470,7 +481,7 @@ class _NotificationScreenState extends State<NotificationScreen>
 
   // 📄 CARTE DE NOTIFICATION
   Widget _buildNotificationCard(Map<String, dynamic> notification) {
-    final isRead = notification['statut'] == 'LU';
+    final isRead = notification['statut'] == 'LUE';
     final type = notification['type']?.toString() ?? '';
     final titre = notification['titre']?.toString() ?? 'Notification';
     final contenu = notification['contenu']?.toString() ?? '';
@@ -682,7 +693,7 @@ class _NotificationScreenState extends State<NotificationScreen>
   // 🎯 ACTIONS
   void _onNotificationTap(Map<String, dynamic> notification) {
     // Marquer comme lue si ce n'est pas déjà fait
-    if (notification['statut'] != 'LU') {
+    if (notification['statut'] != 'LUE') {
       context.read<NotificationBloc>().add(
             MarkNotificationAsRead(notification['_id']?.toString() ?? ''),
           );

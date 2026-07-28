@@ -1,47 +1,136 @@
+import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../data/services/api_client.dart';
 import 'notification_event.dart';
 import 'notification_state.dart';
 
-// 🎯 BLOC POUR LES NOTIFICATIONS CLIENT
+/// Intervalles alignés sur soutralideals-web (`useNotifications` / `useUnreadCount`).
+const _kUnreadPollInterval = Duration(seconds: 90);
+const _kListPollInterval = Duration(seconds: 120);
+
 class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
   final ApiClient _apiClient;
   String? _currentToken;
+  String? _currentUserId;
+  Timer? _unreadTimer;
+  Timer? _listTimer;
 
   NotificationBloc({ApiClient? apiClient})
       : _apiClient = apiClient ?? ApiClient(),
         super(NotificationInitial()) {
-    // 📱 Charger les notifications d'un utilisateur
     on<LoadUserNotifications>(_onLoadUserNotifications);
-
-    // 🔔 Marquer une notification comme lue
     on<MarkNotificationAsRead>(_onMarkNotificationAsRead);
-
-    // ✅ Marquer toutes les notifications comme lues
     on<MarkAllNotificationsAsRead>(_onMarkAllNotificationsAsRead);
-
-    // 🗑️ Supprimer une notification
     on<DeleteNotification>(_onDeleteNotification);
-
-    // 🔄 Rafraîchir les notifications
     on<RefreshNotifications>(_onRefreshNotifications);
-
-    // 🔍 Filtrer les notifications
     on<FilterNotifications>(_onFilterNotifications);
-
-    // 📊 Charger le nombre de notifications non lues
     on<LoadUnreadCount>(_onLoadUnreadCount);
-
-    // 📄 Charger plus de notifications (pagination)
     on<LoadMoreNotifications>(_onLoadMoreNotifications);
+    on<StartNotificationPolling>(_onStartPolling);
+    on<StopNotificationPolling>(_onStopPolling);
+    on<PollUnreadCountTick>(_onPollUnreadCountTick);
+    on<PollNotificationsTick>(_onPollNotificationsTick);
   }
 
-  // 🔑 Définir le token d'authentification
   void setToken(String token) {
     _currentToken = token;
   }
 
-  // 📱 CHARGER LES NOTIFICATIONS D'UN UTILISATEUR
+  void _clearPolling() {
+    _unreadTimer?.cancel();
+    _listTimer?.cancel();
+    _unreadTimer = null;
+    _listTimer = null;
+  }
+
+  Future<void> _onStartPolling(
+    StartNotificationPolling event,
+    Emitter<NotificationState> emit,
+  ) async {
+    _currentUserId = event.userId;
+    _clearPolling();
+    add(LoadUnreadCount(event.userId));
+
+    _unreadTimer = Timer.periodic(_kUnreadPollInterval, (_) {
+      if (_currentUserId == null || _currentUserId!.isEmpty) return;
+      add(PollUnreadCountTick(_currentUserId!));
+    });
+
+    _listTimer = Timer.periodic(_kListPollInterval, (_) {
+      if (_currentUserId == null || _currentUserId!.isEmpty) return;
+      add(PollNotificationsTick(_currentUserId!));
+    });
+  }
+
+  Future<void> _onStopPolling(
+    StopNotificationPolling event,
+    Emitter<NotificationState> emit,
+  ) async {
+    _clearPolling();
+  }
+
+  Future<void> _onPollUnreadCountTick(
+    PollUnreadCountTick event,
+    Emitter<NotificationState> emit,
+  ) async {
+    if (_currentToken == null) return;
+    try {
+      final unreadCount = await _apiClient.getUserUnreadNotificationCount(
+        token: _currentToken!,
+        userId: event.userId,
+      );
+      final currentState = state;
+      if (currentState is NotificationLoaded) {
+        if (currentState.unreadCount == unreadCount) return;
+        emit(NotificationLoaded(
+          notifications: currentState.notifications,
+          unreadCount: unreadCount,
+          currentFilter: currentState.currentFilter,
+          hasMore: currentState.hasMore,
+        ));
+      } else {
+        emit(NotificationLoaded(
+          notifications: const [],
+          unreadCount: unreadCount,
+          hasMore: true,
+        ));
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _onPollNotificationsTick(
+    PollNotificationsTick event,
+    Emitter<NotificationState> emit,
+  ) async {
+    if (_currentToken == null) return;
+    if (state is! NotificationLoaded && state is! NotificationRefreshing) {
+      add(PollUnreadCountTick(event.userId));
+      return;
+    }
+    final filter = state is NotificationLoaded
+        ? (state as NotificationLoaded).currentFilter
+        : null;
+    try {
+      final notifications = await _apiClient.getUserNotifications(
+        token: _currentToken!,
+        userId: event.userId,
+        statut: filter,
+        limit: 50,
+        offset: 0,
+      );
+      final unreadCount = await _apiClient.getUserUnreadNotificationCount(
+        token: _currentToken!,
+        userId: event.userId,
+      );
+      emit(NotificationLoaded(
+        notifications: notifications,
+        unreadCount: unreadCount,
+        currentFilter: filter,
+        hasMore: notifications.length >= 50,
+      ));
+    } catch (_) {}
+  }
+
   Future<void> _onLoadUserNotifications(
     LoadUserNotifications event,
     Emitter<NotificationState> emit,
@@ -53,6 +142,8 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
         emit(const NotificationError('Token d\'authentification manquant'));
         return;
       }
+
+      if (event.userId.isNotEmpty) _currentUserId = event.userId;
 
       final notifications = await _apiClient.getUserNotifications(
         token: _currentToken!,
@@ -78,7 +169,6 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     }
   }
 
-  // 🔔 MARQUER UNE NOTIFICATION COMME LUE
   Future<void> _onMarkNotificationAsRead(
     MarkNotificationAsRead event,
     Emitter<NotificationState> emit,
@@ -94,18 +184,14 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
         notificationId: event.notificationId,
       );
 
-      // Recharger les notifications pour mettre à jour l'état
-      final currentState = state;
-      if (currentState is NotificationLoaded) {
-        // Trouver l'userId depuis l'état actuel ou utiliser un événement de rechargement
-        add(RefreshNotifications(''));
+      if (state is NotificationLoaded) {
+        add(RefreshNotifications(_currentUserId ?? ''));
       }
     } catch (e) {
       emit(NotificationError('Erreur lors de la mise à jour: $e'));
     }
   }
 
-  // ✅ MARQUER TOUTES LES NOTIFICATIONS COMME LUES
   Future<void> _onMarkAllNotificationsAsRead(
     MarkAllNotificationsAsRead event,
     Emitter<NotificationState> emit,
@@ -121,14 +207,12 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
         userId: event.userId,
       );
 
-      // Recharger les notifications
       add(LoadUserNotifications(userId: event.userId));
     } catch (e) {
       emit(NotificationError('Erreur lors de la mise à jour: $e'));
     }
   }
 
-  // 🗑️ SUPPRIMER UNE NOTIFICATION
   Future<void> _onDeleteNotification(
     DeleteNotification event,
     Emitter<NotificationState> emit,
@@ -139,23 +223,18 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
         return;
       }
 
-      // ✅ Appeler API pour supprimer
       final success = await _apiClient.deleteNotification(
         token: _currentToken!,
         notificationId: event.notificationId,
       );
 
       if (success) {
-        // Retirer localement
         final currentState = state;
         if (currentState is NotificationLoaded) {
           final updatedNotifs = currentState.notifications
               .where((n) => n['_id'] != event.notificationId)
               .toList();
-
-          emit(currentState.copyWith(
-            notifications: updatedNotifs,
-          ));
+          emit(currentState.copyWith(notifications: updatedNotifs));
         }
       } else {
         emit(const NotificationError('Impossible de supprimer'));
@@ -165,7 +244,6 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     }
   }
 
-  // 🔄 RAFRAÎCHIR LES NOTIFICATIONS
   Future<void> _onRefreshNotifications(
     RefreshNotifications event,
     Emitter<NotificationState> emit,
@@ -179,18 +257,16 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
         ));
       }
 
-      // Recharger avec l'userId actuel
-      final currentState2 = state;
-      if (currentState2 is NotificationLoaded) {
-        // Utiliser l'userId du dernier état chargé
-        add(LoadUserNotifications(userId: event.userId));
+      final userId =
+          event.userId.isNotEmpty ? event.userId : (_currentUserId ?? '');
+      if (userId.isNotEmpty) {
+        add(LoadUserNotifications(userId: userId));
       }
     } catch (e) {
       emit(NotificationError('Erreur lors du rafraîchissement: $e'));
     }
   }
 
-  // 🔍 FILTRER LES NOTIFICATIONS
   Future<void> _onFilterNotifications(
     FilterNotifications event,
     Emitter<NotificationState> emit,
@@ -201,11 +277,10 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
         return;
       }
 
-      // Trouver l'userId depuis l'état actuel
-      final currentState = state;
-      if (currentState is NotificationLoaded) {
+      final userId = _currentUserId ?? '';
+      if (userId.isNotEmpty) {
         add(LoadUserNotifications(
-          userId: '', // Sera défini par l'écran
+          userId: userId,
           statut: event.statut,
         ));
       }
@@ -214,15 +289,12 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     }
   }
 
-  // 📊 CHARGER LE NOMBRE DE NOTIFICATIONS NON LUES
   Future<void> _onLoadUnreadCount(
     LoadUnreadCount event,
     Emitter<NotificationState> emit,
   ) async {
     try {
-      if (_currentToken == null) {
-        return;
-      }
+      if (_currentToken == null) return;
 
       final unreadCount = await _apiClient.getUserUnreadNotificationCount(
         token: _currentToken!,
@@ -237,14 +309,18 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
           currentFilter: currentState.currentFilter,
           hasMore: currentState.hasMore,
         ));
+      } else {
+        emit(NotificationLoaded(
+          notifications: const [],
+          unreadCount: unreadCount,
+          hasMore: true,
+        ));
       }
     } catch (e) {
-      // Ne pas faire échouer l'état principal pour une erreur de comptage
       print('Erreur chargement compteur: $e');
     }
   }
 
-  // 📄 CHARGER PLUS DE NOTIFICATIONS (PAGINATION)
   Future<void> _onLoadMoreNotifications(
     LoadMoreNotifications event,
     Emitter<NotificationState> emit,
@@ -252,40 +328,36 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     try {
       final currentState = state;
       if (currentState is! NotificationLoaded) return;
-      if (!currentState.hasMore) return; // Déjà tout chargé
-
+      if (!currentState.hasMore) return;
       if (_currentToken == null) return;
-
-      final currentOffset = currentState.notifications.length;
 
       final moreNotifications = await _apiClient.getUserNotifications(
         token: _currentToken!,
         userId: event.userId,
         statut: currentState.currentFilter,
         limit: 50,
-        offset: currentOffset,
+        offset: currentState.notifications.length,
       );
 
       if (moreNotifications.isEmpty) {
-        // Plus de notifications
         emit(currentState.copyWith(hasMore: false));
         return;
       }
 
-      final allNotifications = [
-        ...currentState.notifications,
-        ...moreNotifications,
-      ];
-
       emit(NotificationLoaded(
-        notifications: allNotifications,
+        notifications: [...currentState.notifications, ...moreNotifications],
         unreadCount: currentState.unreadCount,
         currentFilter: currentState.currentFilter,
         hasMore: moreNotifications.length >= 50,
       ));
     } catch (e) {
       print('Erreur chargement pagination: $e');
-      // Ne pas fail, garder l'état actuel
     }
+  }
+
+  @override
+  Future<void> close() {
+    _clearPolling();
+    return super.close();
   }
 }

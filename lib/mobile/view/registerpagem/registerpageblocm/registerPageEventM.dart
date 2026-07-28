@@ -7,36 +7,22 @@ abstract class RegisterPageEventM extends Equatable {
   List<Object?> get props => [];
 }
 
-class RegisterFullNameChanged extends RegisterPageEventM {
+class RegisterSubmitted extends RegisterPageEventM {
   final String fullName;
-  const RegisterFullNameChanged(this.fullName);
-
-  @override
-  List<Object?> get props => [fullName];
-}
-
-class RegisterPhoneChanged extends RegisterPageEventM {
+  final String email;
   final String phone;
-  const RegisterPhoneChanged(this.phone);
-
-  @override
-  List<Object?> get props => [phone];
-}
-
-class RegisterPasswordChanged extends RegisterPageEventM {
   final String password;
-  const RegisterPasswordChanged(this.password);
-
-  @override
-  List<Object?> get props => [password];
-}
-
-class RegisterConfirmPasswordChanged extends RegisterPageEventM {
   final String confirmPassword;
-  const RegisterConfirmPasswordChanged(this.confirmPassword);
+
+  const RegisterSubmitted({
+    required this.fullName,
+    required this.email,
+    required this.phone,
+    required this.password,
+    required this.confirmPassword,
+  });
 
   @override
-  List<Object?> get props => [confirmPassword];
+  List<Object?> get props =>
+      [fullName, email, phone, password, confirmPassword];
 }
-
-class RegisterSubmitted extends RegisterPageEventM {}

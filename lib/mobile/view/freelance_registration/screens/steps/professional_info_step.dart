@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:sdealsmobile/data/models/categorie.dart';
+import 'package:sdealsmobile/data/services/api_client.dart';
 import '../../../../../design_system/colors.dart';
 import '../../../../../design_system/typography.dart';
 
@@ -17,19 +19,9 @@ class _ProfessionalInfoStepState extends State<ProfessionalInfoStep> {
   String? _selectedCategory;
   final Set<String> _selectedSkills = {};
 
-  // Catégories disponibles
-  final List<String> _categories = [
-    'Développement',
-    'Design',
-    'Marketing',
-    'Rédaction',
-    'Traduction',
-    'Photo',
-    'Audio',
-    'Vidéo',
-    'Conseil',
-    'Autre'
-  ];
+  bool _loadingCategories = true;
+  String? _categoriesError;
+  List<Categorie> _categoriesFromApi = [];
 
   // Niveaux d'expérience
   final List<String> _experienceLevels = [
@@ -38,38 +30,94 @@ class _ProfessionalInfoStepState extends State<ProfessionalInfoStep> {
     'Expert'
   ];
 
-  // Compétences suggérées par catégorie
-  final Map<String, List<String>> _categorySkills = {
-    'Développement': ['HTML', 'CSS', 'JavaScript', 'Python', 'Java', 'PHP', 'React', 'Flutter', 'NodeJS'],
-    'Design': ['Photoshop', 'Illustrator', 'Figma', 'UI/UX', 'Logo Design', 'Branding'],
-    'Marketing': ['SEO', 'SEM', 'Social Media', 'Content Marketing', 'Email Marketing', 'Analytics'],
-    'Rédaction': ['Articles', 'Blog', 'Copywriting', 'SEO Writing', 'Storytelling'],
-    'Traduction': ['Anglais', 'Français', 'Espagnol', 'Arabe', 'Wolof'],
-    'Photo': ['Portrait', 'Événementiel', 'Produit', 'Retouche', 'Photojournalisme'],
-    'Audio': ['Mixage', 'Mastering', 'Voix Off', 'Podcast', 'Sound Design'],
-    'Vidéo': ['Montage', 'Animation', 'Motion Design', 'VFX', 'YouTube'],
-    'Conseil': ['Stratégie', 'Business Plan', 'Gestion de projet', 'Coaching'],
-    'Autre': ['Excel', 'PowerPoint', 'Data Entry', 'Support Client', 'Testing']
-  };
-
   @override
   void initState() {
     super.initState();
-    // Initialiser avec les données existantes si disponibles
-    _selectedCategory = widget.formData['mainCategory'];
     _selectedExperienceLevel = widget.formData['experienceLevel'];
-    
+    _selectedCategory = widget.formData['mainCategory'];
+
     if (widget.formData['skills'] != null) {
       _selectedSkills.addAll(Set<String>.from(widget.formData['skills']));
     }
-    
-    // Si catégorie pré-sélectionnée depuis l'étape précédente
-    if (widget.formData['selectedCategories'] != null && 
+
+    if (widget.formData['selectedCategories'] != null &&
         widget.formData['selectedCategories'].isNotEmpty &&
         _selectedCategory == null) {
       _selectedCategory = widget.formData['selectedCategories'].first;
       widget.formData['mainCategory'] = _selectedCategory;
     }
+
+    _loadFreelanceCategories();
+  }
+
+  Future<void> _loadFreelanceCategories() async {
+    setState(() {
+      _loadingCategories = true;
+      _categoriesError = null;
+    });
+    try {
+      final list = await ApiClient().fetchCategorie('Freelance');
+      list.sort((a, b) => a.nomcategorie.compareTo(b.nomcategorie));
+      if (!mounted) return;
+      setState(() {
+        _categoriesFromApi = list;
+        _loadingCategories = false;
+        _syncSelectedCategoryWithApi();
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loadingCategories = false;
+        _categoriesError = 'Impossible de charger les catégories. Réessayez.';
+      });
+    }
+  }
+
+  void _syncSelectedCategoryWithApi() {
+    if (_categoriesFromApi.isEmpty) return;
+    final names = _categoriesFromApi.map((c) => c.nomcategorie).toSet();
+    if (_selectedCategory != null && !names.contains(_selectedCategory)) {
+      _selectedCategory = null;
+      widget.formData.remove('mainCategory');
+      widget.formData.remove('mainCategoryId');
+    }
+  }
+
+  /// Suggestions de compétences selon le nom de catégorie (backend Freelance).
+  List<String> _suggestedSkillsForCategory(String? nom) {
+    if (nom == null || nom.isEmpty) return [];
+    final n = nom.toLowerCase();
+    if (n.contains('tech') || n.contains('cloud') || n.contains(' ia')) {
+      return ['JavaScript', 'Python', 'React', 'Flutter', 'Node.js', 'API', 'SQL'];
+    }
+    if (n.contains('btp') || n.contains('ingenier')) {
+      return ['AutoCAD', 'BIM', 'Plans', 'Chantier', 'Normes'];
+    }
+    if (n.contains('juridique') || n.contains('administratif')) {
+      return ['Contrats', 'RGPD', 'Formalités', 'Droit des affaires'];
+    }
+    if (n.contains('finance') || n.contains('audit')) {
+      return ['Comptabilité', 'Excel', 'Analyse financière', 'Reporting'];
+    }
+    if (n.contains('marketing') || n.contains('ventes')) {
+      return ['SEO', 'SEA', 'Réseaux sociaux', 'Copywriting', 'Analytics'];
+    }
+    if (n.contains('design') || n.contains('creativ')) {
+      return ['Figma', 'Photoshop', 'UI/UX', 'Branding', 'Illustration'];
+    }
+    if (n.contains('redaction') || n.contains('langues')) {
+      return ['Rédaction web', 'SEO', 'Traduction', 'Relecture'];
+    }
+    if (n.contains('audio') || n.contains('video') || n.contains('animation')) {
+      return ['Montage', 'Motion design', 'Voix off', 'After Effects'];
+    }
+    if (n.contains('conseil') || n.contains('formation')) {
+      return ['Coaching', 'Formation', 'Gestion de projet', 'Pédagogie'];
+    }
+    if (n.contains('logistique') || n.contains('services')) {
+      return ['Logistique', 'Sourcing', 'E-commerce', 'Organisation'];
+    }
+    return ['Communication', 'Organisation', 'Relation client', 'Qualité'];
   }
 
   @override
@@ -81,7 +129,7 @@ class _ProfessionalInfoStepState extends State<ProfessionalInfoStep> {
   void _addSkill() {
     if (_skillsController.text.isNotEmpty) {
       setState(() {
-        _selectedSkills.add(_skillsController.text);
+        _selectedSkills.add(_skillsController.text.trim());
         widget.formData['skills'] = _selectedSkills.toList();
         _skillsController.clear();
       });
@@ -90,6 +138,8 @@ class _ProfessionalInfoStepState extends State<ProfessionalInfoStep> {
 
   @override
   Widget build(BuildContext context) {
+    final suggested = _suggestedSkillsForCategory(_selectedCategory);
+
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -99,8 +149,7 @@ class _ProfessionalInfoStepState extends State<ProfessionalInfoStep> {
             style: SDTypography.titleLarge,
           ),
           const SizedBox(height: 24),
-          
-          // Titre professionnel
+
           TextFormField(
             initialValue: widget.formData['professionalTitle'] ?? '',
             decoration: const InputDecoration(
@@ -119,36 +168,80 @@ class _ProfessionalInfoStepState extends State<ProfessionalInfoStep> {
             },
           ),
           const SizedBox(height: 16),
-          
-          // Catégorie principale
-          DropdownButtonFormField<String>(
-            value: _selectedCategory,
-            decoration: const InputDecoration(
-              labelText: 'Catégorie principale *',
-              border: OutlineInputBorder(),
+
+          if (_loadingCategories)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  SizedBox(width: 12),
+                  Text('Chargement des catégories…'),
+                ],
+              ),
+            )
+          else if (_categoriesError != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(_categoriesError!, style: TextStyle(color: Colors.red.shade700)),
+                  TextButton.icon(
+                    onPressed: _loadFreelanceCategories,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Réessayer'),
+                  ),
+                ],
+              ),
             ),
-            items: _categories.map((category) {
-              return DropdownMenuItem(
-                value: category,
-                child: Text(category),
-              );
-            }).toList(),
-            validator: (value) {
-              if (value == null || value.isEmpty) {
-                return 'Veuillez sélectionner une catégorie';
-              }
-              return null;
-            },
-            onChanged: (value) {
-              setState(() {
-                _selectedCategory = value;
-                widget.formData['mainCategory'] = value;
-              });
-            },
-          ),
+
+          if (!_loadingCategories && _categoriesFromApi.isNotEmpty)
+            DropdownButtonFormField<String>(
+              value: _selectedCategory != null &&
+                      _categoriesFromApi.any((c) => c.nomcategorie == _selectedCategory)
+                  ? _selectedCategory
+                  : null,
+              decoration: const InputDecoration(
+                labelText: 'Catégorie principale *',
+                border: OutlineInputBorder(),
+              ),
+              items: _categoriesFromApi.map((c) {
+                return DropdownMenuItem(
+                  value: c.nomcategorie,
+                  child: Text(c.nomcategorie, overflow: TextOverflow.ellipsis),
+                );
+              }).toList(),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Veuillez sélectionner une catégorie';
+                }
+                return null;
+              },
+              onChanged: (value) {
+                setState(() {
+                  _selectedCategory = value;
+                  widget.formData['mainCategory'] = value;
+                  Categorie? match;
+                  for (final c in _categoriesFromApi) {
+                    if (c.nomcategorie == value) {
+                      match = c;
+                      break;
+                    }
+                  }
+                  if (match != null) {
+                    widget.formData['mainCategoryId'] = match.idcategorie;
+                  }
+                });
+              },
+            ),
+
           const SizedBox(height: 16),
-          
-          // Niveau d'expérience
+
           DropdownButtonFormField<String>(
             value: _selectedExperienceLevel,
             decoration: const InputDecoration(
@@ -175,8 +268,7 @@ class _ProfessionalInfoStepState extends State<ProfessionalInfoStep> {
             },
           ),
           const SizedBox(height: 16),
-          
-          // Compétences
+
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -212,50 +304,46 @@ class _ProfessionalInfoStepState extends State<ProfessionalInfoStep> {
                 ],
               ),
               const SizedBox(height: 16),
-              
-              if (_selectedCategory != null && _categorySkills.containsKey(_selectedCategory))
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Compétences suggérées pour $_selectedCategory:',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey.shade700,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: _categorySkills[_selectedCategory]!.map((skill) {
-                        final isSelected = _selectedSkills.contains(skill);
-                        return ActionChip(
-                          label: Text(skill),
-                          backgroundColor: isSelected ? Colors.green.shade100 : null,
-                          side: BorderSide(
-                            color: isSelected ? Colors.green.shade700 : Colors.grey.shade300,
-                          ),
-                          labelStyle: TextStyle(
-                            color: isSelected ? Colors.green.shade700 : null,
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              if (isSelected) {
-                                _selectedSkills.remove(skill);
-                              } else {
-                                _selectedSkills.add(skill);
-                              }
-                              widget.formData['skills'] = _selectedSkills.toList();
-                            });
-                          },
-                        );
-                      }).toList(),
-                    ),
-                  ],
+
+              if (suggested.isNotEmpty) ...[
+                Text(
+                  'Compétences suggérées pour $_selectedCategory:',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey.shade700,
+                  ),
                 ),
-              
-              const SizedBox(height: 16),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: suggested.map((skill) {
+                    final isSelected = _selectedSkills.contains(skill);
+                    return ActionChip(
+                      label: Text(skill),
+                      backgroundColor: isSelected ? Colors.green.shade100 : null,
+                      side: BorderSide(
+                        color: isSelected ? Colors.green.shade700 : Colors.grey.shade300,
+                      ),
+                      labelStyle: TextStyle(
+                        color: isSelected ? Colors.green.shade700 : null,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          if (isSelected) {
+                            _selectedSkills.remove(skill);
+                          } else {
+                            _selectedSkills.add(skill);
+                          }
+                          widget.formData['skills'] = _selectedSkills.toList();
+                        });
+                      },
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 16),
+              ],
+
               Text(
                 'Compétences sélectionnées:',
                 style: TextStyle(
@@ -291,8 +379,7 @@ class _ProfessionalInfoStepState extends State<ProfessionalInfoStep> {
             ],
           ),
           const SizedBox(height: 16),
-          
-          // URL du portfolio
+
           TextFormField(
             initialValue: widget.formData['portfolioUrl'] ?? '',
             decoration: const InputDecoration(
@@ -306,8 +393,7 @@ class _ProfessionalInfoStepState extends State<ProfessionalInfoStep> {
             },
           ),
           const SizedBox(height: 16),
-          
-          // Description/Bio
+
           TextFormField(
             initialValue: widget.formData['bio'] ?? '',
             decoration: const InputDecoration(

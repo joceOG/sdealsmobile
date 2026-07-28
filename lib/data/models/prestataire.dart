@@ -60,6 +60,31 @@ class Prestataire {
 
   // ✅ NOUVELLE FACTORY : Convertir depuis le backend avec nouveau modèle
   factory Prestataire.fromBackend(Map<String, dynamic> json) {
+    double? toDoubleOrNull(dynamic value) {
+      if (value == null) return null;
+      if (value is num) return value.toDouble();
+      if (value is String) {
+        final normalized = value.replaceAll(',', '.').trim();
+        return double.tryParse(normalized);
+      }
+      return null;
+    }
+
+    String? toStringOrNull(dynamic value) {
+      if (value == null) return null;
+      final s = value.toString().trim();
+      return s.isEmpty ? null : s;
+    }
+
+    List<String>? toStringListOrNull(dynamic value) {
+      if (value == null) return null;
+      if (value is List) {
+        final out = value.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
+        return out.isEmpty ? null : out;
+      }
+      return null;
+    }
+
     try {
       final id = json['_id'] as String? ?? json['idprestataire'] as String? ?? '';
       final utilisateur = json['utilisateur'] != null
@@ -85,14 +110,14 @@ class Prestataire {
                 imageservice: '',
                 prixmoyen: '0'),
         // ✅ CORRIGÉ : Mapping correct du backend
-        prixprestataire: (json['prixprestataire'] as num?)?.toDouble() ?? 0.0,
+        prixprestataire: toDoubleOrNull(json['prixprestataire']) ?? 0.0,
         // ✅ CORRIGÉ : Mapping correct du backend
-        localisation: json['localisation'] as String? ?? '',
+        localisation: json['localisation']?.toString() ?? '',
         localisationMaps: json['localisationmaps'] != null
             ? LocalisationMaps.fromJson(json['localisationmaps'])
             : null,
         // ✅ CORRIGÉ : Mapping correct du backend
-        note: json['note'] as String?,
+        note: toStringOrNull(json['note']),
         // ✅ CORRIGÉ : Mapping correct du backend
         verifier: json['verifier'] as bool? ?? false,
         cni1: json['cni1'] as String?,
@@ -100,21 +125,15 @@ class Prestataire {
         selfie: json['selfie'] as String?,
         numeroCNI: json['numeroCNI'] as String?,
         // ✅ CORRIGÉ : Mapping correct du backend
-        specialite: json['specialite'] != null ? List<String>.from(json['specialite']) : null,
-        anneeExperience: json['anneeExperience'] as String?,
-        description: json['description'] as String?,
-        rayonIntervention: json['rayonIntervention'] != null 
-            ? (json['rayonIntervention'] as num).toDouble()
-            : null,
+        specialite: toStringListOrNull(json['specialite']),
+        anneeExperience: toStringOrNull(json['anneeExperience']),
+        description: toStringOrNull(json['description']),
+        rayonIntervention: toDoubleOrNull(json['rayonIntervention']),
         zoneIntervention: json['zoneIntervention'] != null
             ? List<String>.from(json['zoneIntervention'])
             : null,
-        tarifHoraireMin: json['tarifHoraireMin'] != null
-            ? (json['tarifHoraireMin'] as num).toDouble()
-            : null,
-        tarifHoraireMax: json['tarifHoraireMax'] != null
-            ? (json['tarifHoraireMax'] as num).toDouble()
-            : null,
+        tarifHoraireMin: toDoubleOrNull(json['tarifHoraireMin']),
+        tarifHoraireMax: toDoubleOrNull(json['tarifHoraireMax']),
         diplomeCertificat: json['diplomeCertificat'] != null
             ? List<String>.from(json['diplomeCertificat'])
             : null,

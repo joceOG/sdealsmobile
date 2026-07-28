@@ -9,7 +9,8 @@ import '../../../../data/services/authCubit.dart';
 
 // 🎯 ÉCRAN PLANNING PRESTATAIRE MAGNIFIQUE
 class ProviderPlanningScreen extends StatefulWidget {
-  const ProviderPlanningScreen({super.key});
+  final String? prestataireDocId;
+  const ProviderPlanningScreen({super.key, this.prestataireDocId});
 
   @override
   State<ProviderPlanningScreen> createState() => _ProviderPlanningScreenState();
@@ -29,14 +30,20 @@ class _ProviderPlanningScreenState extends State<ProviderPlanningScreen>
     _tabController = TabController(length: 3, vsync: this);
     _selectedDay = DateTime.now();
 
-    // Récupérer l'ID du prestataire depuis AuthCubit
+    // Récupérer l'ID du prestataire
     final authState = context.read<AuthCubit>().state;
     if (authState is AuthAuthenticated) {
-      _prestataireId = authState.utilisateur.idutilisateur;
+      // Utiliser le doc ID passé, sinon fallback sur l'userId
+      _prestataireId = widget.prestataireDocId ?? authState.utilisateur.idutilisateur;
+      // Passer le token au bloc
+      context.read<PlanningBloc>().setToken(authState.token);
+      if (_prestataireId != null) {
+        context.read<PlanningBloc>().setPrestataireId(_prestataireId!);
+      }
       // Charger les prestations du prestataire
-      context
-          .read<PlanningBloc>()
-          .add(LoadPrestationsPlanning(_prestataireId!));
+      if (_prestataireId != null) {
+        context.read<PlanningBloc>().add(LoadPrestationsPlanning(_prestataireId!));
+      }
     }
   }
 
@@ -292,81 +299,99 @@ class _ProviderPlanningScreenState extends State<ProviderPlanningScreen>
   }
 
   // 📅 VUE MOIS
+  //
+  // TableCalendar (~header + 6×rowHeight + jours) fait souvent ~330–380px de haut intrinsèque.
+  // La zone utile peut être ~260px → overflow. On dessine le calendrier dans une boîte de taille
+  // "naturelle" fixe puis FittedBox(scale) pour le faire tenir dans `calHeight` sans RenderFlex overflow.
+  static const double _calendarLayoutHeight = 400.0;
+
   Widget _buildMonthView(PlanningLoaded state) {
-    return Column(
-      children: [
-        Flexible(
-          flex: 3,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              minHeight: 300,
-              maxHeight: 500,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxH = constraints.maxHeight;
+        final maxW = constraints.maxWidth;
+        final calHeight = (maxH * 0.55).clamp(220.0, 420.0);
+
+        final calendar = TableCalendar(
+          firstDay: DateTime.utc(2020, 1, 1),
+          lastDay: DateTime.utc(2030, 12, 31),
+          focusedDay: _focusedDay,
+          sixWeekMonthsEnforced: false,
+          selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+          onDaySelected: (selectedDay, focusedDay) {
+            setState(() {
+              _selectedDay = selectedDay;
+              _focusedDay = focusedDay;
+            });
+            context
+                .read<PlanningBloc>()
+                .add(LoadPrestationsByDate(selectedDay));
+          },
+          onPageChanged: (focusedDay) {
+            setState(() {
+              _focusedDay = focusedDay;
+            });
+            context
+                .read<PlanningBloc>()
+                .add(LoadMonthlyPrestations(focusedDay));
+          },
+          eventLoader: (day) {
+            return state.prestations.where((prestation) {
+              final prestationDate =
+                  DateTime.parse(prestation['datePrestation']);
+              return isSameDay(prestationDate, day);
+            }).toList();
+          },
+          calendarStyle: CalendarStyle(
+            outsideDaysVisible: false,
+            cellMargin: const EdgeInsets.all(4),
+            weekendTextStyle: TextStyle(color: Colors.red[400]),
+            holidayTextStyle: TextStyle(color: Colors.red[400]),
+            selectedDecoration: BoxDecoration(
+              color: Colors.green.shade600,
+              shape: BoxShape.circle,
             ),
-            child: SizedBox(
-              height: 400,
-              child: TableCalendar(
-                firstDay: DateTime.utc(2020, 1, 1),
-                lastDay: DateTime.utc(2030, 12, 31),
-                focusedDay: _focusedDay,
-                selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-                onDaySelected: (selectedDay, focusedDay) {
-                  setState(() {
-                    _selectedDay = selectedDay;
-                    _focusedDay = focusedDay;
-                  });
-                  context
-                      .read<PlanningBloc>()
-                      .add(LoadPrestationsByDate(selectedDay));
-                },
-                onPageChanged: (focusedDay) {
-                  setState(() {
-                    _focusedDay = focusedDay;
-                  });
-                  context
-                      .read<PlanningBloc>()
-                      .add(LoadMonthlyPrestations(focusedDay));
-                },
-                eventLoader: (day) {
-                  return state.prestations.where((prestation) {
-                    final prestationDate =
-                        DateTime.parse(prestation['datePrestation']);
-                    return isSameDay(prestationDate, day);
-                  }).toList();
-                },
-                calendarStyle: CalendarStyle(
-                  outsideDaysVisible: false,
-                  weekendTextStyle: TextStyle(color: Colors.red[400]),
-                  holidayTextStyle: TextStyle(color: Colors.red[400]),
-                  selectedDecoration: BoxDecoration(
-                    color: Colors.green.shade600,
-                    shape: BoxShape.circle,
-                  ),
-                  todayDecoration: BoxDecoration(
-                    color: Colors.green.shade200,
-                    shape: BoxShape.circle,
-                  ),
-                  markerDecoration: BoxDecoration(
-                    color: Colors.orange.shade400,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                headerStyle: HeaderStyle(
-                  formatButtonVisible: false,
-                  titleCentered: true,
-                  leftChevronIcon:
-                      Icon(Icons.chevron_left, color: Colors.green.shade600),
-                  rightChevronIcon:
-                      Icon(Icons.chevron_right, color: Colors.green.shade600),
+            todayDecoration: BoxDecoration(
+              color: Colors.green.shade200,
+              shape: BoxShape.circle,
+            ),
+            markerDecoration: BoxDecoration(
+              color: Colors.orange.shade400,
+              shape: BoxShape.circle,
+            ),
+          ),
+          headerStyle: HeaderStyle(
+            formatButtonVisible: false,
+            titleCentered: true,
+            headerPadding: const EdgeInsets.symmetric(vertical: 6),
+            leftChevronIcon:
+                Icon(Icons.chevron_left, color: Colors.green.shade600),
+            rightChevronIcon:
+                Icon(Icons.chevron_right, color: Colors.green.shade600),
+          ),
+        );
+
+        return ListView(
+          padding: EdgeInsets.zero,
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            SizedBox(
+              height: calHeight,
+              width: maxW,
+              child: FittedBox(
+                fit: BoxFit.contain,
+                alignment: Alignment.topCenter,
+                child: SizedBox(
+                  width: maxW,
+                  height: _calendarLayoutHeight,
+                  child: calendar,
                 ),
               ),
             ),
-          ),
-        ),
-        Flexible(
-          flex: 2,
-          child: _buildSelectedDayEvents(state),
-        ),
-      ],
+            _buildSelectedDayEvents(state),
+          ],
+        );
+      },
     );
   }
 

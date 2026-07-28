@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:sdealsmobile/design_system/widgets/sd_app_bar_icon_button.dart';
 import 'package:intl/intl.dart';
 
 class SoutraTransferScreen extends StatefulWidget {
@@ -93,7 +94,9 @@ class _SoutraTransferScreenState extends State<SoutraTransferScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
+      appBar: SDAppBarIconThemed(
+        style: SDAppBarIconStyles.onLightSurface,
+        bar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
         title: const Text(
@@ -107,6 +110,7 @@ class _SoutraTransferScreenState extends State<SoutraTransferScreen> {
           icon: const Icon(Icons.arrow_back, color: Colors.black87),
           onPressed: () => Navigator.pop(context),
         ),
+      ),
       ),
       body: Column(
         children: [

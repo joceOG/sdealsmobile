@@ -8,7 +8,8 @@ import '../../../../data/services/authCubit.dart';
 
 // 📊 ÉCRAN STATISTIQUES PRESTATAIRE MAGNIFIQUE
 class ProviderStatisticsScreen extends StatefulWidget {
-  const ProviderStatisticsScreen({super.key});
+  final String? prestataireDocId;
+  const ProviderStatisticsScreen({super.key, this.prestataireDocId});
 
   @override
   State<ProviderStatisticsScreen> createState() =>
@@ -26,14 +27,13 @@ class _ProviderStatisticsScreenState extends State<ProviderStatisticsScreen>
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
 
-    // Récupérer l'ID du prestataire depuis AuthCubit
+    // Récupérer l'ID du prestataire (doc ID prioritaire)
     final authState = context.read<AuthCubit>().state;
     if (authState is AuthAuthenticated) {
-      _prestataireId = authState.utilisateur.idutilisateur;
-      // Charger les statistiques
-      context
-          .read<ProviderStatisticsBloc>()
-          .add(LoadProviderStatistics(_prestataireId!));
+      _prestataireId = widget.prestataireDocId ?? authState.utilisateur.idutilisateur;
+      if (_prestataireId != null) {
+        context.read<ProviderStatisticsBloc>().add(LoadProviderStatistics(_prestataireId!));
+      }
     }
   }
 

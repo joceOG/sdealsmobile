@@ -42,6 +42,7 @@ class NavigationHelper {
         builder: (_) => DetailPage(
           title: serviceName,
           image: imageUrl,
+          serviceId: serviceId,
         ),
       ),
     );

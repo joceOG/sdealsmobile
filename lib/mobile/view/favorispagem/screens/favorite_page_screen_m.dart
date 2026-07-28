@@ -8,6 +8,8 @@ import '../../../../design_system/design_system.dart'; // ✅ Import DS
 import 'favoriteDetailScreenM.dart';
 import 'addFavoriteScreenM.dart';
 import '../../common/widgets/empty_state_widget.dart';
+import '../../common/widgets/unauthenticated_banner.dart';
+import '../../../../data/services/authCubit.dart';
 
 class FavoritePageScreenM extends StatefulWidget {
   const FavoritePageScreenM({super.key});
@@ -38,6 +40,16 @@ class _FavoritePageScreenMState extends State<FavoritePageScreenM>
 
   @override
   Widget build(BuildContext context) {
+    final authState = context.watch<AuthCubit>().state;
+    if (authState is! AuthAuthenticated) {
+      return const UnauthenticatedBanner(
+        appBarTitle: 'Mes favoris',
+        icon: Icons.favorite_outline_rounded,
+        title: 'Vos coups de cœur',
+        description: 'Connectez-vous pour sauvegarder vos prestataires, freelances et produits favoris et les retrouver facilement.',
+      );
+    }
+
     return Scaffold(
       backgroundColor: SDColors.neutral50,
       appBar: SDWhiteAppBar.appBar(

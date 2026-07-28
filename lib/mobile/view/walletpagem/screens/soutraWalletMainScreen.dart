@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:sdealsmobile/design_system/widgets/sd_app_bar_icon_button.dart';
 import 'package:intl/intl.dart';
 import 'soutraRechargeScreen.dart';
 import 'soutraTransferScreen.dart';
@@ -72,7 +73,9 @@ class _SoutraWalletMainScreenState extends State<SoutraWalletMainScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       // AppBar personnalisée avec photo de profil et QR code
-      appBar: AppBar(
+      appBar: SDAppBarIconThemed(
+        style: SDAppBarIconStyles.onLightSurface,
+        bar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
         title: const Text(
@@ -127,6 +130,7 @@ class _SoutraWalletMainScreenState extends State<SoutraWalletMainScreen> {
             ),
           ),
         ],
+      ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),

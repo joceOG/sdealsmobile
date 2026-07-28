@@ -19,6 +19,7 @@ import '../../common/widgets/skeleton_loader.dart';
 import '../../../../design_system/colors.dart';
 import '../../../../design_system/typography.dart';
 import '../../../../design_system/spacing.dart';
+import '../../../../design_system/widgets/sd_app_bar_icon_button.dart';
 
 // Utilisation du modèle Product du BLoC
 typedef Product = bloc_model.Product;
@@ -2514,7 +2515,9 @@ class _ShopAllCategoriesPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: SDColors.white,
-      appBar: AppBar(
+      appBar: SDAppBarIconThemed(
+        style: SDAppBarIconStyles.onLightSurface,
+        bar: AppBar(
         elevation: 0,
         backgroundColor: SDColors.white,
         surfaceTintColor: SDColors.white,
@@ -2522,6 +2525,7 @@ class _ShopAllCategoriesPage extends StatelessWidget {
         title: Text(
           'Toutes les catégories',
           style: SDTypography.titleLarge.copyWith(color: SDColors.neutral900),
+        ),
         ),
       ),
       body: GridView.builder(

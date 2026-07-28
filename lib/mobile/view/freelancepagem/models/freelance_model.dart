@@ -94,6 +94,7 @@ class FreelanceModel extends Equatable {
   final String workingHours; // Temps plein, Temps partiel, Ponctuel
   final String location;
   final String? phoneNumber;
+  final String? utilisateurId;
   final List<PortfolioItem> portfolioItems;
   final VerificationDocuments? verificationDocuments;
   final double totalEarnings;
@@ -123,6 +124,7 @@ class FreelanceModel extends Equatable {
     this.workingHours = 'Temps partiel',
     this.location = '',
     this.phoneNumber,
+    this.utilisateurId,
     this.portfolioItems = const [],
     this.verificationDocuments,
     this.totalEarnings = 0.0,
@@ -153,6 +155,7 @@ class FreelanceModel extends Equatable {
         workingHours,
         location,
         phoneNumber,
+        utilisateurId,
         portfolioItems,
         verificationDocuments,
         totalEarnings,
@@ -206,6 +209,13 @@ class FreelanceModel extends Equatable {
       workingHours: safeString('workingHours', 'Temps partiel'),
       location: safeString('location', ''),
       phoneNumber: json['phoneNumber'] as String?,
+      utilisateurId: () {
+        final u = json['utilisateur'];
+        if (u is Map) {
+          return u['_id']?.toString() ?? u['id']?.toString();
+        }
+        return u?.toString();
+      }(),
       portfolioItems:
           json['portfolioItems'] != null && json['portfolioItems'] is List
               ? (json['portfolioItems'] as List)
@@ -315,6 +325,7 @@ class FreelanceModel extends Equatable {
     String? workingHours,
     String? location,
     String? phoneNumber,
+    String? utilisateurId,
     List<PortfolioItem>? portfolioItems,
     VerificationDocuments? verificationDocuments,
     double? totalEarnings,
@@ -343,6 +354,7 @@ class FreelanceModel extends Equatable {
       workingHours: workingHours ?? this.workingHours,
       location: location ?? this.location,
       phoneNumber: phoneNumber ?? this.phoneNumber,
+      utilisateurId: utilisateurId ?? this.utilisateurId,
       portfolioItems: portfolioItems ?? this.portfolioItems,
       verificationDocuments:
           verificationDocuments ?? this.verificationDocuments,

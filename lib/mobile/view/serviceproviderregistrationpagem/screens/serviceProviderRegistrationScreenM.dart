@@ -8,8 +8,8 @@ import 'package:sdealsmobile/mobile/view/serviceproviderregistrationpagem/screen
 import '../serviceproviderregistrationoageblocm/serviceProviderRegistrationPageBlocM.dart';
 import '../serviceproviderregistrationoageblocm/serviceProviderRegistrationPageEventM.dart';
 import '../serviceproviderregistrationoageblocm/serviceProviderRegistrationPageStateM.dart';
-import '../../../../../design_system/colors.dart';
-import '../../../../../design_system/typography.dart';
+import '../../../../../design_system/design_system.dart';
+import '../../common/utils/app_snackbar.dart';
 
 class ServiceProviderRegistrationScreenM extends StatefulWidget {
   const ServiceProviderRegistrationScreenM({Key? key}) : super(key: key);
@@ -22,32 +22,24 @@ class ServiceProviderRegistrationScreenM extends StatefulWidget {
 class _ServiceProviderRegistrationScreenMState
     extends State<ServiceProviderRegistrationScreenM> {
   int _currentStep = 0;
-  final _formKey = GlobalKey<FormState>();
 
-  // ✅ FORMULAIRE SIMPLIFIÉ - Compatible avec le backend
   final Map<String, dynamic> formData = {
-    // ÉTAPE 1 : Infos de base (6 champs)
     'fullName': '',
     'phone': '',
-    'email': '', // OPTIONNEL maintenant
-    'category': 'Plombier',
-    'service': '', // Service spécifique
+    'email': '',
+    'category': null,
+    'categoryName': '',
+    'service': null,
     'serviceAreas': <String>[],
-
-    // ÉTAPE 2 : Tarification (3 champs)
-    'dailyRate': 0.0, // Tarif par jour (plus simple que horaire)
-    'profileImage': null, // Photo optionnelle
-    'description': '', // Description optionnelle
-
-    // CHAMPS REQUIS POUR LE BACKEND (ajoutés automatiquement)
-    'localisation': '', // Sera rempli avec la première zone
-    'localisationmaps': {'latitude': 0.0, 'longitude': 0.0}, // GPS par défaut
-    'prixprestataire': 0.0, // Sera rempli avec dailyRate
-    'position': null, // Position exacte de l'utilisateur
-    'address': '', // Adresse de la position
-
-    // CHAMPS OBLIGATOIRES SUPPRIMÉS (seront optionnels plus tard)
-    'password': '', // Gardé pour compatibilité
+    'dailyRate': 0.0,
+    'profileImage': null,
+    'description': '',
+    'localisation': '',
+    'localisationmaps': {'latitude': 0.0, 'longitude': 0.0},
+    'prixprestataire': 0.0,
+    'position': null,
+    'address': '',
+    'password': '',
     'birthDate': null,
     'gender': 'Homme',
     'businessName': '',
@@ -75,13 +67,29 @@ class _ServiceProviderRegistrationScreenMState
   void initState() {
     super.initState();
     _initializeSteps();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final authState = context.read<AuthCubit>().state;
+      if (authState is AuthAuthenticated) {
+        final u = authState.utilisateur;
+        setState(() {
+          formData['fullName'] =
+              '${u.prenom ?? ''} ${u.nom ?? ''}'.trim();
+          formData['phone'] = u.telephone ?? '';
+          formData['email'] = u.email ?? '';
+        });
+      }
+    });
   }
 
   void _initializeSteps() {
-    // ✅ SIMPLIFIÉ : 2 étapes seulement au lieu de 5
+    final stepTitleStyle = SDTypography.titleSmall.copyWith(
+      color: SDColors.neutral900,
+      fontWeight: FontWeight.w600,
+    );
     _steps = [
       Step(
-        title: const Text('Informations de base'),
+        title: Text('Informations de base', style: stepTitleStyle),
         content: ProviderPersonalInfoStep(
           formData: formData,
           onDataChanged: _updateFormData,
@@ -89,7 +97,7 @@ class _ServiceProviderRegistrationScreenMState
         isActive: _currentStep >= 0,
       ),
       Step(
-        title: const Text('Tarification'),
+        title: Text('Tarification', style: stepTitleStyle),
         content: ProviderPricingStep(
           formData: formData,
           onDataChanged: _updateFormData,
@@ -102,44 +110,84 @@ class _ServiceProviderRegistrationScreenMState
   void _updateFormData(Map<String, dynamic> newData) {
     setState(() {
       formData.addAll(newData);
+      _initializeSteps();
     });
   }
 
-  void _submitForm() {
-    if (_formKey.currentState!.validate()) {
-      // ✅ Préparer les données pour le backend
-      final backendData = _prepareBackendData();
+  /// Valide les champs obligatoires de l'étape 1 avant de passer à l'étape 2.
+  bool _validateStep1() {
+    final name = (formData['fullName'] as String?)?.trim() ?? '';
+    final phone = (formData['phone'] as String?)?.trim() ?? '';
+    final category = formData['category'];
+    final service = formData['service'];
+    final areas = formData['serviceAreas'] as List?;
 
-      // ✅ Injecter l'userId existant s'il est connecté
-      final auth = context.read<AuthCubit>().state;
-      if (auth is AuthAuthenticated) {
-        backendData['existingUserId'] = auth.utilisateur.idutilisateur;
-      }
-
-      context.read<ServiceProviderRegistrationBlocM>().add(
-            SubmitServiceProviderRegistrationEvent(formData: backendData),
-          );
+    if (name.isEmpty) {
+      _showError('Veuillez renseigner votre nom complet');
+      return false;
     }
+    if (phone.isEmpty) {
+      _showError('Veuillez renseigner votre numéro de téléphone');
+      return false;
+    }
+    if (category == null) {
+      _showError('Veuillez sélectionner votre catégorie');
+      return false;
+    }
+    if (service == null) {
+      _showError('Veuillez sélectionner votre service');
+      return false;
+    }
+    if (areas == null || areas.isEmpty) {
+      _showError('Veuillez sélectionner au moins une zone d\'intervention');
+      return false;
+    }
+    return true;
   }
 
-  // ✅ Mapper les données simplifiées vers le format backend
-  Map<String, dynamic> _prepareBackendData() {
-    // Note: Le service sera récupéré côté backend en fonction de la catégorie
-    // Pour l'instant, on utilise un service par défaut qui sera géré par le backend
+  /// Valide les champs obligatoires de l'étape 2.
+  bool _validateStep2() {
+    final rate = formData['dailyRate'];
+    if (rate == null || (rate is double && rate <= 0) || (rate is int && rate <= 0)) {
+      _showError('Veuillez renseigner votre tarif journalier');
+      return false;
+    }
+    return true;
+  }
 
+  void _showError(String message) {
+    AppSnackBar.error(context, message, duration: const Duration(seconds: 3));
+  }
+
+  void _submitForm() {
+    if (!_validateStep2()) return;
+
+    final backendData = _prepareBackendData();
+    final auth = context.read<AuthCubit>().state;
+    String? token;
+    if (auth is AuthAuthenticated) {
+      backendData['existingUserId'] = auth.utilisateur.idutilisateur;
+      token = auth.token;
+    }
+
+    context.read<ServiceProviderRegistrationBlocM>().add(
+          SubmitServiceProviderRegistrationEvent(
+            formData: backendData,
+            token: token,
+          ),
+        );
+  }
+
+  Map<String, dynamic> _prepareBackendData() {
     return {
-      // Champs utilisateur (inchangés)
       'fullName': formData['fullName'],
       'phone': formData['phone'],
       'email': formData['email'],
       'password': formData['password'],
-
-      // Champs prestataire (mappés pour le backend)
-      'service':
-          formData['service'] ?? '', // Service sélectionné par l'utilisateur
-      'category': formData['category'] ?? '', // Catégorie sélectionnée
+      'service': formData['service'] ?? '',
+      'category': formData['categoryName'] ?? formData['category'] ?? '',
       'prixprestataire': formData['dailyRate'],
-      'localisation': formData['serviceAreas'].isNotEmpty
+      'localisation': (formData['serviceAreas'] as List?)?.isNotEmpty == true
           ? formData['serviceAreas'][0]
           : 'Abidjan',
       'localisationmaps': formData['position'] != null
@@ -150,149 +198,186 @@ class _ServiceProviderRegistrationScreenMState
           : formData['localisationmaps'],
       'description': formData['description'],
       'zoneIntervention': formData['serviceAreas'],
-
-      // Champs optionnels avec valeurs par défaut
-      'note': 'Profil créé via inscription simplifiée',
+      'note': 0,
       'verifier': false,
-      'specialite': [formData['category']],
+      'specialite': [formData['categoryName'] ?? formData['category'] ?? ''],
       'anneeExperience': '0',
-      'rayonIntervention': 10, // 10 km par défaut
-      'tarifHoraireMin': formData['dailyRate'] / 8, // Estimation horaire
-      'tarifHoraireMax': formData['dailyRate'] / 6, // Estimation horaire
-
-      // Champs optionnels vides
+      'rayonIntervention': 10,
+      'tarifHoraireMin': formData['dailyRate'] / 8,
+      'tarifHoraireMax': formData['dailyRate'] / 6,
       'numeroCNI': '',
       'numeroRCCM': '',
       'numeroAssurance': '',
       'nbMission': 0,
+      'nbAvis': 0,
       'revenus': 0,
       'clients': [],
-
-      // Source pour traçabilité
       'source': 'sdealsmobile',
-      'status': 'pending',
+      if (formData['profileImage'] != null &&
+          (formData['profileImage'] as String).trim().isNotEmpty)
+        'profileImage': formData['profileImage'],
     };
   }
 
   @override
   Widget build(BuildContext context) {
+    final authState = context.watch<AuthCubit>().state;
+
+    // Guard : utilisateur non connecté
+    if (authState is! AuthAuthenticated) {
+      return Scaffold(
+        backgroundColor: SDColors.neutral50,
+        appBar: SDWhiteAppBar.appBar(
+          centerTitle: false,
+          title: 'Devenir prestataire',
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: SDColors.primary50,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.handyman_rounded, size: 56, color: SDColors.primary600),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  'Connexion requise',
+                  style: SDTypography.titleLarge.copyWith(fontWeight: FontWeight.w700),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Vous devez être connecté pour créer votre profil prestataire.',
+                  style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral600),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 32),
+                SizedBox(
+                  width: double.infinity,
+                  child: SDButton(
+                    text: 'Se connecter',
+                    onPressed: () => context.push('/login'),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: SDButton(
+                    text: 'Créer un compte',
+                    type: SDButtonType.outlined,
+                    onPressed: () => context.push('/register'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return BlocListener<ServiceProviderRegistrationBlocM,
         ServiceProviderRegistrationStateM>(
       listener: (context, state) {
         if (state is ServiceProviderRegistrationLoading) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text("Envoi en cours...")));
+          AppSnackBar.info(context, 'Envoi en cours…');
         } else if (state is ServiceProviderRegistrationSuccess) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text(state.message)));
+          AppSnackBar.success(context, state.message);
 
-          // ✅ NOUVEAU : Mettre à jour les rôles de l'utilisateur connecté
           final auth = context.read<AuthCubit>().state;
           if (auth is AuthAuthenticated) {
             final currentRoles = List<String>.from(auth.roles);
-
-            // Ajouter le rôle PRESTATAIRE s'il n'existe pas déjà
             if (!currentRoles.contains('PRESTATAIRE')) {
               currentRoles.add('PRESTATAIRE');
-
-              // Mettre à jour AuthCubit avec les nouveaux rôles
               context.read<AuthCubit>().setRoles(
                     roles: currentRoles,
-                    activeRole:
-                        'PRESTATAIRE', // Basculer automatiquement vers le rôle prestataire
+                    activeRole: 'PRESTATAIRE',
                   );
-
-              print("✅ Rôle PRESTATAIRE ajouté à l'utilisateur: $currentRoles");
             }
           }
 
           Future.delayed(const Duration(seconds: 2), () {
             final auth = context.read<AuthCubit>().state;
             if (auth is AuthAuthenticated) {
-              // Utiliser GoRouter pour la navigation
               context.push('/providermain', extra: auth.utilisateur);
             }
           });
         } else if (state is ServiceProviderRegistrationFailure) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text(state.error)));
+          AppSnackBar.error(context, state.error);
         }
       },
       child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Devenir prestataire', style: SDTypography.titleLarge),
-          backgroundColor: SDColors.success700,
-          foregroundColor: SDColors.white,
+        backgroundColor: SDColors.neutral50,
+        appBar: SDWhiteAppBar.appBar(
+          centerTitle: false,
+          title: 'Devenir prestataire',
         ),
-        body: Form(
-          key: _formKey,
-          child: Stepper(
-            type: StepperType.vertical,
-            currentStep: _currentStep,
-            steps: _steps,
-            onStepContinue: () {
+        body: Stepper(
+          type: StepperType.vertical,
+          currentStep: _currentStep,
+          steps: _steps,
+          onStepContinue: () {
+            if (_currentStep == 0) {
+              if (_validateStep1()) {
+                setState(() {
+                  _currentStep = 1;
+                  _initializeSteps();
+                });
+              }
+            } else {
+              _submitForm();
+            }
+          },
+          onStepCancel: () {
+            if (_currentStep > 0) {
               setState(() {
-                if (_currentStep < _steps.length - 1) {
-                  _currentStep++;
-                } else {
-                  _submitForm();
-                }
+                _currentStep--;
+                _initializeSteps();
               });
-            },
-            onStepCancel: () {
-              setState(() {
-                if (_currentStep > 0) {
-                  _currentStep--;
-                }
-              });
-            },
-            controlsBuilder: (context, details) {
-              return Padding(
-                padding: const EdgeInsets.only(top: 20.0),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: details.onStepContinue,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: SDColors.success700,
-                          foregroundColor: SDColors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                        child: Text(
-                          _currentStep == _steps.length - 1
+            }
+          },
+          controlsBuilder: (context, details) {
+            return Padding(
+              padding: const EdgeInsets.only(top: 20.0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: BlocBuilder<ServiceProviderRegistrationBlocM,
+                        ServiceProviderRegistrationStateM>(
+                      builder: (context, state) {
+                        final isLoading =
+                            state is ServiceProviderRegistrationLoading;
+                        return SDButton(
+                          text: _currentStep == _steps.length - 1
                               ? 'Soumettre'
                               : 'Suivant',
-                          style: SDTypography.labelLarge,
-                        ),
+                          isLoading: isLoading,
+                          onPressed: isLoading ? null : details.onStepContinue,
+                          fullWidth: true,
+                        );
+                      },
+                    ),
+                  ),
+                  if (_currentStep > 0) ...[
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: SDButton(
+                        text: 'Précédent',
+                        type: SDButtonType.outlined,
+                        onPressed: details.onStepCancel,
+                        fullWidth: true,
                       ),
                     ),
-                    if (_currentStep > 0) ...[
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: details.onStepCancel,
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            side: const BorderSide(color: SDColors.neutral300),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          ),
-                          child: Text(
-                            'Précédent',
-                            style: SDTypography.labelLarge.copyWith(color: SDColors.neutral700),
-                          ),
-                        ),
-                      ),
-                    ],
                   ],
-                ),
-              );
-            },
-          ),
+                ],
+              ),
+            );
+          },
         ),
       ),
     );

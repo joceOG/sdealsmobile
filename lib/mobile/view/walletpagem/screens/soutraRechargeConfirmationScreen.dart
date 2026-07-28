@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:sdealsmobile/design_system/widgets/sd_app_bar_icon_button.dart';
 import 'package:intl/intl.dart';
 
 class SoutraRechargeConfirmationScreen extends StatelessWidget {
@@ -21,7 +22,9 @@ class SoutraRechargeConfirmationScreen extends StatelessWidget {
     
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
+      appBar: SDAppBarIconThemed(
+        style: SDAppBarIconStyles.onLightSurface,
+        bar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
         title: const Text(
@@ -35,6 +38,7 @@ class SoutraRechargeConfirmationScreen extends StatelessWidget {
           icon: const Icon(Icons.arrow_back, color: Colors.black87),
           onPressed: () => Navigator.pop(context),
         ),
+      ),
       ),
       body: Column(
         children: [

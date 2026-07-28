@@ -20,7 +20,9 @@ class CommandeDetailsScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: SDColors.white,
-      appBar: AppBar(
+      appBar: SDAppBarIconThemed(
+        style: SDAppBarIconStyles.onLightSurface,
+        bar: AppBar(
         elevation: 0,
         scrolledUnderElevation: 0,
         backgroundColor: SDColors.white,
@@ -37,6 +39,7 @@ class CommandeDetailsScreen extends StatelessWidget {
           preferredSize: const Size.fromHeight(1),
           child: Divider(height: 1, color: SDColors.neutral200),
         ),
+      ),
       ),
       body: SingleChildScrollView(
         child: Column(

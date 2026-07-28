@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import '../../../../data/services/authCubit.dart'; // ✅ Import AuthCubit
+import '../../common/widgets/unauthenticated_banner.dart';
 
 import '../soutrapayblocm/soutra_wallet_bloc.dart';
 import '../soutrapayblocm/soutra_wallet_event.dart';
@@ -92,6 +93,16 @@ class _WalletPageScreenMState extends State<WalletPageScreenM> {
 
   @override
   Widget build(BuildContext context) {
+    final authState = context.watch<AuthCubit>().state;
+    if (authState is! AuthAuthenticated) {
+      return const UnauthenticatedBanner(
+        appBarTitle: 'SoutraPay',
+        icon: Icons.account_balance_wallet_outlined,
+        title: 'Votre portefeuille vous attend',
+        description: 'Connectez-vous pour accéder à votre solde, effectuer des transferts et consulter vos transactions.',
+      );
+    }
+
     return BlocProvider(
       create: (context) => _soutraWalletBloc,
       child: BlocConsumer<SoutraWalletBloc, SoutraWalletState>(
@@ -123,7 +134,9 @@ class _WalletPageScreenMState extends State<WalletPageScreenM> {
           return Scaffold(
             backgroundColor: SDColors.white,
             // AppBar personnalisée avec photo de profil à droite
-            appBar: AppBar(
+            appBar: SDAppBarIconThemed(
+              style: SDAppBarIconStyles.onLightSurface,
+              bar: AppBar(
               backgroundColor: SDColors.white,
               elevation: 0,
               title: Text(
@@ -156,6 +169,7 @@ class _WalletPageScreenMState extends State<WalletPageScreenM> {
                   ),
                 ),
               ],
+            ),
             ),
             body: SingleChildScrollView(
               padding: EdgeInsets.symmetric(horizontal: SDSpacing.lg, vertical: SDSpacing.xs),

@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../data/models/conversation_model.dart';
 import '../../../data/models/message_model.dart';
@@ -9,6 +10,8 @@ import '../chatpageblocm/chatPageEventM.dart';
 import '../chatpageblocm/chatPageStateM.dart';
 import '../../common/widgets/empty_state_widget.dart';
 import '../../searchpagem/screens/searchPageScreenM.dart';
+import '../../../../data/services/authCubit.dart';
+import 'package:go_router/go_router.dart';
 
 // ✅ Design System
 import '../../../../design_system/design_system.dart';
@@ -47,8 +50,11 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
   bool _arrowPressed = false;
   File? _selectedImage;
   int _prestatairePressed = -1;
+  final ImagePicker _imagePicker = ImagePicker();
+  DateTime? _lastTypingEmit;
 
   late ChatPageBlocM _chatBloc;
+  String _currentUserId = '';
 
   // Méthode pour obtenir la couleur selon le type de conversation
   Color _getConversationColor(ConversationType type) {
@@ -208,7 +214,9 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
 
   /// AppBar uniquement en conversation sur **mobile** (retour + titre + menu).
   PreferredSizeWidget _buildMobileConversationAppBar(ChatPageStateM state) {
-    return AppBar(
+    return SDAppBarIconThemed(
+      style: SDAppBarIconStyles.onLightSurface,
+      bar: AppBar(
       backgroundColor: SDColors.white,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
@@ -269,6 +277,7 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
         preferredSize: const Size.fromHeight(1),
         child: Divider(height: 1, color: SDColors.neutral200),
       ),
+    ),
     );
   }
 
@@ -499,6 +508,14 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
   void initState() {
     super.initState();
     _chatBloc = BlocProvider.of<ChatPageBlocM>(context);
+
+    // Injecter le vrai userId depuis AuthCubit dans le BLoC
+    final authState = context.read<AuthCubit>().state;
+    if (authState is AuthAuthenticated) {
+      _currentUserId = authState.utilisateur.idutilisateur ?? '';
+      _chatBloc.setUserId(_currentUserId);
+    }
+
     _loadInitialData();
   }
 
@@ -539,31 +556,34 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
   }
 
   void _sendMessage() {
-    if (_messageController.text.trim().isEmpty && _selectedImage == null)
+    if (_messageController.text.trim().isEmpty && _selectedImage == null) {
       return;
+    }
 
     final state = _chatBloc.state;
     if (state.status == ChatPageStatus.loaded &&
         state.selectedConversation != null) {
+      final convId = state.selectedConversation!.id;
+      _chatBloc.add(EmitTyping(conversationId: convId, isTyping: false));
+
       if (_selectedImage != null) {
-        // Envoyer une image
         _chatBloc.add(SendMessage(
-          conversationId: state.selectedConversation!.id,
-          content: _selectedImage!.path,
+          conversationId: convId,
+          content: _messageController.text.trim(),
           type: MessageType.image,
+          imageFile: _selectedImage,
         ));
         setState(() => _selectedImage = null);
+        _messageController.clear();
       } else {
-        // Envoyer un message texte
         _chatBloc.add(SendMessage(
-          conversationId: state.selectedConversation!.id,
+          conversationId: convId,
           content: _messageController.text.trim(),
           type: MessageType.text,
         ));
         _messageController.clear();
       }
 
-      // Faire défiler vers le bas après l'envoi
       Future.delayed(const Duration(milliseconds: 100), () {
         if (_scrollController.hasClients) {
           _scrollController.animateTo(
@@ -576,8 +596,165 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
     }
   }
 
+  Future<void> _pickImage() async {
+    try {
+      final picked = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1600,
+        maxHeight: 1600,
+        imageQuality: 85,
+      );
+      if (picked == null) return;
+      setState(() => _selectedImage = File(picked.path));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Impossible de sélectionner l\'image: $e')),
+      );
+    }
+  }
+
+  void _onMessageChanged(String value) {
+    final conv = _chatBloc.state.selectedConversation;
+    if (conv == null) return;
+    final now = DateTime.now();
+    if (_lastTypingEmit == null ||
+        now.difference(_lastTypingEmit!) > const Duration(seconds: 1)) {
+      _lastTypingEmit = now;
+      _chatBloc.add(EmitTyping(
+        conversationId: conv.id,
+        isTyping: value.trim().isNotEmpty,
+      ));
+    }
+  }
+
+  // 🔐 Écran affiché quand l'utilisateur n'est pas connecté
+  Widget _buildNotAuthenticatedScreen(BuildContext context) {
+    return Scaffold(
+      backgroundColor: SDColors.white,
+      appBar: SDAppBarIconThemed(
+        style: SDAppBarIconStyles.onLightSurface,
+        bar: AppBar(
+        backgroundColor: SDColors.white,
+        elevation: 0,
+        title: Text(
+          'Messages',
+          style: SDTypography.titleLarge.copyWith(
+            color: SDColors.neutral900,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        ),
+      ),
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Illustration
+                Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    color: SDColors.primary50,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.forum_outlined,
+                    size: 56,
+                    color: SDColors.primary600,
+                  ),
+                ),
+                const SizedBox(height: 28),
+                Text(
+                  'Pas encore de messages',
+                  style: SDTypography.titleLarge.copyWith(
+                    color: SDColors.neutral900,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 22,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Connectez-vous à votre compte ou créez-en un pour discuter avec des prestataires, vendeurs et freelances.',
+                  style: SDTypography.bodyMedium.copyWith(
+                    color: SDColors.neutral500,
+                    height: 1.5,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 36),
+                // Bouton Se connecter
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => context.push('/login'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: SDColors.primary600,
+                      foregroundColor: SDColors.white,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: SDSpacing.lg,
+                        vertical: SDSpacing.sm,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: Text(
+                      'Se connecter',
+                      style: SDTypography.labelMedium.copyWith(
+                        color: SDColors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(height: SDSpacing.sm),
+                // Bouton Créer un compte
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: () => context.push('/register'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: SDColors.primary700,
+                      side: const BorderSide(color: SDColors.primary600, width: 1.5),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: SDSpacing.lg,
+                        vertical: SDSpacing.sm,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                      ),
+                    ),
+                    child: Text(
+                      'Créer un compte',
+                      style: SDTypography.labelMedium.copyWith(
+                        color: SDColors.primary700,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    // 🔐 Guard : afficher un écran "non connecté" si l'utilisateur n'est pas authentifié
+    final authState = context.watch<AuthCubit>().state;
+    if (authState is! AuthAuthenticated) {
+      return _buildNotAuthenticatedScreen(context);
+    }
+
     return BlocConsumer<ChatPageBlocM, ChatPageStateM>(
         listener: (context, state) {
           // Gérer les erreurs
@@ -1104,7 +1281,7 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
                                                           .id]![index];
                                                   final bool isMe = message
                                                           .senderId ==
-                                                      'currentUser'; // À adapter selon votre logique d'ID utilisateur
+                                                      _currentUserId;
 
                                                   return Padding(
                                                     padding:
@@ -1131,7 +1308,7 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
                                                                             index -
                                                                                 1]
                                                                         .senderId ==
-                                                                    'currentUser')
+                                                                    _currentUserId)
                                                           Container(
                                                             width: 28,
                                                             height: 28,
@@ -1348,6 +1525,75 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
                                                 child: Text('Aucun message')),
                                       ),
                                       // Zone de saisie
+                                      Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          if (state.partnerTyping)
+                                            Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 16,
+                                                      vertical: 4),
+                                              child: Align(
+                                                alignment:
+                                                    Alignment.centerLeft,
+                                                child: Text(
+                                                  'en train d\'écrire…',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    fontStyle: FontStyle.italic,
+                                                    color:
+                                                        Colors.grey.shade600,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          if (_selectedImage != null)
+                                            Padding(
+                                              padding:
+                                                  const EdgeInsets.fromLTRB(
+                                                      12, 8, 12, 0),
+                                              child: Stack(
+                                                children: [
+                                                  ClipRRect(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            12),
+                                                    child: Image.file(
+                                                      _selectedImage!,
+                                                      height: 96,
+                                                      width: 96,
+                                                      fit: BoxFit.cover,
+                                                    ),
+                                                  ),
+                                                  Positioned(
+                                                    top: 0,
+                                                    right: 0,
+                                                    child: IconButton(
+                                                      icon: const Icon(
+                                                          Icons.close,
+                                                          size: 18),
+                                                      style: IconButton
+                                                          .styleFrom(
+                                                        backgroundColor:
+                                                            Colors.black54,
+                                                        foregroundColor:
+                                                            Colors.white,
+                                                        padding:
+                                                            EdgeInsets.zero,
+                                                        minimumSize:
+                                                            const Size(
+                                                                28, 28),
+                                                      ),
+                                                      onPressed: () =>
+                                                          setState(() =>
+                                                              _selectedImage =
+                                                                  null),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
                                       Container(
                                         padding: const EdgeInsets.symmetric(
                                             horizontal: 8.0, vertical: 8.0),
@@ -1366,15 +1612,14 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
                                             // Bouton pour ajouter une image
                                             IconButton(
                                               icon: Icon(Icons.image),
-                                              onPressed: () {
-                                                // Implémenter la sélection d'images
-                                              },
+                                              onPressed: _pickImage,
                                             ),
                                             // Champ de texte
                                             Expanded(
                                               child: TextField(
                                                 controller: _messageController,
                                                 focusNode: _focusNode,
+                                                onChanged: _onMessageChanged,
                                                 decoration: InputDecoration(
                                                   hintText:
                                                       'Tapez un message...',
@@ -1403,6 +1648,8 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
                                             ),
                                           ],
                                         ),
+                                      ),
+                                        ],
                                       ),
                                     ],
                                   ),

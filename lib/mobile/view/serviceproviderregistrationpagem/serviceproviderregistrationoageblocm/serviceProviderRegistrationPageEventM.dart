@@ -8,9 +8,10 @@ abstract class ServiceProviderRegistrationEventM extends Equatable {
 // Quand on envoie le formulaire complet
 class SubmitServiceProviderRegistrationEvent extends ServiceProviderRegistrationEventM {
   final Map<String, dynamic> formData;
+  final String? token;
 
-  SubmitServiceProviderRegistrationEvent({required this.formData});
+  SubmitServiceProviderRegistrationEvent({required this.formData, this.token});
 
   @override
-  List<Object?> get props => [formData];
+  List<Object?> get props => [formData, token];
 }

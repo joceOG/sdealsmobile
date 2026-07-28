@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../colors.dart';
 import '../typography.dart';
 import '../spacing.dart';
+import 'sd_app_bar_icon_button.dart';
 
 /// AppBar standardisée Soutrali Deals
 /// Hauteur: 56px (standard Material Design)
@@ -66,6 +67,9 @@ class SDAppBar extends StatelessWidget implements PreferredSizeWidget {
   
   @override
   Widget build(BuildContext context) {
+    final bool iconsOnLightSurface =
+        !useGradient && backgroundColor == SDColors.white;
+
     // Actions list
     final List<Widget> appBarActions = [];
     
@@ -123,18 +127,27 @@ class SDAppBar extends StatelessWidget implements PreferredSizeWidget {
                 ),
               ],
             ),
-      child: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        centerTitle: centerTitle,
-        leading: leadingWidget,
-        title: Text(
-          title,
-          style: SDTypography.titleLarge.copyWith(
-            color: SDColors.white,
+      child: Theme(
+        data: Theme.of(context).copyWith(
+          iconButtonTheme: IconButtonThemeData(
+            style: iconsOnLightSurface
+                ? SDAppBarIconStyles.onLightSurface
+                : SDAppBarIconStyles.onPrimary,
           ),
         ),
-        actions: appBarActions.isNotEmpty ? appBarActions : null,
+        child: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          centerTitle: centerTitle,
+          leading: leadingWidget,
+          title: Text(
+            title,
+            style: SDTypography.titleLarge.copyWith(
+              color: SDColors.white,
+            ),
+          ),
+          actions: appBarActions.isNotEmpty ? appBarActions : null,
+        ),
       ),
     );
   }

@@ -193,3 +193,29 @@ class DeleteMessage extends ChatPageEventM {
   @override
   List<Object> get props => [conversationId, messageId];
 }
+
+class PartnerTypingChanged extends ChatPageEventM {
+  final String conversationId;
+  final bool isTyping;
+
+  const PartnerTypingChanged({
+    required this.conversationId,
+    required this.isTyping,
+  });
+
+  @override
+  List<Object> get props => [conversationId, isTyping];
+}
+
+class EmitTyping extends ChatPageEventM {
+  final String conversationId;
+  final bool isTyping;
+
+  const EmitTyping({
+    required this.conversationId,
+    required this.isTyping,
+  });
+
+  @override
+  List<Object> get props => [conversationId, isTyping];
+}

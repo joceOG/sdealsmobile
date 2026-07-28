@@ -13,10 +13,10 @@ class ServiceProviderWelcomeScreenM extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: SDAppBar(
-        title: 'Devenir Prestataire',
-        backgroundColor: SDColors.primary600,
-        useGradient: true,
+      backgroundColor: SDColors.neutral50,
+      appBar: SDWhiteAppBar.appBar(
+        centerTitle: false,
+        title: 'Devenir prestataire',
       ),
       // Bouton fixe en bas de l'écran
       bottomNavigationBar: Container(

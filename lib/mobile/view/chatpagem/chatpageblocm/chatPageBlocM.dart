@@ -11,19 +11,20 @@ import 'package:sdealsmobile/data/models/categorie.dart';
 import 'package:sdealsmobile/data/services/api_client.dart';
 import 'package:sdealsmobile/data/services/websocket_service.dart';
 import 'package:sdealsmobile/data/services/notification_service.dart';
+import 'package:sdealsmobile/data/utils/conversation_id.dart';
+import 'dart:io';
 
 class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
   final ApiClient _apiClient = ApiClient();
   final WebSocketService _webSocketService = WebSocketService();
   final NotificationService _notificationService = NotificationService();
 
-  // ✅ ID utilisateur passé au constructeur (depuis AuthCubit)
-  final String _currentUserId;
+  // ✅ ID utilisateur — mutable pour permettre la mise à jour post-création
+  String _currentUserId;
   final _uuid = const Uuid();
 
   ChatPageBlocM({String? userId})
-      : _currentUserId =
-            userId ?? 'currentUser', // ⚠️ Fallback sur mock si non fourni
+      : _currentUserId = userId ?? '',
         super(ChatPageStateM.initial()) {
     on<LoadConversations>(_onLoadConversations);
     on<SelectConversation>(_onSelectConversation);
@@ -41,12 +42,21 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
     on<ChatNotificationReceived>(_onChatNotificationReceived);
     on<SearchMessages>(_onSearchMessages);
     on<DeleteMessage>(_onDeleteMessage);
+    on<PartnerTypingChanged>(_onPartnerTypingChanged);
+    on<EmitTyping>(_onEmitTyping);
 
     // Gardons la compatibilité avec le code existant
     on<LoadCategorieDataM>(_onLoadCategorieDataM);
 
     // Configuration des callbacks WebSocket
     _setupWebSocketCallbacks();
+  }
+
+  // ✅ Met à jour l'ID utilisateur après création du BLoC (ex: auth asynchrone)
+  void setUserId(String id) {
+    if (id.isNotEmpty) {
+      _currentUserId = id;
+    }
   }
 
   // Ajouté pour la compatibilité avec le code existant
@@ -66,30 +76,27 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
 
   Future<void> _onLoadConversations(
       LoadConversations event, Emitter<ChatPageStateM> emit) async {
+    // Refuse de charger si l'ID utilisateur n'est pas encore disponible
+    if (_currentUserId.isEmpty) {
+      emit(state.copyWith(
+        status: ChatPageStatus.error,
+        error: 'Utilisateur non connecté',
+      ));
+      return;
+    }
+
     emit(state.copyWith(status: ChatPageStatus.loading));
 
     try {
-      List<ConversationModel> conversations;
+      print('🔄 Chargement conversations depuis API...');
+      final conversationsData =
+          await _apiClient.getConversations(_currentUserId);
 
-      // 🔄 Tenter d'abord l'API backend
-      try {
-        print('🔄 Tentative chargement conversations depuis API...');
-        final conversationsData =
-            await _apiClient.getConversations(_currentUserId);
+      final conversations = conversationsData
+          .map((data) => ConversationModel.fromBackend(data, _currentUserId))
+          .toList();
 
-        // Convertir les données backend en modèles
-        conversations = conversationsData
-            .map((data) => ConversationModel.fromBackend(data, _currentUserId))
-            .toList();
-
-        print('✅ ${conversations.length} conversations chargées depuis API');
-      } catch (apiError) {
-        // ⚠️ Fallback sur les données mock si l'API échoue
-        print('⚠️ API indisponible, utilisation des données mock: $apiError');
-        await Future.delayed(const Duration(milliseconds: 500));
-        conversations = mockConversations;
-        print('📦 ${conversations.length} conversations mock chargées');
-      }
+      print('✅ ${conversations.length} conversations chargées depuis API');
 
       emit(state.copyWith(
         status: ChatPageStatus.loaded,
@@ -103,6 +110,7 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
       emit(state.copyWith(
         status: ChatPageStatus.error,
         error: error.toString(),
+        conversations: const [],
       ));
     }
   }
@@ -124,57 +132,59 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
 
   Future<void> _onLoadMessages(
       LoadMessages event, Emitter<ChatPageStateM> emit) async {
-    if (state.selectedConversation == null) return;
-
     emit(state.copyWith(status: ChatPageStatus.loading));
 
     try {
-      List<MessageModel> messages;
+      print(
+          '🔄 Chargement messages API pour conversation: ${event.conversationId}');
+      final messagesData = await _apiClient.getConversationMessages(
+        event.conversationId,
+        userId: _currentUserId,
+      );
 
-      // 🔄 Tenter d'abord l'API backend
-      try {
-        print(
-            '🔄 Tentative chargement messages depuis API pour conversation: ${event.conversationId}');
-        final messagesData =
-            await _apiClient.getConversationMessages(event.conversationId);
+      final messages =
+          messagesData.map((data) => MessageModel.fromBackend(data)).toList();
 
-        // Convertir les données backend en modèles
-        messages =
-            messagesData.map((data) => MessageModel.fromBackend(data)).toList();
+      print('✅ ${messages.length} messages chargés depuis API');
 
-        print('✅ ${messages.length} messages chargés depuis API');
-      } catch (apiError) {
-        // ⚠️ Fallback sur les données mock si l'API échoue
-        print('⚠️ API indisponible, utilisation des données mock: $apiError');
-        await Future.delayed(const Duration(milliseconds: 500));
-
-        // Utilisons des données mockées pour le développement
-        switch (event.conversationId) {
-          case 'conv1':
-            messages = mockMessages;
-            break;
-          case 'conv2':
-            messages = mockVendeurMessages;
-            break;
-          case 'conv3':
-            messages = mockFreelanceMessages;
-            break;
-          default:
-            messages = [];
-            break;
-        }
-        print('📦 ${messages.length} messages mock chargés');
-      }
-
-      // Mettre à jour les messages pour la conversation actuelle
       final updatedMessagesMap =
           Map<String, List<MessageModel>>.from(state.messagesByConversation);
       updatedMessagesMap[event.conversationId] = messages;
 
+      // Sélectionner la conversation si absente (deep-link /chat/:id)
+      ConversationModel? selected = state.selectedConversation;
+      if (selected == null || selected.id != event.conversationId) {
+        selected = state.conversations.cast<ConversationModel?>().firstWhere(
+              (c) => c?.id == event.conversationId,
+              orElse: () => null,
+            );
+        if (selected == null) {
+          final otherId =
+              getOtherParticipantId(event.conversationId, _currentUserId) ??
+                  '';
+          selected = ConversationModel(
+            id: event.conversationId,
+            userId: _currentUserId,
+            participantId: otherId,
+            participantName: 'Conversation',
+            participantImage: 'assets/images/default_user.png',
+            lastUpdated: DateTime.now(),
+            type: ConversationType.prestataire,
+          );
+        }
+      }
+
       emit(state.copyWith(
         status: ChatPageStatus.loaded,
         messagesByConversation: updatedMessagesMap,
+        selectedConversation: selected,
+        partnerTyping: false,
       ));
+
+      if (_webSocketService.isConnected) {
+        _webSocketService.joinConversation(event.conversationId);
+      }
+      add(MarkConversationAsRead(event.conversationId));
     } catch (error) {
       if (kDebugMode) {
         print('❌ Error loading messages: $error');
@@ -192,6 +202,7 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
 
     try {
       // Créer un nouveau message avec un ID temporaire
+      final imageFile = event.imageFile is File ? event.imageFile as File : null;
       final newMessage = MessageModel(
         id: _uuid.v4(),
         senderId: _currentUserId,
@@ -199,7 +210,7 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
         timestamp: DateTime.now(),
         content: event.content,
         type: event.type,
-        status: MessageStatus.sending, // Message en cours d'envoi
+        status: MessageStatus.sending,
       );
 
       // Ajouter immédiatement le message à l'UI pour un feedback instantané
@@ -231,40 +242,42 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
         selectedConversation: updatedConversation,
       ));
 
-      // 🔄 Tenter d'envoyer via l'API backend
+      // 🔄 Envoi API (texte ou image) — pas de simulation
       MessageModel sentMessage;
       try {
-        print('🔄 Tentative envoi message via API...');
+        print('🔄 Envoi message via API...');
         final responseData = await _apiClient.sendMessage(
           expediteur: _currentUserId,
           destinataire: state.selectedConversation!.participantId,
-          contenu: event.content,
-          pieceJointe: event.imageFile,
-          typePieceJointe: event.imageFile != null ? 'IMAGE' : null,
+          contenu: imageFile != null
+              ? (event.content.trim().isEmpty ? 'Image' : event.content)
+              : event.content,
+          pieceJointe: imageFile,
+          typePieceJointe: imageFile != null ? 'IMAGE' : null,
         );
 
-        // Convertir la réponse backend en MessageModel
         sentMessage = MessageModel.fromBackend(responseData);
         print('✅ Message envoyé via API avec ID: ${sentMessage.id}');
 
-        // Envoyer aussi via WebSocket pour temps réel
-        if (_webSocketService.isConnected) {
-          _webSocketService.sendMessage(
-            expediteur: _currentUserId,
-            destinataire: state.selectedConversation!.participantId,
-            contenu: event.content,
-            conversationId: event.conversationId,
-          );
-        }
+        // Typing stop après envoi
+        _webSocketService.stopTyping(
+          event.conversationId,
+          userId: _currentUserId,
+        );
       } catch (apiError) {
-        // ⚠️ Fallback sur simulation si l'API échoue
-        print('⚠️ API indisponible, simulation envoi: $apiError');
-        await Future.delayed(const Duration(milliseconds: 500));
-        sentMessage = newMessage.copyWith(newStatus: MessageStatus.sent);
-
-        // Simuler la réception après un délai
-        await Future.delayed(const Duration(seconds: 1));
-        sentMessage = sentMessage.copyWith(newStatus: MessageStatus.delivered);
+        print('❌ Échec envoi message: $apiError');
+        final failedMessages = updatedMessages.map((msg) {
+          if (msg.id == newMessage.id) {
+            return msg.copyWith(newStatus: MessageStatus.failed);
+          }
+          return msg;
+        }).toList();
+        updatedMessagesMap[event.conversationId] = failedMessages;
+        emit(state.copyWith(
+          messagesByConversation: updatedMessagesMap,
+          error: apiError.toString(),
+        ));
+        return;
       }
 
       // Mettre à jour les messages avec le message envoyé
@@ -307,19 +320,18 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
   Future<void> _onMarkMessageAsRead(
       MarkMessageAsRead event, Emitter<ChatPageStateM> emit) async {
     try {
-      // Dans un environnement réel, nous appellerions l'API ici
-      // await _apiClient.markMessageAsRead(event.conversationId, event.messageId);
+      await _apiClient.markMessagesAsRead(
+          event.conversationId, _currentUserId);
 
-      // Simuler le succès de l'API
-      await Future.delayed(const Duration(milliseconds: 200));
-
-      // Mettre à jour le message localement
-      if (!state.messagesByConversation.containsKey(event.conversationId))
+      if (!state.messagesByConversation.containsKey(event.conversationId)) {
         return;
+      }
 
       final updatedMessages =
           state.messagesByConversation[event.conversationId]!.map((msg) {
-        if (msg.id == event.messageId) {
+        if (msg.id == event.messageId ||
+            (msg.receiverId == _currentUserId &&
+                msg.status != MessageStatus.seen)) {
           return msg.copyWith(newStatus: MessageStatus.seen);
         }
         return msg;
@@ -433,19 +445,12 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
         return;
       }
 
-      // Créer une nouvelle conversation
-      // Dans un environnement réel, nous appellerions l'API ici
-      // final newConversation = await _apiClient.createConversation(
-      //   _currentUserId,
-      //   event.participantId,
-      //   event.participantName,
-      // );
-
-      // Simuler la création d'une nouvelle conversation
-      await Future.delayed(const Duration(milliseconds: 500));
+      // Créer une conversation avec ID déterministe (aligné web/backend)
+      final conversationId =
+          buildConversationId(_currentUserId, event.participantId);
 
       final newConversation = ConversationModel(
-        id: _uuid.v4(),
+        id: conversationId,
         userId: _currentUserId,
         participantId: event.participantId,
         participantName: event.participantName,
@@ -457,7 +462,11 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
         isOnline: false,
       );
 
-      final updatedConversations = [newConversation, ...state.conversations];
+      final alreadyListed =
+          state.conversations.any((c) => c.id == conversationId);
+      final updatedConversations = alreadyListed
+          ? state.conversations
+          : [newConversation, ...state.conversations];
 
       emit(state.copyWith(
         status: ChatPageStatus.loaded,
@@ -465,14 +474,20 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
         selectedConversation: newConversation,
       ));
 
-      // Initialiser la liste des messages pour cette conversation
       final updatedMessagesMap =
           Map<String, List<MessageModel>>.from(state.messagesByConversation);
-      updatedMessagesMap[newConversation.id] = [];
+      updatedMessagesMap.putIfAbsent(newConversation.id, () => []);
 
       emit(state.copyWith(
         messagesByConversation: updatedMessagesMap,
       ));
+
+      if (_webSocketService.isConnected) {
+        _webSocketService.joinConversation(conversationId);
+      }
+
+      // Charger l'historique s'il existe déjà côté serveur
+      add(LoadMessages(conversationId));
     } catch (error) {
       if (kDebugMode) {
         print('Error creating conversation: $error');
@@ -494,19 +509,12 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
     emit(state.copyWith(status: ChatPageStatus.loading));
 
     try {
-      // Dans un environnement réel, nous appellerions l'API ici
-      // final List<ConversationModel> filteredConversations =
-      //    await _apiClient.searchConversations(_currentUserId, event.query);
-
-      // Simuler une recherche locale
       final lowercaseQuery = event.query.toLowerCase();
-      final filteredConversations = mockConversations.where((conv) {
+      final filteredConversations = state.conversations.where((conv) {
         return conv.participantName.toLowerCase().contains(lowercaseQuery) ||
             (conv.lastMessage?.content.toLowerCase().contains(lowercaseQuery) ??
                 false);
       }).toList();
-
-      await Future.delayed(const Duration(milliseconds: 300));
 
       emit(state.copyWith(
         status: ChatPageStatus.loaded,
@@ -526,12 +534,28 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
   // 🔌 CONFIGURATION DES CALLBACKS WEBSOCKET
   void _setupWebSocketCallbacks() {
     _webSocketService.onNewMessage((data) {
-      add(NewMessageReceived(data));
+      add(NewMessageReceived(Map<String, dynamic>.from(
+          data is Map ? data as Map : {'raw': data})));
     });
 
     _webSocketService.onMessageNotification((data) {
-      // Gérer les notifications de nouveaux messages
       print('🔔 Notification message reçue: $data');
+    });
+
+    _webSocketService.onUserTyping((data) {
+      try {
+        final map = Map<String, dynamic>.from(
+            data is Map ? data as Map : <String, dynamic>{});
+        final conversationId = map['conversationId']?.toString() ?? '';
+        final typingUserId = map['userId']?.toString() ?? '';
+        final isTyping = map['isTyping'] == true;
+        if (conversationId.isEmpty) return;
+        if (typingUserId == _currentUserId) return;
+        add(PartnerTypingChanged(
+          conversationId: conversationId,
+          isTyping: isTyping,
+        ));
+      } catch (_) {}
     });
 
     _webSocketService.onMessageError((error) {
@@ -543,14 +567,34 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
   Future<void> _onConnectWebSocket(
       ConnectWebSocket event, Emitter<ChatPageStateM> emit) async {
     try {
-      await _webSocketService.connect();
-      _webSocketService.authenticate(_currentUserId);
+      await _webSocketService.authenticate(userId: _currentUserId);
       emit(state.copyWith(isWebSocketConnected: true));
+      if (state.selectedConversation != null) {
+        _webSocketService.joinConversation(state.selectedConversation!.id);
+      }
     } catch (error) {
       emit(state.copyWith(
         isWebSocketConnected: false,
         error: 'Erreur connexion WebSocket: $error',
       ));
+    }
+  }
+
+  Future<void> _onPartnerTypingChanged(
+      PartnerTypingChanged event, Emitter<ChatPageStateM> emit) async {
+    if (state.selectedConversation?.id != event.conversationId) return;
+    emit(state.copyWith(partnerTyping: event.isTyping));
+  }
+
+  Future<void> _onEmitTyping(
+      EmitTyping event, Emitter<ChatPageStateM> emit) async {
+    if (!_webSocketService.isConnected) return;
+    if (event.isTyping) {
+      _webSocketService.startTyping(event.conversationId,
+          userId: _currentUserId);
+    } else {
+      _webSocketService.stopTyping(event.conversationId,
+          userId: _currentUserId);
     }
   }
 

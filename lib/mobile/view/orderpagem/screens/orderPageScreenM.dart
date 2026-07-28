@@ -9,6 +9,8 @@ import '../../common/widgets/empty_state_widget.dart';
 import '../widgets/commande_card.dart';
 import 'commande_details_screen.dart';
 import '../../common/widgets/standard_screen_header.dart';
+import '../../common/widgets/unauthenticated_banner.dart';
+import '../../../../data/services/authCubit.dart';
 
 // ✅ Design System
 import '../../../../design_system/design_system.dart';
@@ -73,6 +75,16 @@ class _OrderPageScreenMState extends State<OrderPageScreenM>
 
   @override
   Widget build(BuildContext context) {
+    final authState = context.watch<AuthCubit>().state;
+    if (authState is! AuthAuthenticated) {
+      return const UnauthenticatedBanner(
+        appBarTitle: 'Mes commandes',
+        icon: Icons.shopping_bag_outlined,
+        title: 'Suivez vos commandes',
+        description: 'Connectez-vous pour retrouver l\'historique de vos commandes et suivre leur statut en temps réel.',
+      );
+    }
+
     return BlocBuilder<CommandeBloc, CommandeState>(
       builder: (context, state) {
         return Scaffold(
@@ -95,6 +107,12 @@ class _OrderPageScreenMState extends State<OrderPageScreenM>
                     children: [
                       StandardScreenHeader(
                         title: 'Commandes',
+                        leading: Navigator.of(context).canPop()
+                            ? SdCircleIconButton(
+                                icon: Icons.arrow_back_rounded,
+                                onPressed: () => Navigator.of(context).pop(),
+                              )
+                            : null,
                         actions: [
                           SdCircleIconButton(
                             icon: _isSearchVisible

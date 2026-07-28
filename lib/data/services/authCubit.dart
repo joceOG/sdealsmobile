@@ -1,7 +1,12 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'dart:convert';
 import '../models/utilisateur.dart';
+import 'api_client.dart';
+import 'token_store.dart';
+import 'fcm_service.dart';
 
 abstract class AuthState {}
 
@@ -12,15 +17,19 @@ class AuthLoading extends AuthState {}
 class AuthAuthenticated extends AuthState {
   final String token;
   final Utilisateur utilisateur;
-  final List<String> roles; // CLIENT, PRESTATAIRE, VENDEUR, FREELANCE, ADMIN
-  final String? activeRole; // rôle actif pour l'UI
-  final Map<String, dynamic>? roleDetails; // détails (verifier/accountStatus)
-  AuthAuthenticated(
-      {required this.token,
-      required this.utilisateur,
-      this.roles = const ['CLIENT'],
-      this.activeRole,
-      this.roleDetails});
+  final List<String> roles;
+  final String? activeRole;
+  final Map<String, dynamic>? roleDetails;
+  final String? refreshToken;
+
+  AuthAuthenticated({
+    required this.token,
+    required this.utilisateur,
+    this.roles = const ['CLIENT'],
+    this.activeRole,
+    this.roleDetails,
+    this.refreshToken,
+  });
 }
 
 class AuthError extends AuthState {
@@ -30,10 +39,12 @@ class AuthError extends AuthState {
 
 class AuthCubit extends Cubit<AuthState> {
   AuthCubit() : super(AuthInitial()) {
+    ApiClient.onUnauthorized = () {
+      logout();
+    };
     _loadAuthFromStorage();
   }
 
-  // ✅ CHARGER L'AUTHENTIFICATION AU DÉMARRAGE
   Future<void> _loadAuthFromStorage() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -41,8 +52,47 @@ class AuthCubit extends Cubit<AuthState> {
       final userJson = prefs.getString('auth_user');
       final rolesJson = prefs.getString('auth_roles');
       final activeRole = prefs.getString('auth_active_role');
+      final refreshToken = prefs.getString('refresh_token');
 
       if (token != null && userJson != null) {
+        final apiUrl = dotenv.env['API_URL'];
+        if (apiUrl != null) {
+          try {
+            final verifyResponse = await http.get(
+              Uri.parse('$apiUrl/utilisateur/profile'),
+              headers: {
+                'Authorization': 'Bearer $token',
+                'Content-Type': 'application/json',
+              },
+            ).timeout(const Duration(seconds: 5));
+
+            if (verifyResponse.statusCode == 401) {
+              final refreshed = await ApiClient().refreshAccessToken();
+              if (refreshed == null) {
+                await _clearAuthFromStorage();
+                emit(AuthInitial());
+                return;
+              }
+              final userData = jsonDecode(userJson);
+              final utilisateur = Utilisateur.fromJson(userData);
+              final roles = rolesJson != null
+                  ? List<String>.from(jsonDecode(rolesJson))
+                  : ['CLIENT'];
+              emit(AuthAuthenticated(
+                token: refreshed,
+                utilisateur: utilisateur,
+                roles: roles,
+                activeRole:
+                    activeRole ?? (roles.isNotEmpty ? roles.first : 'CLIENT'),
+                refreshToken: await TokenStore.getRefreshToken(),
+              ));
+              return;
+            }
+          } catch (_) {
+            // Offline : accepter le token local
+          }
+        }
+
         final userData = jsonDecode(userJson);
         final utilisateur = Utilisateur.fromJson(userData);
         final roles = rolesJson != null
@@ -54,22 +104,23 @@ class AuthCubit extends Cubit<AuthState> {
           utilisateur: utilisateur,
           roles: roles,
           activeRole: activeRole ?? (roles.isNotEmpty ? roles.first : 'CLIENT'),
+          refreshToken: refreshToken,
         ));
       }
     } catch (e) {
-      // En cas d'erreur, rester en AuthInitial
       print('Erreur lors du chargement de l\'authentification: $e');
     }
   }
 
-  void setAuthenticated(
-      {required String token,
-      required Utilisateur utilisateur,
-      List<String> roles = const ['CLIENT'],
-      String? activeRole,
-      Map<String, dynamic>? roleDetails}) {
-    // ✅ SAUVEGARDER DANS LE STOCKAGE LOCAL
-    _saveAuthToStorage(token, utilisateur, roles, activeRole);
+  void setAuthenticated({
+    required String token,
+    required Utilisateur utilisateur,
+    List<String> roles = const ['CLIENT'],
+    String? activeRole,
+    Map<String, dynamic>? roleDetails,
+    String? refreshToken,
+  }) {
+    _saveAuthToStorage(token, utilisateur, roles, activeRole, refreshToken);
 
     emit(AuthAuthenticated(
       token: token,
@@ -77,12 +128,20 @@ class AuthCubit extends Cubit<AuthState> {
       roles: roles,
       activeRole: activeRole ?? (roles.isNotEmpty ? roles.first : 'CLIENT'),
       roleDetails: roleDetails,
+      refreshToken: refreshToken,
     ));
+
+    // Enregistrer le token FCM maintenant que la session est active
+    Future.microtask(() => FcmService.instance.syncTokenWithBackend());
   }
 
-  // ✅ SAUVEGARDER L'AUTHENTIFICATION
-  Future<void> _saveAuthToStorage(String token, Utilisateur utilisateur,
-      List<String> roles, String? activeRole) async {
+  Future<void> _saveAuthToStorage(
+    String token,
+    Utilisateur utilisateur,
+    List<String> roles,
+    String? activeRole,
+    String? refreshToken,
+  ) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('auth_token', token);
@@ -91,23 +150,38 @@ class AuthCubit extends Cubit<AuthState> {
       if (activeRole != null) {
         await prefs.setString('auth_active_role', activeRole);
       }
+      await TokenStore.saveTokens(
+        accessToken: token,
+        refreshToken: refreshToken,
+      );
     } catch (e) {
       print('Erreur lors de la sauvegarde de l\'authentification: $e');
     }
   }
 
-  void setRoles(
-      {required List<String> roles,
-      String? activeRole,
-      Map<String, dynamic>? roleDetails}) {
+  void setRoles({
+    required List<String> roles,
+    String? activeRole,
+    Map<String, dynamic>? roleDetails,
+  }) {
     final current = state;
     if (current is AuthAuthenticated) {
+      final newRoles = roles.isNotEmpty ? roles : current.roles;
+      final newActiveRole = activeRole ?? current.activeRole;
+      _saveAuthToStorage(
+        current.token,
+        current.utilisateur,
+        newRoles,
+        newActiveRole,
+        current.refreshToken,
+      );
       emit(AuthAuthenticated(
         token: current.token,
         utilisateur: current.utilisateur,
-        roles: roles.isNotEmpty ? roles : current.roles,
-        activeRole: activeRole ?? current.activeRole,
+        roles: newRoles,
+        activeRole: newActiveRole,
         roleDetails: roleDetails ?? current.roleDetails,
+        refreshToken: current.refreshToken,
       ));
     }
   }
@@ -115,32 +189,54 @@ class AuthCubit extends Cubit<AuthState> {
   void switchActiveRole(String role) {
     final current = state;
     if (current is AuthAuthenticated && current.roles.contains(role)) {
-      // ✅ PROTECTION : Ne pas émettre si le rôle est déjà actif
-      if (current.activeRole == role) {
-        print('Rôle $role déjà actif, pas de changement');
-        return;
-      }
+      if (current.activeRole == role) return;
 
-      // ✅ PROTECTION : Vérifier que l'état a vraiment changé
-      final newState = AuthAuthenticated(
+      _saveAuthToStorage(
+        current.token,
+        current.utilisateur,
+        current.roles,
+        role,
+        current.refreshToken,
+      );
+
+      emit(AuthAuthenticated(
         token: current.token,
         utilisateur: current.utilisateur,
         roles: current.roles,
         activeRole: role,
         roleDetails: current.roleDetails,
-      );
-
-      // Émettre seulement si l'état est différent
-      emit(newState);
+        refreshToken: current.refreshToken,
+      ));
     }
   }
 
-  void logout() {
-    _clearAuthFromStorage();
+  Future<void> logout() async {
+    final current = state;
+    if (current is AuthAuthenticated) {
+      try {
+        await FcmService.instance.unregisterFromBackend();
+      } catch (_) {}
+      try {
+        final apiUrl = dotenv.env['API_URL'] ?? '';
+        await http
+            .post(
+              Uri.parse('$apiUrl/logout'),
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ${current.token}',
+              },
+              body: jsonEncode({
+                if (current.refreshToken != null)
+                  'refreshToken': current.refreshToken,
+              }),
+            )
+            .timeout(const Duration(seconds: 10));
+      } catch (_) {}
+    }
+    await _clearAuthFromStorage();
     emit(AuthInitial());
   }
 
-  // ✅ SUPPRIMER L'AUTHENTIFICATION DU STOCKAGE
   Future<void> _clearAuthFromStorage() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -148,6 +244,7 @@ class AuthCubit extends Cubit<AuthState> {
       await prefs.remove('auth_user');
       await prefs.remove('auth_roles');
       await prefs.remove('auth_active_role');
+      await TokenStore.clear();
     } catch (e) {
       print('Erreur lors de la suppression de l\'authentification: $e');
     }

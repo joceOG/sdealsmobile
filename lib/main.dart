@@ -3,9 +3,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:responsive_builder/responsive_builder.dart';
 import 'package:sdealsmobile/data/models/article.dart';
+import 'package:sdealsmobile/data/models/vendeur.dart' hide Utilisateur;
 import 'data/models/categorie.dart';
 import 'data/models/utilisateur.dart';
 import 'data/services/authCubit.dart';
+import 'data/services/fcm_service.dart';
 import 'mobile/view/locationpagem/locationpageblocm/locationPageBlocM.dart';
 import 'mobile/view/home.dart';
 import 'mobile/view/loginpagem/loginpageblocm/loginPageBlocM.dart';
@@ -19,6 +21,7 @@ import 'mobile/view/serviceproviderregistrationpagem/screens/serviceProviderRegi
 import 'mobile/view/serviceproviderregistrationpagem/serviceproviderregistrationoageblocm/serviceProviderRegistrationPageBlocM.dart';
 import 'mobile/view/serviceproviderwelcomepagem/screens/serviceProviderWelcomeScreenM.dart';
 import 'mobile/view/shoppingpagem/screens/productDetailsScreenM.dart';
+import 'mobile/view/shoppingpagem/screens/vendorDetailsScreenM.dart';
 import 'mobile/view/shoppingpagem/shoppingpageblocm/shoppingPageBlocM.dart';
 import 'mobile/view/shoppingpagem/shoppingpageblocm/shoppingPageEventM.dart'
     as shoppingPageEventM;
@@ -27,6 +30,8 @@ import 'mobile/view/splashcreenm/splashscreenblocm/splashscreenBlocM.dart';
 import 'mobile/view/splashcreenm/splashscreenblocm/splashscreenEventM.dart';
 import 'mobile/view/walletpagem/screens/walletPageScreenM.dart';
 import 'mobile/view/walletpagem/soutrapayblocm/soutra_wallet_bloc.dart';
+import 'mobile/view/chatpagem/screens/chatPageScreenM.dart';
+import 'mobile/view/chatpagem/chatpageblocm/chatPageBlocM.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
@@ -40,6 +45,9 @@ void main() async {
   await Hive.initFlutter();
   await dotenv.load(fileName: ".env");
   await initializeDateFormatting('fr_FR', null);
+
+  // FCM : no-op si Firebase non configuré (pas de google-services.json)
+  await FcmService.instance.initialize();
 
   runApp(MyApp());
 }
@@ -110,7 +118,17 @@ class MyApp extends StatelessWidget {
         path: '/prestataire-finalization',
         name: 'prestataire-finalization',
         builder: (context, state) {
-          return PrestataireFinalizationScreen();
+          return PrestataireFinalizationScreen(
+            prestataireId: state.extra as String?,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/vendeurDetails',
+        name: 'vendeurDetails',
+        builder: (context, state) {
+          final vendeur = state.extra as Vendeur;
+          return VendorDetailsScreenM(vendeur: vendeur);
         },
       ),
       GoRoute(
@@ -176,36 +194,13 @@ class MyApp extends StatelessWidget {
         name: 'chat',
         builder: (context, state) {
           final conversationId = state.pathParameters['conversationId'] ?? '';
-          // TODO: Créer ou utiliser ChatScreen existant
-          return Scaffold(
-            appBar: AppBar(
-              title: const Text('Conversation'),
-              backgroundColor: const Color(0xFF2E7D32),
-              foregroundColor: Colors.white,
-            ),
-            body: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.chat_bubble, size: 64, color: Color(0xFF2E7D32)),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Écran Chat à implémenter',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Conversation ID: $conversationId',
-                    style: const TextStyle(color: Colors.grey),
-                  ),
-                  const SizedBox(height: 24),
-                  const Text(
-                    'TODO: Utiliser ChatPageScreenM existant',
-                    style: TextStyle(fontSize: 14, fontStyle: FontStyle.italic),
-                  ),
-                ],
-              ),
-            ),
+          final authState = context.read<AuthCubit>().state;
+          final userId = authState is AuthAuthenticated
+              ? (authState.utilisateur.idutilisateur ?? '')
+              : '';
+          return BlocProvider(
+            create: (_) => ChatPageBlocM(userId: userId),
+            child: ChatPageScreenM(conversationId: conversationId),
           );
         },
       ),
@@ -227,7 +222,20 @@ class MyApp extends StatelessWidget {
           create: (_) => LocationPageBlocM(),
         ),
       ],
-      child: ResponsiveBuilder(builder: (context, sizingInformation) {
+      child: Builder(builder: (context) {
+        // Deep-links FCM → GoRouter
+        FcmService.instance.onNavigate = (data) {
+          final route = FcmService.resolveRoute(data);
+          if (route != null && route.isNotEmpty) {
+            mobileRouter.go(route);
+          }
+        };
+        final auth = context.read<AuthCubit>().state;
+        if (auth is AuthAuthenticated) {
+          Future.microtask(() => FcmService.instance.syncTokenWithBackend());
+        }
+
+        return ResponsiveBuilder(builder: (context, sizingInformation) {
         GoRouter router = mobileRouter;
 
         return MaterialApp.router(
@@ -409,8 +417,23 @@ class MyApp extends StatelessWidget {
               unselectedLabelStyle: SDTypography.labelSmall,
               type: BottomNavigationBarType.fixed,
             ),
+
+            // SnackBars bruts (sans AppSnackBar) : couleur marque + coins arrondis
+            snackBarTheme: SnackBarThemeData(
+              behavior: SnackBarBehavior.floating,
+              elevation: 2,
+              backgroundColor: SDColors.primary700,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              contentTextStyle: SDTypography.bodyMedium.copyWith(
+                color: SDColors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         );
+      });
       }),
     );
   }
