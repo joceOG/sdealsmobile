@@ -140,8 +140,9 @@ class ShoppingPageBlocM extends Bloc<ShoppingPageEventM, ShoppingPageStateM> {
               }
 
               products.add(Product(
-                id: article.hashCode
-                    .toString(), // Utiliser hashCode comme ID unique
+                id: article.id?.isNotEmpty == true
+                    ? article.id!
+                    : '${article.nomArticle}_${article.prixArticle}',
                 name: article.nomArticle.isEmpty
                     ? 'Article sans nom'
                     : article.nomArticle,
@@ -167,93 +168,26 @@ class ShoppingPageBlocM extends Bloc<ShoppingPageEventM, ShoppingPageStateM> {
           ));
           return;
         } else {
-          print("Aucun article trouvé dans l'API ou erreur de récupération");
+          print("Aucun article trouvé dans l'API");
         }
       } catch (apiError) {
         print("Erreur lors de la récupération des articles: $apiError");
+        emit(state.copyWith(
+          products: const [],
+          filteredProducts: const [],
+          isLoading: false,
+          error: 'Impossible de charger le catalogue',
+        ));
+        return;
       }
 
-      // Si l'API échoue, utiliser les données fictives comme fallback
-      List<Product> mockProducts = [
-        Product(
-            id: '1',
-            name: 'Nike Air Max',
-            image: 'assets/products/1.png',
-            size: 'Pointures 42-43',
-            price: '25.000 Fcfa',
-            brand: 'Nike'),
-        Product(
-            id: '2',
-            name: 'Adidas Superstar',
-            image: 'assets/products/2.png',
-            size: 'Pointures 42-43',
-            price: '30.000 Fcfa',
-            brand: 'Adidas',
-            isFavorite: false),
-        Product(
-            id: '3',
-            name: 'Puma Suede',
-            image: 'assets/products/3.png',
-            size: 'Pointures 40-44',
-            price: '22.000 Fcfa',
-            brand: 'Puma'),
-        Product(
-            id: '4',
-            name: 'Reebok Classic',
-            image: 'assets/products/4.png',
-            size: 'Pointures 41-45',
-            price: '28.000 Fcfa',
-            brand: 'Reebok',
-            isFavorite: false),
-        Product(
-            id: '5',
-            name: 'Fila Disruptor',
-            image: 'assets/products/5.png',
-            size: 'Pointures 39-43',
-            price: '20.000 Fcfa',
-            brand: 'Fila'),
-        Product(
-            id: '6',
-            name: 'Converse Chuck Taylor',
-            image: 'assets/products/6.png',
-            size: 'Pointures 38-42',
-            price: '27.000 Fcfa',
-            brand: 'Converse'),
-        Product(
-            id: '7',
-            name: 'Vans Old Skool',
-            image: 'assets/products/7.png',
-            size: 'Pointures 40-44',
-            price: '24.000 Fcfa',
-            brand: 'Vans'),
-        Product(
-            id: '8',
-            name: 'New Balance 574',
-            image: 'assets/products/8.png',
-            size: 'Pointures 41-45',
-            price: '29.000 Fcfa',
-            brand: 'New Balance'),
-        Product(
-            id: '9',
-            name: 'Asics Gel Lyte',
-            image: 'assets/products/9.png',
-            size: 'Pointures 40-43',
-            price: '23.000 Fcfa',
-            brand: 'Asics'),
-        Product(
-            id: '10',
-            name: 'Air Jordan 4',
-            image: 'assets/products/10.png',
-            size: 'Pointures 42-46',
-            price: '35.000 Fcfa',
-            brand: 'Jordan',
-            rating: 4.9),
-      ];
-
+      // Pas de catalogue fictif : liste vide plutôt que faux succès
       emit(state.copyWith(
-          products: mockProducts,
-          filteredProducts: mockProducts,
-          isLoading: false));
+        products: const [],
+        filteredProducts: const [],
+        isLoading: false,
+        error: 'Aucun produit disponible',
+      ));
     } catch (error) {
       emit(state.copyWith(error: error.toString(), isLoading: false));
     }
@@ -496,7 +430,7 @@ class ShoppingPageBlocM extends Bloc<ShoppingPageEventM, ShoppingPageStateM> {
 
       // ✅ NETTOYER LES DONNÉES AVANT PARSING (FIX UNICODE)
       List<Map<String, dynamic>> vendeursCleans = vendeursData.map((data) {
-        return _cleanVendeurData(data);
+        return data; // UTF-8 corrigé côté ApiClient.decodeJson — plus de pansement mojibake
       }).toList();
 
       // Convertir les données nettoyées en modèles Vendeur
@@ -620,70 +554,7 @@ class ShoppingPageBlocM extends Bloc<ShoppingPageEventM, ShoppingPageStateM> {
         "Vendeur ${event.vendeurId} ${favoriteIds.contains(event.vendeurId) ? 'ajouté aux' : 'retiré des'} favoris");
   }
 
-  // ✅ MÉTHODE ULTRA-ROBUSTE : Nettoyer toutes les données Unicode corrompues
-  Map<String, dynamic> _cleanVendeurData(Map<String, dynamic> data) {
-    Map<String, dynamic> cleanData = {};
-
-    data.forEach((key, value) {
-      if (value is String) {
-        // Nettoyer les strings Unicode corrompus
-        cleanData[key] = _cleanUnicodeString(value);
-      } else if (value is Map<String, dynamic>) {
-        // Récursif pour les objets imbriqués
-        cleanData[key] = _cleanVendeurData(value);
-      } else if (value is List) {
-        // Nettoyer les listes
-        cleanData[key] = value.map((item) {
-          if (item is String) {
-            return _cleanUnicodeString(item);
-          } else if (item is Map<String, dynamic>) {
-            return _cleanVendeurData(item);
-          }
-          return item;
-        }).toList();
-      } else {
-        // Garder les autres types tels quels
-        cleanData[key] = value;
-      }
-    });
-
-    return cleanData;
-  }
-
-  // ✅ NETTOYAGE ULTRA-DÉFENSIF DES STRINGS UNICODE
-  String _cleanUnicodeString(String input) {
-    if (input.isEmpty) return input;
-
-    try {
-      String cleaned = input
-          // Remplacer les caractères Unicode corrompus spécifiques
-          .replaceAll('�', '')
-          .replaceAll('Ã´', 'ô')
-          .replaceAll('Ã©', 'é')
-          .replaceAll('Ã¨', 'è')
-          .replaceAll('Ã ', 'à')
-          .replaceAll('Ã»', 'û')
-          .replaceAll('Ã§', 'ç')
-          .replaceAll('Ã¢', 'â')
-          .replaceAll('Ã®', 'î')
-          .replaceAll('Ã¯', 'ï')
-          .replaceAll('Ã¼', 'ü')
-          .replaceAll('Ã«', 'ë')
-          .replaceAll('Ã', 'À')
-          .replaceAll('Â', '')
-          // Nettoyer les bytes invisibles
-          .replaceAll(RegExp(r'[\u0000-\u001F\u007F-\u009F]'), '')
-          // Supprimer les caractères de contrôle
-          .replaceAll(RegExp(r'[\uFFFD\uFEFF]'), '')
-          .trim();
-
-      // Si le string devient devient vide après nettoyage, retourner une valeur par défaut
-      return cleaned.isEmpty ? 'Non spécifié' : cleaned;
-    } catch (e) {
-      print('Erreur nettoyage string: $e pour input: $input');
-      return 'Non spécifié';
-    }
-  }
+  // Ancien pansement mojibake retiré — le décodage UTF-8 est dans ApiClient.decodeJson
 
   // 🛒 ==================== HANDLERS DU PANIER ====================
 

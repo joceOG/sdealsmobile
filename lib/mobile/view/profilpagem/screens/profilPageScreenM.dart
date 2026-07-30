@@ -535,12 +535,23 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
                               title: "Sécurité du compte",
                               subtitle: "Mot de passe, double authentification",
                               onTap: () {
+                                final auth = context.read<AuthCubit>().state;
                                 Navigator.of(context).push(
                                   MaterialPageRoute(
                                     builder: (context) => BlocProvider(
-                                      create: (context) => SecurityPageBlocM(
-                                        apiClient: ApiClient(),
-                                      ),
+                                      create: (context) {
+                                        final bloc = SecurityPageBlocM(
+                                          apiClient: ApiClient(),
+                                        );
+                                        if (auth is AuthAuthenticated) {
+                                          bloc.setAuth(
+                                            token: auth.token,
+                                            userId:
+                                                auth.utilisateur.idutilisateur,
+                                          );
+                                        }
+                                        return bloc;
+                                      },
                                       child: const SecurityPageScreenM(),
                                     ),
                                   ),

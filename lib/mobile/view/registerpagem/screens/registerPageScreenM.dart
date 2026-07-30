@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../data/models/utilisateur.dart';
+import '../../../../data/services/api_client.dart';
 import '../../../../data/services/authCubit.dart';
+import '../../../../data/services/google_auth_service.dart';
+import '../../../../data/services/token_store.dart';
 import '../registerpageblocm/registerPageBlocM.dart';
 import '../registerpageblocm/registerPageEventM.dart';
 import '../registerpageblocm/registerPageStateM.dart';
@@ -113,6 +117,45 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
             confirmPassword: _confirmPasswordController.text,
           ),
         );
+  }
+
+  Future<void> _signInWithGoogle(BuildContext context) async {
+    try {
+      final idToken = await GoogleAuthService.instance.signInForIdToken();
+      if (idToken == null || !context.mounted) return;
+
+      final response = await ApiClient().loginWithGoogle(idToken: idToken);
+      final token = response['token']?.toString() ?? '';
+      final refreshToken = response['refreshToken']?.toString();
+      final utilisateurData =
+          response['utilisateur'] as Map<String, dynamic>? ?? {};
+      if (token.isEmpty) {
+        throw Exception('Token manquant');
+      }
+
+      final utilisateur = Utilisateur.fromMap(utilisateurData);
+      await TokenStore.saveTokens(
+        accessToken: token,
+        refreshToken: refreshToken,
+      );
+
+      if (!context.mounted) return;
+      final role = utilisateur.role.toUpperCase();
+      context.read<AuthCubit>().setAuthenticated(
+            token: token,
+            utilisateur: utilisateur,
+            roles: [role],
+            activeRole: role,
+            refreshToken: refreshToken,
+          );
+      context.push('/homepage');
+    } catch (e) {
+      if (!context.mounted) return;
+      AppSnackBar.error(
+        context,
+        e.toString().replaceAll('Exception: ', ''),
+      );
+    }
   }
 
   @override
@@ -327,22 +370,10 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
                             prev.isSubmitting != curr.isSubmitting,
                         builder: (context, state) {
                           return SDGoogleSignInButton(
+                            isLoading: state.isSubmitting,
                             onPressed: state.isSubmitting
                                 ? null
-                                : () {
-                                    ScaffoldMessenger.of(context)
-                                        .showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          'Inscription avec Google : bientôt disponible.',
-                                          style: SDTypography.bodyMedium
-                                              .copyWith(
-                                                  color: SDColors.white),
-                                        ),
-                                        backgroundColor: SDColors.neutral700,
-                                      ),
-                                    );
-                                  },
+                                : () => _signInWithGoogle(context),
                           );
                         },
                       ),

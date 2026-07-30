@@ -27,14 +27,14 @@ class SDGoogleSignInButton extends StatelessWidget {
       color: SDColors.white,
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium), // 12px — aligné avec SDButton
         side: BorderSide(color: SDColors.neutral300, width: 1),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: effectiveOnPressed,
         child: SizedBox(
-          height: 52,
+          height: SDSpacing.buttonHeight, // 56px — aligné avec SDButton
           child: Padding(
             padding: EdgeInsets.symmetric(horizontal: SDSpacing.md),
             child: isLoading

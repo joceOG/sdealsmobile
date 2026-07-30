@@ -8,6 +8,7 @@ import '../../../../data/services/authCubit.dart';
 import '../loginpageblocm/loginPageBlocM.dart';
 import '../loginpageblocm/loginPageEventM.dart';
 import '../loginpageblocm/loginPageStateM.dart';
+import '../../common/utils/app_snackbar.dart';
 
 // ✅ Design System
 import '../../../../design_system/design_system.dart';
@@ -99,8 +100,7 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
               context.push('/homepage');
               print('🔐 Connecté en tant que $activeRole avec rôles: $roles');
             } else if (state is LoginPageFailureM) {
-              ScaffoldMessenger.of(context)
-                  .showSnackBar(SnackBar(content: Text(state.error)));
+              AppSnackBar.error(context, state.error);
             }
           },
           child: SingleChildScrollView(
@@ -189,7 +189,12 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
                       Align(
                         alignment: Alignment.centerRight,
                         child: TextButton(
-                          onPressed: () {},
+                          onPressed: () {
+                            AppSnackBar.info(
+                              context,
+                              'Contactez le support pour réinitialiser votre mot de passe.',
+                            );
+                          },
                           style: TextButton.styleFrom(
                             padding: EdgeInsets.symmetric(
                               horizontal: SDSpacing.xs,
@@ -254,17 +259,9 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
                   SDSpacing.verticalMediumGap,
                   SDGoogleSignInButton(
                     onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'Connexion Google : bientôt disponible.',
-                            style: SDTypography.bodyMedium.copyWith(
-                              color: SDColors.white,
-                            ),
-                          ),
-                          backgroundColor: SDColors.neutral700,
-                        ),
-                      );
+                      context
+                          .read<LoginPageBlocM>()
+                          .add(GoogleLoginSubmittedM());
                     },
                   ),
                   SDSpacing.verticalMediumGap,

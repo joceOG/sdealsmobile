@@ -40,6 +40,8 @@ class _ServiceProviderRegistrationScreenMState
     'position': null,
     'address': '',
     'password': '',
+    'confirmPassword': '',
+    'requirePassword': true,
     'birthDate': null,
     'gender': 'Homme',
     'businessName': '',
@@ -77,7 +79,10 @@ class _ServiceProviderRegistrationScreenMState
               '${u.prenom ?? ''} ${u.nom ?? ''}'.trim();
           formData['phone'] = u.telephone ?? '';
           formData['email'] = u.email ?? '';
+          formData['requirePassword'] = false;
         });
+      } else {
+        setState(() => formData['requirePassword'] = true);
       }
     });
   }
@@ -129,6 +134,18 @@ class _ServiceProviderRegistrationScreenMState
     if (phone.isEmpty) {
       _showError('Veuillez renseigner votre numéro de téléphone');
       return false;
+    }
+    if (formData['requirePassword'] == true) {
+      final password = (formData['password'] as String?)?.trim() ?? '';
+      final confirm = (formData['confirmPassword'] as String?)?.trim() ?? '';
+      if (password.length < 6) {
+        _showError('Mot de passe requis (6 caractères minimum)');
+        return false;
+      }
+      if (password != confirm) {
+        _showError('Les mots de passe ne correspondent pas');
+        return false;
+      }
     }
     if (category == null) {
       _showError('Veuillez sélectionner votre catégorie');

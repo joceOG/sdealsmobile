@@ -27,6 +27,8 @@ class _ProviderPersonalInfoStepState extends State<ProviderPersonalInfoStep> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _confirmPasswordController = TextEditingController();
 
   File? _profileImage;
   String? _selectedCategory;
@@ -120,6 +122,8 @@ class _ProviderPersonalInfoStepState extends State<ProviderPersonalInfoStep> {
     _nameController.dispose();
     _phoneController.dispose();
     _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
@@ -151,6 +155,8 @@ class _ProviderPersonalInfoStepState extends State<ProviderPersonalInfoStep> {
       'fullName': _nameController.text,
       'phone': _phoneController.text,
       'email': _emailController.text,
+      'password': _passwordController.text,
+      'confirmPassword': _confirmPasswordController.text,
       'category': validCategory,
       'categoryName': categoryName,
       'service': validService,
@@ -269,6 +275,27 @@ class _ProviderPersonalInfoStepState extends State<ProviderPersonalInfoStep> {
           },
           onChanged: (_) => _updateFormData(),
         ),
+        // Mot de passe — obligatoire si nouveau compte (non connecté)
+        if (widget.formData['requirePassword'] == true) ...[
+          SizedBox(height: SDSpacing.sm),
+          SDInput(
+            label: 'Mot de passe *',
+            hint: 'Au moins 6 caractères',
+            controller: _passwordController,
+            prefixIcon: Icons.lock_outline,
+            obscureText: true,
+            onChanged: (_) => _updateFormData(),
+          ),
+          SizedBox(height: SDSpacing.sm),
+          SDInput(
+            label: 'Confirmer le mot de passe *',
+            hint: 'Retapez le mot de passe',
+            controller: _confirmPasswordController,
+            prefixIcon: Icons.lock_outline,
+            obscureText: true,
+            onChanged: (_) => _updateFormData(),
+          ),
+        ],
         SizedBox(height: SDSpacing.md),
 
         // Catégorie

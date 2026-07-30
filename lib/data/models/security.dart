@@ -32,54 +32,76 @@ class Security {
   });
 
   factory Security.fromJson(Map<String, dynamic> json) {
-    return Security(
-      id: json['_id'],
-      userId: json['userId'],
-      twoFactorEnabled: json['twoFactorEnabled'] ?? false,
-      twoFactorSecret: json['twoFactorSecret'],
-      sessions: (json['sessions'] as List<dynamic>?)
-              ?.map((session) => SecuritySession.fromJson(session))
-              .toList() ??
-          [],
-      alerts: (json['alerts'] as List<dynamic>?)
-              ?.map((alert) => SecurityAlert.fromJson(alert))
-              .toList() ??
-          [],
-      trustedDevices: (json['trustedDevices'] as List<dynamic>?)
-              ?.map((device) => TrustedDevice.fromJson(device))
-              .toList() ??
-          [],
-      settings: SecuritySettings.fromJson(json['settings'] ?? {}),
-      lastPasswordChange: json['lastPasswordChange'] != null
-          ? DateTime.parse(json['lastPasswordChange'])
-          : null,
-      lastLogin:
-          json['lastLogin'] != null ? DateTime.parse(json['lastLogin']) : null,
-      lastLoginIp: json['lastLoginIp'],
-      lastLoginLocation: json['lastLoginLocation'],
-      createdAt: DateTime.parse(json['createdAt']),
-      updatedAt: DateTime.parse(json['updatedAt']),
-    );
+    return Security.fromBackend({'security': json});
   }
 
-  Map<String, dynamic> toJson() {
-    return {
-      '_id': id,
-      'userId': userId,
-      'twoFactorEnabled': twoFactorEnabled,
-      'twoFactorSecret': twoFactorSecret,
-      'sessions': sessions.map((session) => session.toJson()).toList(),
-      'alerts': alerts.map((alert) => alert.toJson()).toList(),
-      'trustedDevices':
-          trustedDevices.map((device) => device.toJson()).toList(),
-      'settings': settings.toJson(),
-      'lastPasswordChange': lastPasswordChange?.toIso8601String(),
-      'lastLogin': lastLogin?.toIso8601String(),
-      'lastLoginIp': lastLoginIp,
-      'lastLoginLocation': lastLoginLocation,
-      'createdAt': createdAt.toIso8601String(),
-      'updatedAt': updatedAt.toIso8601String(),
-    };
+  /// Accepte `{ security: doc }` (API) ou le document plat.
+  factory Security.fromBackend(Map<String, dynamic> payload) {
+    final root = payload['security'] is Map
+        ? Map<String, dynamic>.from(payload['security'] as Map)
+        : payload;
+
+    final twoFa = root['twoFactorAuth'] is Map
+        ? Map<String, dynamic>.from(root['twoFactorAuth'] as Map)
+        : <String, dynamic>{};
+
+    final userRaw = root['utilisateur'] ?? root['userId'] ?? '';
+    final userId = userRaw is Map
+        ? (userRaw['_id'] ?? userRaw['id'] ?? '').toString()
+        : userRaw.toString();
+
+    DateTime parseDt(dynamic v) {
+      if (v == null) return DateTime.now();
+      return DateTime.tryParse(v.toString()) ?? DateTime.now();
+    }
+
+    List<Map<String, dynamic>> asMapList(dynamic v) {
+      if (v is! List) return [];
+      return v
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+    }
+
+    final sessions = asMapList(root['activeSessions'] ?? root['sessions'])
+        .map(SecuritySession.fromJson)
+        .toList();
+    final alerts = asMapList(root['securityAlerts'] ?? root['alerts'])
+        .map(SecurityAlert.fromJson)
+        .toList();
+    final devices = asMapList(root['trustedDevices'])
+        .map(TrustedDevice.fromJson)
+        .toList();
+
+    final settingsRaw = root['securitySettings'] ?? root['settings'] ?? {};
+    final settings = SecuritySettings.fromJson(
+      settingsRaw is Map
+          ? Map<String, dynamic>.from(settingsRaw)
+          : <String, dynamic>{},
+    );
+
+    return Security(
+      id: root['_id']?.toString(),
+      userId: userId,
+      twoFactorEnabled: twoFa['enabled'] == true ||
+          root['twoFactorEnabled'] == true,
+      twoFactorSecret: twoFa['secret']?.toString() ??
+          root['twoFactorSecret']?.toString(),
+      sessions: sessions,
+      alerts: alerts,
+      trustedDevices: devices,
+      settings: settings,
+      lastPasswordChange: root['lastPasswordChange'] != null
+          ? parseDt(root['lastPasswordChange'])
+          : null,
+      lastLogin: root['securityStats']?['lastLogin'] != null
+          ? parseDt(root['securityStats']['lastLogin'])
+          : (root['lastLogin'] != null ? parseDt(root['lastLogin']) : null),
+      lastLoginIp: root['lastLoginIp']?.toString(),
+      lastLoginLocation: root['lastLoginLocation']?.toString(),
+      createdAt: parseDt(root['createdAt']),
+      updatedAt: parseDt(root['updatedAt']),
+    );
   }
 }
 
@@ -107,18 +129,20 @@ class SecuritySession {
   });
 
   factory SecuritySession.fromJson(Map<String, dynamic> json) {
+    DateTime parseDt(dynamic v) =>
+        DateTime.tryParse(v?.toString() ?? '') ?? DateTime.now();
     return SecuritySession(
-      id: json['_id'],
-      deviceName: json['deviceName'],
-      deviceType: json['deviceType'],
-      ipAddress: json['ipAddress'],
-      location: json['location'],
-      userAgent: json['userAgent'],
-      isActive: json['isActive'] ?? true,
-      createdAt: DateTime.parse(json['createdAt']),
+      id: json['_id']?.toString() ?? json['id']?.toString(),
+      deviceName: (json['deviceName'] ?? json['device'] ?? 'Appareil').toString(),
+      deviceType: (json['deviceType'] ?? json['platform'] ?? 'unknown').toString(),
+      ipAddress: (json['ipAddress'] ?? json['ip'] ?? '').toString(),
+      location: (json['location'] ?? '').toString(),
+      userAgent: (json['userAgent'] ?? '').toString(),
+      isActive: json['isActive'] ?? json['success'] ?? true,
+      createdAt: parseDt(json['createdAt'] ?? json['loginTime']),
       lastActivity: json['lastActivity'] != null
-          ? DateTime.parse(json['lastActivity'])
-          : null,
+          ? parseDt(json['lastActivity'])
+          : (json['loginTime'] != null ? parseDt(json['loginTime']) : null),
     );
   }
 
@@ -160,14 +184,17 @@ class SecurityAlert {
 
   factory SecurityAlert.fromJson(Map<String, dynamic> json) {
     return SecurityAlert(
-      id: json['_id'],
-      type: json['type'],
-      title: json['title'],
-      message: json['message'],
-      severity: json['severity'],
+      id: json['_id']?.toString() ?? json['id']?.toString(),
+      type: (json['type'] ?? 'INFO').toString(),
+      title: (json['title'] ?? '').toString(),
+      message: (json['message'] ?? '').toString(),
+      severity: (json['severity'] ?? 'LOW').toString(),
       isRead: json['isRead'] ?? false,
-      createdAt: DateTime.parse(json['createdAt']),
-      metadata: json['metadata'],
+      createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? '') ??
+          DateTime.now(),
+      metadata: json['metadata'] is Map
+          ? Map<String, dynamic>.from(json['metadata'] as Map)
+          : null,
     );
   }
 
@@ -207,16 +234,18 @@ class TrustedDevice {
   });
 
   factory TrustedDevice.fromJson(Map<String, dynamic> json) {
+    DateTime parseDt(dynamic v) =>
+        DateTime.tryParse(v?.toString() ?? '') ?? DateTime.now();
     return TrustedDevice(
-      id: json['_id'],
-      deviceName: json['deviceName'],
-      deviceType: json['deviceType'],
-      deviceId: json['deviceId'],
-      ipAddress: json['ipAddress'],
-      location: json['location'],
-      addedAt: DateTime.parse(json['addedAt']),
+      id: json['_id']?.toString() ?? json['id']?.toString(),
+      deviceName: (json['deviceName'] ?? 'Appareil').toString(),
+      deviceType: (json['deviceType'] ?? 'unknown').toString(),
+      deviceId: (json['deviceId'] ?? json['_id'] ?? '').toString(),
+      ipAddress: (json['ipAddress'] ?? '').toString(),
+      location: (json['location'] ?? '').toString(),
+      addedAt: parseDt(json['addedAt'] ?? json['createdAt']),
       lastUsed:
-          json['lastUsed'] != null ? DateTime.parse(json['lastUsed']) : null,
+          json['lastUsed'] != null ? parseDt(json['lastUsed']) : null,
     );
   }
 
@@ -254,14 +283,30 @@ class SecuritySettings {
   });
 
   factory SecuritySettings.fromJson(Map<String, dynamic> json) {
+    final emailNotifs = json['emailNotifications'];
+    final loginNotif = json['loginNotifications'] ??
+        (emailNotifs is Map ? emailNotifs['newLogin'] : null);
+
+    final rawTimeout = json['sessionTimeout'];
+    final timeoutMinutes = json['sessionTimeoutMinutes'] is num
+        ? (json['sessionTimeoutMinutes'] as num).toInt()
+        : (rawTimeout is num ? rawTimeout.toInt() : 30);
+
     return SecuritySettings(
-      loginNotifications: json['loginNotifications'] ?? true,
-      twoFactorRequired: json['twoFactorRequired'] ?? false,
-      sessionTimeout: json['sessionTimeout'] ?? true,
-      sessionTimeoutMinutes: json['sessionTimeoutMinutes'] ?? 30,
-      allowMultipleSessions: json['allowMultipleSessions'] ?? true,
-      requirePasswordChange: json['requirePasswordChange'] ?? false,
-      passwordChangeDays: json['passwordChangeDays'] ?? 90,
+      loginNotifications: loginNotif == true || loginNotif == null,
+      twoFactorRequired: json['twoFactorRequired'] == true,
+      sessionTimeout: rawTimeout is bool
+          ? rawTimeout
+          : (rawTimeout is num ? rawTimeout > 0 : true),
+      sessionTimeoutMinutes: timeoutMinutes,
+      allowMultipleSessions: json['allowMultipleSessions'] ??
+          ((json['maxConcurrentSessions'] is num)
+              ? (json['maxConcurrentSessions'] as num) > 1
+              : true),
+      requirePasswordChange: json['requirePasswordChange'] == true,
+      passwordChangeDays: json['passwordChangeDays'] is num
+          ? (json['passwordChangeDays'] as num).toInt()
+          : 90,
     );
   }
 

@@ -117,22 +117,22 @@ class ServiceProviderRegistrationBlocM extends Bloc<
     final nom = nameParts.isNotEmpty ? nameParts.first : '';
     final prenom = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
 
-    // Générer un mot de passe temporaire basé sur le téléphone
     final phone = formData['phone'] ?? '';
-    final tempPassword =
-        phone.replaceAll(RegExp(r'[^\d]'), ''); // Garder seulement les chiffres
-    final finalPassword = tempPassword.isNotEmpty
-        ? tempPassword
-        : '123456'; // Mot de passe par défaut
+    // Mot de passe choisi par l'utilisateur — jamais dérivé du téléphone
+    final password = (formData['password'] as String?)?.trim() ?? '';
+    if (password.length < 6) {
+      throw Exception(
+          'Mot de passe requis (6 caractères minimum) pour créer le compte');
+    }
 
     return {
       "nom": nom,
       "prenom": prenom,
       "telephone": phone,
       "email": formData['email'] ?? '',
-      "password": finalPassword, // ✅ Mot de passe temporaire généré
+      "password": password,
       "genre": formData['gender'] ?? 'Homme',
-      "role": "prestataire", // ✅ Ajouter le rôle prestataire
+      "role": "prestataire",
     };
   }
 

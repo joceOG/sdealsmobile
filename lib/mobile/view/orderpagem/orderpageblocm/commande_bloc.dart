@@ -58,44 +58,13 @@ class CommandeBloc extends Bloc<CommandeEvent, CommandeState> {
         error: null,
       ));
     } catch (error) {
-      print('⚠️ Erreur API, utilisation mock data: $error');
-      
-      // 📦 Fallback sur mock data pour développement
-      final mockCommandes = _getMockCommandes();
-      
+      print('⚠️ Erreur API commandes: $error');
       emit(state.copyWith(
         isLoading: false,
-        commandes: mockCommandes,
-        error: 'API indisponible (mode offline)',
+        commandes: const [],
+        error: 'Impossible de charger les commandes',
       ));
     }
-  }
-
-  // Mock data pour fallback
-  List<CommandeModel> _getMockCommandes() {
-    return [
-      CommandeModel(
-        id: 'mock_1',
-        prestataireId: 'P_MOCK_1',
-        prestataireName: 'Jean Dupont (Mock)',
-        prestataireImage: 'assets/profil.png',
-        typeService: 'Plomberie',
-        status: CommandeStatus.enCours,
-        montant: 25000,
-        dateCommande: DateTime.now().subtract(Duration(days: 2)),
-      ),
-      CommandeModel(
-        id: 'mock_2',
-        prestataireId: 'P_MOCK_2',
-        prestataireName: 'Marie Martin (Mock)',
-        prestataireImage: 'assets/profil.png',
-        typeService: 'Électricité',
-        status: CommandeStatus.terminee,
-        montant: 35000,
-        dateCommande: DateTime.now().subtract(Duration(days: 5)),
-        estNotee: false,
-      ),
-    ];
   }
 
   void _onFiltrerParStatus(
@@ -429,10 +398,9 @@ class CommandeBloc extends Bloc<CommandeEvent, CommandeState> {
     ));
   }
 
-  // 🧹 NETTOYAGE
+  // 🧹 NETTOYAGE — ne pas disposer le WebSocket singleton global
   @override
   Future<void> close() {
-    _webSocketService.dispose();
     _notificationService.dispose();
     return super.close();
   }

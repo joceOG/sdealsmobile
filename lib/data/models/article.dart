@@ -1,50 +1,42 @@
-
-
-
-class Article{
+class Article {
+  String? id;
   String nomArticle;
   String prixArticle;
   int quantiteArticle;
   String photoArticle;
-  //Object categorie;
 
   Article({
+    this.id,
     required this.nomArticle,
     required this.prixArticle,
     required this.quantiteArticle,
     required this.photoArticle,
-    //required this.categorie,
   });
-
-  /*factory Groupe.fromJson(Map<String, dynamic> json){
-    return Groupe(
-      idgroupe: json['idgroupe'] as String,
-      nomgroupe:  json['nomgroupe'] as String,
-    );
-  } */
 
   factory Article.fromJson(dynamic json) {
     final prix = json['prixArticle'];
     final prixText = prix == null ? '' : prix.toString();
     final quantite = json['quantiteArticle'];
+    final rawId =
+        json['_id'] ?? json['id'] ?? json['idarticle'] ?? json['idArticle'];
     return Article(
-        nomArticle : json['nomArticle'] as String,
-        prixArticle: prixText,
-        quantiteArticle: quantite is int ? quantite : int.tryParse(quantite.toString()) ?? 0,
-        photoArticle : json['photoArticle'] as String
-        //categorie: json['categorie'] as Object
-        );
+      id: rawId?.toString(),
+      nomArticle: json['nomArticle'] as String,
+      prixArticle: prixText,
+      quantiteArticle: quantite is int
+          ? quantite
+          : int.tryParse(quantite.toString()) ?? 0,
+      photoArticle: json['photoArticle'] as String,
+    );
   }
 
   Map<String, dynamic> toMap() {
     return {
+      if (id != null) 'id': id,
       'nomArticle': nomArticle,
       'prixArticle': prixArticle,
       'quantiteArticle': quantiteArticle,
       'photoArticle': photoArticle,
-      //'categorie': categorie,
     };
   }
 }
-
-

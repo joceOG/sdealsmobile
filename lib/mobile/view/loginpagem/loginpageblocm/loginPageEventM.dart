@@ -19,3 +19,12 @@ class LoginSubmittedM extends LoginPageEventM {
   @override
   List<Object?> get props => [identifiant, password, rememberMe];
 }
+
+class GoogleLoginSubmittedM extends LoginPageEventM {
+  final bool rememberMe;
+
+  GoogleLoginSubmittedM({this.rememberMe = true});
+
+  @override
+  List<Object?> get props => [rememberMe];
+}

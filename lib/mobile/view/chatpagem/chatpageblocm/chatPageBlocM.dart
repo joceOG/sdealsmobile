@@ -362,9 +362,10 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
             event.conversationId, _currentUserId);
         print('✅ Conversation marquée comme lue via API');
       } catch (apiError) {
-        // ⚠️ Fallback sur simulation si l'API échoue
-        print('⚠️ API indisponible, simulation marquage: $apiError');
-        await Future.delayed(const Duration(milliseconds: 200));
+        print('⚠️ API mark-as-read échouée: $apiError');
+        // Pas de faux succès silencieux : on propage l'erreur
+        emit(state.copyWith(error: 'Marquage lu impossible: $apiError'));
+        return;
       }
 
       // Mettre à jour la conversation localement
@@ -598,10 +599,12 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
     }
   }
 
-  // 🔌 DÉCONNEXION WEBSOCKET
+  // 🔌 DÉCONNEXION WEBSOCKET — quitte la room, ne coupe pas le singleton
   Future<void> _onDisconnectWebSocket(
       DisconnectWebSocket event, Emitter<ChatPageStateM> emit) async {
-    _webSocketService.disconnect();
+    if (state.selectedConversation != null) {
+      _webSocketService.leaveConversation(state.selectedConversation!.id);
+    }
     emit(state.copyWith(isWebSocketConnected: false));
   }
 
@@ -939,7 +942,7 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
   }
 
   Future<void> close() {
-    _webSocketService.dispose();
+    // Ne pas disposer le WebSocket singleton (partagé app-wide)
     _notificationService.dispose();
     return super.close();
   }

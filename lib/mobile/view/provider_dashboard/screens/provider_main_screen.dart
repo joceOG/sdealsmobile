@@ -1250,8 +1250,15 @@ class _ProviderMainScreenState extends State<ProviderMainScreen> {
 
   // ✅ ÉCRANS STATIQUES SANS BLOCBUILDER
   Widget _buildSimpleMissions() {
+    final auth = context.read<AuthCubit>().state;
+    final token = auth is AuthAuthenticated ? auth.token : null;
     return BlocProvider(
-      create: (context) => MissionsBloc(),
+      create: (context) {
+        final bloc = MissionsBloc();
+        if (token != null) bloc.setToken(token);
+        if (_prestataireDocId != null) bloc.setPrestataireId(_prestataireDocId!);
+        return bloc;
+      },
       child: ProviderMissionsScreen(prestataireDocId: _prestataireDocId),
     );
   }

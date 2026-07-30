@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:math';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:sdealsmobile/data/services/api_client.dart';
 import 'provider_profile_event.dart';
@@ -9,7 +8,6 @@ import 'provider_profile_state.dart';
 class ProviderProfileBloc
     extends Bloc<ProviderProfileEvent, ProviderProfileState> {
   final ApiClient _apiClient = ApiClient();
-  final Random _random = Random();
   String? _currentToken;
 
   double _asDouble(dynamic value, {double fallback = 0.0}) {
@@ -162,295 +160,123 @@ class ProviderProfileBloc
       }
     });
 
-    // 👤 CHARGER LES STATISTIQUES
+    // 👤 Stats / activité / badges — plus de Random() fictif
     on<LoadProviderStats>((event, emit) async {
-      try {
-        await Future.delayed(const Duration(milliseconds: 500));
-
-        final stats = {
-          'missionsCompleted': 24 + _random.nextInt(10),
-          'averageRating': 4.8 + _random.nextDouble() * 0.2,
-          'totalReviews': 18 + _random.nextInt(5),
-          'monthlyEarnings': 125000.0 + _random.nextDouble() * 50000,
-          'successRate': 96.0 + _random.nextDouble() * 4,
-          'responseTime': '2h',
-          'completionRate': 98.0 + _random.nextDouble() * 2,
-        };
-
-        emit(ProviderStatsLoaded(stats));
-      } catch (e) {
-        emit(ProviderProfileError(
-            'Erreur lors du chargement des statistiques: $e'));
-      }
+      emit(ProviderProfileError(
+          'Stats profil : utilisez l\'écran Statistiques (données serveur)'));
     });
 
-    // 👤 CHARGER L'ACTIVITÉ RÉCENTE
     on<LoadRecentActivity>((event, emit) async {
-      try {
-        await Future.delayed(const Duration(milliseconds: 400));
-
-        final activities = List.generate(
-            event.limit,
-            (index) => {
-                  'id': '${index + 1}',
-                  'type': [
-                    'mission_completed',
-                    'new_mission',
-                    'review_received'
-                  ][index % 3],
-                  'title': [
-                    'Mission terminée',
-                    'Nouvelle mission',
-                    'Avis reçu'
-                  ][index % 3],
-                  'description': 'Description de l\'activité ${index + 1}',
-                  'timestamp':
-                      DateTime.now().subtract(Duration(hours: index + 1)),
-                  'icon': ['check_circle', 'assignment', 'star'][index % 3],
-                  'color': ['green', 'blue', 'amber'][index % 3],
-                });
-
-        emit(RecentActivityLoaded(activities));
-      } catch (e) {
-        emit(ProviderProfileError(
-            'Erreur lors du chargement de l\'activité: $e'));
-      }
+      emit(RecentActivityLoaded(const []));
     });
 
-    // 👤 CHARGER LES RÉCOMPENSES
     on<LoadAchievements>((event, emit) async {
-      try {
-        await Future.delayed(const Duration(milliseconds: 300));
-
-        final achievements = [
-          {
-            'id': '1',
-            'title': 'Expert',
-            'description': 'Plus de 20 missions terminées',
-            'icon': 'star',
-            'color': 'amber',
-            'unlocked': true,
-          },
-          {
-            'id': '2',
-            'title': 'Fiable',
-            'description': 'Note moyenne supérieure à 4.5',
-            'icon': 'verified',
-            'color': 'green',
-            'unlocked': true,
-          },
-          {
-            'id': '3',
-            'title': 'Rapide',
-            'description': 'Temps de réponse inférieur à 2h',
-            'icon': 'speed',
-            'color': 'blue',
-            'unlocked': true,
-          },
-        ];
-
-        emit(AchievementsLoaded(achievements));
-      } catch (e) {
-        emit(ProviderProfileError(
-            'Erreur lors du chargement des récompenses: $e'));
-      }
+      emit(AchievementsLoaded(const []));
     });
 
-    // 👤 CHARGER LES PARAMÈTRES
+    // 👤 CHARGER LES PARAMÈTRES (local-only defaults — pas d'API dédiée)
     on<LoadProviderSettings>((event, emit) async {
-      try {
-        await Future.delayed(const Duration(milliseconds: 300));
-
-        final settings = {
-          'language': 'fr',
-          'currency': 'FCFA',
-          'timezone': 'Africa/Abidjan',
-          'theme': 'light',
-          'autoAccept': false,
-          'maxDistance': 15.0,
-        };
-
-        emit(ProviderSettingsLoaded(settings));
-      } catch (e) {
-        emit(ProviderProfileError(
-            'Erreur lors du chargement des paramètres: $e'));
-      }
+      emit(ProviderSettingsLoaded({
+        'language': 'fr',
+        'currency': 'FCFA',
+        'timezone': 'Africa/Abidjan',
+        'theme': 'light',
+        'autoAccept': false,
+        'maxDistance': 15.0,
+        '_localOnly': true,
+      }));
     });
 
-    // 👤 METTRE À JOUR LES PARAMÈTRES
     on<UpdateProviderSettings>((event, emit) async {
-      try {
-        await Future.delayed(const Duration(milliseconds: 500));
-
-        emit(ProviderSettingsUpdated(event.settings));
-      } catch (e) {
-        emit(ProviderProfileError(
-            'Erreur lors de la mise à jour des paramètres: $e'));
-      }
+      emit(ProviderProfileError(
+          'Sauvegarde des paramètres non branchée au serveur — action annulée'));
     });
 
-    // 👤 CHARGER LES NOTIFICATIONS
     on<LoadNotificationSettings>((event, emit) async {
-      try {
-        await Future.delayed(const Duration(milliseconds: 300));
-
-        final notificationSettings = {
-          'newMissions': true,
-          'messages': true,
-          'payments': true,
-          'reviews': true,
-          'promotions': false,
-          'system': true,
-        };
-
-        emit(NotificationSettingsLoaded(notificationSettings));
-      } catch (e) {
-        emit(ProviderProfileError(
-            'Erreur lors du chargement des notifications: $e'));
-      }
+      emit(NotificationSettingsLoaded({
+        'newMissions': true,
+        'messages': true,
+        'payments': true,
+        'reviews': true,
+        'promotions': false,
+        'system': true,
+        '_localOnly': true,
+      }));
     });
 
-    // 👤 METTRE À JOUR LES NOTIFICATIONS
     on<UpdateNotificationSettings>((event, emit) async {
-      try {
-        await Future.delayed(const Duration(milliseconds: 400));
-
-        emit(NotificationSettingsUpdated(event.notificationSettings));
-      } catch (e) {
-        emit(ProviderProfileError(
-            'Erreur lors de la mise à jour des notifications: $e'));
-      }
+      emit(ProviderProfileError(
+          'Sauvegarde des notifications non branchée au serveur — action annulée'));
     });
 
-    // 👤 CHARGER LES SERVICES
     on<LoadProviderServices>((event, emit) async {
-      try {
-        await Future.delayed(const Duration(milliseconds: 300));
-
-        final services = ['Plomberie', 'Électricité', 'Peinture', 'Menuiserie'];
-
-        emit(ProviderServicesLoaded(services));
-      } catch (e) {
-        emit(
-            ProviderProfileError('Erreur lors du chargement des services: $e'));
-      }
+      emit(ProviderServicesLoaded(const []));
     });
 
-    // 👤 METTRE À JOUR LES SERVICES
     on<UpdateProviderServices>((event, emit) async {
-      try {
-        await Future.delayed(const Duration(milliseconds: 500));
-
-        emit(ProviderServicesUpdated(event.services));
-      } catch (e) {
-        emit(ProviderProfileError(
-            'Erreur lors de la mise à jour des services: $e'));
-      }
+      emit(ProviderProfileError(
+          'Mise à jour des services non branchée au serveur — action annulée'));
     });
 
-    // 👤 CHARGER LA ZONE DE SERVICE
     on<LoadServiceZone>((event, emit) async {
-      try {
-        await Future.delayed(const Duration(milliseconds: 300));
-
-        final serviceZone = {
-          'address': 'Abidjan, Côte d\'Ivoire',
-          'latitude': 5.3600,
-          'longitude': -4.0083,
-          'radius': 15.0,
-          'coverage': 'Toute la ville d\'Abidjan',
-        };
-
-        emit(ServiceZoneLoaded(serviceZone));
-      } catch (e) {
-        emit(ProviderProfileError('Erreur lors du chargement de la zone: $e'));
-      }
+      emit(ServiceZoneLoaded({
+        'address': '',
+        'latitude': null,
+        'longitude': null,
+        'radius': null,
+        '_localOnly': true,
+      }));
     });
 
-    // 👤 METTRE À JOUR LA ZONE DE SERVICE
     on<UpdateServiceZone>((event, emit) async {
-      try {
-        await Future.delayed(const Duration(milliseconds: 500));
-
-        emit(ServiceZoneUpdated(event.zoneData));
-      } catch (e) {
-        emit(ProviderProfileError(
-            'Erreur lors de la mise à jour de la zone: $e'));
-      }
+      emit(ProviderProfileError(
+          'Mise à jour de la zone non branchée au serveur — action annulée'));
     });
 
-    // 👤 CHARGER LES DOCUMENTS
     on<LoadProviderDocuments>((event, emit) async {
-      try {
-        await Future.delayed(const Duration(milliseconds: 300));
-
-        final documents = [
-          {
-            'id': '1',
-            'type': 'cni',
-            'name': 'Carte d\'identité',
-            'status': 'verified',
-            'uploadDate': '2024-01-15',
-          },
-          {
-            'id': '2',
-            'type': 'selfie',
-            'name': 'Photo de profil',
-            'status': 'verified',
-            'uploadDate': '2024-01-15',
-          },
-          {
-            'id': '3',
-            'type': 'certificate',
-            'name': 'Certificat de formation',
-            'status': 'pending',
-            'uploadDate': '2024-01-20',
-          },
-        ];
-
-        emit(ProviderDocumentsLoaded(documents));
-      } catch (e) {
-        emit(ProviderProfileError(
-            'Erreur lors du chargement des documents: $e'));
-      }
+      // Plus de documents fictifs « verified »
+      emit(ProviderDocumentsLoaded(const []));
     });
 
     // 👤 UPLOADER UN DOCUMENT
     on<UploadDocument>((event, emit) async {
-      try {
-        await Future.delayed(const Duration(milliseconds: 1000));
-
-        final uploadedDocument = {
-          'id': DateTime.now().millisecondsSinceEpoch.toString(),
-          'type': event.documentType,
-          'name': 'Document ${event.documentType}',
-          'status': 'pending',
-          'uploadDate': DateTime.now().toIso8601String(),
-        };
-
-        emit(DocumentUploaded(uploadedDocument));
-      } catch (e) {
-        emit(ProviderProfileError('Erreur lors de l\'upload: $e'));
-      }
+      emit(ProviderProfileError(
+          'Upload de documents non branché au serveur — action annulée'));
     });
 
     // 👤 SUPPRIMER UN DOCUMENT
     on<DeleteDocument>((event, emit) async {
-      try {
-        await Future.delayed(const Duration(milliseconds: 500));
-
-        emit(DocumentDeleted(event.documentId));
-      } catch (e) {
-        emit(ProviderProfileError('Erreur lors de la suppression: $e'));
-      }
+      emit(ProviderProfileError(
+          'Suppression de document non branchée au serveur — action annulée'));
     });
 
     // 👤 CHANGER LE MOT DE PASSE
     on<ChangePassword>((event, emit) async {
       try {
-        await Future.delayed(const Duration(milliseconds: 800));
-
-        emit(PasswordChanged());
+        if (_currentToken == null || _currentToken!.isEmpty) {
+          emit(ProviderProfileError('Session expirée — reconnectez-vous'));
+          return;
+        }
+        final response = await _apiClient.patch(
+          '/utilisateur/password',
+          body: {
+            'currentPassword': event.currentPassword,
+            'newPassword': event.newPassword,
+          },
+          token: _currentToken,
+        );
+        if (response.statusCode == 200) {
+          emit(PasswordChanged());
+        } else {
+          String message = 'Erreur changement mot de passe (${response.statusCode})';
+          try {
+            final data = jsonDecode(response.body);
+            if (data is Map && data['error'] != null) {
+              message = data['error'].toString();
+            }
+          } catch (_) {}
+          emit(ProviderProfileError(message));
+        }
       } catch (e) {
         emit(ProviderProfileError(
             'Erreur lors du changement de mot de passe: $e'));
@@ -459,40 +285,19 @@ class ProviderProfileBloc
 
     // 👤 DÉSACTIVER LE COMPTE
     on<DeactivateAccount>((event, emit) async {
-      try {
-        await Future.delayed(const Duration(milliseconds: 1000));
-
-        emit(AccountDeactivated(event.reason));
-      } catch (e) {
-        emit(ProviderProfileError('Erreur lors de la désactivation: $e'));
-      }
+      emit(ProviderProfileError(
+          'Désactivation de compte non disponible pour le moment'));
     });
 
     // 👤 SUPPRIMER LE COMPTE
     on<DeleteAccount>((event, emit) async {
-      try {
-        await Future.delayed(const Duration(milliseconds: 1500));
-
-        emit(AccountDeleted(event.reason));
-      } catch (e) {
-        emit(ProviderProfileError('Erreur lors de la suppression: $e'));
-      }
+      emit(ProviderProfileError(
+          'Suppression de compte non branchée — contactez le support'));
     });
 
     // 👤 ACTUALISER LE PROFIL
     on<RefreshProviderProfile>((event, emit) async {
-      try {
-        await Future.delayed(const Duration(milliseconds: 500));
-
-        final refreshedProfile = {
-          'id': event.prestataireId,
-          'lastRefresh': DateTime.now().toIso8601String(),
-        };
-
-        emit(ProviderProfileRefreshed(refreshedProfile));
-      } catch (e) {
-        emit(ProviderProfileError('Erreur lors de l\'actualisation: $e'));
-      }
+      add(LoadProviderProfile(event.prestataireId));
     });
   }
 }

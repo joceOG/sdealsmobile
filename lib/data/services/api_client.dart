@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:sdealsmobile/data/models/categorie.dart';
@@ -16,7 +17,8 @@ import 'token_store.dart';
 // Exception spéciale pour forcer le re-login côté UI
 class UnauthorizedException implements Exception {
   final String message;
-  const UnauthorizedException([this.message = 'Session expirée. Veuillez vous reconnecter.']);
+  const UnauthorizedException(
+      [this.message = 'Session expirée. Veuillez vous reconnecter.']);
   @override
   String toString() => message;
 }
@@ -28,6 +30,14 @@ class ApiClient {
 
   var apiUrl = dotenv.env['API_URL'];
 
+  /// Décodage UTF-8 fiable (évite les mojibake latin1 de response.body).
+  static dynamic decodeJson(http.Response response) {
+    return jsonDecode(utf8.decode(response.bodyBytes));
+  }
+
+  static String decodeBody(http.Response response) {
+    return utf8.decode(response.bodyBytes);
+  }
   // Callback déclenché quand le token est invalide/expiré — pour forcer logout
   static void Function()? onUnauthorized;
 
@@ -64,7 +74,7 @@ class ApiClient {
 
       if (response.statusCode != 200) return null;
 
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final data = decodeJson(response) as Map<String, dynamic>;
       final newAccess = data['token']?.toString();
       final newRefresh = data['refreshToken']?.toString();
       if (newAccess == null || newAccess.isEmpty) return null;
@@ -100,7 +110,7 @@ class ApiClient {
             )
             .timeout(const Duration(seconds: 10));
         if (retry.statusCode == 200) {
-          final data = jsonDecode(retry.body) as Map<String, dynamic>;
+          final data = jsonDecode(utf8.decode(retry.bodyBytes)) as Map<String, dynamic>;
           final socketToken = data['socketToken']?.toString();
           if (socketToken != null && socketToken.isNotEmpty) return socketToken;
         }
@@ -111,7 +121,7 @@ class ApiClient {
     if (response.statusCode != 200) {
       throw Exception('Erreur socket-token ${response.statusCode}');
     }
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    final data = decodeJson(response) as Map<String, dynamic>;
     final socketToken = data['socketToken']?.toString();
     if (socketToken == null || socketToken.isEmpty) {
       throw Exception('socketToken manquant');
@@ -222,7 +232,7 @@ class ApiClient {
       var response = await http.Response.fromStream(streamedResponse);
 
       if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+        return decodeJson(response);
       } else {
         throw Exception(
             'Erreur lors de la mise à jour: ${response.statusCode}');
@@ -237,7 +247,7 @@ class ApiClient {
     try {
       final response = await get('/utilisateur/$userId');
       if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+        return decodeJson(response);
       } else {
         throw Exception('Erreur lors du chargement: ${response.statusCode}');
       }
@@ -291,7 +301,7 @@ class ApiClient {
     try {
       final response = await http.get(Uri.parse('$apiUrl/categorie'));
       if (response.statusCode == 200) {
-        List<dynamic> categoriesJson = jsonDecode(response.body);
+        List<dynamic> categoriesJson = decodeJson(response);
         List<Categorie> allCategories = [];
         for (var json in categoriesJson) {
           try {
@@ -402,7 +412,7 @@ class ApiClient {
       final response = await http.get(Uri.parse('$apiUrl/categorie'));
 
       if (response.statusCode == 200) {
-        List<dynamic> allCategoriesJson = jsonDecode(response.body);
+        List<dynamic> allCategoriesJson = decodeJson(response);
         List<Categorie> allCategories = [];
 
         // Traiter chaque catégorie
@@ -473,7 +483,7 @@ class ApiClient {
       print('Status code de la réponse: ${response.statusCode}');
 
       if (response.statusCode == 200) {
-        List<dynamic> servicesJson = jsonDecode(response.body);
+        List<dynamic> servicesJson = decodeJson(response);
         print('Nombre total de services reçus: ${servicesJson.length}');
         
         // 3️⃣ Save Cache
@@ -528,7 +538,7 @@ class ApiClient {
       final response = await http.get(Uri.parse('$apiUrl/articles'));
 
       if (response.statusCode == 200) {
-        List<dynamic> articlesJson = jsonDecode(response.body);
+        List<dynamic> articlesJson = decodeJson(response);
         List<Article> articles =
             articlesJson.map((json) => Article.fromJson(json)).toList();
         print('Articles récupérés: ${articles.length}');
@@ -566,7 +576,7 @@ class ApiClient {
     final nom = parts.isNotEmpty ? parts.first : "";
     final prenom = parts.length > 1 ? parts.sublist(1).join(" ") : "";
 
-    print("🌍 Appel API: $url");
+    print("🌍 Appel API register");
     print(
         "📤 Données envoyées: { nom: $nom, prenom: $prenom, telephone: $phone, password: *****, role: $role }");
 
@@ -586,20 +596,17 @@ class ApiClient {
     );
 
     print("📥 StatusCode: ${response.statusCode}");
-    print("📥 Réponse brute: ${response.body}");
 
     if (response.statusCode == 200 || response.statusCode == 201) {
-      final data = jsonDecode(response.body);
-      print("✅ Succès Register: $data");
+      final data = decodeJson(response);
+      print("✅ Succès Register");
       return data;
     } else {
       String message;
       try {
-        final error = jsonDecode(response.body);
-        print("❌ Erreur API Register: $error");
+        final error = decodeJson(response);
         message = error["error"] ?? error["message"] ?? "Erreur d'inscription";
       } catch (_) {
-        print("⚠️ Impossible de parser l'erreur: ${response.body}");
         message = "Erreur inconnue (${response.statusCode})";
       }
       throw Exception(message);
@@ -629,13 +636,13 @@ class ApiClient {
         body: jsonEncode(body),
       );
 
-      final data = jsonDecode(response.body);
+      final data = decodeJson(response);
 
-      print("📥 Réponse login brute: ${response.body}");
-      print("📥 StatusCode: ${response.statusCode}");
-      print("📥 Data parsed: $data");
-      print("📥 Token présent: ${data["token"] != null}");
-      print("📥 Utilisateur présent: ${data["utilisateur"] != null}");
+      assert(() {
+        // Ne jamais logger le body (JWT / hash) — même en debug, pas le payload brut
+        print("📥 Login status=${response.statusCode} token=${data["token"] != null}");
+        return true;
+      }());
 
       if (response.statusCode == 200) {
         // Vérifier que le token est présent
@@ -650,13 +657,40 @@ class ApiClient {
           // await prefs.setString("token", data["token"]);
         }
         return data; // { utilisateur: {...}, token: "xxx" }
-      } else {
-        throw Exception(
-            data["error"] ?? "Erreur inconnue lors de la connexion");
       }
+
+      throw Exception(data["error"] ?? "Échec de connexion (${response.statusCode})");
     } catch (e) {
-      throw Exception("Erreur de connexion: $e");
+      rethrow;
     }
+  }
+
+  /// Connexion / inscription via Google idToken.
+  Future<Map<String, dynamic>> loginWithGoogle({
+    required String idToken,
+    String role = 'client',
+  }) async {
+    final response = await http.post(
+      Uri.parse("$apiUrl/login/google"),
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode({
+        "idToken": idToken,
+        "role": role,
+      }),
+    );
+
+    final data = decodeJson(response);
+    if (response.statusCode == 200) {
+      if (data["token"] == null) {
+        throw Exception("Token manquant dans la réponse");
+      }
+      return data as Map<String, dynamic>;
+    }
+
+    throw Exception(
+      data["error"]?.toString() ??
+          "Échec connexion Google (${response.statusCode})",
+    );
   }
 
   // ✅ NOUVEAU : Récupérer les rôles d'un utilisateur
@@ -665,7 +699,7 @@ class ApiClient {
       final response =
           await http.get(Uri.parse('$apiUrl/utilisateur/$userId/roles'));
       if (response.statusCode == 200) {
-        return jsonDecode(response.body) as Map<String, dynamic>;
+        return decodeJson(response) as Map<String, dynamic>;
       }
       throw Exception(
           'Erreur (${response.statusCode}) lors de la récupération des rôles');
@@ -682,7 +716,7 @@ class ApiClient {
     );
     final response = await http.get(uri);
     if (response.statusCode == 200) {
-      return jsonDecode(response.body) as Map<String, dynamic>;
+      return decodeJson(response) as Map<String, dynamic>;
     }
     throw Exception(
         'Échec freelance-services/home: ${response.statusCode} ${response.body}');
@@ -694,7 +728,7 @@ class ApiClient {
     final uri = Uri.parse('$base/freelance-services/$id');
     final response = await http.get(uri);
     if (response.statusCode == 200) {
-      return jsonDecode(response.body) as Map<String, dynamic>;
+      return decodeJson(response) as Map<String, dynamic>;
     }
     throw Exception(
         'Échec freelance-services/$id: ${response.statusCode} ${response.body}');
@@ -722,7 +756,7 @@ class ApiClient {
       final response = await http.get(uri);
 
       if (response.statusCode == 200) {
-        final Map<String, dynamic> responseData = jsonDecode(response.body);
+        final Map<String, dynamic> responseData = decodeJson(response);
 
         // ✅ Gestion de l'ancienne structure (array) et nouvelle (objet avec pagination)
         if (responseData.containsKey('freelances')) {
@@ -808,7 +842,7 @@ class ApiClient {
       print('📝 Response Body Length: ${response.body.length}');
 
       if (response.statusCode == 200) {
-        List<dynamic> prestatairesJson = jsonDecode(response.body);
+        List<dynamic> prestatairesJson = decodeJson(response);
         print('✅ Prestataires récupérés: ${prestatairesJson.length}');
 
         // Retourner la liste de Map pour que le BLoC puisse la convertir
@@ -836,100 +870,11 @@ class ApiClient {
           }
         } catch (_) {}
       }
-      // Utiliser les données de fallback en cas d'erreur
-      return _getFallbackPrestataires();
+      throw Exception('Impossible de charger les prestataires');
     }
   }
 
-  // 🛡️ DONNÉES DE FALLBACK EN CAS DE PROBLÈME DE CONNECTIVITÉ
-  List<Map<String, dynamic>> _getFallbackPrestataires() {
-    print("📦 Utilisation des données de fallback prestataires");
-    return [
-      {
-        'idprestataire': 'fallback1',
-        'utilisateur': {
-          'idutilisateur': 'user1',
-          'nom': 'Diallo',
-          'prenom': 'Amadou',
-          'email': 'amadou@example.com',
-          'telephone': '+223 65 43 21 00'
-        },
-        'service': {
-          'idservice': 'service1',
-          'nomservice': 'Ménage résidentiel',
-          'prixservice': 15000.0,
-          'categorie': {
-            'idcategorie': 'cat1',
-            'nomcategorie': 'Ménage',
-            'groupe': {'idgroupe': 'grp1', 'nomgroupe': 'Métiers'}
-          }
-        },
-        'prixprestataire': 15000.0, // ✅ Requis par le modèle
-        'localisation': 'Abidjan, Côte d\'Ivoire',
-        'localisationmaps': {'latitude': 5.3600, 'longitude': -4.0083},
-        'description': 'Service de ménage professionnel disponible 24h/7',
-        'verifier': true,
-        'note': '4.8', // ✅ String comme attendu
-        'anneeExperience': '5',
-        'specialite': ['Ménage résidentiel', 'Nettoyage bureaux'],
-        // Champs optionnels pour éviter les erreurs null
-        'cni1': null,
-        'cni2': null,
-        'selfie': null,
-        'numeroCNI': null,
-        'rayonIntervention': 10.0,
-        'zoneIntervention': ['Abidjan'],
-        'tarifHoraireMin': 2000.0,
-        'tarifHoraireMax': 5000.0,
-        'diplomeCertificat': null,
-        'attestationAssurance': null,
-        'numeroAssurance': null,
-        'numeroRCCM': null
-      },
-      {
-        'idprestataire': 'fallback2',
-        'utilisateur': {
-          'idutilisateur': 'user2',
-          'nom': 'Traoré',
-          'prenom': 'Fatoumata',
-          'email': 'fatoumata@example.com',
-          'telephone': '+223 76 54 32 10'
-        },
-        'service': {
-          'idservice': 'service2',
-          'nomservice': 'Jardinage',
-          'prixservice': 25000.0,
-          'categorie': {
-            'idcategorie': 'cat2',
-            'nomcategorie': 'Jardinage',
-            'groupe': {'idgroupe': 'grp1', 'nomgroupe': 'Métiers'}
-          }
-        },
-        'prixprestataire': 25000.0, // ✅ Requis par le modèle
-        'localisation': 'Abidjan, Côte d\'Ivoire',
-        'localisationmaps': {'latitude': 5.3700, 'longitude': -4.0200},
-        'description':
-            'Spécialiste en aménagement paysager et entretien jardins',
-        'verifier': true,
-        'note': '4.5', // ✅ String comme attendu
-        'anneeExperience': '8',
-        'specialite': ['Jardinage', 'Paysagisme'],
-        // Champs optionnels pour éviter les erreurs null
-        'cni1': null,
-        'cni2': null,
-        'selfie': null,
-        'numeroCNI': null,
-        'rayonIntervention': 15.0,
-        'zoneIntervention': ['Abidjan'],
-        'tarifHoraireMin': 3000.0,
-        'tarifHoraireMax': 8000.0,
-        'diplomeCertificat': null,
-        'attestationAssurance': null,
-        'numeroAssurance': null,
-        'numeroRCCM': null
-      }
-    ];
-  }
+  // Données fictives retirées — ne plus présenter de faux prestataires.
 
   // ✅ NOUVELLE MÉTHODE : Récupérer tous les vendeurs (CORRIGÉ PARSING !)
   Future<List<Map<String, dynamic>>> fetchVendeurs() async {
@@ -940,7 +885,7 @@ class ApiClient {
           await http.get(Uri.parse('${dotenv.env['API_URL']}/vendeur'));
 
       if (response.statusCode == 200) {
-        dynamic responseData = jsonDecode(response.body);
+        dynamic responseData = decodeJson(response);
         print('Type de réponse: ${responseData.runtimeType}');
         // Réduire le log pour éviter les erreurs Flutter Web avec gros JSON
         final preview = response.body.length > 300
@@ -1008,7 +953,7 @@ class ApiClient {
       );
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+        final data = decodeJson(response);
         // Le backend renvoie { success, distance: { text, value }, duration: { text, value } }
         // distance.value est en mètres, on convertit en km
         final distanceObj = data['distance'];
@@ -1061,7 +1006,7 @@ class ApiClient {
       );
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+        final data = decodeJson(response);
         if (data['success'] == true) {
           return data;
         }
@@ -1097,7 +1042,7 @@ class ApiClient {
       );
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+        final data = decodeJson(response);
         print('✅ Résultats trouvés: ${data['counts']}');
         return data;
       } else {
@@ -1119,7 +1064,7 @@ class ApiClient {
       );
 
       if (response.statusCode == 200) {
-        List<dynamic> data = jsonDecode(response.body);
+        List<dynamic> data = decodeJson(response);
         return data.cast<String>();
       }
       return [];
@@ -1154,7 +1099,7 @@ class ApiClient {
       ).timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+        final data = decodeJson(response);
         if (data['success'] == true) {
           return List<Map<String, dynamic>>.from(data['places'] ?? []);
         }
@@ -1196,7 +1141,7 @@ class ApiClient {
 
       final response = await http.get(uri);
       if (response.statusCode == 200) {
-        final List<dynamic> jsonList = jsonDecode(response.body);
+        final List<dynamic> jsonList = decodeJson(response);
         return jsonList.cast<Map<String, dynamic>>();
       }
 
@@ -1245,7 +1190,7 @@ class ApiClient {
       print('📡 Status Code: ${response.statusCode}');
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final data = decodeJson(response) as Map<String, dynamic>;
         print('✅ Prestataire récupéré: ${data['utilisateur']?['nom']}');
         return data;
       } else {
@@ -1280,7 +1225,7 @@ class ApiClient {
       final response = await http.get(uri);
 
       if (response.statusCode == 200) {
-        List<dynamic> freelancesJson = jsonDecode(response.body);
+        List<dynamic> freelancesJson = decodeJson(response);
         print('Freelances trouvés: ${freelancesJson.length}');
         return freelancesJson.cast<Map<String, dynamic>>();
       } else {
@@ -1311,7 +1256,7 @@ class ApiClient {
       final response = await http.get(uri);
 
       if (response.statusCode == 200) {
-        List<dynamic> freelancesJson = jsonDecode(response.body);
+        List<dynamic> freelancesJson = decodeJson(response);
         print('Freelances trouvés pour "$category": ${freelancesJson.length}');
         return freelancesJson.cast<Map<String, dynamic>>();
       } else {
@@ -1333,7 +1278,7 @@ class ApiClient {
           await http.get(Uri.parse('${dotenv.env['API_URL']}/freelance/$id'));
 
       if (response.statusCode == 200) {
-        Map<String, dynamic> freelanceJson = jsonDecode(response.body);
+        Map<String, dynamic> freelanceJson = decodeJson(response);
         print('Freelance récupéré: ${freelanceJson['name']}');
         return freelanceJson;
       } else {
@@ -1365,7 +1310,7 @@ class ApiClient {
       );
 
       if (response.statusCode == 200) {
-        Map<String, dynamic> result = jsonDecode(response.body);
+        Map<String, dynamic> result = decodeJson(response);
         print('Note mise à jour: ${result['newRating']}');
         return result;
       } else {
@@ -1416,7 +1361,7 @@ extension ServiceRequestsApi on ApiClient {
       body: jsonEncode(body),
     );
     if (res.statusCode == 201) {
-      return jsonDecode(res.body) as Map<String, dynamic>;
+      return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
     }
     throw Exception(
         'Erreur création prestation: ${res.statusCode} ${res.body}');
@@ -1438,7 +1383,7 @@ extension ServiceRequestsApi on ApiClient {
       'Authorization': 'Bearer $token',
     });
     if (res.statusCode == 200) {
-      final data = jsonDecode(res.body);
+      final data = jsonDecode(utf8.decode(res.bodyBytes));
       if (data is List) {
         return data.cast<Map<String, dynamic>>();
       } else if (data is Map && data.containsKey('prestations')) {
@@ -1458,7 +1403,7 @@ extension ServiceRequestsApi on ApiClient {
         'Authorization': 'Bearer $token',
       }).timeout(const Duration(seconds: 10));
       if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
+        final data = jsonDecode(utf8.decode(res.bodyBytes));
         final list = data is List ? data : (data['prestataires'] ?? []);
         if ((list as List).isEmpty) return null;
         return list[0] as Map<String, dynamic>;
@@ -1484,7 +1429,7 @@ extension ServiceRequestsApi on ApiClient {
       'Authorization': 'Bearer $token',
     });
     if (res.statusCode == 200) {
-      final data = jsonDecode(res.body);
+      final data = jsonDecode(utf8.decode(res.bodyBytes));
       if (data is List) {
         return data.cast<Map<String, dynamic>>();
       } else if (data is Map && data.containsKey('prestations')) {
@@ -1511,7 +1456,7 @@ extension ServiceRequestsApi on ApiClient {
       body: jsonEncode({'statut': newStatus}),
     );
     if (res.statusCode == 200) {
-      return jsonDecode(res.body) as Map<String, dynamic>;
+      return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
     }
     throw Exception('Erreur updatePrestationStatus: ${res.statusCode}');
   }
@@ -1526,7 +1471,7 @@ extension ServiceRequestsApi on ApiClient {
       'Authorization': 'Bearer $token',
     });
     if (res.statusCode == 200) {
-      return jsonDecode(res.body) as Map<String, dynamic>;
+      return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
     }
     throw Exception('Erreur getPrestationById: ${res.statusCode}');
   }
@@ -1550,7 +1495,7 @@ extension ServiceRequestsApi on ApiClient {
       'Authorization': 'Bearer $token',
     });
     if (res.statusCode == 200) {
-      final data = jsonDecode(res.body);
+      final data = jsonDecode(utf8.decode(res.bodyBytes));
       if (data is Map && data.containsKey('notifications')) {
         return (data['notifications'] as List).cast<Map<String, dynamic>>();
       }
@@ -1569,7 +1514,7 @@ extension ServiceRequestsApi on ApiClient {
       'Authorization': 'Bearer $token',
     });
     if (res.statusCode == 200) {
-      final data = jsonDecode(res.body);
+      final data = jsonDecode(utf8.decode(res.bodyBytes));
       return data['count'] ?? 0;
     }
     throw Exception('Erreur getUnreadNotificationCount: ${res.statusCode}');
@@ -1610,7 +1555,7 @@ extension CartApi on ApiClient {
   Future<Map<String, dynamic>> getCart(String userId) async {
     final response = await get('/cart/user/$userId');
     if (response.statusCode == 200) {
-      return jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiClient.decodeJson(response) as Map<String, dynamic>;
     }
     throw Exception('Erreur récupération panier: ${response.statusCode}');
   }
@@ -1632,7 +1577,7 @@ extension CartApi on ApiClient {
     });
 
     if (response.statusCode == 200) {
-      return jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiClient.decodeJson(response) as Map<String, dynamic>;
     }
     throw Exception(
         'Erreur ajout au panier: ${response.statusCode} ${response.body}');
@@ -1649,7 +1594,7 @@ extension CartApi on ApiClient {
     });
 
     if (response.statusCode == 200) {
-      return jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiClient.decodeJson(response) as Map<String, dynamic>;
     }
     throw Exception('Erreur mise à jour quantité: ${response.statusCode}');
   }
@@ -1662,7 +1607,7 @@ extension CartApi on ApiClient {
     final response = await delete('/cart/user/$userId/item/$itemId');
 
     if (response.statusCode == 200) {
-      return jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiClient.decodeJson(response) as Map<String, dynamic>;
     }
     throw Exception('Erreur retrait du panier: ${response.statusCode}');
   }
@@ -1672,7 +1617,7 @@ extension CartApi on ApiClient {
     final response = await delete('/cart/user/$userId/clear');
 
     if (response.statusCode == 200) {
-      return jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiClient.decodeJson(response) as Map<String, dynamic>;
     }
     throw Exception('Erreur vidage panier: ${response.statusCode}');
   }
@@ -1691,7 +1636,7 @@ extension CartApi on ApiClient {
     });
 
     if (response.statusCode == 200) {
-      return jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiClient.decodeJson(response) as Map<String, dynamic>;
     }
     throw Exception('Erreur application code promo: ${response.statusCode}');
   }
@@ -1718,7 +1663,7 @@ extension CartApi on ApiClient {
     });
 
     if (response.statusCode == 200) {
-      return jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiClient.decodeJson(response) as Map<String, dynamic>;
     }
     throw Exception('Erreur mise à jour adresse: ${response.statusCode}');
   }
@@ -1735,7 +1680,7 @@ extension CartApi on ApiClient {
     });
 
     if (response.statusCode == 201) {
-      return jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiClient.decodeJson(response) as Map<String, dynamic>;
     }
     throw Exception('Erreur checkout: ${response.statusCode} ${response.body}');
   }
@@ -1810,7 +1755,7 @@ extension MessagerieApi on ApiClient {
       final response = await _authedGet(uri, token: token);
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+        final data = ApiClient.decodeJson(response);
 
         if (data is Map && data.containsKey('conversations')) {
           final List<dynamic> conversations = data['conversations'];
@@ -1858,7 +1803,7 @@ extension MessagerieApi on ApiClient {
       final response = await _authedGet(uri, token: token);
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+        final data = ApiClient.decodeJson(response);
 
         if (data is Map && data.containsKey('messages')) {
           final List<dynamic> messages = data['messages'];
@@ -1931,7 +1876,7 @@ extension MessagerieApi on ApiClient {
 
         if (response.statusCode == 201) {
           print('✅ Message avec fichier envoyé');
-          return jsonDecode(response.body) as Map<String, dynamic>;
+          return ApiClient.decodeJson(response) as Map<String, dynamic>;
         }
 
         throw Exception('Erreur ${response.statusCode}: ${response.body}');
@@ -1947,7 +1892,7 @@ extension MessagerieApi on ApiClient {
 
         if (response.statusCode == 201) {
           print('✅ Message texte envoyé');
-          return jsonDecode(response.body) as Map<String, dynamic>;
+          return ApiClient.decodeJson(response) as Map<String, dynamic>;
         }
 
         throw Exception('Erreur ${response.statusCode}: ${response.body}');
@@ -2039,7 +1984,7 @@ extension MessagerieApi on ApiClient {
       final response = await http.get(uri).timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+        final data = ApiClient.decodeJson(response);
 
         if (data is Map && data.containsKey('messages')) {
           final List<dynamic> messages = data['messages'];
@@ -2075,7 +2020,7 @@ extension MessagerieApi on ApiClient {
 
       if (response.statusCode == 200) {
         print('✅ Statistiques récupérées');
-        return jsonDecode(response.body) as Map<String, dynamic>;
+        return ApiClient.decodeJson(response) as Map<String, dynamic>;
       }
 
       throw Exception('Erreur ${response.statusCode}: ${response.body}');
@@ -2101,7 +2046,7 @@ extension MessagerieApi on ApiClient {
       final response = await http.get(uri).timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+        final data = ApiClient.decodeJson(response);
 
         if (data is Map && data.containsKey('messages')) {
           final List<dynamic> messages = data['messages'];
@@ -2152,7 +2097,7 @@ extension MessagerieApi on ApiClient {
       ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+        final data = ApiClient.decodeJson(response);
         // Le backend retourne: { commandes: [...], total: X, ... }
         return List<Map<String, dynamic>>.from(data['commandes'] ?? []);
       } else {
@@ -2170,7 +2115,7 @@ extension MessagerieApi on ApiClient {
       final response = await get('/commande/$commandeId');
 
       if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+        return ApiClient.decodeJson(response);
       } else if (response.statusCode == 404) {
         throw Exception('Commande non trouvée');
       } else {
@@ -2194,7 +2139,7 @@ extension MessagerieApi on ApiClient {
       );
 
       if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+        return ApiClient.decodeJson(response);
       } else {
         throw Exception('Erreur ${response.statusCode}');
       }
@@ -2285,7 +2230,7 @@ extension MessagerieApi on ApiClient {
 
       _checkUnauthorized(response);
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+        final data = ApiClient.decodeJson(response);
         return List<Map<String, dynamic>>.from(data['notifications'] ?? []);
       } else {
         throw Exception('Erreur ${response.statusCode}: ${response.body}');
@@ -2314,7 +2259,7 @@ extension MessagerieApi on ApiClient {
 
       _checkUnauthorized(response);
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+        final data = ApiClient.decodeJson(response);
         return data['count'] ?? 0;
       } else {
         throw Exception('Erreur ${response.statusCode}');
@@ -2421,7 +2366,7 @@ extension MessagerieApi on ApiClient {
     ).timeout(const Duration(seconds: 30));
 
     if (response.statusCode == 200) {
-      return jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiClient.decodeJson(response) as Map<String, dynamic>;
     }
     throw Exception('Erreur wallet: ${response.statusCode} — ${response.body}');
   }
@@ -2449,7 +2394,7 @@ extension MessagerieApi on ApiClient {
     ).timeout(const Duration(seconds: 30));
 
     if (response.statusCode == 201) {
-      return jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiClient.decodeJson(response) as Map<String, dynamic>;
     }
     throw Exception('Erreur transfert: ${response.statusCode} — ${response.body}');
   }
@@ -2473,7 +2418,7 @@ extension MessagerieApi on ApiClient {
     ).timeout(const Duration(seconds: 30));
 
     if (response.statusCode == 200) {
-      return jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiClient.decodeJson(response) as Map<String, dynamic>;
     }
     throw Exception('Erreur transactions: ${response.statusCode}');
   }

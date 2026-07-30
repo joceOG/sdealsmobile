@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:responsive_builder/responsive_builder.dart';
-import 'package:sdealsmobile/data/models/article.dart';
 import 'package:sdealsmobile/data/models/vendeur.dart' hide Utilisateur;
-import 'data/models/categorie.dart';
 import 'data/models/utilisateur.dart';
 import 'data/services/authCubit.dart';
+import 'data/services/crashlytics_service.dart';
 import 'data/services/fcm_service.dart';
+import 'data/utils/go_router_refresh_stream.dart';
 import 'mobile/view/locationpagem/locationpageblocm/locationPageBlocM.dart';
 import 'mobile/view/home.dart';
 import 'mobile/view/loginpagem/loginpageblocm/loginPageBlocM.dart';
@@ -20,16 +20,11 @@ import 'mobile/view/registerpagem/screens/registerPageScreenM.dart';
 import 'mobile/view/serviceproviderregistrationpagem/screens/serviceProviderRegistrationScreenM.dart';
 import 'mobile/view/serviceproviderregistrationpagem/serviceproviderregistrationoageblocm/serviceProviderRegistrationPageBlocM.dart';
 import 'mobile/view/serviceproviderwelcomepagem/screens/serviceProviderWelcomeScreenM.dart';
-import 'mobile/view/shoppingpagem/screens/productDetailsScreenM.dart';
 import 'mobile/view/shoppingpagem/screens/vendorDetailsScreenM.dart';
-import 'mobile/view/shoppingpagem/shoppingpageblocm/shoppingPageBlocM.dart';
-import 'mobile/view/shoppingpagem/shoppingpageblocm/shoppingPageEventM.dart'
-    as shoppingPageEventM;
 import 'mobile/view/splashcreenm/screens/splashScreenM.dart';
 import 'mobile/view/splashcreenm/splashscreenblocm/splashscreenBlocM.dart';
 import 'mobile/view/splashcreenm/splashscreenblocm/splashscreenEventM.dart';
 import 'mobile/view/walletpagem/screens/walletPageScreenM.dart';
-import 'mobile/view/walletpagem/soutrapayblocm/soutra_wallet_bloc.dart';
 import 'mobile/view/chatpagem/screens/chatPageScreenM.dart';
 import 'mobile/view/chatpagem/chatpageblocm/chatPageBlocM.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -40,20 +35,55 @@ import 'package:hive_flutter/hive_flutter.dart';
 // Design System
 import 'design_system/design_system.dart';
 
+/// AuthCubit racine — partagé par GoRouter.redirect et MultiBlocProvider.
+late final AuthCubit appAuthCubit;
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Hive.initFlutter();
-  await dotenv.load(fileName: ".env");
+  try {
+    await dotenv.load(fileName: ".env");
+  } catch (_) {
+    try {
+      await dotenv.load(fileName: ".env.example");
+    } catch (_) {}
+  }
+  const apiUrlDefine = String.fromEnvironment('API_URL');
+  const mapsKeyDefine = String.fromEnvironment('GOOGLE_MAPS_API_KEY');
+  if (apiUrlDefine.isNotEmpty) dotenv.env['API_URL'] = apiUrlDefine;
+  if (mapsKeyDefine.isNotEmpty) {
+    dotenv.env['GOOGLE_MAPS_API_KEY'] = mapsKeyDefine;
+  }
   await initializeDateFormatting('fr_FR', null);
 
+  // Firebase + Crashlytics (no-op si non configuré)
+  await CrashlyticsService.initialize();
   // FCM : no-op si Firebase non configuré (pas de google-services.json)
   await FcmService.instance.initialize();
 
+  appAuthCubit = AuthCubit();
   runApp(MyApp());
 }
 
 class MyApp extends StatelessWidget {
+  static const _authRequiredPrefixes = [
+    '/wallet',
+    '/providermain',
+    '/prestataire-finalization',
+    '/mission-details',
+    '/chat',
+  ];
+
   final GoRouter mobileRouter = GoRouter(
+    refreshListenable: GoRouterRefreshStream(appAuthCubit.stream),
+    redirect: (context, state) {
+      final loggedIn = appAuthCubit.state is AuthAuthenticated;
+      final loc = state.matchedLocation;
+      final needsAuth =
+          _authRequiredPrefixes.any((p) => loc == p || loc.startsWith('$p/'));
+      if (needsAuth && !loggedIn) return '/login';
+      return null;
+    },
     routes: [
       GoRoute(
         path: '/',
@@ -134,55 +164,53 @@ class MyApp extends StatelessWidget {
       GoRoute(
         path: '/wallet',
         builder: (context, state) {
-          return BlocProvider(
-            create: (context) => SoutraWalletBloc(),
-            child: const WalletPageScreenM(),
-          );
+          return const WalletPageScreenM();
         },
       ),
       GoRoute(
         path: '/wallet/profile',
         builder: (context, state) {
-          return BlocProvider(
-            create: (context) => SoutraWalletBloc(),
-            child: const WalletPageScreenM(), // Ou créer un ProfileScreen dédié
-          );
+          return const WalletPageScreenM();
         },
       ),
-      // 🎯 Route pour les détails de mission (depuis notifications)
+      // Deep-link mission → écran d'aiguillage (plus de TODO placeholder)
       GoRoute(
         path: '/mission-details/:missionId',
         name: 'mission-details',
         builder: (context, state) {
           final missionId = state.pathParameters['missionId'] ?? '';
-          // TODO: Créer MissionDetailsScreen
           return Scaffold(
             appBar: AppBar(
-              title: const Text('Détails Mission'),
-              backgroundColor: const Color(0xFF2E7D32),
+              title: const Text('Mission'),
+              backgroundColor: SDColors.primary600,
               foregroundColor: Colors.white,
             ),
             body: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.assignment, size: 64, color: Color(0xFF2E7D32)),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Écran Mission à implémenter',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Mission ID: $missionId',
-                    style: const TextStyle(color: Colors.grey),
-                  ),
-                  const SizedBox(height: 24),
-                  const Text(
-                    'TODO: Créer MissionDetailsScreen',
-                    style: TextStyle(fontSize: 14, fontStyle: FontStyle.italic),
-                  ),
-                ],
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.assignment,
+                        size: 64, color: SDColors.primary600),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Mission #$missionId',
+                      style: const TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Ouvrez le tableau prestataire pour gérer cette mission.',
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 24),
+                    FilledButton(
+                      onPressed: () => context.go('/providermain'),
+                      child: const Text('Voir mes missions'),
+                    ),
+                  ],
+                ),
               ),
             ),
           );
@@ -196,7 +224,7 @@ class MyApp extends StatelessWidget {
           final conversationId = state.pathParameters['conversationId'] ?? '';
           final authState = context.read<AuthCubit>().state;
           final userId = authState is AuthAuthenticated
-              ? (authState.utilisateur.idutilisateur ?? '')
+              ? authState.utilisateur.idutilisateur
               : '';
           return BlocProvider(
             create: (_) => ChatPageBlocM(userId: userId),
@@ -214,8 +242,8 @@ class MyApp extends StatelessWidget {
     return MultiBlocProvider(
       providers: [
         // 👇 AuthCubit global pour toute l'application
-        BlocProvider<AuthCubit>(
-          create: (_) => AuthCubit(),
+        BlocProvider<AuthCubit>.value(
+          value: appAuthCubit,
         ),
         // 👇 LocationPageBlocM pour la géolocalisation
         BlocProvider<LocationPageBlocM>(
@@ -256,12 +284,10 @@ class MyApp extends StatelessWidget {
               primary: SDColors.primary600,
               secondary: SDColors.secondary500,
               surface: SDColors.white,
-              background: SDColors.neutral50,
               error: SDColors.error500,
               onPrimary: SDColors.white,
               onSecondary: SDColors.white,
               onSurface: SDColors.neutral900,
-              onBackground: SDColors.neutral900,
               onError: SDColors.white,
             ),
             
@@ -380,7 +406,7 @@ class MyApp extends StatelessWidget {
             cardTheme: CardThemeData(
               color: SDColors.white,
               elevation: 2,
-              shadowColor: SDColors.neutral900.withOpacity(0.1),
+              shadowColor: SDColors.neutral900.withValues(alpha: 0.1),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
               ),

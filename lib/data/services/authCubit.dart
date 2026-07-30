@@ -2,11 +2,13 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import '../models/utilisateur.dart';
 import 'api_client.dart';
 import 'token_store.dart';
 import 'fcm_service.dart';
+import 'websocket_service.dart';
 
 abstract class AuthState {}
 
@@ -48,11 +50,11 @@ class AuthCubit extends Cubit<AuthState> {
   Future<void> _loadAuthFromStorage() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('auth_token');
+      final token = await TokenStore.getAccessToken();
       final userJson = prefs.getString('auth_user');
       final rolesJson = prefs.getString('auth_roles');
       final activeRole = prefs.getString('auth_active_role');
-      final refreshToken = prefs.getString('refresh_token');
+      final refreshToken = await TokenStore.getRefreshToken();
 
       if (token != null && userJson != null) {
         final apiUrl = dotenv.env['API_URL'];
@@ -108,7 +110,9 @@ class AuthCubit extends Cubit<AuthState> {
         ));
       }
     } catch (e) {
-      print('Erreur lors du chargement de l\'authentification: $e');
+      if (kDebugMode) {
+        print('Erreur lors du chargement de l\'authentification: $e');
+      }
     }
   }
 
@@ -144,7 +148,6 @@ class AuthCubit extends Cubit<AuthState> {
   ) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('auth_token', token);
       await prefs.setString('auth_user', jsonEncode(utilisateur.toJson()));
       await prefs.setString('auth_roles', jsonEncode(roles));
       if (activeRole != null) {
@@ -155,7 +158,9 @@ class AuthCubit extends Cubit<AuthState> {
         refreshToken: refreshToken,
       );
     } catch (e) {
-      print('Erreur lors de la sauvegarde de l\'authentification: $e');
+      if (kDebugMode) {
+        print('Erreur lors de la sauvegarde de l\'authentification: $e');
+      }
     }
   }
 
@@ -233,6 +238,7 @@ class AuthCubit extends Cubit<AuthState> {
             .timeout(const Duration(seconds: 10));
       } catch (_) {}
     }
+    WebSocketService().disconnectForLogout();
     await _clearAuthFromStorage();
     emit(AuthInitial());
   }
@@ -246,7 +252,9 @@ class AuthCubit extends Cubit<AuthState> {
       await prefs.remove('auth_active_role');
       await TokenStore.clear();
     } catch (e) {
-      print('Erreur lors de la suppression de l\'authentification: $e');
+      if (kDebugMode) {
+        print('Erreur lors de la suppression de l\'authentification: $e');
+      }
     }
   }
 }
