@@ -182,14 +182,12 @@ class PrestataireFinalizationBloc
     }
   }
 
-  // 🎯 VALIDATION DES DOCUMENTS OBLIGATOIRES
+  // 🎯 VALIDATION — seule la localisation est obligatoire
+  // CNI + selfie = optionnels (badge "Identité vérifiée")
   Map<String, dynamic> _validateRequiredDocuments(
       Map<String, dynamic> formData) {
     final missing = <String>[];
 
-    if (formData['cniRecto'] == null) missing.add('CNI Recto');
-    if (formData['cniVerso'] == null) missing.add('CNI Verso');
-    if (formData['selfie'] == null) missing.add('Selfie');
     if (formData['location'] == null) missing.add('Localisation');
 
     return {

@@ -54,6 +54,22 @@ class SendMessage extends ChatPageEventM {
   List<Object?> get props => [conversationId, content, type, imageFile];
 }
 
+// Événement pour envoyer un message vocal
+class SendAudioMessage extends ChatPageEventM {
+  final String conversationId;
+  final dynamic audioFile; // File audio enregistré
+  final int dureeFichier;  // durée en secondes
+
+  const SendAudioMessage({
+    required this.conversationId,
+    required this.audioFile,
+    required this.dureeFichier,
+  });
+
+  @override
+  List<Object?> get props => [conversationId, audioFile, dureeFichier];
+}
+
 // Événement pour marquer un message comme lu
 class MarkMessageAsRead extends ChatPageEventM {
   final String conversationId;

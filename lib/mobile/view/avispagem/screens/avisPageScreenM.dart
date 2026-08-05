@@ -330,18 +330,22 @@ class _AvisPageScreenMState extends State<AvisPageScreenM> {
 
                 const SizedBox(height: 12),
 
-                // Titre et commentaire
-                Text(
-                  avis.titre,
-                  style: SDTypography.titleMedium.copyWith(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  avis.commentaire,
-                  style: const TextStyle(fontSize: 14),
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                ),
+                // Titre et commentaire (optionnels)
+                if (avis.titre != null && avis.titre!.isNotEmpty) ...[
+                  Text(
+                    avis.titre!,
+                    style: SDTypography.titleMedium
+                        .copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                if (avis.commentaire != null && avis.commentaire!.isNotEmpty)
+                  Text(
+                    avis.commentaire!,
+                    style: const TextStyle(fontSize: 14),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                  ),
 
                 const SizedBox(height: 12),
 

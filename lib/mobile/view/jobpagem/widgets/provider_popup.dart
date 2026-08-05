@@ -116,7 +116,7 @@ class ProviderPopup extends StatelessWidget {
                                 : null,
                             ratingText: '${data['note'] ?? 'N/A'}/5',
                             metaText: data['isVerified'] == true
-                                ? '${data['location'] ?? ''} • Vérifié'
+                                ? '${data['location'] ?? ''} • ✓ Identité vérifiée'
                                 : (data['location']?.toString() ?? ''),
                             statusText: 'Disponible maintenant',
                             priceText: data['price']?.toString(),

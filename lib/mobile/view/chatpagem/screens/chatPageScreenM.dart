@@ -12,6 +12,7 @@ import '../../common/widgets/empty_state_widget.dart';
 import '../../searchpagem/screens/searchPageScreenM.dart';
 import '../../../../data/services/authCubit.dart';
 import 'package:go_router/go_router.dart';
+import '../widgets/voice_recorder_widget.dart';
 
 // ✅ Design System
 import '../../../../design_system/design_system.dart';
@@ -1609,10 +1610,26 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
                                         ),
                                         child: Row(
                                           children: [
-                                            // Bouton pour ajouter une image
+                                            // Bouton photo du problème
                                             IconButton(
-                                              icon: Icon(Icons.image),
+                                              icon: const Icon(Icons.image_outlined),
+                                              tooltip: 'Photo du problème',
                                               onPressed: _pickImage,
+                                            ),
+                                            // Bouton vocal
+                                            Padding(
+                                              padding: const EdgeInsets.symmetric(horizontal: 2),
+                                              child: VoiceRecorderWidget(
+                                                onSend: (audioFile, duration) {
+                                                  final conv = _chatBloc.state.selectedConversation;
+                                                  if (conv == null) return;
+                                                  _chatBloc.add(SendAudioMessage(
+                                                    conversationId: conv.id,
+                                                    audioFile: audioFile,
+                                                    dureeFichier: duration,
+                                                  ));
+                                                },
+                                              ),
                                             ),
                                             // Champ de texte
                                             Expanded(
@@ -1622,7 +1639,7 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
                                                 onChanged: _onMessageChanged,
                                                 decoration: InputDecoration(
                                                   hintText:
-                                                      'Tapez un message...',
+                                                      'Message (optionnel)',
                                                   border: OutlineInputBorder(
                                                     borderRadius:
                                                         BorderRadius.circular(
@@ -1640,7 +1657,7 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
                                                 ),
                                               ),
                                             ),
-                                            // Bouton d'envoi
+                                            // Bouton d'envoi texte
                                             IconButton(
                                               icon: Icon(Icons.send,
                                                   color: Colors.green),

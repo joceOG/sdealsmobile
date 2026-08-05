@@ -273,19 +273,24 @@ class _AvisDetailScreenMState extends State<AvisDetailScreenM> {
           ],
         ),
         const SizedBox(height: 12),
-        Text(
-          widget.avis.titre,
-          style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
+        if (widget.avis.titre != null && widget.avis.titre!.isNotEmpty)
+          Text(
+            widget.avis.titre!,
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
           ),
-        ),
       ],
     );
   }
 
   // 💬 COMMENTAIRE
   Widget _buildCommentaire() {
+    final commentaire = widget.avis.commentaire;
+    if (commentaire == null || commentaire.isEmpty) {
+      return const SizedBox.shrink();
+    }
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -305,7 +310,7 @@ class _AvisDetailScreenMState extends State<AvisDetailScreenM> {
           ),
           const SizedBox(height: 8),
           Text(
-            widget.avis.commentaire,
+            commentaire,
             style: const TextStyle(fontSize: 16, height: 1.5),
           ),
         ],

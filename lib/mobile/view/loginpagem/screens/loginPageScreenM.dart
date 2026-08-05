@@ -68,9 +68,7 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (_) => LoginPageBlocM(),
-      child: Scaffold(
+    return Scaffold(
         backgroundColor: SDColors.white,
         appBar: SDAppBar(
           title: '', // Empty title for minimal look
@@ -313,7 +311,6 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
             ),
           ),
         ),
-      ),
     );
   }
 }

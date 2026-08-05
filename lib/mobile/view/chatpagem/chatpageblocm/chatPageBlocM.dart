@@ -30,6 +30,7 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
     on<SelectConversation>(_onSelectConversation);
     on<LoadMessages>(_onLoadMessages);
     on<SendMessage>(_onSendMessage);
+    on<SendAudioMessage>(_onSendAudioMessage);
     on<MarkMessageAsRead>(_onMarkMessageAsRead);
     on<MarkConversationAsRead>(_onMarkConversationAsRead);
     on<CreateConversation>(_onCreateConversation);
@@ -313,6 +314,60 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
       emit(state.copyWith(
         messagesByConversation: updatedMessagesMap,
         error: error.toString(),
+      ));
+    }
+  }
+
+  Future<void> _onSendAudioMessage(
+      SendAudioMessage event, Emitter<ChatPageStateM> emit) async {
+    if (state.selectedConversation == null) return;
+    final audioFile = event.audioFile is File ? event.audioFile as File : null;
+    if (audioFile == null) return;
+
+    final tempMessage = MessageModel(
+      id: _uuid.v4(),
+      senderId: _currentUserId,
+      receiverId: state.selectedConversation!.participantId,
+      timestamp: DateTime.now(),
+      content: '🎤 Message vocal',
+      type: MessageType.audio,
+      status: MessageStatus.sending,
+      dureeFichier: event.dureeFichier,
+    );
+
+    final currentMessages = state.selectedConversationMessages;
+    final updatedMessages = List<MessageModel>.from(currentMessages)
+      ..add(tempMessage);
+    final updatedMessagesMap =
+        Map<String, List<MessageModel>>.from(state.messagesByConversation);
+    updatedMessagesMap[event.conversationId] = updatedMessages;
+
+    emit(state.copyWith(messagesByConversation: updatedMessagesMap));
+
+    try {
+      final responseData = await _apiClient.sendMessage(
+        expediteur: _currentUserId,
+        destinataire: state.selectedConversation!.participantId,
+        pieceJointe: audioFile,
+        typePieceJointe: 'AUDIO',
+        dureeFichier: event.dureeFichier,
+      );
+      final sentMessage = MessageModel.fromBackend(responseData);
+      final finalMessages = updatedMessages.map((msg) {
+        return msg.id == tempMessage.id ? sentMessage : msg;
+      }).toList();
+      updatedMessagesMap[event.conversationId] = finalMessages;
+      emit(state.copyWith(messagesByConversation: updatedMessagesMap));
+    } catch (e) {
+      final failedMessages = updatedMessages.map((msg) {
+        return msg.id == tempMessage.id
+            ? msg.copyWith(newStatus: MessageStatus.failed)
+            : msg;
+      }).toList();
+      updatedMessagesMap[event.conversationId] = failedMessages;
+      emit(state.copyWith(
+        messagesByConversation: updatedMessagesMap,
+        error: e.toString(),
       ));
     }
   }

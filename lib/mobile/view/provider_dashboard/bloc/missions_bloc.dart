@@ -121,13 +121,13 @@ class MissionsBloc extends Bloc<MissionsEvent, MissionsState> {
         emit(MissionsError('Session expirée — reconnectez-vous'));
         return;
       }
+      // PATCH /prestation/:id/statut — seul endpoint qui accepte le changement de statut
       final body = <String, dynamic>{
         'statut': statut,
-        if (notes != null) 'notesPrestataire': notes,
-        if (photos != null) 'photosApres': photos,
+        if (notes != null && notes.isNotEmpty) 'commentaire': notes,
       };
-      final response = await _apiClient.put(
-        '/prestation/$missionId',
+      final response = await _apiClient.patch(
+        '/prestation/$missionId/statut',
         body: body,
         token: _currentToken,
       );
@@ -156,7 +156,6 @@ class MissionsBloc extends Bloc<MissionsEvent, MissionsState> {
 
   Future<void> _onAccept(
       AcceptMission event, Emitter<MissionsState> emit) async {
-    // Ancienne route morte /prestataire/missions/:id/accept → PUT /prestation/:id
     await _mutateStatut(
       missionId: event.missionId,
       statut: 'ACCEPTEE',

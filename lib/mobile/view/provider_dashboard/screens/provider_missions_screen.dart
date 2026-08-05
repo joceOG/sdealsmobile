@@ -1013,7 +1013,7 @@ class _ProviderMissionsScreenState extends State<ProviderMissionsScreen>
                   SizedBox(width: SDSpacing.xxxs),
                   Expanded(
                     child: Text(
-                      'Service 100% GRATUIT',
+                      'Mise en relation gratuite',
                       style: SDTypography.bodySmall.copyWith(
                         color: SDColors.success700,
                         fontWeight: FontWeight.w600,

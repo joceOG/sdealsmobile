@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 enum MessageType {
   text,
   image,
+  audio,
 }
 
 enum MessageStatus {
@@ -21,6 +22,10 @@ class MessageModel {
   final String content;
   final MessageType type;
   final MessageStatus status;
+  /// URL Cloudinary du fichier joint (photo ou audio)
+  final String? attachmentUrl;
+  /// Durée en secondes pour les messages audio
+  final int? dureeFichier;
 
   MessageModel({
     required this.id,
@@ -30,6 +35,8 @@ class MessageModel {
     required this.content,
     required this.type,
     required this.status,
+    this.attachmentUrl,
+    this.dureeFichier,
   });
 
   factory MessageModel.fromJson(Map<String, dynamic> json) {
@@ -50,9 +57,18 @@ class MessageModel {
     );
   }
 
+  // 🔄 Extraire l'ID depuis un champ qui peut être une String ou un objet populé
+  static String _extractId(dynamic field) {
+    if (field == null) return '';
+    if (field is String) return field;
+    if (field is Map<String, dynamic>) {
+      return field['_id']?.toString() ?? field['id']?.toString() ?? '';
+    }
+    return field.toString();
+  }
+
   // 🔄 Convertir depuis le format backend
   factory MessageModel.fromBackend(Map<String, dynamic> json) {
-    // Mapper les statuts backend vers les statuts locaux
     MessageStatus mapStatus(String? backendStatus) {
       switch (backendStatus?.toUpperCase()) {
         case 'ENVOYE':
@@ -66,7 +82,6 @@ class MessageModel {
       }
     }
 
-    // Mapper les types backend vers les types locaux
     MessageType mapType(String? typePieceJointe) {
       if (typePieceJointe == null || typePieceJointe.isEmpty) {
         return MessageType.text;
@@ -74,22 +89,36 @@ class MessageModel {
       switch (typePieceJointe.toUpperCase()) {
         case 'IMAGE':
           return MessageType.image;
+        case 'AUDIO':
+          return MessageType.audio;
         default:
           return MessageType.text;
       }
     }
 
+    final attachmentUrl = json['pieceJointe']?.toString();
+    final type = mapType(json['typePieceJointe']);
+
+    // contenu affiché : texte du message, sinon placeholder selon type
+    String content = json['contenu']?.toString() ?? '';
+    if (content.isEmpty) {
+      content = type == MessageType.audio ? '🎤 Message vocal' : '📷 Photo';
+    }
+
     return MessageModel(
       id: json['_id']?.toString() ?? json['id']?.toString() ?? '',
-      senderId: json['expediteur']?.toString() ?? '',
-      receiverId: json['destinataire']?.toString() ?? '',
+      senderId: _extractId(json['expediteur']),
+      receiverId: _extractId(json['destinataire']),
       timestamp: json['createdAt'] != null
           ? DateTime.parse(json['createdAt'])
           : DateTime.now(),
-      content:
-          json['contenu']?.toString() ?? json['pieceJointe']?.toString() ?? '',
-      type: mapType(json['typePieceJointe']),
+      content: content,
+      type: type,
       status: mapStatus(json['statut']),
+      attachmentUrl: attachmentUrl,
+      dureeFichier: json['dureeFichier'] != null
+          ? int.tryParse(json['dureeFichier'].toString())
+          : null,
     );
   }
 
@@ -102,6 +131,8 @@ class MessageModel {
       'content': content,
       'type': type.toString().split('.').last,
       'status': status.toString().split('.').last,
+      if (attachmentUrl != null) 'attachmentUrl': attachmentUrl,
+      if (dureeFichier != null) 'dureeFichier': dureeFichier,
     };
   }
 
@@ -135,6 +166,8 @@ class MessageModel {
       content: content,
       type: type,
       status: newStatus ?? status,
+      attachmentUrl: attachmentUrl,
+      dureeFichier: dureeFichier,
     );
   }
 }

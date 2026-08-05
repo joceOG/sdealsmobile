@@ -44,17 +44,17 @@ class _PrestataireFinalizationScreenState
   final List<Map<String, dynamic>> _steps = [
     {
       'title': 'Documents d\'identité',
-      'subtitle': 'CNI recto/verso et photo selfie',
+      'subtitle': 'Optionnel — pour le badge Vérifié',
+      'required': false,
+    },
+    {
+      'title': 'Zone d\'intervention',
+      'subtitle': 'Obligatoire pour être visible',
       'required': true,
     },
     {
-      'title': 'Localisation',
-      'subtitle': 'Zone d\'intervention GPS',
-      'required': true,
-    },
-    {
-      'title': 'Documents optionnels',
-      'subtitle': 'Certificats et assurance (optionnel)',
+      'title': 'Confirmation',
+      'subtitle': 'Vérifiez avant de soumettre',
       'required': false,
     },
   ];
@@ -115,7 +115,7 @@ class _PrestataireFinalizationScreenState
                   children: [
                     _buildIdentityStep(),
                     _buildLocationStep(),
-                    _buildOptionalDocumentsStep(),
+                    _buildConfirmationStep(),
                   ],
                 ),
               ),
@@ -205,7 +205,7 @@ class _PrestataireFinalizationScreenState
             title: 'CNI Recto',
             subtitle: 'Photo du recto de votre carte d\'identité',
             icon: Icons.credit_card,
-            isRequired: true,
+            isRequired: false,
             image: _formData['cniRecto'],
             onTap: () => _pickImage('cniRecto'),
           ),
@@ -217,7 +217,7 @@ class _PrestataireFinalizationScreenState
             title: 'CNI Verso',
             subtitle: 'Photo du verso de votre carte d\'identité',
             icon: Icons.credit_card,
-            isRequired: true,
+            isRequired: false,
             image: _formData['cniVerso'],
             onTap: () => _pickImage('cniVerso'),
           ),
@@ -229,33 +229,47 @@ class _PrestataireFinalizationScreenState
             title: 'Photo Selfie',
             subtitle: 'Photo de vous-même pour vérification',
             icon: Icons.face,
-            isRequired: true,
+            isRequired: false,
             image: _formData['selfie'],
             onTap: () => _pickImage('selfie'),
           ),
 
           SizedBox(height: 24),
 
-          // Information importante
+          // Badge expliqué
           Container(
             padding: EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.blue.shade50,
+              color: Colors.green.shade50,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.blue.shade200),
+              border: Border.all(color: Colors.green.shade200),
             ),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.info, color: Colors.blue.shade600),
-                SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Ces documents sont obligatoires pour vérifier votre identité et activer votre compte prestataire.',
-                    style: TextStyle(
-                      color: Colors.blue.shade700,
-                      fontSize: 14,
+                Row(
+                  children: [
+                    Icon(Icons.verified_user, color: Colors.green.shade600),
+                    SizedBox(width: 8),
+                    Text(
+                      'Badge "Identité vérifiée"',
+                      style: TextStyle(
+                        color: Colors.green.shade800,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
                     ),
-                  ),
+                  ],
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'Ces documents sont optionnels. Si vous les fournissez, votre profil affichera le badge "Vérifié" et les clients vous feront plus confiance.',
+                  style: TextStyle(color: Colors.green.shade700, fontSize: 13),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'Sans documents, votre profil sera publié normalement, sans badge.',
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
                 ),
               ],
             ),
@@ -362,94 +376,126 @@ class _PrestataireFinalizationScreenState
     );
   }
 
-  // 🎯 ÉTAPE 3: DOCUMENTS OPTIONNELS
-  Widget _buildOptionalDocumentsStep() {
+  // 🎯 ÉTAPE 3: CONFIRMATION
+  Widget _buildConfirmationStep() {
+    final hasIdentity = _formData['cniRecto'] != null &&
+        _formData['cniVerso'] != null &&
+        _formData['selfie'] != null;
+    final hasLocation = _formData['location'] != null;
+
     return SingleChildScrollView(
-      padding: EdgeInsets.all(20),
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Documents optionnels',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.green.shade700,
-            ),
+          const Text(
+            'Récapitulatif',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
-          SizedBox(height: 8),
-          Text(
-            'Ces documents améliorent votre profil et augmentent vos chances d\'être sélectionné',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[600],
-            ),
-          ),
+          const SizedBox(height: 20),
 
-          SizedBox(height: 24),
-
-          // Certificats
-          _buildDocumentCard(
-            title: 'Certificats/Diplômes',
-            subtitle: 'Vos diplômes et certificats professionnels',
-            icon: Icons.school,
-            isRequired: false,
-            image: _formData['certificates'].isNotEmpty
-                ? _formData['certificates'].first
-                : null,
-            onTap: () => _pickMultipleImages('certificates'),
+          // Localisation
+          _buildSummaryRow(
+            icon: hasLocation ? Icons.check_circle : Icons.cancel,
+            iconColor: hasLocation ? Colors.green : Colors.red,
+            label: hasLocation
+                ? 'Zone d\'intervention définie'
+                : 'Zone non définie — retournez à l\'étape 2',
+            isOk: hasLocation,
           ),
 
-          SizedBox(height: 16),
+          const SizedBox(height: 12),
 
-          // Assurance
-          _buildDocumentCard(
-            title: 'Assurance professionnelle',
-            subtitle: 'Votre attestation d\'assurance',
-            icon: Icons.security,
-            isRequired: false,
-            image: _formData['insurance'],
-            onTap: () => _pickImage('insurance'),
+          // Identité / Badge
+          _buildSummaryRow(
+            icon: hasIdentity ? Icons.verified_user : Icons.info_outline,
+            iconColor: hasIdentity ? Colors.green : Colors.grey,
+            label: hasIdentity
+                ? 'Documents d\'identité fournis → badge Vérifié'
+                : 'Pas de CNI — profil sans badge (vous pourrez l\'ajouter plus tard)',
+            isOk: hasIdentity,
           ),
 
-          SizedBox(height: 16),
+          const SizedBox(height: 28),
 
-          // Portfolio
-          _buildDocumentCard(
-            title: 'Portfolio',
-            subtitle: 'Photos de vos réalisations',
-            icon: Icons.photo_library,
-            isRequired: false,
-            image: _formData['portfolio'].isNotEmpty
-                ? _formData['portfolio'].first
-                : null,
-            onTap: () => _pickMultipleImages('portfolio'),
-          ),
-
-          SizedBox(height: 24),
-
-          // Information
-          Container(
-            padding: EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.orange.shade50,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.orange.shade200),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.info, color: Colors.orange.shade600),
-                SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Ces documents sont optionnels mais recommandés pour améliorer votre profil.',
-                    style: TextStyle(
-                      color: Colors.orange.shade700,
-                      fontSize: 14,
+          // Avertissement si pas de localisation
+          if (!hasLocation)
+            Container(
+              padding: const EdgeInsets.all(14),
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.red.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.warning, color: Colors.red.shade600),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text(
+                      'La localisation est obligatoire pour publier votre profil. Revenez à l\'étape précédente.',
+                      style: TextStyle(fontSize: 13),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
+            ),
+
+          // Info si pas d'identité
+          if (!hasIdentity)
+            Container(
+              padding: const EdgeInsets.all(14),
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.blue.shade100),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.blue.shade600),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text(
+                      'Vous pourrez ajouter votre CNI depuis votre tableau de bord pour obtenir le badge Vérifié.',
+                      style: TextStyle(fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummaryRow({
+    required IconData icon,
+    required Color iconColor,
+    required String label,
+    required bool isOk,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isOk ? Colors.green.shade50 : Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isOk ? Colors.green.shade200 : Colors.grey.shade200,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: iconColor, size: 22),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                color: isOk ? Colors.green.shade800 : Colors.grey.shade700,
+              ),
             ),
           ),
         ],
@@ -594,9 +640,19 @@ class _PrestataireFinalizationScreenState
 
   // 🎯 MÉTHODES
   void _nextStep() {
+    // Étape 2 (index 1) = localisation obligatoire avant de continuer
+    if (_currentStep == 1 && _formData['location'] == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Activez votre localisation pour continuer.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
     if (_currentStep < _steps.length - 1) {
       _pageController.nextPage(
-        duration: Duration(milliseconds: 300),
+        duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
       );
     }
@@ -692,6 +748,22 @@ class _PrestataireFinalizationScreenState
   }
 
   void _submitForm() {
+    // Garde : localisation obligatoire
+    if (_formData['location'] == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('La localisation est obligatoire pour soumettre votre profil.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      _pageController.animateToPage(
+        1,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+      return;
+    }
+
     final auth = context.read<AuthCubit>().state;
     String? prestataireId = widget.prestataireId;
     String? authToken;
@@ -702,7 +774,7 @@ class _PrestataireFinalizationScreenState
 
     if (prestataireId == null || authToken == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur: ID prestataire non trouvé')),
+        const SnackBar(content: Text('Erreur: ID prestataire non trouvé')),
       );
       return;
     }

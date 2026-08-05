@@ -990,7 +990,7 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
                 onPressed: _onRequestService,
                 icon: Icon(Icons.send_rounded, color: SDColors.white),
                 label: Text(
-                  'Demander un devis',
+                  'Demander un service',
                   style: SDTypography.labelMedium.copyWith(
                     color: SDColors.white,
                     fontWeight: FontWeight.bold,
@@ -1121,7 +1121,6 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
     final adresseCtrl = TextEditingController();
     final villeCtrl = TextEditingController();
     final notesCtrl = TextEditingController();
-    DateTime? selectedDateTime;
 
     showModalBottomSheet(
       context: context,
@@ -1139,9 +1138,7 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
             right: 20,
             top: 20,
           ),
-          child: StatefulBuilder(
-            builder: (context, setSheetState) {
-              return SingleChildScrollView(
+          child: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1167,7 +1164,7 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Text(
-                                'Demander un devis',
+                                'Demander un service',
                                 style: TextStyle(
                                   fontSize: 20,
                                   fontWeight: FontWeight.bold,
@@ -1275,7 +1272,7 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
                     TextField(
                       controller: villeCtrl,
                       decoration: InputDecoration(
-                        labelText: 'Ville',
+                        labelText: 'Ville *',
                         hintText: 'Ex: Abidjan',
                         prefixIcon: const Icon(Icons.location_city, color: Color(0xFF2E7D32)),
                         border: OutlineInputBorder(
@@ -1289,70 +1286,15 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
                     ),
                     const SizedBox(height: 12),
                     
-                    // Date et heure moderne
-                    Container(
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey.shade300),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.calendar_today, color: Color(0xFF2E7D32)),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              selectedDateTime == null
-                                  ? 'Choisir une date et heure (optionnel)'
-                                  : '${selectedDateTime!.day}/${selectedDateTime!.month}/${selectedDateTime!.year} à ${selectedDateTime!.hour}:${selectedDateTime!.minute.toString().padLeft(2, '0')}',
-                              style: TextStyle(
-                                color: selectedDateTime == null ? Colors.grey.shade500 : Colors.black87,
-                                fontSize: 15,
-                              ),
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: () async {
-                              final date = await showDatePicker(
-                                context: context,
-                                initialDate: DateTime.now().add(const Duration(days: 1)),
-                                firstDate: DateTime.now(),
-                                lastDate: DateTime.now().add(const Duration(days: 365)),
-                              );
-                              if (date != null) {
-                                final time = await showTimePicker(
-                                  context: context,
-                                  initialTime: TimeOfDay.now(),
-                                );
-                                if (time != null) {
-                                  setSheetState(() {
-                                    selectedDateTime = DateTime(
-                                      date.year,
-                                      date.month,
-                                      date.day,
-                                      time.hour,
-                                      time.minute,
-                                    );
-                                  });
-                                }
-                              }
-                            },
-                            child: const Text('Choisir', style: TextStyle(color: Color(0xFF2E7D32))),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    
-                    // Notes
+                    // Notes (optionnel)
                     TextField(
                       controller: notesCtrl,
-                      maxLines: 3,
+                      maxLines: 2,
                       decoration: InputDecoration(
-                        labelText: 'Notes / Instructions (optionnel)',
-                        hintText: 'Ajoutez des détails supplémentaires...',
+                        labelText: 'Précision (optionnel)',
+                        hintText: 'Ou envoyez une photo / vocal dans le chat',
                         prefixIcon: const Padding(
-                          padding: EdgeInsets.only(bottom: 40),
+                          padding: EdgeInsets.only(bottom: 20),
                           child: Icon(Icons.note_alt, color: Color(0xFF2E7D32)),
                         ),
                         alignLabelWithHint: true,
@@ -1367,7 +1309,7 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
                     ),
                     const SizedBox(height: 16),
                     
-                    // Info système gratuit
+                    // Mise en relation gratuite
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
@@ -1381,7 +1323,7 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              'Service 100% GRATUIT - Aucun paiement requis',
+                              'Mise en relation gratuite. Le prix se discute ensuite (chat, appel ou sur place).',
                               style: TextStyle(
                                 color: Colors.blue.shade700,
                                 fontSize: 13,
@@ -1409,6 +1351,23 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
                                   Icon(Icons.warning_amber_rounded, color: Colors.white),
                                   SizedBox(width: 8),
                                   Expanded(child: Text('Veuillez saisir une adresse')),
+                                ],
+                              ),
+                              backgroundColor: Colors.orange,
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          );
+                          return;
+                        }
+                        if (villeCtrl.text.trim().isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Row(
+                                children: const [
+                                  Icon(Icons.warning_amber_rounded, color: Colors.white),
+                                  SizedBox(width: 8),
+                                  Expanded(child: Text('Veuillez saisir une ville')),
                                 ],
                               ),
                               backgroundColor: Colors.orange,
@@ -1449,7 +1408,6 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
                             serviceId: _provider!.service.idservice,
                             adresse: adresseCtrl.text.trim(),
                             ville: villeCtrl.text.trim(),
-                            datePrestation: selectedDateTime,
                             notesClient: notesCtrl.text.trim(),
                             montant: _provider!.prixprestataire,
                           );
@@ -1538,8 +1496,6 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
                   ),
                 ],
                 ),
-              );
-            },
           ),
         );
       },

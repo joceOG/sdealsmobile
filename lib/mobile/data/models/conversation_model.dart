@@ -56,36 +56,28 @@ class ConversationModel {
   }
 
   // 🔄 Convertir depuis le format backend
+  // Le backend renvoie : { conversationId, interlocuteur, dernierMessage, nonLus }
   factory ConversationModel.fromBackend(
       Map<String, dynamic> json, String currentUserId) {
-    // Extraire les participants
-    final List<dynamic> participants = json['participants'] ?? [];
 
-    // Trouver l'autre participant (pas l'utilisateur actuel)
-    Map<String, dynamic>? otherParticipant;
-    for (var p in participants) {
-      if (p is Map<String, dynamic>) {
-        final participantId = p['_id']?.toString() ?? p['id']?.toString() ?? '';
-        if (participantId != currentUserId) {
-          otherParticipant = p;
-          break;
-        }
-      }
-    }
+    // Interlocuteur : objet renvoyé par formatConversationsForUser
+    final Map<String, dynamic>? interlocuteur =
+        json['interlocuteur'] is Map<String, dynamic>
+            ? json['interlocuteur'] as Map<String, dynamic>
+            : null;
 
-    // Déterminer le type de conversation
+    // Déterminer le type de conversation selon les rôles de l'interlocuteur
     ConversationType determineType(Map<String, dynamic>? participant) {
       if (participant == null) return ConversationType.prestataire;
-
-      final role = participant['role']?.toString().toLowerCase() ?? '';
-      if (role.contains('vendeur') || role == 'vendeur') {
-        return ConversationType.vendeur;
-      } else if (role.contains('freelance') || role == 'freelance') {
-        return ConversationType.freelance;
-      } else if (role.contains('prestataire') || role == 'prestataire') {
-        return ConversationType.prestataire;
+      final roles = participant['roles'];
+      if (roles is List) {
+        final rolesStr = roles.join(' ').toLowerCase();
+        if (rolesStr.contains('vendeur')) return ConversationType.vendeur;
+        if (rolesStr.contains('freelance')) return ConversationType.freelance;
       }
-
+      final role = participant['role']?.toString().toLowerCase() ?? '';
+      if (role.contains('vendeur')) return ConversationType.vendeur;
+      if (role.contains('freelance')) return ConversationType.freelance;
       return ConversationType.prestataire;
     }
 
@@ -93,31 +85,41 @@ class ConversationModel {
     MessageModel? lastMessage;
     if (json['dernierMessage'] != null) {
       try {
-        lastMessage = MessageModel.fromBackend(json['dernierMessage']);
+        lastMessage = MessageModel.fromBackend(
+            json['dernierMessage'] as Map<String, dynamic>);
       } catch (e) {
-        print('⚠️ Erreur parsing dernierMessage: $e');
+        // ignore parsing error
       }
     }
 
+    // unreadCount : le backend renvoie nonLus (pas messagesNonLus)
+    final unreadCount = (json['nonLus'] as num?)?.toInt() ??
+        (json['messagesNonLus'] as num?)?.toInt() ??
+        0;
+
+    // Nom affiché : préférer prénom + nom
+    final prenom = interlocuteur?['prenom']?.toString() ?? '';
+    final nom = interlocuteur?['nom']?.toString() ?? '';
+    final participantName =
+        '${prenom} ${nom}'.trim().isNotEmpty ? '${prenom} ${nom}'.trim() : 'Utilisateur';
+
     return ConversationModel(
-      id: json['_id']?.toString() ?? json['conversationId']?.toString() ?? '',
+      id: json['conversationId']?.toString() ?? json['_id']?.toString() ?? '',
       userId: currentUserId,
-      participantId: otherParticipant?['_id']?.toString() ??
-          otherParticipant?['id']?.toString() ??
+      participantId: interlocuteur?['_id']?.toString() ??
+          interlocuteur?['id']?.toString() ??
           '',
-      participantName: otherParticipant?['nom']?.toString() ??
-          otherParticipant?['prenom']?.toString() ??
-          'Utilisateur',
+      participantName: participantName,
       participantImage:
-          otherParticipant?['photoProfil']?.toString() ?? 'assets/profil.png',
+          interlocuteur?['photoProfil']?.toString() ?? 'assets/profil.png',
       lastMessage: lastMessage,
       lastUpdated: json['updatedAt'] != null
-          ? DateTime.parse(json['updatedAt'])
-          : DateTime.now(),
-      unread: json['messagesNonLus'] != null && json['messagesNonLus'] > 0,
-      unreadCount: json['messagesNonLus'] ?? 0,
-      type: determineType(otherParticipant),
-      isOnline: false, // À implémenter avec WebSocket
+          ? DateTime.parse(json['updatedAt'].toString())
+          : (lastMessage?.timestamp ?? DateTime.now()),
+      unread: unreadCount > 0,
+      unreadCount: unreadCount,
+      type: determineType(interlocuteur),
+      isOnline: false,
     );
   }
 

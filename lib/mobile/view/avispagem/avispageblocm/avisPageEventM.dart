@@ -44,13 +44,13 @@ class SearchAvisM extends AvisPageEventM {
   List<Object?> get props => [query, objetType, ville];
 }
 
-// 📝 CRÉATION D'AVIS
+// 📝 CRÉATION D'AVIS (seule la note est obligatoire)
 class CreateAvisM extends AvisPageEventM {
   final String objetType;
   final String objetId;
   final int note;
-  final String titre;
-  final String commentaire;
+  final String? titre;
+  final String? commentaire;
   final List<CategorieEvaluation>? categories;
   final List<MediaAvis>? medias;
   final bool recommande;
@@ -62,8 +62,8 @@ class CreateAvisM extends AvisPageEventM {
     required this.objetType,
     required this.objetId,
     required this.note,
-    required this.titre,
-    required this.commentaire,
+    this.titre,
+    this.commentaire,
     this.categories,
     this.medias,
     this.recommande = true,

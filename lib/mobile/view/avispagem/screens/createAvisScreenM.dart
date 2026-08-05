@@ -3,7 +3,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../avispageblocm/avisPageBlocM.dart';
 import '../avispageblocm/avisPageEventM.dart';
 import '../avispageblocm/avisPageStateM.dart';
-import 'package:sdealsmobile/data/models/avis.dart';
 import '../../../../design_system/design_system.dart';
 
 class CreateAvisScreenM extends StatefulWidget {
@@ -23,39 +22,8 @@ class CreateAvisScreenM extends StatefulWidget {
 }
 
 class _CreateAvisScreenMState extends State<CreateAvisScreenM> {
-  final _formKey = GlobalKey<FormState>();
-  final _titreController = TextEditingController();
   final _commentaireController = TextEditingController();
-
-  int _note = 5;
-  bool _recommande = true;
-  bool _anonyme = false;
-  List<String> _selectedTags = [];
-  String? _selectedVille;
-
-  final List<String> _availableTags = [
-    'Excellent service',
-    'Rapide',
-    'Professionnel',
-    'Bon rapport qualité-prix',
-    'Recommandé',
-    'Ponctuel',
-    'Sympathique',
-    'Expert',
-  ];
-
-  final List<String> _availableVilles = [
-    'Abidjan',
-    'Bouaké',
-    'Daloa',
-    'San-Pédro',
-    'Korhogo',
-    'Gagnoa',
-    'Man',
-    'Divo',
-    'Anyama',
-    'Abengourou',
-  ];
+  int _note = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -103,51 +71,18 @@ class _CreateAvisScreenMState extends State<CreateAvisScreenM> {
         },
         builder: (context, state) {
           return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Informations sur l'objet
-                  _buildObjetInfo(),
-
-                  const SizedBox(height: 24),
-
-                  // Note
-                  _buildRatingSection(),
-
-                  const SizedBox(height: 24),
-
-                  // Titre
-                  _buildTitreField(),
-
-                  const SizedBox(height: 16),
-
-                  // Commentaire
-                  _buildCommentaireField(),
-
-                  const SizedBox(height: 24),
-
-                  // Options
-                  _buildOptionsSection(),
-
-                  const SizedBox(height: 24),
-
-                  // Tags
-                  _buildTagsSection(),
-
-                  const SizedBox(height: 24),
-
-                  // Localisation
-                  _buildLocationSection(),
-
-                  const SizedBox(height: 32),
-
-                  // Bouton de soumission
-                  _buildSubmitButton(state),
-                ],
-              ),
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildObjetInfo(),
+                const SizedBox(height: 32),
+                _buildRatingSection(),
+                const SizedBox(height: 28),
+                _buildCommentaireField(),
+                const SizedBox(height: 32),
+                _buildSubmitButton(state),
+              ],
             ),
           );
         },
@@ -200,6 +135,7 @@ class _CreateAvisScreenMState extends State<CreateAvisScreenM> {
 
   // ⭐ SECTION DE NOTATION
   Widget _buildRatingSection() {
+    final labels = ['', 'Mauvais', 'Passable', 'Bien', 'Très bien', 'Excellent'];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -207,191 +143,77 @@ class _CreateAvisScreenMState extends State<CreateAvisScreenM> {
           'Votre note',
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
         Row(
-          children: [
-            Expanded(
-              child: Text(
-                'Note: $_note/5',
-                style: const TextStyle(fontSize: 16),
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(5, (index) {
+            final star = index + 1;
+            return GestureDetector(
+              onTap: () => setState(() => _note = star),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Icon(
+                  star <= _note ? Icons.star : Icons.star_border,
+                  color: Colors.amber,
+                  size: 44,
+                ),
+              ),
+            );
+          }),
+        ),
+        if (_note > 0) ...[
+          const SizedBox(height: 8),
+          Center(
+            child: Text(
+              labels[_note],
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: Colors.amber.shade700,
               ),
             ),
-            Row(
-              children: List.generate(5, (index) {
-                return GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _note = index + 1;
-                    });
-                  },
-                  child: Icon(
-                    index < _note ? Icons.star : Icons.star_border,
-                    color: Colors.amber,
-                    size: 32,
-                  ),
-                );
-              }),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  // 📝 CHAMP TITRE
-  Widget _buildTitreField() {
-    return TextFormField(
-      controller: _titreController,
-      decoration: const InputDecoration(
-        labelText: 'Titre de votre avis',
-        hintText: 'Ex: Excellent service, très satisfait',
-        border: OutlineInputBorder(),
-        prefixIcon: Icon(Icons.title),
-      ),
-      validator: (value) {
-        if (value == null || value.trim().isEmpty) {
-          return 'Veuillez saisir un titre';
-        }
-        if (value.trim().length < 5) {
-          return 'Le titre doit contenir au moins 5 caractères';
-        }
-        return null;
-      },
-      maxLength: 100,
-    );
-  }
-
-  // 💬 CHAMP COMMENTAIRE
-  Widget _buildCommentaireField() {
-    return TextFormField(
-      controller: _commentaireController,
-      decoration: const InputDecoration(
-        labelText: 'Votre commentaire',
-        hintText: 'Décrivez votre expérience en détail...',
-        border: OutlineInputBorder(),
-        prefixIcon: Icon(Icons.comment),
-        alignLabelWithHint: true,
-      ),
-      validator: (value) {
-        if (value == null || value.trim().isEmpty) {
-          return 'Veuillez saisir un commentaire';
-        }
-        if (value.trim().length < 20) {
-          return 'Le commentaire doit contenir au moins 20 caractères';
-        }
-        return null;
-      },
-      maxLines: 5,
-      maxLength: 1000,
-    );
-  }
-
-  // ⚙️ SECTION OPTIONS
-  Widget _buildOptionsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Options',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 12),
-        CheckboxListTile(
-          title: const Text('Je recommande ce service'),
-          subtitle:
-              const Text('Cochez si vous recommandez ce service à d\'autres'),
-          value: _recommande,
-          onChanged: (value) {
-            setState(() {
-              _recommande = value ?? true;
-            });
-          },
-          controlAffinity: ListTileControlAffinity.leading,
-        ),
-        CheckboxListTile(
-          title: const Text('Publier de manière anonyme'),
-          subtitle: const Text('Votre nom ne sera pas affiché'),
-          value: _anonyme,
-          onChanged: (value) {
-            setState(() {
-              _anonyme = value ?? false;
-            });
-          },
-          controlAffinity: ListTileControlAffinity.leading,
-        ),
-      ],
-    );
-  }
-
-  // 🏷️ SECTION TAGS
-  Widget _buildTagsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Tags (optionnel)',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          'Sélectionnez les mots-clés qui décrivent votre expérience',
-          style: TextStyle(fontSize: 14, color: Colors.grey),
-        ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: _availableTags.map((tag) {
-            final isSelected = _selectedTags.contains(tag);
-            return FilterChip(
-              label: Text(tag),
-              selected: isSelected,
-              onSelected: (selected) {
-                setState(() {
-                  if (selected) {
-                    _selectedTags.add(tag);
-                  } else {
-                    _selectedTags.remove(tag);
-                  }
-                });
-              },
-              selectedColor: Colors.green[100],
-              checkmarkColor: Colors.green,
-            );
-          }).toList(),
-        ),
-      ],
-    );
-  }
-
-  // 📍 SECTION LOCALISATION
-  Widget _buildLocationSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Localisation (optionnel)',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 12),
-        DropdownButtonFormField<String>(
-          value: _selectedVille,
-          decoration: const InputDecoration(
-            labelText: 'Ville',
-            border: OutlineInputBorder(),
-            prefixIcon: Icon(Icons.location_city),
           ),
-          items: _availableVilles.map((ville) {
-            return DropdownMenuItem(
-              value: ville,
-              child: Text(ville),
-            );
-          }).toList(),
-          onChanged: (value) {
-            setState(() {
-              _selectedVille = value;
-            });
-          },
+        ],
+      ],
+    );
+  }
+
+  // 💬 CHAMP COMMENTAIRE (optionnel)
+  Widget _buildCommentaireField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        RichText(
+          text: const TextSpan(
+            text: 'Commentaire ',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
+            children: [
+              TextSpan(
+                text: '(optionnel)',
+                style: TextStyle(
+                  fontWeight: FontWeight.normal,
+                  color: Colors.grey,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        TextField(
+          controller: _commentaireController,
+          decoration: InputDecoration(
+            hintText: 'Décrivez votre expérience…',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            filled: true,
+            fillColor: Colors.grey.shade50,
+          ),
+          maxLines: 4,
+          maxLength: 1000,
         ),
       ],
     );
@@ -426,23 +248,23 @@ class _CreateAvisScreenMState extends State<CreateAvisScreenM> {
 
   // 🚀 SOUMISSION DE L'AVIS
   void _submitAvis() {
-    if (_formKey.currentState!.validate()) {
-      final avisData = CreateAvisM(
-        objetType: widget.objetType,
-        objetId: widget.objetId,
-        note: _note,
-        titre: _titreController.text.trim(),
-        commentaire: _commentaireController.text.trim(),
-        recommande: _recommande,
-        anonyme: _anonyme,
-        tags: _selectedTags.isNotEmpty ? _selectedTags : null,
-        localisation: _selectedVille != null
-            ? LocalisationAvis(ville: _selectedVille, pays: 'Côte d\'Ivoire')
-            : null,
+    if (_note == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Sélectionnez une note (1 à 5 étoiles)'),
+          backgroundColor: Colors.orange,
+        ),
       );
-
-      context.read<AvisPageBlocM>().add(avisData);
+      return;
     }
+
+    final commentaire = _commentaireController.text.trim();
+    context.read<AvisPageBlocM>().add(CreateAvisM(
+      objetType: widget.objetType,
+      objetId: widget.objetId,
+      note: _note,
+      commentaire: commentaire.isNotEmpty ? commentaire : null,
+    ));
   }
 
   // 🎯 ICÔNES POUR LES TYPES D'OBJET
@@ -491,7 +313,6 @@ class _CreateAvisScreenMState extends State<CreateAvisScreenM> {
 
   @override
   void dispose() {
-    _titreController.dispose();
     _commentaireController.dispose();
     super.dispose();
   }

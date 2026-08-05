@@ -6,9 +6,9 @@ class Avis {
   String
       objetType; // PRESTATAIRE, VENDEUR, FREELANCE, ARTICLE, SERVICE, PRESTATION, COMMANDE
   String objetId;
-  int note; // 1-5
-  String titre;
-  String commentaire;
+  int note; // 1-5 (seul champ obligatoire)
+  String? titre;
+  String? commentaire;
   List<CategorieEvaluation>? categories;
   List<MediaAvis>? medias;
   bool recommande;
@@ -32,8 +32,8 @@ class Avis {
     required this.objetType,
     required this.objetId,
     required this.note,
-    required this.titre,
-    required this.commentaire,
+    this.titre,
+    this.commentaire,
     this.categories,
     this.medias,
     this.recommande = true,
@@ -59,8 +59,8 @@ class Avis {
       objetType: json['objetType'] ?? '',
       objetId: json['objetId'] ?? '',
       note: json['note'] ?? 0,
-      titre: json['titre'] ?? '',
-      commentaire: json['commentaire'] ?? '',
+      titre: json['titre']?.toString(),
+      commentaire: json['commentaire']?.toString(),
       categories: json['categories'] != null
           ? (json['categories'] as List)
               .map((c) => CategorieEvaluation.fromJson(c))

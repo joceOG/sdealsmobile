@@ -1828,9 +1828,10 @@ extension MessagerieApi on ApiClient {
   Future<Map<String, dynamic>> sendMessage({
     required String expediteur,
     required String destinataire,
-    required String contenu,
+    String contenu = '',
     File? pieceJointe,
     String? typePieceJointe,
+    int? dureeFichier,
     String typeMessage = 'NORMAL',
     String? referenceId,
     String? referenceType,
@@ -1849,10 +1850,13 @@ extension MessagerieApi on ApiClient {
           }
           request.fields['expediteur'] = expediteur;
           request.fields['destinataire'] = destinataire;
-          request.fields['contenu'] = contenu;
+          if (contenu.isNotEmpty) request.fields['contenu'] = contenu;
           request.fields['typeMessage'] = typeMessage;
           if (typePieceJointe != null) {
             request.fields['typePieceJointe'] = typePieceJointe;
+          }
+          if (dureeFichier != null) {
+            request.fields['dureeFichier'] = dureeFichier.toString();
           }
           if (referenceId != null) request.fields['referenceId'] = referenceId;
           if (referenceType != null) {

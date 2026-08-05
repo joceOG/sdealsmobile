@@ -160,21 +160,31 @@ class AvisPageBlocM extends Bloc<AvisPageEventM, AvisPageStateM> {
     emit(state.copyWith(isCreating: true, createError: null));
 
     try {
-      final response = await _apiClient.post('/avis', body: {
+      final body = <String, dynamic>{
         'objetType': event.objetType,
         'objetId': event.objetId,
         'note': event.note,
-        'titre': event.titre,
-        'commentaire': event.commentaire,
         'recommande': event.recommande,
         'anonyme': event.anonyme,
-        'tags': event.tags,
-        'localisation': event.localisation?.toJson(),
-      });
+      };
+      if (event.titre != null && event.titre!.isNotEmpty) {
+        body['titre'] = event.titre;
+      }
+      if (event.commentaire != null && event.commentaire!.isNotEmpty) {
+        body['commentaire'] = event.commentaire;
+      }
+      if (event.tags != null && event.tags!.isNotEmpty) {
+        body['tags'] = event.tags;
+      }
+      if (event.localisation != null) {
+        body['localisation'] = event.localisation!.toJson();
+      }
+      final response = await _apiClient.post('/avis', body: body);
 
       if (response.statusCode == 201) {
         final responseData = jsonDecode(response.body);
-        final newAvis = Avis.fromJson(responseData);
+        final avisJson = responseData['avis'] ?? responseData;
+        final newAvis = Avis.fromJson(avisJson);
 
         // Ajouter le nouvel avis à la liste
         final updatedAvis = List<Avis>.from(state.avis ?? [])
