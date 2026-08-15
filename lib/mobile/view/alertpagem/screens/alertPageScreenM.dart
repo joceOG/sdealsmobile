@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
+
+import '../../../../data/models/alert.dart';
+import '../../../../design_system/design_system.dart';
 import '../alertpageblocm/alertPageBlocM.dart';
 import '../alertpageblocm/alertPageEventM.dart';
 import '../alertpageblocm/alertPageStateM.dart';
-import '../../../../data/models/alert.dart';
 import 'alertDetailScreenM.dart';
-import 'createAlertScreenM.dart';
 import 'alertSettingsScreenM.dart';
 
+/// Notifications (inbox) — restyle Airbnb.
+/// Inbox notifications réelle (pas faux switches Actif/Inactif Figma).
 class AlertPageScreenM extends StatefulWidget {
   const AlertPageScreenM({super.key});
 
@@ -15,99 +19,405 @@ class AlertPageScreenM extends StatefulWidget {
   State<AlertPageScreenM> createState() => _AlertPageScreenMState();
 }
 
-class _AlertPageScreenMState extends State<AlertPageScreenM>
-    with TickerProviderStateMixin {
-  late TabController _tabController;
-  final TextEditingController _searchController = TextEditingController();
-  String _selectedType = '';
-  String _selectedStatut = '';
-  String _selectedPriorite = '';
-  int _selectedPeriode = 30;
-  int _currentPage = 1;
-  final int _itemsPerPage = 20;
+class _AlertPageScreenMState extends State<AlertPageScreenM> {
+  static const double _hPad = 20;
 
-  final List<String> _typeOptions = [
-    'Tous',
-    'COMMANDE',
-    'PRESTATION',
-    'PAIEMENT',
-    'VERIFICATION',
-    'MESSAGE',
-    'SYSTEME',
-    'PROMOTION',
-    'RAPPEL'
-  ];
-
-  final List<String> _statutOptions = ['Tous', 'NON_LUE', 'LUE', 'ARCHIVEE'];
-
-  final List<String> _prioriteOptions = [
-    'Tous',
-    'BASSE',
-    'NORMALE',
-    'HAUTE',
-    'CRITIQUE'
-  ];
-
-  final List<Map<String, dynamic>> _periodeOptions = [
-    {'value': 7, 'label': '7 jours'},
-    {'value': 30, 'label': '30 jours'},
-    {'value': 90, 'label': '90 jours'},
-    {'value': 365, 'label': '1 an'},
-  ];
+  /// null = toutes ; NON_LUE ; ARCHIVEE
+  String? _filterStatut;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
-    _loadAlerts();
+    context.read<AlertPageBlocM>().add(const LoadAlertsDataM(limit: 50));
   }
 
   @override
-  void dispose() {
-    _tabController.dispose();
-    _searchController.dispose();
-    super.dispose();
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: SDColors.white,
+      body: SafeArea(
+        child: BlocConsumer<AlertPageBlocM, AlertPageStateM>(
+          listener: (context, state) {
+            if (state is AlertPageErrorM) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(state.message),
+                  backgroundColor: SDColors.error500,
+                ),
+              );
+            }
+            if (state is AlertMarkedAsReadM ||
+                state is AlertDeletedM ||
+                state is AlertArchivedM ||
+                state is AllAlertsMarkedAsReadM) {
+              context
+                  .read<AlertPageBlocM>()
+                  .add(const LoadAlertsDataM(limit: 50));
+            }
+          },
+          builder: (context, state) {
+            final all = state is AlertPageLoadedM ? state.alerts : <Alert>[];
+            final unread =
+                all.where((a) => a.statut == 'NON_LUE').length;
+            final archived =
+                all.where((a) => a.statut == 'ARCHIVEE').length;
+            final filtered = _applyFilter(all);
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildTopBar(context),
+                _buildHeader(),
+                _buildChips(
+                  total: all.length,
+                  unread: unread,
+                  archived: archived,
+                ),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: state is AlertPageLoadingM ||
+                          state is AlertPageInitialM
+                      ? const Center(child: CircularProgressIndicator())
+                      : RefreshIndicator(
+                          color: SDColors.primary600,
+                          onRefresh: () async {
+                            context
+                                .read<AlertPageBlocM>()
+                                .add(const LoadAlertsDataM(limit: 50));
+                          },
+                          child: filtered.isEmpty
+                              ? ListView(
+                                  physics:
+                                      const AlwaysScrollableScrollPhysics(),
+                                  children: [
+                                    SizedBox(
+                                      height:
+                                          MediaQuery.sizeOf(context).height *
+                                              0.45,
+                                      child: _emptyState(),
+                                    ),
+                                  ],
+                                )
+                              : ListView.separated(
+                                  physics:
+                                      const AlwaysScrollableScrollPhysics(),
+                                  padding: const EdgeInsets.fromLTRB(
+                                      _hPad, 8, _hPad, 24),
+                                  itemCount: filtered.length,
+                                  separatorBuilder: (_, __) =>
+                                      const SizedBox(height: 10),
+                                  itemBuilder: (context, i) =>
+                                      _buildAlertCard(filtered[i]),
+                                ),
+                        ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
   }
 
-  void _loadAlerts() {
-    context.read<AlertPageBlocM>().add(LoadAlertsDataM(
-          type: _selectedType.isEmpty ? null : _selectedType,
-          statut: _selectedStatut.isEmpty ? null : _selectedStatut,
-          priorite: _selectedPriorite.isEmpty ? null : _selectedPriorite,
-          periode: _selectedPeriode,
-          page: _currentPage,
-          limit: _itemsPerPage,
-        ));
-  }
-
-  void _searchAlerts() {
-    if (_searchController.text.isNotEmpty) {
-      context.read<AlertPageBlocM>().add(SearchAlertsM(
-            query: _searchController.text,
-            type: _selectedType.isEmpty ? null : _selectedType,
-            priorite: _selectedPriorite.isEmpty ? null : _selectedPriorite,
-            periode: _selectedPeriode,
-          ));
-    } else {
-      _loadAlerts();
+  List<Alert> _applyFilter(List<Alert> all) {
+    if (_filterStatut == null) {
+      return all.where((a) => a.statut != 'ARCHIVEE').toList();
     }
+    return all.where((a) => a.statut == _filterStatut).toList();
   }
 
-  void _loadStats() {
-    context.read<AlertPageBlocM>().add(LoadAlertStatsM(
-          periode: _selectedPeriode,
-        ));
+  Widget _buildTopBar(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 4, 8, 0),
+      child: Row(
+        children: [
+          IconButton(
+            onPressed: () => Navigator.of(context).maybePop(),
+            icon: const Icon(Icons.arrow_back, color: SDColors.neutral900),
+            tooltip: 'Retour',
+          ),
+          const Spacer(),
+          IconButton(
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => BlocProvider(
+                    create: (_) => AlertPageBlocM()
+                      ..add(const LoadAlertPreferencesM()),
+                    child: const AlertSettingsScreenM(),
+                  ),
+                ),
+              );
+            },
+            icon: const Icon(
+              Icons.settings_outlined,
+              color: SDColors.neutral900,
+            ),
+            tooltip: 'Préférences',
+          ),
+        ],
+      ),
+    );
   }
 
-  void _loadUnreadAlerts() {
-    context.read<AlertPageBlocM>().add(LoadUnreadAlertsM(limit: 10));
+  Widget _buildHeader() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(_hPad, 4, _hPad, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Notifications',
+            style: SDTypography.displayMedium.copyWith(
+              color: SDColors.neutral900,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Messages et alertes de l’app',
+            style: SDTypography.bodyMedium.copyWith(
+              color: SDColors.neutral600,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
-  void _loadUrgentAlerts() {
-    context.read<AlertPageBlocM>().add(LoadUrgentAlertsM(limit: 10));
+  Widget _buildChips({
+    required int total,
+    required int unread,
+    required int archived,
+  }) {
+    final chips = <({String? id, String label})>[
+      (id: null, label: 'Toutes (${total - archived})'),
+      (id: 'NON_LUE', label: 'Non lues ($unread)'),
+      (id: 'ARCHIVEE', label: 'Archivées ($archived)'),
+    ];
+
+    return SizedBox(
+      height: 44,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: _hPad, vertical: 4),
+        itemCount: chips.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final c = chips[index];
+          final selected = _filterStatut == c.id;
+          return GestureDetector(
+            onTap: () => setState(() => _filterStatut = c.id),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: selected ? SDColors.primary600 : SDColors.neutral100,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                c.label,
+                style: SDTypography.labelLarge.copyWith(
+                  color: selected ? SDColors.white : SDColors.neutral900,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 
-  String _getTypeLabel(String type) {
+  Widget _buildAlertCard(Alert alert) {
+    final iconData = _iconForType(alert.type);
+    final tint = _tintForType(alert.type);
+    final unread = alert.estNonLue;
+
+    return Material(
+      color: SDColors.white,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: () {
+          if (unread && alert.id != null) {
+            context
+                .read<AlertPageBlocM>()
+                .add(MarkAsReadM(alertId: alert.id!));
+          }
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => BlocProvider(
+                create: (_) => AlertPageBlocM(),
+                child: AlertDetailScreenM(alert: alert),
+              ),
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(16),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: SDColors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: unread ? SDColors.primary200 : SDColors.neutral200,
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: tint.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(iconData, color: tint, size: 24),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              alert.titre,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: SDTypography.titleMedium.copyWith(
+                                color: SDColors.neutral900,
+                                fontWeight:
+                                    unread ? FontWeight.w700 : FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          if (unread)
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: const BoxDecoration(
+                                color: SDColors.primary600,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                        ],
+                      ),
+                      if (alert.description.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          alert.description,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: SDTypography.bodyMedium.copyWith(
+                            color: SDColors.neutral600,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 6),
+                      Text(
+                        _typeLabel(alert.type),
+                        style: SDTypography.labelMedium.copyWith(
+                          color: SDColors.primary600,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Créée le ${DateFormat('d MMM yyyy', 'fr_FR').format(alert.createdAt)}',
+                        style: SDTypography.bodySmall.copyWith(
+                          color: SDColors.neutral500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                PopupMenuButton<String>(
+                  icon: const Icon(
+                    Icons.more_vert,
+                    color: SDColors.neutral500,
+                  ),
+                  onSelected: (v) {
+                    if (alert.id == null) return;
+                    if (v == 'read') {
+                      context
+                          .read<AlertPageBlocM>()
+                          .add(MarkAsReadM(alertId: alert.id!));
+                    } else if (v == 'archive') {
+                      context
+                          .read<AlertPageBlocM>()
+                          .add(ArchiveAlertM(alertId: alert.id!));
+                    } else if (v == 'delete') {
+                      context
+                          .read<AlertPageBlocM>()
+                          .add(DeleteAlertM(alertId: alert.id!));
+                    }
+                  },
+                  itemBuilder: (_) => [
+                    if (unread)
+                      const PopupMenuItem(
+                        value: 'read',
+                        child: Text('Marquer comme lue'),
+                      ),
+                    if (alert.statut != 'ARCHIVEE')
+                      const PopupMenuItem(
+                        value: 'archive',
+                        child: Text('Archiver'),
+                      ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Text('Supprimer'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _emptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.notifications_none_rounded,
+              size: 64,
+              color: SDColors.neutral400,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Aucune alerte',
+              style: SDTypography.titleMedium.copyWith(
+                color: SDColors.neutral900,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Vos notifications importantes apparaîtront ici.',
+              style: SDTypography.bodyMedium.copyWith(
+                color: SDColors.neutral600,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _typeLabel(String type) {
     switch (type) {
       case 'COMMANDE':
         return 'Commande';
@@ -115,785 +425,56 @@ class _AlertPageScreenMState extends State<AlertPageScreenM>
         return 'Prestation';
       case 'PAIEMENT':
         return 'Paiement';
-      case 'VERIFICATION':
-        return 'Vérification';
       case 'MESSAGE':
         return 'Message';
-      case 'SYSTEME':
-        return 'Système';
       case 'PROMOTION':
         return 'Promotion';
       case 'RAPPEL':
         return 'Rappel';
+      case 'VERIFICATION':
+        return 'Vérification';
+      case 'SYSTEME':
+        return 'Système';
       default:
         return type;
     }
   }
 
-  String _getStatutLabel(String statut) {
-    switch (statut) {
-      case 'NON_LUE':
-        return 'Non lue';
-      case 'LUE':
-        return 'Lue';
-      case 'ARCHIVEE':
-        return 'Archivée';
-      default:
-        return statut;
-    }
-  }
-
-  String _getPrioriteLabel(String priorite) {
-    switch (priorite) {
-      case 'BASSE':
-        return 'Basse';
-      case 'NORMALE':
-        return 'Normale';
-      case 'HAUTE':
-        return 'Haute';
-      case 'CRITIQUE':
-        return 'Critique';
-      default:
-        return priorite;
-    }
-  }
-
-  Color _getTypeColor(String type) {
+  IconData _iconForType(String type) {
     switch (type) {
       case 'COMMANDE':
-        return Colors.blue;
+        return Icons.shopping_bag_outlined;
       case 'PRESTATION':
-        return Colors.green;
+        return Icons.handyman_outlined;
       case 'PAIEMENT':
-        return Colors.orange;
-      case 'VERIFICATION':
-        return Colors.purple;
+        return Icons.payments_outlined;
       case 'MESSAGE':
-        return Colors.teal;
-      case 'SYSTEME':
-        return Colors.grey;
+        return Icons.chat_bubble_outline;
       case 'PROMOTION':
-        return Colors.pink;
+        return Icons.local_offer_outlined;
       case 'RAPPEL':
-        return Colors.amber;
+        return Icons.alarm_outlined;
+      case 'VERIFICATION':
+        return Icons.verified_outlined;
       default:
-        return Colors.grey;
+        return Icons.notifications_outlined;
     }
   }
 
-  Color _getPrioriteColor(String priorite) {
-    switch (priorite) {
-      case 'BASSE':
-        return Colors.green;
-      case 'NORMALE':
-        return Colors.blue;
-      case 'HAUTE':
-        return Colors.orange;
-      case 'CRITIQUE':
-        return Colors.red;
-      default:
-        return Colors.grey;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Mes Alertes'),
-        backgroundColor: Colors.green[600],
-        foregroundColor: Colors.white,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => BlocProvider(
-                    create: (context) => AlertPageBlocM(),
-                    child: const AlertSettingsScreenM(),
-                  ),
-                ),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              _loadAlerts();
-              _loadStats();
-            },
-          ),
-        ],
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          indicatorColor: Colors.white,
-          tabs: const [
-            Tab(text: 'Toutes', icon: Icon(Icons.notifications)),
-            Tab(text: 'Non lues', icon: Icon(Icons.mark_email_unread)),
-            Tab(text: 'Urgentes', icon: Icon(Icons.priority_high)),
-            Tab(text: 'Statistiques', icon: Icon(Icons.analytics)),
-          ],
-        ),
-      ),
-      body: Column(
-        children: [
-          // 🔍 BARRE DE RECHERCHE ET FILTRES
-          Container(
-            padding: const EdgeInsets.all(16),
-            color: Colors.grey[50],
-            child: Column(
-              children: [
-                // Barre de recherche
-                TextField(
-                  controller: _searchController,
-                  decoration: InputDecoration(
-                    hintText: 'Rechercher dans les alertes...',
-                    prefixIcon: const Icon(Icons.search),
-                    suffixIcon: IconButton(
-                      icon: const Icon(Icons.clear),
-                      onPressed: () {
-                        _searchController.clear();
-                        _loadAlerts();
-                      },
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    filled: true,
-                    fillColor: Colors.white,
-                  ),
-                  onSubmitted: (_) => _searchAlerts(),
-                ),
-                const SizedBox(height: 12),
-                // Filtres
-                Wrap(
-                  spacing: 4,
-                  runSpacing: 8,
-                  children: [
-                    SizedBox(
-                      width: (MediaQuery.of(context).size.width - 48) / 3,
-                      child: DropdownButtonFormField<String>(
-                        value: _selectedType.isEmpty ? null : _selectedType,
-                        decoration: const InputDecoration(
-                          labelText: 'Type',
-                          border: OutlineInputBorder(),
-                          contentPadding:
-                              EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-                          isDense: true,
-                        ),
-                        isExpanded: true,
-                        items: _typeOptions.map((type) {
-                          return DropdownMenuItem<String>(
-                            value: type == 'Tous' ? '' : type,
-                            child: Text(type == 'Tous'
-                                ? 'Tous les types'
-                                : _getTypeLabel(type)),
-                          );
-                        }).toList(),
-                        onChanged: (value) {
-                          setState(() {
-                            _selectedType = value ?? '';
-                          });
-                          _loadAlerts();
-                        },
-                      ),
-                    ),
-                    SizedBox(
-                      width: (MediaQuery.of(context).size.width - 48) / 3,
-                      child: DropdownButtonFormField<String>(
-                        value: _selectedStatut.isEmpty ? null : _selectedStatut,
-                        decoration: const InputDecoration(
-                          labelText: 'Statut',
-                          border: OutlineInputBorder(),
-                          contentPadding:
-                              EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-                          isDense: true,
-                        ),
-                        isExpanded: true,
-                        items: _statutOptions.map((statut) {
-                          return DropdownMenuItem<String>(
-                            value: statut == 'Tous' ? '' : statut,
-                            child: Text(statut == 'Tous'
-                                ? 'Tous les statuts'
-                                : _getStatutLabel(statut)),
-                          );
-                        }).toList(),
-                        onChanged: (value) {
-                          setState(() {
-                            _selectedStatut = value ?? '';
-                          });
-                          _loadAlerts();
-                        },
-                      ),
-                    ),
-                    SizedBox(
-                      width: (MediaQuery.of(context).size.width - 48) / 3,
-                      child: DropdownButtonFormField<String>(
-                        value: _selectedPriorite.isEmpty
-                            ? null
-                            : _selectedPriorite,
-                        decoration: const InputDecoration(
-                          labelText: 'Priorité',
-                          border: OutlineInputBorder(),
-                          contentPadding:
-                              EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-                          isDense: true,
-                        ),
-                        isExpanded: true,
-                        items: _prioriteOptions.map((priorite) {
-                          return DropdownMenuItem<String>(
-                            value: priorite == 'Tous' ? '' : priorite,
-                            child: Text(priorite == 'Tous'
-                                ? 'Toutes les priorités'
-                                : _getPrioriteLabel(priorite)),
-                          );
-                        }).toList(),
-                        onChanged: (value) {
-                          setState(() {
-                            _selectedPriorite = value ?? '';
-                          });
-                          _loadAlerts();
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      flex: 2,
-                      child: DropdownButtonFormField<int>(
-                        value: _selectedPeriode,
-                        decoration: const InputDecoration(
-                          labelText: 'Période',
-                          border: OutlineInputBorder(),
-                          contentPadding:
-                              EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-                          isDense: true,
-                        ),
-                        isExpanded: true,
-                        items: _periodeOptions.map((periode) {
-                          return DropdownMenuItem<int>(
-                            value: periode['value'],
-                            child: Text(periode['label']),
-                          );
-                        }).toList(),
-                        onChanged: (value) {
-                          setState(() {
-                            _selectedPeriode = value ?? 30;
-                          });
-                          _loadAlerts();
-                          _loadStats();
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      flex: 1,
-                      child: ElevatedButton(
-                        onPressed: _searchAlerts,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green[600],
-                          foregroundColor: Colors.white,
-                        ),
-                        child: const Text('Filtrer'),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          // 📋 CONTENU PRINCIPAL
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildAlertsList(),
-                _buildUnreadAlertsList(),
-                _buildUrgentAlertsList(),
-                _buildStatsView(),
-              ],
-            ),
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => BlocProvider(
-                create: (context) => AlertPageBlocM(),
-                child: const CreateAlertScreenM(),
-              ),
-            ),
-          );
-        },
-        child: const Icon(Icons.add),
-      ),
-    );
-  }
-
-  Widget _buildAlertsList() {
-    return BlocBuilder<AlertPageBlocM, AlertPageStateM>(
-      builder: (context, state) {
-        if (state is AlertPageLoadingM) {
-          return const Center(child: CircularProgressIndicator());
-        } else if (state is AlertPageErrorM) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.error, size: 64, color: Colors.red[300]),
-                const SizedBox(height: 16),
-                Text(
-                  'Erreur: ${state.message}',
-                  style: const TextStyle(fontSize: 16),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: _loadAlerts,
-                  child: const Text('Réessayer'),
-                ),
-              ],
-            ),
-          );
-        } else if (state is AlertPageLoadedM) {
-          if (state.alerts.isEmpty) {
-            return const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.notifications_off, size: 64, color: Colors.grey),
-                  SizedBox(height: 16),
-                  Text(
-                    'Aucune alerte trouvée',
-                    style: TextStyle(fontSize: 16, color: Colors.grey),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          return ListView.builder(
-            itemCount: state.alerts.length,
-            itemBuilder: (context, index) {
-              final alert = state.alerts[index];
-              return _buildAlertCard(alert);
-            },
-          );
-        } else if (state is AlertsSearchedM) {
-          if (state.searchResults.isEmpty) {
-            return const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.search_off, size: 64, color: Colors.grey),
-                  SizedBox(height: 16),
-                  Text(
-                    'Aucun résultat trouvé',
-                    style: TextStyle(fontSize: 16, color: Colors.grey),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          return ListView.builder(
-            itemCount: state.searchResults.length,
-            itemBuilder: (context, index) {
-              final alert = state.searchResults[index];
-              return _buildAlertCard(alert);
-            },
-          );
-        }
-
-        return const Center(child: CircularProgressIndicator());
-      },
-    );
-  }
-
-  Widget _buildUnreadAlertsList() {
-    return BlocBuilder<AlertPageBlocM, AlertPageStateM>(
-      builder: (context, state) {
-        if (state is AlertPageLoadingM) {
-          return const Center(child: CircularProgressIndicator());
-        } else if (state is UnreadAlertsLoadedM) {
-          if (state.unreadAlerts.isEmpty) {
-            return const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.mark_email_read, size: 64, color: Colors.grey),
-                  SizedBox(height: 16),
-                  Text(
-                    'Aucune alerte non lue',
-                    style: TextStyle(fontSize: 16, color: Colors.grey),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          return ListView.builder(
-            itemCount: state.unreadAlerts.length,
-            itemBuilder: (context, index) {
-              final alert = state.unreadAlerts[index];
-              return _buildAlertCard(alert);
-            },
-          );
-        }
-
-        // Charger les alertes non lues si pas encore chargées
-        if (state is! UnreadAlertsLoadedM) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            _loadUnreadAlerts();
-          });
-        }
-
-        return const Center(child: CircularProgressIndicator());
-      },
-    );
-  }
-
-  Widget _buildUrgentAlertsList() {
-    return BlocBuilder<AlertPageBlocM, AlertPageStateM>(
-      builder: (context, state) {
-        if (state is AlertPageLoadingM) {
-          return const Center(child: CircularProgressIndicator());
-        } else if (state is UrgentAlertsLoadedM) {
-          if (state.urgentAlerts.isEmpty) {
-            return const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.priority_high, size: 64, color: Colors.grey),
-                  SizedBox(height: 16),
-                  Text(
-                    'Aucune alerte urgente',
-                    style: TextStyle(fontSize: 16, color: Colors.grey),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          return ListView.builder(
-            itemCount: state.urgentAlerts.length,
-            itemBuilder: (context, index) {
-              final alert = state.urgentAlerts[index];
-              return _buildAlertCard(alert);
-            },
-          );
-        }
-
-        // Charger les alertes urgentes si pas encore chargées
-        if (state is! UrgentAlertsLoadedM) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            _loadUrgentAlerts();
-          });
-        }
-
-        return const Center(child: CircularProgressIndicator());
-      },
-    );
-  }
-
-  Widget _buildStatsView() {
-    return BlocBuilder<AlertPageBlocM, AlertPageStateM>(
-      builder: (context, state) {
-        if (state is AlertPageLoadingM) {
-          return const Center(child: CircularProgressIndicator());
-        } else if (state is AlertStatsLoadedM) {
-          final stats = state.stats;
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Statistiques générales
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Statistiques Générales',
-                          style: TextStyle(
-                              fontSize: 18, fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildStatCard(
-                                'Total Alertes',
-                                '${stats['totalNotifications'] ?? 0}',
-                                Icons.notifications,
-                                Colors.blue,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: _buildStatCard(
-                                'Non lues',
-                                '${stats['unreadNotifications'] ?? 0}',
-                                Icons.mark_email_unread,
-                                Colors.red,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildStatCard(
-                                'Lues',
-                                '${stats['readNotifications'] ?? 0}',
-                                Icons.mark_email_read,
-                                Colors.green,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: _buildStatCard(
-                                'Période',
-                                '${_selectedPeriode} jours',
-                                Icons.calendar_today,
-                                Colors.purple,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                // Alertes par type
-                if (stats['statsParType'] != null)
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Alertes par Type',
-                            style: TextStyle(
-                                fontSize: 18, fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 16),
-                          ...((stats['statsParType'] as List).map((item) {
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 4),
-                              child: Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(_getTypeLabel(item['_id'] ?? '')),
-                                  Chip(
-                                    label: Text('${item['count'] ?? 0}'),
-                                    backgroundColor:
-                                        _getTypeColor(item['_id'] ?? ''),
-                                    labelStyle:
-                                        const TextStyle(color: Colors.white),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }).toList()),
-                        ],
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          );
-        }
-
-        // Charger les statistiques si pas encore chargées
-        if (state is! AlertStatsLoadedM) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            _loadStats();
-          });
-        }
-
-        return const Center(child: CircularProgressIndicator());
-      },
-    );
-  }
-
-  Widget _buildStatCard(
-      String title, String value, IconData icon, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3)),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            title,
-            style: const TextStyle(fontSize: 12, color: Colors.grey),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAlertCard(Alert alert) {
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: _getTypeColor(alert.type),
-          child: Icon(
-            _getTypeIcon(alert.type),
-            color: Colors.white,
-          ),
-        ),
-        title: Text(
-          alert.titre,
-          style: TextStyle(
-            fontWeight: alert.estNonLue ? FontWeight.bold : FontWeight.normal,
-          ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              alert.description,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: Colors.grey[600],
-                fontSize: 12,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Chip(
-                  label: Text(
-                    alert.typeLabel,
-                    style: const TextStyle(fontSize: 10),
-                  ),
-                  backgroundColor: _getTypeColor(alert.type).withOpacity(0.2),
-                  labelStyle: TextStyle(color: _getTypeColor(alert.type)),
-                ),
-                const SizedBox(width: 4),
-                Chip(
-                  label: Text(
-                    alert.prioriteLabel,
-                    style: const TextStyle(fontSize: 10),
-                  ),
-                  backgroundColor:
-                      _getPrioriteColor(alert.priorite).withOpacity(0.2),
-                  labelStyle:
-                      TextStyle(color: _getPrioriteColor(alert.priorite)),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text(
-              alert.dateFormatee,
-              style: TextStyle(color: Colors.grey[600], fontSize: 12),
-            ),
-          ],
-        ),
-        trailing: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (alert.estNonLue)
-              Container(
-                width: 12,
-                height: 12,
-                decoration: const BoxDecoration(
-                  color: Colors.red,
-                  shape: BoxShape.circle,
-                ),
-              ),
-            if (alert.estUrgente)
-              Container(
-                margin: const EdgeInsets.only(top: 4),
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.red,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Text(
-                  'URGENT',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 8,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-          ],
-        ),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => BlocProvider(
-                create: (context) => AlertPageBlocM(),
-                child: AlertDetailScreenM(alert: alert),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  IconData _getTypeIcon(String type) {
+  Color _tintForType(String type) {
     switch (type) {
       case 'COMMANDE':
-        return Icons.shopping_cart;
+        return SDColors.primary600;
       case 'PRESTATION':
-        return Icons.work;
+        return SDColors.info600;
       case 'PAIEMENT':
-        return Icons.payment;
-      case 'VERIFICATION':
-        return Icons.verified;
+        return SDColors.warning600;
       case 'MESSAGE':
-        return Icons.message;
-      case 'SYSTEME':
-        return Icons.settings;
+        return SDColors.info500;
       case 'PROMOTION':
-        return Icons.local_offer;
-      case 'RAPPEL':
-        return Icons.schedule;
+        return SDColors.error500;
       default:
-        return Icons.notifications;
+        return SDColors.neutral600;
     }
   }
 }

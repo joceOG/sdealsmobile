@@ -29,6 +29,9 @@ class SearchPageStateM extends Equatable {
   // 🔢 Compteurs
   final Map<String, int> counts;
 
+  /// `true` après une recherche validée (pour distinguer empty initial vs 0 résultat).
+  final bool hasSearched;
+
   const SearchPageStateM({
     this.isLoading = false,
     this.error = '',
@@ -50,6 +53,7 @@ class SearchPageStateM extends Equatable {
       'prestataires': 0, // ✅ Ajout
       'vendeurs': 0
     },
+    this.hasSearched = false,
   });
 
   factory SearchPageStateM.initial() {
@@ -72,6 +76,7 @@ class SearchPageStateM extends Equatable {
     double? minPrice,
     double? maxPrice,
     String? city,
+    bool? hasSearched,
   }) {
     return SearchPageStateM(
       isLoading: isLoading ?? this.isLoading,
@@ -88,6 +93,7 @@ class SearchPageStateM extends Equatable {
       prestataires: prestataires ?? this.prestataires, // ✅ Ajout
       vendeurs: vendeurs ?? this.vendeurs,
       counts: counts ?? this.counts,
+      hasSearched: hasSearched ?? this.hasSearched,
     );
   }
 
@@ -95,7 +101,7 @@ class SearchPageStateM extends Equatable {
   List<Object?> get props => [
     isLoading, error, query, suggestions, history, // ✅ Ajout
     services, articles, freelances, prestataires, vendeurs, counts,
-    minPrice, maxPrice, city // 🎛️ Filtres
+    minPrice, maxPrice, city, hasSearched,
   ];
 }
 

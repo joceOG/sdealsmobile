@@ -24,7 +24,7 @@ class _CategoryGridState extends State<CategoryGrid> {
   Future<void> _loadCategories() async {
     try {
       final response =
-          await http.get(Uri.parse('$apiUrl/api/categorie'));
+          await http.get(Uri.parse('$apiUrl/categorie'));
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
         setState(() {

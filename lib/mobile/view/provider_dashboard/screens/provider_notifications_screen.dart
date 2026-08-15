@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import '../../../../design_system/design_system.dart';
 import '../bloc/notifications_bloc.dart';
 import '../bloc/notifications_event.dart';
 import '../bloc/notifications_state.dart';
@@ -52,31 +53,12 @@ class _ProviderNotificationsScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        backgroundColor: Colors.green.shade600,
-        elevation: 0,
-        leading: IconButton(
-          onPressed: () => Navigator.pop(context),
-          icon: Icon(Icons.arrow_back, color: Colors.white),
-        ),
-        title: Row(
-          children: [
-            Icon(Icons.notifications, color: Colors.white),
-            const SizedBox(width: 8),
-            Text(
-              'Notifications Prestataire',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
+      backgroundColor: SDColors.white,
+      appBar: SDWhiteAppBar.appBar(
+        title: 'Notifications Prestataire',
         actions: [
           _buildUnreadBadge(),
-          const SizedBox(width: 16),
+          const SizedBox(width: 8),
         ],
       ),
       body: BlocBuilder<NotificationsBloc, NotificationsState>(
@@ -108,16 +90,16 @@ class _ProviderNotificationsScreenState
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
-            color: unreadCount > 0 ? Colors.red : Colors.white.withOpacity(0.2),
+            color: unreadCount > 0 ? SDColors.error500 : SDColors.neutral100,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.white.withOpacity(0.3)),
+            border: Border.all(color: SDColors.neutral200),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                Icons.notifications_active,
-                color: Colors.white,
+                Icons.notifications_active_outlined,
+                color: unreadCount > 0 ? SDColors.white : SDColors.neutral700,
                 size: 16,
               ),
               if (unreadCount > 0) ...[
@@ -125,7 +107,7 @@ class _ProviderNotificationsScreenState
                 Text(
                   '$unreadCount',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: SDColors.white,
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
                   ),
@@ -671,6 +653,7 @@ class _ProviderNotificationsScreenState
   // ➕ BOUTON D'ACTION FLOTTANT
   Widget _buildFloatingActionButton() {
     return FloatingActionButton.extended(
+      heroTag: 'provider_notifications_fab',
       onPressed: () {
         _markAllAsRead();
       },

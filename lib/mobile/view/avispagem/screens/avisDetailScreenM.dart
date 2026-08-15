@@ -537,11 +537,81 @@ class _AvisDetailScreenMState extends State<AvisDetailScreenM> {
 
   // ✏️ DIALOGUE DE MODIFICATION
   void _showEditDialog() {
-    // TODO: Implémenter le dialogue de modification
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content:
-            Text('Fonctionnalité de modification en cours de développement'),
+    final titreController = TextEditingController(text: widget.avis.titre ?? '');
+    final commentaireController =
+        TextEditingController(text: widget.avis.commentaire ?? '');
+    int note = widget.avis.note;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Modifier l\'avis'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(5, (index) {
+                    return IconButton(
+                      onPressed: () =>
+                          setDialogState(() => note = index + 1),
+                      icon: Icon(
+                        index < note ? Icons.star : Icons.star_border,
+                        color: Colors.amber,
+                      ),
+                    );
+                  }),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: titreController,
+                  decoration: const InputDecoration(
+                    labelText: 'Titre',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: commentaireController,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    labelText: 'Commentaire',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Annuler'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                context.read<AvisPageBlocM>().add(
+                      UpdateAvisM(
+                        avisId: widget.avis.id,
+                        note: note,
+                        titre: titreController.text.trim().isEmpty
+                            ? null
+                            : titreController.text.trim(),
+                        commentaire: commentaireController.text.trim().isEmpty
+                            ? null
+                            : commentaireController.text.trim(),
+                      ),
+                    );
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Modification envoyée')),
+                );
+              },
+              child: const Text('Enregistrer'),
+            ),
+          ],
+        ),
       ),
     );
   }

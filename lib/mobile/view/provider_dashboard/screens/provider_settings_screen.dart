@@ -1,20 +1,158 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
+import 'package:sdealsmobile/data/utils/legal_urls.dart';
+import '../../../../data/services/api_client.dart';
+import '../../../../data/services/authCubit.dart';
+import '../../../../design_system/design_system.dart';
 import '../bloc/provider_profile_bloc.dart';
+import '../bloc/provider_profile_event.dart';
 import '../bloc/provider_profile_state.dart';
 
 // ⚙️ ÉCRAN PARAMÈTRES PRESTATAIRE
 class ProviderSettingsScreen extends StatefulWidget {
-  const ProviderSettingsScreen({super.key});
+  final String? prestataireDocId;
+
+  const ProviderSettingsScreen({super.key, this.prestataireDocId});
 
   @override
   State<ProviderSettingsScreen> createState() => _ProviderSettingsScreenState();
 }
 
 class _ProviderSettingsScreenState extends State<ProviderSettingsScreen> {
+  final ApiClient _apiClient = ApiClient();
+
+  final Map<String, bool> _notifTypes = {
+    'newMissions': true,
+    'messages': true,
+    'payments': true,
+    'reviews': true,
+    'promotions': false,
+    'system': true,
+  };
+  bool _notifLoading = true;
+  bool _notifSaving = false;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadNotificationPrefs();
+    });
+  }
+
+  Future<void> _loadNotificationPrefs() async {
+    final auth = context.read<AuthCubit>().state;
+    if (auth is! AuthAuthenticated) {
+      if (mounted) setState(() => _notifLoading = false);
+      return;
+    }
+    final userId = auth.utilisateur.idutilisateur;
+    if (userId.isEmpty) {
+      if (mounted) setState(() => _notifLoading = false);
+      return;
+    }
+    try {
+      final response = await _apiClient.get(
+        '/preferences/user/$userId',
+        token: auth.token,
+      );
+      if (response.statusCode == 200) {
+        final data = ApiClient.decodeJson(response);
+        Map<String, dynamic>? types;
+        if (data is Map) {
+          final prefs = data['preferences'] is Map
+              ? data['preferences'] as Map
+              : data;
+          final notifs = prefs['notifications'];
+          if (notifs is Map && notifs['types'] is Map) {
+            types = Map<String, dynamic>.from(notifs['types'] as Map);
+          }
+        }
+        if (types != null && mounted) {
+          setState(() {
+            for (final key in _notifTypes.keys) {
+              if (types!.containsKey(key)) {
+                _notifTypes[key] = types[key] != false;
+              }
+            }
+          });
+        }
+      }
+    } catch (_) {
+      // Garder les défauts
+    } finally {
+      if (mounted) setState(() => _notifLoading = false);
+    }
+  }
+
+  Future<void> _toggleNotification(String typeKey, bool value) async {
+    final previous = Map<String, bool>.from(_notifTypes);
+    setState(() {
+      _notifTypes[typeKey] = value;
+      _notifSaving = true;
+    });
+
+    final auth = context.read<AuthCubit>().state;
+    if (auth is! AuthAuthenticated) {
+      setState(() {
+        _notifTypes.addAll(previous);
+        _notifSaving = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Session expirée — reconnectez-vous')),
+      );
+      return;
+    }
+    final userId = auth.utilisateur.idutilisateur;
+    if (userId.isEmpty) {
+      setState(() {
+        _notifTypes.addAll(previous);
+        _notifSaving = false;
+      });
+      return;
+    }
+
+    try {
+      final response = await _apiClient.put(
+        '/preferences/user/$userId',
+        body: {
+          'notifications': {
+            'types': Map<String, bool>.from(_notifTypes),
+          },
+        },
+        token: auth.token,
+      );
+      if (!mounted) return;
+      if (response.statusCode != 200) {
+        setState(() => _notifTypes.addAll(previous));
+        String message = 'Impossible de sauvegarder la préférence';
+        try {
+          final data = ApiClient.decodeJson(response);
+          if (data is Map &&
+              (data['error'] != null || data['message'] != null)) {
+            message = (data['error'] ?? data['message']).toString();
+          }
+        } catch (_) {}
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _notifTypes.addAll(previous));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur réseau: $e'),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _notifSaving = false);
+    }
   }
 
   @override
@@ -22,56 +160,74 @@ class _ProviderSettingsScreenState extends State<ProviderSettingsScreen> {
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: _buildSettingsAppBar(),
-      body: BlocBuilder<ProviderProfileBloc, ProviderProfileState>(
-        builder: (context, state) {
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                _buildAccountSection(),
-                const SizedBox(height: 20),
-                _buildNotificationSection(),
-                const SizedBox(height: 20),
-                _buildPrivacySection(),
-                const SizedBox(height: 20),
-                _buildSecuritySection(),
-                const SizedBox(height: 20),
-                _buildDangerZone(),
-              ],
-            ),
-          );
+      body: BlocListener<ProviderProfileBloc, ProviderProfileState>(
+        listener: (context, state) {
+          if (state is PasswordChanged) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Mot de passe changé avec succès'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          } else if (state is AccountDeactivated) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.reason),
+                backgroundColor: Colors.orange.shade700,
+              ),
+            );
+            context.read<AuthCubit>().switchActiveRole('CLIENT');
+            if (context.canPop()) {
+              context.pop();
+            }
+          } else if (state is AccountDeleted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.reason),
+                backgroundColor: Colors.red.shade700,
+              ),
+            );
+            context.read<AuthCubit>().logout();
+            context.go('/login');
+          } else if (state is ProviderProfileError) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.message),
+                backgroundColor: Colors.red.shade700,
+              ),
+            );
+          }
         },
+        child: BlocBuilder<ProviderProfileBloc, ProviderProfileState>(
+          builder: (context, state) {
+            return SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  _buildAccountSection(),
+                  const SizedBox(height: 20),
+                  _buildNotificationSection(),
+                  const SizedBox(height: 20),
+                  _buildPrivacySection(),
+                  const SizedBox(height: 20),
+                  _buildSecuritySection(),
+                  const SizedBox(height: 20),
+                  _buildDangerZone(),
+                ],
+              ),
+            );
+          },
+        ),
       ),
     );
   }
 
-  // 🎨 APP BAR PARAMÈTRES
   PreferredSizeWidget _buildSettingsAppBar() {
-    return AppBar(
-      backgroundColor: Colors.green.shade600,
-      elevation: 0,
-      leading: IconButton(
-        onPressed: () => Navigator.pop(context),
-        icon: Icon(Icons.arrow_back, color: Colors.white),
-      ),
-      title: Row(
-        children: [
-          Icon(Icons.settings, color: Colors.white),
-          const SizedBox(width: 8),
-          Text(
-            'Paramètres',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
+    return SDWhiteAppBar.appBar(
+      title: 'Paramètres',
     );
   }
 
-  // 👤 SECTION COMPTE
   Widget _buildAccountSection() {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -115,7 +271,7 @@ class _ProviderSettingsScreenState extends State<ProviderSettingsScreen> {
             'Changer le mot de passe',
             'Sécurité du compte',
             Icons.lock,
-            () => _showChangePassword(),
+            () => _showPasswordDialog(),
           ),
           _buildSettingItem(
             'Vérification d\'identité',
@@ -128,7 +284,6 @@ class _ProviderSettingsScreenState extends State<ProviderSettingsScreen> {
     );
   }
 
-  // 🔔 SECTION NOTIFICATIONS
   Widget _buildNotificationSection() {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -158,43 +313,51 @@ class _ProviderSettingsScreenState extends State<ProviderSettingsScreen> {
                   color: Colors.grey[800],
                 ),
               ),
+              if (_notifLoading || _notifSaving) ...[
+                const SizedBox(width: 8),
+                const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ],
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           _buildSwitchItem(
             'Nouvelles missions',
             'Recevoir les notifications de nouvelles missions',
-            true,
-            (value) => _toggleNotification('missions', value),
+            _notifTypes['newMissions'] ?? true,
+            (value) => _toggleNotification('newMissions', value),
           ),
           _buildSwitchItem(
             'Messages clients',
             'Notifications des messages clients',
-            true,
+            _notifTypes['messages'] ?? true,
             (value) => _toggleNotification('messages', value),
           ),
           _buildSwitchItem(
             'Paiements',
             'Notifications de paiements reçus',
-            true,
+            _notifTypes['payments'] ?? true,
             (value) => _toggleNotification('payments', value),
           ),
           _buildSwitchItem(
             'Avis et évaluations',
             'Notifications des avis clients',
-            true,
+            _notifTypes['reviews'] ?? true,
             (value) => _toggleNotification('reviews', value),
           ),
           _buildSwitchItem(
             'Promotions',
             'Offres et promotions SoutraLi',
-            false,
+            _notifTypes['promotions'] ?? false,
             (value) => _toggleNotification('promotions', value),
           ),
           _buildSwitchItem(
             'Notifications système',
             'Mises à jour et maintenance',
-            true,
+            _notifTypes['system'] ?? true,
             (value) => _toggleNotification('system', value),
           ),
         ],
@@ -202,7 +365,6 @@ class _ProviderSettingsScreenState extends State<ProviderSettingsScreen> {
     );
   }
 
-  // 🔒 SECTION CONFIDENTIALITÉ
   Widget _buildPrivacySection() {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -239,26 +401,25 @@ class _ProviderSettingsScreenState extends State<ProviderSettingsScreen> {
             'Gérer les données',
             'Télécharger ou supprimer vos données',
             Icons.data_usage,
-            () => _showDataManagement(),
+            () => openLegalUrl(context, LegalUrls.confidentialite),
           ),
           _buildSettingItem(
             'Politique de confidentialité',
             'Lire notre politique de confidentialité',
             Icons.policy,
-            () => _showPrivacyPolicy(),
+            () => openLegalUrl(context, LegalUrls.confidentialite),
           ),
           _buildSettingItem(
             'Conditions d\'utilisation',
             'Lire nos conditions d\'utilisation',
             Icons.description,
-            () => _showTermsOfService(),
+            () => openLegalUrl(context, LegalUrls.cgu),
           ),
         ],
       ),
     );
   }
 
-  // 🔐 SECTION SÉCURITÉ
   Widget _buildSecuritySection() {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -292,29 +453,22 @@ class _ProviderSettingsScreenState extends State<ProviderSettingsScreen> {
           ),
           const SizedBox(height: 16),
           _buildSettingItem(
-            'Authentification à deux facteurs',
-            'Sécuriser votre compte avec 2FA',
-            Icons.security,
-            () => _showTwoFactorAuth(),
-          ),
-          _buildSettingItem(
             'Sessions actives',
             'Gérer les appareils connectés',
             Icons.devices,
-            () => _showActiveSessions(),
+            () => _showUnavailable('Sessions actives'),
           ),
           _buildSettingItem(
             'Historique de connexion',
             'Voir l\'historique des connexions',
             Icons.history,
-            () => _showLoginHistory(),
+            () => _showUnavailable('Historique de connexion'),
           ),
         ],
       ),
     );
   }
 
-  // 🗑️ ZONE DANGEREUSE
   Widget _buildDangerZone() {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -343,24 +497,23 @@ class _ProviderSettingsScreenState extends State<ProviderSettingsScreen> {
           const SizedBox(height: 16),
           _buildDangerItem(
             'Désactiver le compte',
-            'Suspendre temporairement votre compte',
+            'Suspendre temporairement votre espace Métiers',
             Icons.pause_circle,
             Colors.orange,
-            () => _showDeactivateAccount(),
+            _confirmDeactivatePrestataire,
           ),
           _buildDangerItem(
             'Supprimer le compte',
-            'Supprimer définitivement votre compte',
+            'Désactiver définitivement votre compte utilisateur',
             Icons.delete_forever,
             Colors.red,
-            () => _showDeleteAccount(),
+            _confirmDeleteAccount,
           ),
         ],
       ),
     );
   }
 
-  // ⚙️ ÉLÉMENT DE PARAMÈTRE
   Widget _buildSettingItem(
       String title, String subtitle, IconData icon, VoidCallback onTap) {
     return ListTile(
@@ -386,7 +539,6 @@ class _ProviderSettingsScreenState extends State<ProviderSettingsScreen> {
     );
   }
 
-  // 🔄 ÉLÉMENT AVEC SWITCH
   Widget _buildSwitchItem(
       String title, String subtitle, bool value, Function(bool) onChanged) {
     return ListTile(
@@ -407,13 +559,12 @@ class _ProviderSettingsScreenState extends State<ProviderSettingsScreen> {
       ),
       trailing: Switch(
         value: value,
-        onChanged: onChanged,
+        onChanged: _notifLoading || _notifSaving ? null : onChanged,
         activeColor: Colors.green.shade600,
       ),
     );
   }
 
-  // 🚨 ÉLÉMENT DANGEREUX
   Widget _buildDangerItem(String title, String subtitle, IconData icon,
       Color color, VoidCallback onTap) {
     return ListTile(
@@ -439,230 +590,222 @@ class _ProviderSettingsScreenState extends State<ProviderSettingsScreen> {
     );
   }
 
-  // 🔧 MÉTHODES UTILITAIRES
-
   void _showEditProfile() {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Édition du profil - En développement')),
+      const SnackBar(
+        content: Text(
+            'Utilisez l\'onglet Profil pour modifier bio et description'),
+      ),
     );
-  }
-
-  void _showChangePassword() {
-    _showPasswordDialog();
   }
 
   void _showIdentityVerification() {
+    _showUnavailable('Vérification d\'identité');
+  }
+
+  void _showUnavailable(String feature) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-          content: Text('Vérification d\'identité - En développement')),
+      SnackBar(content: Text('$feature — non disponible pour le moment')),
     );
   }
 
-  void _showDataManagement() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Gestion des données - En développement')),
+  void _confirmDeactivatePrestataire() {
+    final id = widget.prestataireDocId;
+    if (id == null || id.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Profil prestataire introuvable'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Désactiver l\'espace Métiers ?'),
+        content: const Text(
+          'Votre profil prestataire sera suspendu et vous ne recevrez plus de missions. '
+          'Vous pourrez le réactiver plus tard.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              final auth = context.read<AuthCubit>().state;
+              if (auth is AuthAuthenticated) {
+                context.read<ProviderProfileBloc>().setToken(auth.token);
+              }
+              context
+                  .read<ProviderProfileBloc>()
+                  .add(DeactivateAccount(id, 'Désactivation volontaire'));
+            },
+            child: const Text('Désactiver',
+                style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
     );
   }
 
-  void _showPrivacyPolicy() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-          content: Text('Politique de confidentialité - En développement')),
+  void _confirmDeleteAccount() {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Supprimer le compte ?'),
+        content: const Text(
+          'Votre compte utilisateur sera désactivé. Cette action nécessite une '
+          'reconnexion éventuelle via le support pour réactivation. Continuer ?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              final auth = context.read<AuthCubit>().state;
+              if (auth is AuthAuthenticated) {
+                context.read<ProviderProfileBloc>().setToken(auth.token);
+              }
+              final id = widget.prestataireDocId ?? '';
+              context
+                  .read<ProviderProfileBloc>()
+                  .add(DeleteAccount(id, 'Suppression demandée'));
+            },
+            child: const Text('Supprimer',
+                style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
     );
   }
 
-  void _showTermsOfService() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-          content: Text('Conditions d\'utilisation - En développement')),
-    );
-  }
-
-  void _showTwoFactorAuth() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-          content: Text('Authentification à deux facteurs - En développement')),
-    );
-  }
-
-  void _showActiveSessions() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Sessions actives - En développement')),
-    );
-  }
-
-  void _showLoginHistory() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-          content: Text('Historique de connexion - En développement')),
-    );
-  }
-
-  void _showDeactivateAccount() {
-    _showDeactivateDialog();
-  }
-
-  void _showDeleteAccount() {
-    _showDeleteDialog();
-  }
-
-  void _toggleNotification(String type, bool value) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-          content:
-              Text('Notification $type: ${value ? 'activée' : 'désactivée'}')),
-    );
-  }
-
-  // 🔐 DIALOGUE CHANGEMENT DE MOT DE PASSE
   void _showPasswordDialog() {
     final currentPasswordController = TextEditingController();
     final newPasswordController = TextEditingController();
     final confirmPasswordController = TextEditingController();
+    var submitting = false;
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Changer le mot de passe'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: currentPasswordController,
-              decoration: const InputDecoration(
-                labelText: 'Mot de passe actuel',
-                border: OutlineInputBorder(),
-              ),
-              obscureText: true,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          return AlertDialog(
+            title: const Text('Changer le mot de passe'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: currentPasswordController,
+                  decoration: const InputDecoration(
+                    labelText: 'Mot de passe actuel',
+                    border: OutlineInputBorder(),
+                  ),
+                  obscureText: true,
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: newPasswordController,
+                  decoration: const InputDecoration(
+                    labelText: 'Nouveau mot de passe',
+                    border: OutlineInputBorder(),
+                  ),
+                  obscureText: true,
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: confirmPasswordController,
+                  decoration: const InputDecoration(
+                    labelText: 'Confirmer le mot de passe',
+                    border: OutlineInputBorder(),
+                  ),
+                  obscureText: true,
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: newPasswordController,
-              decoration: const InputDecoration(
-                labelText: 'Nouveau mot de passe',
-                border: OutlineInputBorder(),
+            actions: [
+              TextButton(
+                onPressed:
+                    submitting ? null : () => Navigator.pop(dialogContext),
+                child: const Text('Annuler'),
               ),
-              obscureText: true,
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: confirmPasswordController,
-              decoration: const InputDecoration(
-                labelText: 'Confirmer le mot de passe',
-                border: OutlineInputBorder(),
-              ),
-              obscureText: true,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Annuler'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              // TODO: Implémenter le changement de mot de passe
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                    content: Text('Mot de passe changé avec succès')),
-              );
-            },
-            child: const Text('Changer'),
-          ),
-        ],
-      ),
-    );
-  }
+              ElevatedButton(
+                onPressed: submitting
+                    ? null
+                    : () async {
+                        final current = currentPasswordController.text.trim();
+                        final next = newPasswordController.text.trim();
+                        final confirm = confirmPasswordController.text.trim();
 
-  // ⏸️ DIALOGUE DÉSACTIVATION
-  void _showDeactivateDialog() {
-    final reasonController = TextEditingController();
+                        if (current.isEmpty || next.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Veuillez remplir tous les champs'),
+                              backgroundColor: Colors.orange,
+                            ),
+                          );
+                          return;
+                        }
+                        if (next != confirm) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content:
+                                  Text('Les mots de passe ne correspondent pas'),
+                              backgroundColor: Colors.orange,
+                            ),
+                          );
+                          return;
+                        }
+                        if (next.length < 6) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                  'Le nouveau mot de passe doit contenir au moins 6 caractères'),
+                              backgroundColor: Colors.orange,
+                            ),
+                          );
+                          return;
+                        }
 
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Désactiver le compte'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Êtes-vous sûr de vouloir désactiver votre compte ?'),
-            const SizedBox(height: 16),
-            TextField(
-              controller: reasonController,
-              decoration: const InputDecoration(
-                labelText: 'Raison (optionnel)',
-                border: OutlineInputBorder(),
+                        final auth = context.read<AuthCubit>().state;
+                        if (auth is! AuthAuthenticated ||
+                            auth.token.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content:
+                                  Text('Session expirée — reconnectez-vous'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                          return;
+                        }
+
+                        setDialogState(() => submitting = true);
+                        final bloc = context.read<ProviderProfileBloc>();
+                        bloc.setToken(auth.token);
+                        bloc.add(ChangePassword(
+                          widget.prestataireDocId ?? '',
+                          current,
+                          next,
+                        ));
+                        if (dialogContext.mounted) {
+                          Navigator.pop(dialogContext);
+                        }
+                      },
+                child: const Text('Confirmer'),
               ),
-              maxLines: 3,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Annuler'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              // TODO: Implémenter la désactivation
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Compte désactivé avec succès')),
-              );
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-            child: const Text('Désactiver'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 🗑️ DIALOGUE SUPPRESSION
-  void _showDeleteDialog() {
-    final reasonController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Supprimer le compte'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'ATTENTION: Cette action est irréversible. Toutes vos données seront supprimées définitivement.',
-              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: reasonController,
-              decoration: const InputDecoration(
-                labelText: 'Raison (obligatoire)',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 3,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Annuler'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              // TODO: Implémenter la suppression
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Compte supprimé avec succès')),
-              );
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Supprimer'),
-          ),
-        ],
+            ],
+          );
+        },
       ),
     );
   }

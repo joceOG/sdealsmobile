@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../data/services/authCubit.dart';
 import '../preferencespageblocm/preferencesPageBlocM.dart';
 import '../preferencespageblocm/preferencesPageEventM.dart';
 import '../preferencespageblocm/preferencesPageStateM.dart';
@@ -15,14 +16,13 @@ class PreferencesPageScreenM extends StatefulWidget {
 class _PreferencesPageScreenMState extends State<PreferencesPageScreenM>
     with TickerProviderStateMixin {
   late TabController _tabController;
-  String _currentUserId =
-      '653a8411c76522006a111111'; // TODO: Remplacer par l'ID utilisateur réel
+  String _currentUserId = '';
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 6, vsync: this);
-    _loadPreferences();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadPreferences());
   }
 
   @override
@@ -32,6 +32,14 @@ class _PreferencesPageScreenMState extends State<PreferencesPageScreenM>
   }
 
   void _loadPreferences() {
+    final auth = context.read<AuthCubit>().state;
+    if (auth is! AuthAuthenticated) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Connexion requise pour les préférences')),
+      );
+      return;
+    }
+    _currentUserId = auth.utilisateur.idutilisateur;
     context
         .read<PreferencesPageBlocM>()
         .add(LoadPreferencesM(utilisateurId: _currentUserId));

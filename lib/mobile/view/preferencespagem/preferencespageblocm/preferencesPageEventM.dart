@@ -136,6 +136,7 @@ class UpdateNotificationsM extends PreferencesPageEventM {
   final bool push;
   final bool sms;
   final String langue;
+  final Map<String, bool>? types;
 
   const UpdateNotificationsM({
     required this.utilisateurId,
@@ -143,10 +144,11 @@ class UpdateNotificationsM extends PreferencesPageEventM {
     required this.push,
     required this.sms,
     required this.langue,
+    this.types,
   });
 
   @override
-  List<Object?> get props => [utilisateurId, email, push, sms, langue];
+  List<Object?> get props => [utilisateurId, email, push, sms, langue, types];
 }
 
 // 📍 METTRE À JOUR LA LOCALISATION

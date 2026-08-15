@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import '../../../../design_system/design_system.dart';
 import '../bloc/soutrapay_bloc.dart';
 import '../bloc/soutrapay_event.dart';
 import '../bloc/soutrapay_state.dart';
@@ -70,31 +71,12 @@ class _ProviderSoutraPayScreenState extends State<ProviderSoutraPayScreen>
 
   // 🎨 APP BAR SOUTRAPAY
   PreferredSizeWidget _buildSoutraPayAppBar() {
-    return AppBar(
-      backgroundColor: Colors.green.shade600,
-      elevation: 0,
-      leading: IconButton(
-        onPressed: () => Navigator.pop(context),
-        icon: Icon(Icons.arrow_back, color: Colors.white),
-      ),
-      title: Row(
-        children: [
-          Icon(Icons.account_balance_wallet, color: Colors.white),
-          const SizedBox(width: 8),
-          Text(
-            'SoutraPay',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
+    return SDWhiteAppBar.appBar(
+      title: 'SoutraPay',
       actions: [
         IconButton(
           onPressed: () => _refreshBalance(),
-          icon: Icon(Icons.refresh, color: Colors.white),
+          icon: const Icon(Icons.refresh),
         ),
         const SizedBox(width: 8),
       ],
@@ -977,6 +959,7 @@ class _ProviderSoutraPayScreenState extends State<ProviderSoutraPayScreen>
   // ➕ BOUTON D'ACTION FLOTTANT
   Widget _buildFloatingActionButton() {
     return FloatingActionButton.extended(
+      heroTag: 'provider_soutrapay_fab',
       onPressed: () => _showWithdrawalDialog(),
       backgroundColor: Colors.green.shade600,
       icon: const Icon(Icons.money_off, color: Colors.white),

@@ -1,7 +1,9 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../../../data/services/api_client.dart';
 import '../../../../data/models/security.dart';
+import '../../../../design_system/design_system.dart';
 import '../securitypageblocm/securityPageBlocM.dart';
 import '../securitypageblocm/securityPageEventM.dart';
 import '../securitypageblocm/securityPageStateM.dart';
@@ -45,17 +47,12 @@ class _SecuritySettingsScreenMState extends State<SecuritySettingsScreenM> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (context) => SecurityPageBlocM(
-        apiClient: ApiClient(),
+    return Scaffold(
+      backgroundColor: SDColors.white,
+      appBar: SDWhiteAppBar.appBar(
+        title: 'Mot de passe',
       ),
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Paramètres de sécurité'),
-          backgroundColor: Colors.green[600],
-          foregroundColor: Colors.white,
-        ),
-        body: BlocConsumer<SecurityPageBlocM, SecurityPageStateM>(
+      body: BlocConsumer<SecurityPageBlocM, SecurityPageStateM>(
           listener: (context, state) {
             if (state is SecurityPageErrorStateM) {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -99,6 +96,31 @@ class _SecuritySettingsScreenMState extends State<SecuritySettingsScreenM> {
                   backgroundColor: Colors.green,
                 ),
               );
+            } else if (state is SecurityDataExportedStateM) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(state.message),
+                  backgroundColor: Colors.green,
+                ),
+              );
+              showDialog(
+                context: context,
+                builder: (dialogCtx) => AlertDialog(
+                  title: const Text('Export sécurité'),
+                  content: SingleChildScrollView(
+                    child: SelectableText(
+                      const JsonEncoder.withIndent('  ').convert(state.data),
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(dialogCtx),
+                      child: const Text('Fermer'),
+                    ),
+                  ],
+                ),
+              );
             }
           },
           builder: (context, state) {
@@ -131,7 +153,6 @@ class _SecuritySettingsScreenMState extends State<SecuritySettingsScreenM> {
             );
           },
         ),
-      ),
     );
   }
 
@@ -378,32 +399,6 @@ class _SecuritySettingsScreenMState extends State<SecuritySettingsScreenM> {
             ),
             const SizedBox(height: 16),
 
-            // Terminer toutes les sessions
-            ListTile(
-              leading: const Icon(Icons.logout, color: Colors.red),
-              title: const Text('Terminer toutes les sessions'),
-              subtitle: const Text('Déconnecter tous les appareils'),
-              trailing: const Icon(Icons.arrow_forward_ios),
-              onTap: () {
-                _showTerminateAllSessionsDialog();
-              },
-            ),
-
-            const Divider(),
-
-            // Vider l'historique de connexion
-            ListTile(
-              leading: const Icon(Icons.history, color: Colors.orange),
-              title: const Text('Vider l\'historique de connexion'),
-              subtitle: const Text('Supprimer l\'historique des connexions'),
-              trailing: const Icon(Icons.arrow_forward_ios),
-              onTap: () {
-                _showClearHistoryDialog();
-              },
-            ),
-
-            const Divider(),
-
             // Exporter les données de sécurité
             ListTile(
               leading: const Icon(Icons.download, color: Colors.blue),
@@ -412,6 +407,17 @@ class _SecuritySettingsScreenMState extends State<SecuritySettingsScreenM> {
               trailing: const Icon(Icons.arrow_forward_ios),
               onTap: () {
                 _exportSecurityData();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.done_all, color: Colors.teal),
+              title: const Text('Marquer toutes les alertes comme lues'),
+              subtitle: const Text('Réinitialiser les alertes non lues'),
+              trailing: const Icon(Icons.arrow_forward_ios),
+              onTap: () {
+                context
+                    .read<SecurityPageBlocM>()
+                    .add(MarkAllAlertsAsReadEventM());
               },
             ),
           ],
@@ -473,72 +479,7 @@ class _SecuritySettingsScreenMState extends State<SecuritySettingsScreenM> {
         );
   }
 
-  void _showTerminateAllSessionsDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Terminer toutes les sessions'),
-        content: const Text(
-          'Êtes-vous sûr de vouloir terminer toutes les sessions actives ? '
-          'Vous devrez vous reconnecter sur tous vos appareils.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Annuler'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              context
-                  .read<SecurityPageBlocM>()
-                  .add(TerminateAllOtherSessionsEventM());
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child:
-                const Text('Terminer', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showClearHistoryDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Vider l\'historique de connexion'),
-        content: const Text(
-          'Êtes-vous sûr de vouloir supprimer l\'historique de connexion ? '
-          'Cette action est irréversible.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Annuler'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              context.read<SecurityPageBlocM>().add(ClearLoginHistoryEventM());
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-            child:
-                const Text('Supprimer', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _exportSecurityData() {
-    // TODO: Implémenter l'exportation des données de sécurité
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content:
-            Text('Fonctionnalité d\'exportation en cours de développement'),
-        backgroundColor: Colors.blue,
-      ),
-    );
+    context.read<SecurityPageBlocM>().add(ExportSecurityDataEventM());
   }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sdealsmobile/data/services/authCubit.dart';
+import 'package:sdealsmobile/mobile/view/serviceproviderregistrationpagem/screens/steps/provider_activity_details_step.dart';
 import 'package:sdealsmobile/mobile/view/serviceproviderregistrationpagem/screens/steps/provider_personal_info_step.dart';
 import 'package:sdealsmobile/mobile/view/serviceproviderregistrationpagem/screens/steps/provider_pricing_step.dart';
 
@@ -22,6 +23,8 @@ class ServiceProviderRegistrationScreenM extends StatefulWidget {
 class _ServiceProviderRegistrationScreenMState
     extends State<ServiceProviderRegistrationScreenM> {
   int _currentStep = 0;
+  bool _formUnlocked = false;
+  bool _success = false;
 
   final Map<String, dynamic> formData = {
     'fullName': '',
@@ -30,6 +33,7 @@ class _ServiceProviderRegistrationScreenMState
     'category': null,
     'categoryName': '',
     'service': null,
+    'serviceName': '',
     'serviceAreas': <String>[],
     'dailyRate': 0.0,
     'profileImage': null,
@@ -42,43 +46,28 @@ class _ServiceProviderRegistrationScreenMState
     'password': '',
     'confirmPassword': '',
     'requirePassword': true,
-    'birthDate': null,
-    'gender': 'Homme',
-    'businessName': '',
-    'specialties': <String>[],
-    'yearsOfExperience': 0,
-    'serviceDescription': '',
-    'serviceRadius': 0.0,
-    'location': null,
-    'minimumHourlyRate': 0.0,
-    'maximumHourlyRate': 0.0,
-    'billingMode': 'Heure',
-    'travelFees': false,
-    'travelFeesAmount': 0.0,
-    'idCardNumber': '',
-    'idCardFront': null,
-    'idCardBack': null,
-    'certificates': <dynamic>[],
-    'insurance': {'number': '', 'document': null},
-    'businessRegistry': '',
   };
 
-  late List<Step> _steps;
+  static const _stepLabels = [
+    'Informations de base',
+    'Détails d’activité',
+    'Tarification',
+  ];
 
   @override
   void initState() {
     super.initState();
-    _initializeSteps();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final authState = context.read<AuthCubit>().state;
       if (authState is AuthAuthenticated) {
-        final u = authState.utilisateur;
         setState(() {
+          _formUnlocked = true;
           formData['fullName'] =
-              '${u.prenom ?? ''} ${u.nom ?? ''}'.trim();
-          formData['phone'] = u.telephone ?? '';
-          formData['email'] = u.email ?? '';
+              '${authState.utilisateur.prenom ?? ''} ${authState.utilisateur.nom}'
+                  .trim();
+          formData['phone'] = authState.utilisateur.telephone ?? '';
+          formData['email'] = authState.utilisateur.email ?? '';
           formData['requirePassword'] = false;
         });
       } else {
@@ -87,46 +76,13 @@ class _ServiceProviderRegistrationScreenMState
     });
   }
 
-  void _initializeSteps() {
-    final stepTitleStyle = SDTypography.titleSmall.copyWith(
-      color: SDColors.neutral900,
-      fontWeight: FontWeight.w600,
-    );
-    _steps = [
-      Step(
-        title: Text('Informations de base', style: stepTitleStyle),
-        content: ProviderPersonalInfoStep(
-          formData: formData,
-          onDataChanged: _updateFormData,
-        ),
-        isActive: _currentStep >= 0,
-      ),
-      Step(
-        title: Text('Tarification', style: stepTitleStyle),
-        content: ProviderPricingStep(
-          formData: formData,
-          onDataChanged: _updateFormData,
-        ),
-        isActive: _currentStep >= 1,
-      ),
-    ];
-  }
-
   void _updateFormData(Map<String, dynamic> newData) {
-    setState(() {
-      formData.addAll(newData);
-      _initializeSteps();
-    });
+    formData.addAll(newData);
   }
 
-  /// Valide les champs obligatoires de l'étape 1 avant de passer à l'étape 2.
   bool _validateStep1() {
     final name = (formData['fullName'] as String?)?.trim() ?? '';
     final phone = (formData['phone'] as String?)?.trim() ?? '';
-    final category = formData['category'];
-    final service = formData['service'];
-    final areas = formData['serviceAreas'] as List?;
-
     if (name.isEmpty) {
       _showError('Veuillez renseigner votre nom complet');
       return false;
@@ -147,25 +103,31 @@ class _ServiceProviderRegistrationScreenMState
         return false;
       }
     }
-    if (category == null) {
+    if (formData['category'] == null) {
       _showError('Veuillez sélectionner votre catégorie');
       return false;
     }
-    if (service == null) {
+    if (formData['service'] == null) {
       _showError('Veuillez sélectionner votre service');
-      return false;
-    }
-    if (areas == null || areas.isEmpty) {
-      _showError('Veuillez sélectionner au moins une zone d\'intervention');
       return false;
     }
     return true;
   }
 
-  /// Valide les champs obligatoires de l'étape 2.
   bool _validateStep2() {
+    final areas = formData['serviceAreas'] as List?;
+    if (areas == null || areas.isEmpty) {
+      _showError('Veuillez sélectionner au moins une zone d’intervention');
+      return false;
+    }
+    return true;
+  }
+
+  bool _validateStep3() {
     final rate = formData['dailyRate'];
-    if (rate == null || (rate is double && rate <= 0) || (rate is int && rate <= 0)) {
+    if (rate == null ||
+        (rate is num && rate <= 0) ||
+        (rate is String && (double.tryParse(rate) ?? 0) <= 0)) {
       _showError('Veuillez renseigner votre tarif journalier');
       return false;
     }
@@ -176,8 +138,30 @@ class _ServiceProviderRegistrationScreenMState
     AppSnackBar.error(context, message, duration: const Duration(seconds: 3));
   }
 
+  void _goNext() {
+    if (_currentStep == 0) {
+      if (!_validateStep1()) return;
+      setState(() => _currentStep = 1);
+      return;
+    }
+    if (_currentStep == 1) {
+      if (!_validateStep2()) return;
+      setState(() => _currentStep = 2);
+      return;
+    }
+    _submitForm();
+  }
+
+  void _goBack() {
+    if (_currentStep > 0) {
+      setState(() => _currentStep--);
+    } else {
+      Navigator.of(context).maybePop();
+    }
+  }
+
   void _submitForm() {
-    if (!_validateStep2()) return;
+    if (!_validateStep3()) return;
 
     final backendData = _prepareBackendData();
     final auth = context.read<AuthCubit>().state;
@@ -196,6 +180,7 @@ class _ServiceProviderRegistrationScreenMState
   }
 
   Map<String, dynamic> _prepareBackendData() {
+    final daily = (formData['dailyRate'] as num?)?.toDouble() ?? 0.0;
     return {
       'fullName': formData['fullName'],
       'phone': formData['phone'],
@@ -203,7 +188,7 @@ class _ServiceProviderRegistrationScreenMState
       'password': formData['password'],
       'service': formData['service'] ?? '',
       'category': formData['categoryName'] ?? formData['category'] ?? '',
-      'prixprestataire': formData['dailyRate'],
+      'prixprestataire': daily,
       'localisation': (formData['serviceAreas'] as List?)?.isNotEmpty == true
           ? formData['serviceAreas'][0]
           : 'Abidjan',
@@ -220,8 +205,8 @@ class _ServiceProviderRegistrationScreenMState
       'specialite': [formData['categoryName'] ?? formData['category'] ?? ''],
       'anneeExperience': '0',
       'rayonIntervention': 10,
-      'tarifHoraireMin': formData['dailyRate'] / 8,
-      'tarifHoraireMax': formData['dailyRate'] / 6,
+      'tarifHoraireMin': daily / 8,
+      'tarifHoraireMax': daily / 6,
       'numeroCNI': '',
       'numeroRCCM': '',
       'numeroAssurance': '',
@@ -236,17 +221,26 @@ class _ServiceProviderRegistrationScreenMState
     };
   }
 
+  void _openProviderSpace() {
+    final auth = context.read<AuthCubit>().state;
+    if (auth is AuthAuthenticated) {
+      context.push('/providermain', extra: auth.utilisateur);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final authState = context.watch<AuthCubit>().state;
+    if (authState is AuthAuthenticated) {
+      _formUnlocked = true;
+    }
 
-    // Guard : utilisateur non connecté
-    if (authState is! AuthAuthenticated) {
+    if (!_formUnlocked && authState is! AuthAuthenticated) {
       return Scaffold(
-        backgroundColor: SDColors.neutral50,
+        backgroundColor: SDColors.white,
         appBar: SDWhiteAppBar.appBar(
-          centerTitle: false,
-          title: 'Devenir prestataire',
+          centerTitle: true,
+          title: 'Créer mon profil prestataire',
         ),
         body: Center(
           child: Padding(
@@ -256,40 +250,39 @@ class _ServiceProviderRegistrationScreenMState
               children: [
                 Container(
                   padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     color: SDColors.primary50,
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(Icons.handyman_rounded, size: 56, color: SDColors.primary600),
+                  child: const Icon(Icons.handyman_rounded,
+                      size: 56, color: SDColors.primary600),
                 ),
                 const SizedBox(height: 24),
                 Text(
                   'Connexion requise',
-                  style: SDTypography.titleLarge.copyWith(fontWeight: FontWeight.w700),
+                  style: SDTypography.titleLarge
+                      .copyWith(fontWeight: FontWeight.w700),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
                 Text(
                   'Vous devez être connecté pour créer votre profil prestataire.',
-                  style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral600),
+                  style: SDTypography.bodyMedium
+                      .copyWith(color: SDColors.neutral600),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 32),
-                SizedBox(
-                  width: double.infinity,
-                  child: SDButton(
-                    text: 'Se connecter',
-                    onPressed: () => context.push('/login'),
-                  ),
+                SDButton(
+                  text: 'Se connecter',
+                  fullWidth: true,
+                  onPressed: () => context.push('/login'),
                 ),
                 const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: SDButton(
-                    text: 'Créer un compte',
-                    type: SDButtonType.outlined,
-                    onPressed: () => context.push('/register'),
-                  ),
+                SDButton(
+                  text: 'Créer un compte',
+                  type: SDButtonType.outlined,
+                  fullWidth: true,
+                  onPressed: () => context.push('/register'),
                 ),
               ],
             ),
@@ -301,11 +294,7 @@ class _ServiceProviderRegistrationScreenMState
     return BlocListener<ServiceProviderRegistrationBlocM,
         ServiceProviderRegistrationStateM>(
       listener: (context, state) {
-        if (state is ServiceProviderRegistrationLoading) {
-          AppSnackBar.info(context, 'Envoi en cours…');
-        } else if (state is ServiceProviderRegistrationSuccess) {
-          AppSnackBar.success(context, state.message);
-
+        if (state is ServiceProviderRegistrationSuccess) {
           final auth = context.read<AuthCubit>().state;
           if (auth is AuthAuthenticated) {
             final currentRoles = List<String>.from(auth.roles);
@@ -317,86 +306,250 @@ class _ServiceProviderRegistrationScreenMState
                   );
             }
           }
-
-          Future.delayed(const Duration(seconds: 2), () {
-            final auth = context.read<AuthCubit>().state;
-            if (auth is AuthAuthenticated) {
-              context.push('/providermain', extra: auth.utilisateur);
-            }
-          });
+          setState(() => _success = true);
         } else if (state is ServiceProviderRegistrationFailure) {
           AppSnackBar.error(context, state.error);
         }
       },
-      child: Scaffold(
-        backgroundColor: SDColors.neutral50,
-        appBar: SDWhiteAppBar.appBar(
-          centerTitle: false,
-          title: 'Devenir prestataire',
-        ),
-        body: Stepper(
-          type: StepperType.vertical,
-          currentStep: _currentStep,
-          steps: _steps,
-          onStepContinue: () {
-            if (_currentStep == 0) {
-              if (_validateStep1()) {
-                setState(() {
-                  _currentStep = 1;
-                  _initializeSteps();
-                });
-              }
-            } else {
-              _submitForm();
-            }
-          },
-          onStepCancel: () {
-            if (_currentStep > 0) {
-              setState(() {
-                _currentStep--;
-                _initializeSteps();
-              });
-            }
-          },
-          controlsBuilder: (context, details) {
-            return Padding(
-              padding: const EdgeInsets.only(top: 20.0),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: BlocBuilder<ServiceProviderRegistrationBlocM,
-                        ServiceProviderRegistrationStateM>(
-                      builder: (context, state) {
-                        final isLoading =
-                            state is ServiceProviderRegistrationLoading;
-                        return SDButton(
-                          text: _currentStep == _steps.length - 1
-                              ? 'Soumettre'
-                              : 'Suivant',
-                          isLoading: isLoading,
-                          onPressed: isLoading ? null : details.onStepContinue,
-                          fullWidth: true,
-                        );
-                      },
-                    ),
-                  ),
-                  if (_currentStep > 0) ...[
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: SDButton(
-                        text: 'Précédent',
-                        type: SDButtonType.outlined,
-                        onPressed: details.onStepCancel,
-                        fullWidth: true,
-                      ),
-                    ),
-                  ],
-                ],
+      child: _success ? _buildSuccess() : _buildWizard(),
+    );
+  }
+
+  Widget _buildSuccess() {
+    return Scaffold(
+      backgroundColor: SDColors.white,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+          child: Column(
+            children: [
+              const Spacer(),
+              Container(
+                width: 96,
+                height: 96,
+                decoration: const BoxDecoration(
+                  color: SDColors.primary600,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.check_rounded,
+                    color: SDColors.white, size: 52),
               ),
-            );
-          },
+              const SizedBox(height: 28),
+              Text(
+                'Félicitations !',
+                style: SDTypography.displaySmall.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: SDColors.neutral900,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Votre profil prestataire a été créé avec succès.\nVous pourrez bientôt recevoir des demandes.',
+                textAlign: TextAlign.center,
+                style: SDTypography.bodyMedium.copyWith(
+                  color: SDColors.neutral600,
+                  height: 1.45,
+                ),
+              ),
+              const Spacer(),
+              SDButton(
+                text: 'Accéder à mon espace prestataire',
+                icon: Icons.arrow_forward_rounded,
+                iconRight: true,
+                fullWidth: true,
+                onPressed: _openProviderSpace,
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
         ),
       ),
+    );
+  }
+
+  Widget _buildWizard() {
+    return Scaffold(
+      backgroundColor: SDColors.white,
+      appBar: SDWhiteAppBar.appBar(
+        centerTitle: true,
+        title: 'Créer mon profil prestataire',
+      ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+            child: _StepProgress(
+              currentStep: _currentStep,
+              labels: _stepLabels,
+            ),
+          ),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+              physics: const BouncingScrollPhysics(),
+              child: _buildStepBody(),
+            ),
+          ),
+          _buildBottomBar(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStepBody() {
+    switch (_currentStep) {
+      case 0:
+        return ProviderPersonalInfoStep(
+          key: const ValueKey('provider_step_1'),
+          formData: formData,
+          onDataChanged: _updateFormData,
+        );
+      case 1:
+        return ProviderActivityDetailsStep(
+          key: const ValueKey('provider_step_2'),
+          formData: formData,
+          onDataChanged: _updateFormData,
+        );
+      default:
+        return ProviderPricingStep(
+          key: const ValueKey('provider_step_3'),
+          formData: formData,
+          onDataChanged: _updateFormData,
+          onEditSummary: () => setState(() => _currentStep = 0),
+        );
+    }
+  }
+
+  Widget _buildBottomBar() {
+    final isLast = _currentStep == 2;
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(
+        20,
+        12,
+        20,
+        12 + MediaQuery.paddingOf(context).bottom,
+      ),
+      decoration: BoxDecoration(
+        color: SDColors.white,
+        boxShadow: [
+          BoxShadow(
+            color: SDColors.neutral900.withValues(alpha: 0.06),
+            blurRadius: 12,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          BlocBuilder<ServiceProviderRegistrationBlocM,
+              ServiceProviderRegistrationStateM>(
+            builder: (context, state) {
+              final loading = state is ServiceProviderRegistrationLoading;
+              return SDButton(
+                text: isLast ? 'Créer mon profil prestataire' : 'Continuer',
+                icon: isLast
+                    ? Icons.check_rounded
+                    : Icons.arrow_forward_rounded,
+                iconRight: true,
+                fullWidth: true,
+                isLoading: loading,
+                onPressed: loading ? null : _goNext,
+              );
+            },
+          ),
+          if (_currentStep > 0) ...[
+            const SizedBox(height: 4),
+            TextButton(
+              onPressed: _goBack,
+              child: Text(
+                'Retour',
+                style: SDTypography.labelMedium.copyWith(
+                  color: SDColors.neutral600,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _StepProgress extends StatelessWidget {
+  final int currentStep;
+  final List<String> labels;
+
+  const _StepProgress({
+    required this.currentStep,
+    required this.labels,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Row(
+          children: List.generate(labels.length * 2 - 1, (i) {
+            if (i.isOdd) {
+              final after = i ~/ 2;
+              final done = currentStep > after;
+              return Expanded(
+                child: Container(
+                  height: 3,
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  decoration: BoxDecoration(
+                    color: done ? SDColors.primary600 : SDColors.neutral200,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              );
+            }
+            final step = i ~/ 2;
+            final active = currentStep >= step;
+            return Container(
+              width: 28,
+              height: 28,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: active ? SDColors.primary600 : SDColors.neutral100,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: active ? SDColors.primary600 : SDColors.neutral300,
+                ),
+              ),
+              child: Text(
+                '${step + 1}',
+                style: SDTypography.labelSmall.copyWith(
+                  color: active ? SDColors.white : SDColors.neutral500,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            );
+          }),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: List.generate(labels.length, (i) {
+            final active = currentStep == i;
+            return Expanded(
+              child: Text(
+                labels[i],
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: SDTypography.labelSmall.copyWith(
+                  color: active ? SDColors.primary700 : SDColors.neutral500,
+                  fontWeight: active ? FontWeight.w800 : FontWeight.w600,
+                  fontSize: 11,
+                ),
+              ),
+            );
+          }),
+        ),
+      ],
     );
   }
 }

@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../../../data/models/prestataire.dart';
 import '../../../../data/services/api_client.dart';
 import '../../../../data/services/authCubit.dart';
-import '../../loginpagem/screens/loginPageScreenM.dart';
-import '../widgets/mini_map_widget.dart';
-import '../../orderpagem/screens/service_request_summary_screen.dart';
+import '../screens/fullMapScreenM.dart';
 import '../../common/widgets/app_image.dart';
+import '../widgets/service_request_sheet.dart';
 // ✅ Design System
 import '../../../../design_system/design_system.dart';
 
@@ -32,6 +32,9 @@ class ProviderProfileScreen extends StatefulWidget {
 
 class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
   final ApiClient _api = ApiClient();
+
+  /// Remettre à `true` quand le catalogue aura assez de profils proches.
+  static const bool _showSimilarProviders = false;
   
   Prestataire? _provider;
   bool _isLoading = true;
@@ -231,6 +234,10 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
                 _buildReviewsContent(),
                 SizedBox(height: SDSpacing.lg),
                 _buildPortfolioContent(),
+                if (_showSimilarProviders) ...[
+                  SizedBox(height: SDSpacing.lg),
+                  _buildSimilarProvidersContent(),
+                ],
               ],
             ),
           ),
@@ -481,7 +488,7 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.payments_outlined, color: SDColors.primary600, size: 22),
+                Icon(Icons.payments_outlined, color: SDColors.neutral900, size: 22),
                 SizedBox(width: SDSpacing.xs),
                 Flexible(
                   child: Text(
@@ -507,7 +514,7 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
   Widget _buildStatItem(IconData icon, String value, String label) {
     return Column(
       children: [
-        Icon(icon, color: SDColors.primary600, size: 26),
+        Icon(icon, color: SDColors.neutral900, size: 26),
         SizedBox(height: SDSpacing.xxxs),
         Text(
           value,
@@ -625,7 +632,7 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
                             style: SDTypography.labelMedium,
                           ),
                           avatar: Icon(Icons.location_on_outlined,
-                              size: 16, color: SDColors.primary600),
+                              size: 16, color: SDColors.neutral900),
                           backgroundColor: SDColors.neutral100,
                           side: BorderSide(color: SDColors.neutral200),
                           visualDensity: VisualDensity.compact,
@@ -645,7 +652,7 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
                 children: _provider!.diplomeCertificat!
                     .map((d) => ListTile(
                           leading: Icon(Icons.verified_outlined,
-                              color: SDColors.primary600, size: 22),
+                              color: SDColors.neutral900, size: 22),
                           title: Text(
                             d,
                             maxLines: 2,
@@ -661,39 +668,189 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
           if (_provider!.diplomeCertificat != null && _provider!.diplomeCertificat!.isNotEmpty)
             SizedBox(height: SDSpacing.lg),
           
-          // Carte de localisation
-          _buildSection(
-            'Localisation',
-            Icons.map_outlined,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _provider!.localisation,
-                  style: SDTypography.bodyMedium,
-                  maxLines: 4,
-                  overflow: TextOverflow.ellipsis,
+          // Localisation compacte (adresse + vignette map)
+          _buildCompactLocationBlock(),
+        ],
+    );
+  }
+
+  Widget _buildCompactLocationBlock() {
+    final address = _provider!.localisation.trim().isNotEmpty
+        ? _provider!.localisation.trim()
+        : 'Adresse non renseignée';
+    final maps = _provider!.localisationMaps;
+    final hasGps = maps != null &&
+        maps.latitude.abs() <= 90 &&
+        maps.longitude.abs() <= 180;
+    final subtitle = _locationSubtitle(hasGps: hasGps);
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: SDSpacing.md),
+      child: InkWell(
+        onTap: hasGps ? _openProviderFullMap : null,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.location_on,
+                          size: 18,
+                          color: SDColors.primary600,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Localisation',
+                          style: SDTypography.titleSmall.copyWith(
+                            color: SDColors.neutral900,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      address,
+                      style: SDTypography.bodyLarge.copyWith(
+                        color: SDColors.neutral900,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: SDTypography.bodySmall.copyWith(
+                          color: SDColors.neutral500,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ],
                 ),
-                SizedBox(height: SDSpacing.sm),
-                if (_userLocation != null)
-                  ClipRRect(
-                    borderRadius:
-                        BorderRadius.circular(SDSpacing.borderRadiusLarge),
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(
-                        minHeight: 100,
-                        maxHeight: 200,
+              ),
+              const SizedBox(width: 12),
+              _buildLocationThumb(hasGps: hasGps, maps: maps),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String? _locationSubtitle({required bool hasGps}) {
+    final rayon = _provider!.rayonIntervention;
+    if (rayon != null && rayon > 0) {
+      final r = rayon == rayon.roundToDouble()
+          ? rayon.toInt().toString()
+          : rayon.toStringAsFixed(1);
+      return 'Déplacement possible dans un rayon de $r km';
+    }
+
+    if (_userLocation != null && hasGps) {
+      final maps = _provider!.localisationMaps!;
+      final meters = Geolocator.distanceBetween(
+        _userLocation!.latitude,
+        _userLocation!.longitude,
+        maps.latitude,
+        maps.longitude,
+      );
+      if (meters < 1000) {
+        return 'À ${meters.toInt()} m de vous';
+      }
+      return 'À ${(meters / 1000).toStringAsFixed(1)} km de vous';
+    }
+
+    if (!hasGps) {
+      return 'Position GPS non enregistrée';
+    }
+    return 'Activez la localisation pour voir la distance';
+  }
+
+  Widget _buildLocationThumb({
+    required bool hasGps,
+    required LocalisationMaps? maps,
+  }) {
+    const size = 88.0;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: !hasGps || maps == null
+            ? Container(
+                color: SDColors.neutral100,
+                alignment: Alignment.center,
+                child: Icon(
+                  Icons.map_outlined,
+                  color: SDColors.neutral400,
+                  size: 28,
+                ),
+              )
+            : Stack(
+                fit: StackFit.expand,
+                children: [
+                  GoogleMap(
+                    initialCameraPosition: CameraPosition(
+                      target: LatLng(maps.latitude, maps.longitude),
+                      zoom: 14.5,
+                    ),
+                    markers: {
+                      Marker(
+                        markerId: const MarkerId('provider'),
+                        position: LatLng(maps.latitude, maps.longitude),
                       ),
-                      child: MiniMapWidget(
-                        provider: _provider!.toJson(),
-                        userLocation: _userLocation,
-                      ),
+                    },
+                    liteModeEnabled: true,
+                    zoomControlsEnabled: false,
+                    myLocationButtonEnabled: false,
+                    mapToolbarEnabled: false,
+                    compassEnabled: false,
+                    rotateGesturesEnabled: false,
+                    scrollGesturesEnabled: false,
+                    zoomGesturesEnabled: false,
+                    tiltGesturesEnabled: false,
+                    onTap: (_) => _openProviderFullMap(),
+                  ),
+                  // Overlay pour capturer le tap (Android liteMode)
+                  Positioned.fill(
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(onTap: _openProviderFullMap),
                     ),
                   ),
-              ],
-            ),
-          ),
-        ],
+                ],
+              ),
+      ),
+    );
+  }
+
+  void _openProviderFullMap() {
+    final maps = _provider?.localisationMaps;
+    if (maps == null) return;
+    final pos = LatLng(maps.latitude, maps.longitude);
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => FullMapScreenM(
+          initialPosition: pos,
+          providers: [_provider!.toJson()],
+          searchRadius: _provider!.rayonIntervention ?? 10.0,
+          selectedCategory:
+              _provider!.service.categorie?.nomcategorie,
+          selectedService: _provider!.service.nomservice,
+        ),
+      ),
     );
   }
 
@@ -718,7 +875,7 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Icon(Icons.build_circle_outlined,
-                          color: SDColors.primary600, size: 24),
+                          color: SDColors.neutral900, size: 24),
                     ),
                     SizedBox(width: SDSpacing.sm),
                     Expanded(
@@ -750,7 +907,7 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
                       '${_provider!.prixprestataire.toInt()} FCFA',
                       style: SDTypography.titleSmall.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: SDColors.primary600,
+                        color: SDColors.neutral900,
                       ),
                     ),
                   ],
@@ -759,6 +916,7 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
             ),
           ),
           SizedBox(height: SDSpacing.sm),
+
           Text(
             'Ce prestataire propose des services de qualité avec une expertise reconnue.',
             style: SDTypography.bodyMedium.copyWith(
@@ -919,13 +1077,25 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
     );
   }
 
+  /// Emplacement prêt pour une liste horizontale de profils proches.
+  Widget _buildSimilarProvidersContent() {
+    return _buildSection(
+      'Prestataires similaires',
+      Icons.people_outline,
+      child: Text(
+        'Bientôt disponible.',
+        style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral600),
+      ),
+    );
+  }
+
   Widget _buildSection(String title, IconData icon, {required Widget child}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Icon(icon, color: SDColors.primary600, size: 22),
+            Icon(icon, color: SDColors.neutral900, size: 22),
             SizedBox(width: SDSpacing.xs),
             Expanded(
               child: Text(
@@ -1024,25 +1194,57 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
     }
   }
 
-  void _onToggleFavorite() {
+  void _onToggleFavorite() async {
     final auth = context.read<AuthCubit>().state;
     if (auth is! AuthAuthenticated) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Connectez-vous pour ajouter en favoris.')),
       );
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const LoginPageScreenM()),
-      );
+      context.push('/login');
       return;
     }
+    if (_provider == null) return;
 
+    final previous = _isFavorited;
     setState(() => _isFavorited = !_isFavorited);
-    final msg = _isFavorited ? 'Ajouté aux favoris' : 'Retiré des favoris';
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+
+    try {
+      final nowFavorite = await _api.toggleFavorite(
+        token: auth.token,
+        objetType: 'PRESTATAIRE',
+        objetId: _provider!.idprestataire,
+        titre: _provider!.utilisateur.fullName,
+        image: _provider!.utilisateur.photoProfil,
+      );
+      if (!mounted) return;
+      setState(() => _isFavorited = nowFavorite);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            nowFavorite ? 'Ajouté aux favoris' : 'Retiré des favoris',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isFavorited = previous);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Échec favoris : $e')),
+      );
+    }
   }
 
   void _onReportProfile() async {
+    final auth = context.read<AuthCubit>().state;
+    if (auth is! AuthAuthenticated) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Connectez-vous pour signaler.')),
+      );
+      context.push('/login');
+      return;
+    }
+    if (_provider == null) return;
+
     final controller = TextEditingController();
     final result = await showDialog<bool>(
       context: context,
@@ -1072,9 +1274,30 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
       },
     );
 
-    if (result == true && mounted) {
+    if (result != true || !mounted) return;
+    final reason = controller.text.trim();
+    if (reason.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Veuillez saisir un motif.')),
+      );
+      return;
+    }
+
+    try {
+      await _api.createReport(
+        token: auth.token,
+        targetType: 'PRESTATAIRE',
+        targetId: _provider!.idprestataire,
+        reason: reason,
+      );
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Signalement envoyé. Merci.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Échec du signalement : $e')),
       );
     }
   }
@@ -1106,10 +1329,7 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Veuillez vous connecter pour demander un devis.')),
       );
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const LoginPageScreenM()),
-      );
+      context.push('/login');
       return;
     }
 
@@ -1118,387 +1338,16 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
   }
 
   void _openRequestQuoteSheet(AuthAuthenticated auth) {
-    final adresseCtrl = TextEditingController();
-    final villeCtrl = TextEditingController();
-    final notesCtrl = TextEditingController();
-
-    showModalBottomSheet(
+    showServiceRequestSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-            left: 20,
-            right: 20,
-            top: 20,
-          ),
-          child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // En-tête moderne
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF2E7D32).withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(
-                            Icons.request_quote_rounded,
-                            color: Color(0xFF2E7D32),
-                            size: 28,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Demander un service',
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.black87,
-                                ),
-                              ),
-                              Text(
-                                _provider!.utilisateur.fullName,
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey.shade600,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: () => Navigator.pop(context),
-                          icon: const Icon(Icons.close),
-                          color: Colors.grey.shade400,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    
-                    // Badge du service
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.green.shade50,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.green.shade200),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.build_circle, color: Colors.green.shade700, size: 20),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Service demandé',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
-                                    color: Colors.black54,
-                                  ),
-                                ),
-                                Text(
-                                  _provider!.service.nomservice,
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.green.shade800,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
-                            ),
-                          ),
-                          if (_provider!.prixprestataire > 0)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF2E7D32),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                '${_provider!.prixprestataire.toInt()} F',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    
-                    // Adresse
-                    TextField(
-                      controller: adresseCtrl,
-                      decoration: InputDecoration(
-                        labelText: 'Adresse *',
-                        hintText: 'Ex: Rue 12, Cocody',
-                        prefixIcon: const Icon(Icons.home, color: Color(0xFF2E7D32)),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 2),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    
-                    // Ville
-                    TextField(
-                      controller: villeCtrl,
-                      decoration: InputDecoration(
-                        labelText: 'Ville *',
-                        hintText: 'Ex: Abidjan',
-                        prefixIcon: const Icon(Icons.location_city, color: Color(0xFF2E7D32)),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 2),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    
-                    // Notes (optionnel)
-                    TextField(
-                      controller: notesCtrl,
-                      maxLines: 2,
-                      decoration: InputDecoration(
-                        labelText: 'Précision (optionnel)',
-                        hintText: 'Ou envoyez une photo / vocal dans le chat',
-                        prefixIcon: const Padding(
-                          padding: EdgeInsets.only(bottom: 20),
-                          child: Icon(Icons.note_alt, color: Color(0xFF2E7D32)),
-                        ),
-                        alignLabelWithHint: true,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 2),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    
-                    // Mise en relation gratuite
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.blue.shade200),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Mise en relation gratuite. Le prix se discute ensuite (chat, appel ou sur place).',
-                              style: TextStyle(
-                                color: Colors.blue.shade700,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                  
-                  // Bouton de soumission moderne
-                  SizedBox(
-                    width: double.infinity,
-                    height: 56,
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        // Validation
-                        if (adresseCtrl.text.trim().isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Row(
-                                children: const [
-                                  Icon(Icons.warning_amber_rounded, color: Colors.white),
-                                  SizedBox(width: 8),
-                                  Expanded(child: Text('Veuillez saisir une adresse')),
-                                ],
-                              ),
-                              backgroundColor: Colors.orange,
-                              behavior: SnackBarBehavior.floating,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
-                          );
-                          return;
-                        }
-                        if (villeCtrl.text.trim().isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Row(
-                                children: const [
-                                  Icon(Icons.warning_amber_rounded, color: Colors.white),
-                                  SizedBox(width: 8),
-                                  Expanded(child: Text('Veuillez saisir une ville')),
-                                ],
-                              ),
-                              backgroundColor: Colors.orange,
-                              behavior: SnackBarBehavior.floating,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
-                          );
-                          return;
-                        }
-                        
-                        // Montrer un loader
-                        showDialog(
-                          context: context,
-                          barrierDismissible: false,
-                          builder: (_) => const Center(
-                            child: Card(
-                              child: Padding(
-                                padding: EdgeInsets.all(24),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    CircularProgressIndicator(color: Color(0xFF2E7D32)),
-                                    SizedBox(height: 16),
-                                    Text('Envoi en cours...'),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                        
-                        // Créer la demande
-                        try {
-                          final created = await _api.createPrestation(
-                            token: auth.token,
-                            utilisateurId: auth.utilisateur.idutilisateur,
-                            prestataireId: _provider!.idprestataire,
-                            serviceId: _provider!.service.idservice,
-                            adresse: adresseCtrl.text.trim(),
-                            ville: villeCtrl.text.trim(),
-                            notesClient: notesCtrl.text.trim(),
-                            montant: _provider!.prixprestataire,
-                          );
-                          
-                          if (mounted) {
-                            Navigator.pop(context); // Fermer le loader
-                            Navigator.pop(context); // Fermer le modal
-                            
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Row(
-                                  children: const [
-                                    Icon(Icons.check_circle, color: Colors.white),
-                                    SizedBox(width: 8),
-                                    Expanded(child: Text('Demande envoyée avec succès ! 🎉')),
-                                  ],
-                                ),
-                                backgroundColor: const Color(0xFF2E7D32),
-                                behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                duration: const Duration(seconds: 3),
-                              ),
-                            );
-                            
-                            // Navigation vers l'écran de suivi
-                            final requestId = created['_id']?.toString();
-                            if (requestId != null) {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => ServiceRequestSummaryScreen(
-                                    requestId: requestId,
-                                    token: auth.token,
-                                  ),
-                                ),
-                              );
-                            }
-                          }
-                        } catch (e) {
-                          if (mounted) {
-                            Navigator.pop(context); // Fermer le loader
-                            Navigator.pop(context); // Fermer le modal
-                            
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Row(
-                                  children: [
-                                    const Icon(Icons.error_outline, color: Colors.white),
-                                    const SizedBox(width: 8),
-                                    Expanded(child: Text('Erreur: ${e.toString()}')),
-                                  ],
-                                ),
-                                backgroundColor: Colors.red,
-                                behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                duration: const Duration(seconds: 4),
-                              ),
-                            );
-                          }
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2E7D32),
-                        foregroundColor: Colors.white,
-                        elevation: 3,
-                        shadowColor: const Color(0xFF2E7D32).withOpacity(0.4),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
-                          Icon(Icons.send_rounded, size: 22),
-                          SizedBox(width: 8),
-                          Text(
-                            'Envoyer la demande',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-                ),
-          ),
-        );
-      },
+      token: auth.token,
+      utilisateurId: auth.utilisateur.idutilisateur,
+      prestataireId: _provider!.idprestataire,
+      serviceId: _provider!.service.idservice,
+      serviceName: _provider!.service.nomservice,
+      providerName: _provider!.utilisateur.fullName,
+      prix: _provider!.prixprestataire,
+      apiClient: _api,
     );
   }
 }

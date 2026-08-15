@@ -43,8 +43,10 @@ class AvisPageBlocM extends Bloc<AvisPageEventM, AvisPageStateM> {
       if (event.note != null) queryParams['note'] = event.note.toString();
       if (event.searchTerm != null) queryParams['q'] = event.searchTerm!;
 
-      // Appel API
-      final response = await _apiClient.get('/avis');
+      final path = queryParams.isEmpty
+          ? '/avis'
+          : '/avis?${Uri(queryParameters: queryParams).query}';
+      final response = await _apiClient.get(path);
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
@@ -122,7 +124,8 @@ class AvisPageBlocM extends Bloc<AvisPageEventM, AvisPageStateM> {
     emit(state.copyWith(isLoading: true, error: null));
 
     try {
-      final response = await _apiClient.get('/avis/recent');
+      final response = await _apiClient.get(
+          '/avis/recents?limit=${event.limit}');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
@@ -363,7 +366,8 @@ class AvisPageBlocM extends Bloc<AvisPageEventM, AvisPageStateM> {
   Future<void> _onLoadStatsObjetM(
       LoadStatsObjetM event, Emitter<AvisPageStateM> emit) async {
     try {
-      final response = await _apiClient.get('/avis/stats/${event.objetId}');
+      final response = await _apiClient.get(
+          '/avis/stats/${event.objetType}/${event.objetId}');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);

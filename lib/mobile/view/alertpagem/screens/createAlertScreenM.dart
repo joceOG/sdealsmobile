@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../alertpageblocm/alertPageBlocM.dart';
 import '../alertpageblocm/alertPageEventM.dart';
 import '../alertpageblocm/alertPageStateM.dart';
+import '../../../../design_system/design_system.dart';
 
 class CreateAlertScreenM extends StatefulWidget {
   const CreateAlertScreenM({super.key});
@@ -221,18 +222,18 @@ class _CreateAlertScreenMState extends State<CreateAlertScreenM> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Créer une Alerte'),
-        backgroundColor: Colors.green[600],
-        foregroundColor: Colors.white,
-        elevation: 0,
+      backgroundColor: SDColors.white,
+      appBar: SDWhiteAppBar.appBar(
+        title: 'Créer une Alerte',
         actions: [
           TextButton(
             onPressed: _submitForm,
-            child: const Text(
+            child: Text(
               'Créer',
-              style:
-                  TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              style: SDTypography.bodyMedium.copyWith(
+                color: SDColors.neutral900,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],

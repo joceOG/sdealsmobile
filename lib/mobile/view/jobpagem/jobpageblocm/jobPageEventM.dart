@@ -94,3 +94,23 @@ class LoadUrgentProvidersM extends JobPageEventM {
   @override
   List<Object> get props => [latitude ?? 0, longitude ?? 0, radius];
 }
+
+/// Filtres locaux Liste|Carte (vérifié / note) — sans rechargement API.
+class UpdateExplorerFiltersM extends JobPageEventM {
+  final bool? filterVerifiedOnly;
+  final double? filterMinRating;
+  final bool clearMinRating;
+
+  const UpdateExplorerFiltersM({
+    this.filterVerifiedOnly,
+    this.filterMinRating,
+    this.clearMinRating = false,
+  });
+
+  @override
+  List<Object> get props => [
+        filterVerifiedOnly ?? false,
+        filterMinRating ?? -1,
+        clearMinRating,
+      ];
+}

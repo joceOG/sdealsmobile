@@ -66,9 +66,9 @@ class StandardScreenHeader extends StatelessWidget {
             textAlign: TextAlign.start,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: SDTypography.headlineSmall.copyWith(
+            style: SDTypography.displayMedium.copyWith(
               color: SDColors.neutral900,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ),

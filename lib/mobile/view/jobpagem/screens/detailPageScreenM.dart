@@ -3,9 +3,10 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:sdealsmobile/data/services/api_client.dart';
 import 'package:sdealsmobile/data/services/authCubit.dart';
-import 'package:sdealsmobile/mobile/view/loginpagem/screens/loginPageScreenM.dart';
 import 'package:sdealsmobile/mobile/view/orderpagem/screens/service_request_summary_screen.dart';
 import 'package:sdealsmobile/mobile/view/jobpagem/screens/provider_profile_screen.dart';
 import 'package:sdealsmobile/mobile/view/common/widgets/app_image.dart';
@@ -38,7 +39,6 @@ class _DetailPageState extends State<DetailPage> {
   bool _loading = true;
   List<Map<String, dynamic>> _providers = [];
   bool _filterVerifiedOnly = false;
-  bool _isFavorited = false;
   LatLng? _userLocation;
   /// ID service résolu (paramètre ou premier prestataire chargé).
   String? _effectiveServiceId;
@@ -52,6 +52,8 @@ class _DetailPageState extends State<DetailPage> {
   double? _filterMaxPrice;
   bool _filterActiveOnly = false;
   String? _filterSpecialite;
+  final Set<String> _favoritedProviderIds = {};
+  bool _showAllSpecialites = false;
 
   @override
   void initState() {
@@ -139,29 +141,10 @@ class _DetailPageState extends State<DetailPage> {
               if (!_showSearchField) _searchController.clear();
             }),
           ),
-          PopupMenuButton<String>(
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: SDSpacing.xs),
-              child: Icon(Icons.more_horiz, color: SDColors.neutral900),
-            ),
-            onSelected: (value) {
-              switch (value) {
-                case 'share':
-                  _onShareTap();
-                  break;
-                case 'fav':
-                  _onFavoriteTap();
-                  break;
-                case 'report':
-                  _onReportTap();
-                  break;
-              }
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(value: 'share', child: Text('Partager')),
-              const PopupMenuItem(value: 'fav', child: Text('Favori')),
-              const PopupMenuItem(value: 'report', child: Text('Signaler')),
-            ],
+          IconButton(
+            tooltip: 'Filtres',
+            icon: const Icon(Icons.tune),
+            onPressed: _openExtraFiltersSheet,
           ),
         ],
         bottom: _showSearchField
@@ -482,16 +465,19 @@ class _DetailPageState extends State<DetailPage> {
   }
 
   Widget _buildCompactServiceHeader() {
+    final verifiedCount =
+        _providers.where(_isVerified).length;
+    final n = _providers.length;
     return Padding(
       padding: EdgeInsets.fromLTRB(SDSpacing.md, SDSpacing.sm, SDSpacing.md, 0),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
             child: SizedBox(
-              width: 88,
-              height: 88,
+              width: 72,
+              height: 72,
               child: _buildServiceThumb(widget.image),
             ),
           ),
@@ -509,9 +495,9 @@ class _DetailPageState extends State<DetailPage> {
                 ),
                 SizedBox(height: SDSpacing.xxxs),
                 Text(
-                  _providers.isEmpty
+                  n == 0
                       ? 'Chargement des professionnels…'
-                      : '${_providers.length} prestataire${_providers.length > 1 ? 's' : ''}',
+                      : '$n prestataire${n > 1 ? 's' : ''} disponible${n > 1 ? 's' : ''}',
                   style: SDTypography.bodySmall.copyWith(
                     color: SDColors.neutral600,
                   ),
@@ -519,6 +505,27 @@ class _DetailPageState extends State<DetailPage> {
               ],
             ),
           ),
+          if (verifiedCount > 0)
+            Column(
+              children: [
+                Icon(
+                  Icons.verified_user,
+                  color: SDColors.primary600,
+                  size: 22,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Prestataires\nvérifiés',
+                  textAlign: TextAlign.center,
+                  style: SDTypography.labelSmall.copyWith(
+                    color: SDColors.primary700,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 10,
+                    height: 1.15,
+                  ),
+                ),
+              ],
+            ),
         ],
       ),
     );
@@ -556,9 +563,15 @@ class _DetailPageState extends State<DetailPage> {
           padding: EdgeInsets.symmetric(horizontal: SDSpacing.md),
           children: [
             _filterChip(
-              label: 'Dist. : toutes',
+              label: 'Distance : toutes',
               selected: _filterMaxDistanceKm == null,
+              icon: Icons.place,
               onTap: () => setState(() => _filterMaxDistanceKm = null),
+            ),
+            _filterChip(
+              label: '≤ 2 km',
+              selected: _filterMaxDistanceKm == 2,
+              onTap: () => setState(() => _filterMaxDistanceKm = 2),
             ),
             _filterChip(
               label: '≤ 5 km',
@@ -571,56 +584,10 @@ class _DetailPageState extends State<DetailPage> {
               onTap: () => setState(() => _filterMaxDistanceKm = 10),
             ),
             _filterChip(
-              label: '≤ 20 km',
-              selected: _filterMaxDistanceKm == 20,
+              label: 'Plus',
+              selected: _filterMaxDistanceKm != null &&
+                  _filterMaxDistanceKm! > 10,
               onTap: () => setState(() => _filterMaxDistanceKm = 20),
-            ),
-            _filterChip(
-              label: 'Prix : tous',
-              selected: _filterMaxPrice == null,
-              onTap: () => setState(() => _filterMaxPrice = null),
-            ),
-            _filterChip(
-              label: '≤ 25k F',
-              selected: _filterMaxPrice == 25000,
-              onTap: () => setState(() => _filterMaxPrice = 25000),
-            ),
-            _filterChip(
-              label: '≤ 50k F',
-              selected: _filterMaxPrice == 50000,
-              onTap: () => setState(() => _filterMaxPrice = 50000),
-            ),
-            _filterChip(
-              label: '≤ 100k F',
-              selected: _filterMaxPrice == 100000,
-              onTap: () => setState(() => _filterMaxPrice = 100000),
-            ),
-            _filterChip(
-              label: 'Note : toutes',
-              selected: _filterMinNote == null,
-              onTap: () => setState(() => _filterMinNote = null),
-            ),
-            _filterChip(
-              label: '≥ 3 ★',
-              selected: _filterMinNote == 3,
-              onTap: () => setState(() => _filterMinNote = 3),
-            ),
-            _filterChip(
-              label: '≥ 4 ★',
-              selected: _filterMinNote == 4,
-              onTap: () => setState(() => _filterMinNote = 4),
-            ),
-            _filterChip(
-              label: 'Actifs',
-              selected: _filterActiveOnly,
-              onTap: () =>
-                  setState(() => _filterActiveOnly = !_filterActiveOnly),
-            ),
-            _filterChip(
-              label: 'Vérifiés',
-              selected: _filterVerifiedOnly,
-              onTap: () =>
-                  setState(() => _filterVerifiedOnly = !_filterVerifiedOnly),
             ),
           ],
         ),
@@ -632,25 +599,31 @@ class _DetailPageState extends State<DetailPage> {
     required String label,
     required bool selected,
     required VoidCallback onTap,
+    IconData? icon,
   }) {
     return Padding(
       padding: EdgeInsets.only(right: SDSpacing.xs),
       child: FilterChip(
+        avatar: icon == null
+            ? null
+            : Icon(
+                icon,
+                size: 16,
+                color: selected ? SDColors.white : SDColors.primary700,
+              ),
         label: Text(
           label,
           style: SDTypography.labelSmall.copyWith(
-            color: selected ? SDColors.primary800 : SDColors.neutral700,
+            color: selected ? SDColors.white : SDColors.neutral800,
             fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
           ),
         ),
         selected: selected,
         onSelected: (_) => onTap(),
-        selectedColor: SDColors.primary100,
-        checkmarkColor: SDColors.primary800,
-        backgroundColor: SDColors.white,
-        side: BorderSide(
-          color: selected ? SDColors.primary600 : SDColors.neutral300,
-        ),
+        selectedColor: SDColors.primary700,
+        checkmarkColor: SDColors.white,
+        backgroundColor: SDColors.neutral100,
+        side: BorderSide.none,
         showCheckmark: false,
         materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
         visualDensity: VisualDensity.compact,
@@ -659,8 +632,9 @@ class _DetailPageState extends State<DetailPage> {
   }
 
   Widget _buildAggregatedSpecialitesRow() {
-    final items = _aggregatedSpecialites();
-    if (items.isEmpty) return const SizedBox.shrink();
+    final all = _aggregatedSpecialites();
+    if (all.isEmpty) return const SizedBox.shrink();
+    final visible = _showAllSpecialites ? all : all.take(6).toList();
     return Padding(
       padding: EdgeInsets.only(top: SDSpacing.sm),
       child: Column(
@@ -668,12 +642,36 @@ class _DetailPageState extends State<DetailPage> {
         children: [
           Padding(
             padding: EdgeInsets.symmetric(horizontal: SDSpacing.md),
-            child: Text(
-              'Spécialités proposées',
-              style: SDTypography.labelMedium.copyWith(
-                color: SDColors.neutral600,
-                fontWeight: FontWeight.w600,
-              ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Spécialités proposées',
+                    style: SDTypography.labelMedium.copyWith(
+                      color: SDColors.neutral800,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                if (all.length > 6)
+                  TextButton(
+                    onPressed: () => setState(
+                      () => _showAllSpecialites = !_showAllSpecialites,
+                    ),
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: Text(
+                      _showAllSpecialites ? 'Réduire' : 'Voir tout →',
+                      style: SDTypography.labelMedium.copyWith(
+                        color: SDColors.primary700,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
           SizedBox(height: SDSpacing.xs),
@@ -682,7 +680,7 @@ class _DetailPageState extends State<DetailPage> {
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
               padding: EdgeInsets.symmetric(horizontal: SDSpacing.md),
-              itemCount: items.length + 1,
+              itemCount: visible.length + 1,
               itemBuilder: (context, i) {
                 if (i == 0) {
                   return Padding(
@@ -690,27 +688,40 @@ class _DetailPageState extends State<DetailPage> {
                     child: ActionChip(
                       label: Text(
                         'Toutes',
-                        style: SDTypography.labelSmall,
+                        style: SDTypography.labelSmall.copyWith(
+                          color: _filterSpecialite == null
+                              ? SDColors.white
+                              : SDColors.neutral800,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       onPressed: () =>
                           setState(() => _filterSpecialite = null),
                       backgroundColor: _filterSpecialite == null
-                          ? SDColors.primary100
-                          : SDColors.white,
+                          ? SDColors.primary700
+                          : SDColors.neutral100,
+                      side: BorderSide.none,
                     ),
                   );
                 }
-                final s = items[i - 1];
+                final s = visible[i - 1];
                 final sel = _filterSpecialite == s;
                 return Padding(
                   padding: EdgeInsets.only(right: SDSpacing.xs),
                   child: ActionChip(
-                    label: Text(s, style: SDTypography.labelSmall),
+                    label: Text(
+                      s,
+                      style: SDTypography.labelSmall.copyWith(
+                        color: sel ? SDColors.white : SDColors.neutral800,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                     onPressed: () => setState(() {
                       _filterSpecialite = sel ? null : s;
                     }),
                     backgroundColor:
-                        sel ? SDColors.primary100 : SDColors.white,
+                        sel ? SDColors.primary700 : SDColors.neutral100,
+                    side: BorderSide.none,
                   ),
                 );
               },
@@ -821,6 +832,164 @@ class _DetailPageState extends State<DetailPage> {
     );
   }
 
+  String _formatPrice(num price) {
+    final formatted =
+        NumberFormat('#,###', 'fr_FR').format(price.toInt()).replaceAll(',', ' ');
+    return '$formatted FCFA';
+  }
+
+  void _toggleProviderFavorite(String id) {
+    final auth = context.read<AuthCubit>().state;
+    if (auth is! AuthAuthenticated) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Connectez-vous pour ajouter en favoris.',
+            style: SDTypography.bodyMedium,
+          ),
+        ),
+      );
+      context.push('/login');
+      return;
+    }
+    setState(() {
+      if (_favoritedProviderIds.contains(id)) {
+        _favoritedProviderIds.remove(id);
+      } else {
+        _favoritedProviderIds.add(id);
+      }
+    });
+  }
+
+  void _openExtraFiltersSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: SDColors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheet) {
+            void apply(VoidCallback fn) {
+              setSheet(fn);
+              setState(fn);
+            }
+
+            return Padding(
+              padding: EdgeInsets.fromLTRB(
+                SDSpacing.md,
+                SDSpacing.md,
+                SDSpacing.md,
+                MediaQuery.of(ctx).padding.bottom + SDSpacing.md,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Filtres',
+                    style: SDTypography.titleMedium.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  SizedBox(height: SDSpacing.sm),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _filterChip(
+                        label: 'Prix : tous',
+                        selected: _filterMaxPrice == null,
+                        onTap: () => apply(() => _filterMaxPrice = null),
+                      ),
+                      _filterChip(
+                        label: '≤ 25k F',
+                        selected: _filterMaxPrice == 25000,
+                        onTap: () => apply(() => _filterMaxPrice = 25000),
+                      ),
+                      _filterChip(
+                        label: '≤ 50k F',
+                        selected: _filterMaxPrice == 50000,
+                        onTap: () => apply(() => _filterMaxPrice = 50000),
+                      ),
+                      _filterChip(
+                        label: '≥ 4 ★',
+                        selected: _filterMinNote == 4,
+                        onTap: () => apply(
+                          () => _filterMinNote =
+                              _filterMinNote == 4 ? null : 4,
+                        ),
+                      ),
+                      _filterChip(
+                        label: 'Actifs',
+                        selected: _filterActiveOnly,
+                        onTap: () => apply(
+                          () => _filterActiveOnly = !_filterActiveOnly,
+                        ),
+                      ),
+                      _filterChip(
+                        label: 'Vérifiés',
+                        selected: _filterVerifiedOnly,
+                        onTap: () => apply(
+                          () => _filterVerifiedOnly = !_filterVerifiedOnly,
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: SDSpacing.md),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: SDColors.primary700,
+                        foregroundColor: SDColors.white,
+                      ),
+                      child: const Text('Appliquer'),
+                    ),
+                  ),
+                  SizedBox(height: SDSpacing.sm),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _onShareTap();
+                        },
+                        child: Text(
+                          'Partager',
+                          style: SDTypography.labelMedium
+                              .copyWith(color: SDColors.neutral700),
+                        ),
+                      ),
+                      Text(
+                        '·',
+                        style: TextStyle(color: SDColors.neutral400),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _onReportTap();
+                        },
+                        child: Text(
+                          'Signaler',
+                          style: SDTypography.labelMedium
+                              .copyWith(color: SDColors.neutral700),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Widget _buildProviderCard(Map<String, dynamic> p) {
     final id = p['_id']?.toString() ?? '';
     final name = _displayName(p);
@@ -833,6 +1002,7 @@ class _DetailPageState extends State<DetailPage> {
     final active = _isActiveStatus(p);
     final top = _showTopBadge(p);
     final photo = _photoUrl(p);
+    final isFav = id.isNotEmpty && _favoritedProviderIds.contains(id);
 
     return Material(
       color: SDColors.white,
@@ -865,23 +1035,46 @@ class _DetailPageState extends State<DetailPage> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  ClipRRect(
-                    borderRadius:
-                        BorderRadius.circular(SDSpacing.borderRadiusMedium),
-                    child: SizedBox(
-                      width: 72,
-                      height: 72,
-                      child: photo != null
-                          ? AppImage(imageUrl: photo, fit: BoxFit.cover)
-                          : Container(
-                              color: SDColors.primary50,
-                              child: Icon(
-                                Icons.person,
-                                color: SDColors.primary600,
-                                size: 36,
-                              ),
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(
+                          SDSpacing.borderRadiusMedium,
+                        ),
+                        child: SizedBox(
+                          width: 72,
+                          height: 72,
+                          child: photo != null
+                              ? AppImage(imageUrl: photo, fit: BoxFit.cover)
+                              : Container(
+                                  color: SDColors.neutral100,
+                                  child: Icon(
+                                    Icons.person,
+                                    color: SDColors.neutral500,
+                                    size: 36,
+                                  ),
+                                ),
+                        ),
+                      ),
+                      if (verified)
+                        Positioned(
+                          right: -2,
+                          bottom: -2,
+                          child: Container(
+                            padding: const EdgeInsets.all(2),
+                            decoration: const BoxDecoration(
+                              color: SDColors.white,
+                              shape: BoxShape.circle,
                             ),
-                    ),
+                            child: Icon(
+                              Icons.verified_user,
+                              color: SDColors.primary600,
+                              size: 18,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                   SizedBox(width: SDSpacing.sm),
                   Expanded(
@@ -889,30 +1082,58 @@ class _DetailPageState extends State<DetailPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Expanded(
-                              child: Text(
-                                name,
-                                style: SDTypography.titleSmall.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                              child: Row(
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      name,
+                                      style: SDTypography.titleSmall.copyWith(
+                                        fontWeight: FontWeight.w700,
+                                        color: SDColors.neutral900,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  if (verified) ...[
+                                    const SizedBox(width: 4),
+                                    Icon(
+                                      Icons.verified,
+                                      color: SDColors.primary600,
+                                      size: 16,
+                                    ),
+                                  ],
+                                ],
                               ),
                             ),
-                            if (verified)
-                              Icon(
-                                Icons.verified,
-                                color: SDColors.primary600,
-                                size: 20,
+                            if (id.isNotEmpty)
+                              IconButton(
+                                onPressed: () => _toggleProviderFavorite(id),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(
+                                  minWidth: 32,
+                                  minHeight: 32,
+                                ),
+                                icon: Icon(
+                                  isFav
+                                      ? Icons.favorite
+                                      : Icons.favorite_border,
+                                  color: isFav
+                                      ? SDColors.error500
+                                      : SDColors.neutral400,
+                                  size: 22,
+                                ),
                               ),
                           ],
                         ),
-                        SizedBox(height: SDSpacing.xxxs),
                         Text(
-                          metier,
+                          '[${metier.isEmpty ? widget.title : metier}]',
                           style: SDTypography.bodySmall.copyWith(
-                            color: SDColors.neutral600,
+                            color: SDColors.neutral700,
+                            fontWeight: FontWeight.w600,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -960,21 +1181,17 @@ class _DetailPageState extends State<DetailPage> {
                     ),
                   ),
                   if (distKm != null) ...[
-                    SizedBox(width: SDSpacing.sm),
-                    Icon(Icons.near_me_outlined,
-                        size: 16, color: SDColors.neutral500),
-                    SizedBox(width: SDSpacing.xxxs),
                     Text(
-                      '${distKm.toStringAsFixed(distKm < 10 ? 1 : 0)} km',
+                      '  ·  ${distKm.toStringAsFixed(distKm < 10 ? 1 : 0)} km',
                       style: SDTypography.bodySmall.copyWith(
-                        color: SDColors.neutral700,
+                        color: SDColors.neutral600,
                       ),
                     ),
                   ],
                   const Spacer(),
                   if (price != null && price > 0)
                     Text(
-                      '${price.toInt()} FCFA',
+                      _formatPrice(price),
                       style: SDTypography.titleSmall.copyWith(
                         color: SDColors.primary700,
                         fontWeight: FontWeight.w800,
@@ -986,24 +1203,25 @@ class _DetailPageState extends State<DetailPage> {
               Row(
                 children: [
                   Expanded(
-                    child: OutlinedButton(
+                    child: OutlinedButton.icon(
                       onPressed: () => _contactProvider(p),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: SDColors.primary700,
-                        side: BorderSide(color: SDColors.primary700),
-                        padding: EdgeInsets.symmetric(vertical: SDSpacing.xs),
-                      ),
-                      child: Text(
+                      icon: Icon(Icons.chat_bubble_outline, size: 18),
+                      label: Text(
                         'Contacter',
                         style: SDTypography.labelMedium.copyWith(
                           fontWeight: FontWeight.w600,
                         ),
                       ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: SDColors.primary700,
+                        side: BorderSide(color: SDColors.primary700),
+                        padding: EdgeInsets.symmetric(vertical: SDSpacing.xs),
+                      ),
                     ),
                   ),
                   SizedBox(width: SDSpacing.sm),
                   Expanded(
-                    child: ElevatedButton(
+                    child: ElevatedButton.icon(
                       onPressed: id.isEmpty
                           ? null
                           : () {
@@ -1019,28 +1237,24 @@ class _DetailPageState extends State<DetailPage> {
                                     ),
                                   ),
                                 );
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                        const LoginPageScreenM(),
-                                  ),
-                                );
+                                context.push('/login');
                                 return;
                               }
                               _openCheckoutSheet();
                             },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: SDColors.primary700,
-                        foregroundColor: SDColors.white,
-                        padding: EdgeInsets.symmetric(vertical: SDSpacing.xs),
-                      ),
-                      child: Text(
+                      icon: Icon(Icons.shopping_cart_outlined,
+                          size: 18, color: SDColors.white),
+                      label: Text(
                         'Commander',
                         style: SDTypography.labelMedium.copyWith(
                           fontWeight: FontWeight.bold,
                           color: SDColors.white,
                         ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: SDColors.primary700,
+                        foregroundColor: SDColors.white,
+                        padding: EdgeInsets.symmetric(vertical: SDSpacing.xs),
                       ),
                     ),
                   ),
@@ -1081,40 +1295,6 @@ class _DetailPageState extends State<DetailPage> {
       SnackBar(content: Text('Texte copié dans le presse-papiers',
           style: SDTypography.bodyMedium)),
     );
-  }
-
-  void _onFavoriteTap() {
-    final auth = context.read<AuthCubit>().state;
-    if (auth is! AuthAuthenticated) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text('Connectez-vous pour ajouter en favoris.',
-                style: SDTypography.bodyMedium)),
-      );
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const LoginPageScreenM()),
-      );
-      return;
-    }
-
-    setState(() => _isFavorited = !_isFavorited);
-    final msg = _isFavorited ? 'Ajouté aux favoris' : 'Retiré des favoris';
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(msg, style: SDTypography.bodyMedium),
-        backgroundColor: SDColors.success500));
-
-    // Appel backend (fire-and-forget)
-    if (_isFavorited) {
-      final token = auth.token;
-      _api
-          .addFavorite(
-            token: token,
-            title: widget.title,
-            image: widget.image,
-          )
-          .catchError((e) => debugPrint('Erreur favoris: $e'));
-    }
   }
 
   void _onReportTap() async {
@@ -1221,10 +1401,7 @@ class _DetailPageState extends State<DetailPage> {
                       content: Text('Veuillez vous connecter pour commander.',
                           style: SDTypography.bodyMedium)),
                 );
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const LoginPageScreenM()),
-                );
+                context.push('/login');
                 return;
               }
               _openCheckoutSheet();

@@ -31,7 +31,11 @@ class TerminateSessionEventM extends SecurityPageEventM {
   TerminateSessionEventM({required this.sessionId});
 }
 
-class TerminateAllOtherSessionsEventM extends SecurityPageEventM {}
+class TerminateAllOtherSessionsEventM extends SecurityPageEventM {
+  final String? keepSessionId;
+
+  TerminateAllOtherSessionsEventM({this.keepSessionId});
+}
 
 // 🚨 ÉVÉNEMENTS POUR LES ALERTES DE SÉCURITÉ
 class LoadSecurityAlertsEventM extends SecurityPageEventM {}
@@ -95,6 +99,8 @@ class ChangePasswordEventM extends SecurityPageEventM {
 class LoadLoginHistoryEventM extends SecurityPageEventM {}
 
 class ClearLoginHistoryEventM extends SecurityPageEventM {}
+
+class ExportSecurityDataEventM extends SecurityPageEventM {}
 
 // 🔍 ÉVÉNEMENTS POUR LA RECHERCHE ET FILTRAGE
 class SearchSecurityAlertsEventM extends SecurityPageEventM {

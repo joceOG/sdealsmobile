@@ -22,7 +22,9 @@ class VendorDetailsScreenM extends StatelessWidget {
             expandedHeight: 250.0,
             floating: false,
             pinned: true,
-            backgroundColor: SDColors.primary600,
+            backgroundColor: SDColors.white,
+            foregroundColor: SDColors.neutral900,
+            iconTheme: const IconThemeData(color: SDColors.neutral900),
             flexibleSpace: FlexibleSpaceBar(
               title: Text(
                 vendeur.shopName.isNotEmpty ? vendeur.shopName : 'Boutique',
@@ -38,8 +40,8 @@ class VendorDetailsScreenM extends StatelessWidget {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      SDColors.primary600,
-                      SDColors.primary800,
+                      SDColors.neutral700,
+                      SDColors.neutral900,
                     ],
                   ),
                 ),

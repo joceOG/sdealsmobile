@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:sdealsmobile/design_system/design_system.dart';
 import '../../../data/models/commande_model.dart';
+import '../orderpageblocm/commande_bloc.dart';
+import '../orderpageblocm/commande_event.dart';
 
 class CommandeDetailsScreen extends StatelessWidget {
   final CommandeModel commande;
@@ -226,15 +229,46 @@ class CommandeDetailsScreen extends StatelessWidget {
                   const SizedBox(height: 12),
                   if (commande.status == CommandeStatus.enAttente)
                     OutlinedButton.icon(
-                      onPressed: () {
-                        // Action d'annulation
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Commande annulée'),
-                            backgroundColor: Colors.red,
+                      onPressed: () async {
+                        final ok = await showDialog<bool>(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: const Text('Annuler la commande'),
+                            content: const Text(
+                              'Confirmer l’annulation de cette commande ?',
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(ctx, false),
+                                child: const Text('Non'),
+                              ),
+                              TextButton(
+                                onPressed: () => Navigator.pop(ctx, true),
+                                child: const Text('Oui, annuler'),
+                              ),
+                            ],
                           ),
                         );
+                        if (ok != true || !context.mounted) return;
+                        try {
+                          final bloc = BlocProvider.of<CommandeBloc>(context);
+                          bloc.add(AnnulerCommande(commande.id));
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Demande d’annulation envoyée'),
+                            ),
+                          );
+                        } catch (_) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Impossible d’annuler pour le moment',
+                              ),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
                       },
                       icon: const Icon(Icons.cancel_outlined),
                       label: const Text('Annuler la commande'),

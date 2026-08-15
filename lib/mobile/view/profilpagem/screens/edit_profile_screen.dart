@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../data/services/api_client.dart';
 import '../../../../data/services/authCubit.dart';
+import '../../../../data/models/utilisateur.dart';
 import '../../../../design_system/design_system.dart';
 import '../profilpageblocm/edit_profile_bloc.dart';
 
@@ -110,7 +111,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
 
     // Afficher l'icône par défaut
-    return const Icon(Icons.person, size: 60, color: Colors.green);
+    return const Icon(Icons.person, size: 60, color: SDColors.neutral900);
   }
 
   void _updateProfile() {
@@ -167,13 +168,52 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         body: BlocConsumer<EditProfileBloc, EditProfileState>(
           listener: (context, state) {
             if (state is EditProfileSuccess) {
+              try {
+                final raw = state.updatedUser;
+                final userMap = raw['utilisateur'] is Map<String, dynamic>
+                    ? raw['utilisateur'] as Map<String, dynamic>
+                    : raw;
+                final updated = Utilisateur.fromJson(userMap);
+                context.read<AuthCubit>().updateUtilisateur(updated);
+              } catch (_) {
+                // Fallback : fusion locale des champs édités
+                final auth = context.read<AuthCubit>().state;
+                if (auth is AuthAuthenticated) {
+                  final u = auth.utilisateur;
+                  context.read<AuthCubit>().updateUtilisateur(
+                        Utilisateur(
+                          idutilisateur: u.idutilisateur,
+                          nom: _nomController.text.trim(),
+                          prenom: _prenomController.text.trim(),
+                          telephone: _telephoneController.text.trim(),
+                          email: _emailController.text.trim(),
+                          genre: _genreController.text.trim().isNotEmpty
+                              ? _genreController.text.trim()
+                              : u.genre,
+                          dateNaissance:
+                              _dateNaissanceController.text.trim().isNotEmpty
+                                  ? _dateNaissanceController.text.trim()
+                                  : u.dateNaissance,
+                          photoProfil: u.photoProfil,
+                          password: u.password,
+                          note: u.note,
+                          tokens: u.tokens,
+                          token: u.token,
+                          createdAt: u.createdAt,
+                          updatedAt: u.updatedAt,
+                          role: u.role,
+                          verifie: u.verifie,
+                        ),
+                      );
+                }
+              }
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(state.message),
-                  backgroundColor: Colors.green,
+                  backgroundColor: SDColors.neutral900,
                 ),
               );
-              Navigator.pop(context, true); // Retourner avec succès
+              Navigator.pop(context, true);
             } else if (state is EditProfileError) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
@@ -206,7 +246,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         children: [
                           CircleAvatar(
                             radius: 60,
-                            backgroundColor: Colors.green.shade100,
+                            backgroundColor: SDColors.neutral100,
                             backgroundImage: _getProfileImage(),
                             child: _getProfileIcon(),
                           ),
@@ -218,7 +258,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               child: Container(
                                 padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
-                                  color: Colors.green,
+                                  color: SDColors.neutral900,
                                   shape: BoxShape.circle,
                                   border:
                                       Border.all(color: Colors.white, width: 2),
@@ -239,7 +279,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       'Appuyez sur l\'icône caméra pour changer la photo',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: Colors.grey,
+                        color: SDColors.neutral500,
                         fontSize: 14,
                       ),
                     ),
@@ -250,10 +290,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       controller: _nomController,
                       decoration: const InputDecoration(
                         labelText: 'Nom *',
-                        prefixIcon: Icon(Icons.person, color: Colors.green),
+                        prefixIcon: Icon(Icons.person, color: SDColors.neutral900),
                         border: OutlineInputBorder(),
                         focusedBorder: OutlineInputBorder(
-                          borderSide: BorderSide(color: Colors.green),
+                          borderSide: BorderSide(color: SDColors.neutral900),
                         ),
                       ),
                       validator: (value) {
@@ -271,10 +311,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       decoration: const InputDecoration(
                         labelText: 'Prénom',
                         prefixIcon:
-                            Icon(Icons.person_outline, color: Colors.green),
+                            Icon(Icons.person_outline, color: SDColors.neutral900),
                         border: OutlineInputBorder(),
                         focusedBorder: OutlineInputBorder(
-                          borderSide: BorderSide(color: Colors.green),
+                          borderSide: BorderSide(color: SDColors.neutral900),
                         ),
                       ),
                     ),
@@ -285,10 +325,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       controller: _telephoneController,
                       decoration: const InputDecoration(
                         labelText: 'Téléphone *',
-                        prefixIcon: Icon(Icons.phone, color: Colors.green),
+                        prefixIcon: Icon(Icons.phone, color: SDColors.neutral900),
                         border: OutlineInputBorder(),
                         focusedBorder: OutlineInputBorder(
-                          borderSide: BorderSide(color: Colors.green),
+                          borderSide: BorderSide(color: SDColors.neutral900),
                         ),
                       ),
                       keyboardType: TextInputType.phone,
@@ -309,10 +349,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       controller: _emailController,
                       decoration: const InputDecoration(
                         labelText: 'Email *',
-                        prefixIcon: Icon(Icons.email, color: Colors.green),
+                        prefixIcon: Icon(Icons.email, color: SDColors.neutral900),
                         border: OutlineInputBorder(),
                         focusedBorder: OutlineInputBorder(
-                          borderSide: BorderSide(color: Colors.green),
+                          borderSide: BorderSide(color: SDColors.neutral900),
                         ),
                       ),
                       keyboardType: TextInputType.emailAddress,
@@ -335,10 +375,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       decoration: const InputDecoration(
                         labelText: 'Genre',
                         prefixIcon:
-                            Icon(Icons.person_outline, color: Colors.green),
+                            Icon(Icons.person_outline, color: SDColors.neutral900),
                         border: OutlineInputBorder(),
                         focusedBorder: OutlineInputBorder(
-                          borderSide: BorderSide(color: Colors.green),
+                          borderSide: BorderSide(color: SDColors.neutral900),
                         ),
                         hintText: 'Homme, Femme, Autre...',
                       ),
@@ -351,10 +391,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       decoration: const InputDecoration(
                         labelText: 'Date de naissance',
                         prefixIcon:
-                            Icon(Icons.calendar_today, color: Colors.green),
+                            Icon(Icons.calendar_today, color: SDColors.neutral900),
                         border: OutlineInputBorder(),
                         focusedBorder: OutlineInputBorder(
-                          borderSide: BorderSide(color: Colors.green),
+                          borderSide: BorderSide(color: SDColors.neutral900),
                         ),
                         hintText: 'JJ/MM/AAAA',
                       ),
@@ -369,7 +409,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             onPressed: () => Navigator.pop(context),
                             style: OutlinedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 12),
-                              side: const BorderSide(color: Colors.grey),
+                              side: const BorderSide(color: SDColors.neutral500),
                             ),
                             child: const Text('Annuler'),
                           ),
@@ -379,7 +419,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           child: ElevatedButton(
                             onPressed: _updateProfile,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green,
+                              backgroundColor: SDColors.neutral900,
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(vertical: 12),
                             ),

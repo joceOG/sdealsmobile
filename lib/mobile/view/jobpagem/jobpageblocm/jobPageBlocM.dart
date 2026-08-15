@@ -6,6 +6,7 @@ import 'package:bloc/bloc.dart';
 
 import 'package:sdealsmobile/data/models/categorie.dart';
 import 'package:sdealsmobile/data/services/api_client.dart';
+import 'package:sdealsmobile/data/utils/network_user_message.dart';
 import 'package:sdealsmobile/ai_services/mock_implementations/mock_price_estimation_service.dart';
 import 'package:sdealsmobile/ai_services/mock_implementations/mock_provider_matching_service.dart';
 import 'package:sdealsmobile/ai_services/models/ai_recommendation_model.dart';
@@ -24,6 +25,13 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
     on<LoadNearbyProvidersM>(_onLoadNearbyProvidersM);
     on<LoadProvidersByCategoryM>(_onLoadProvidersByCategoryM);
     on<LoadUrgentProvidersM>(_onLoadUrgentProvidersM);
+    on<UpdateExplorerFiltersM>((event, emit) {
+      emit(state.copyWith(
+        filterVerifiedOnly: event.filterVerifiedOnly,
+        filterMinRating: event.filterMinRating,
+        clearMinRating: event.clearMinRating,
+      ));
+    });
   }
 
   Future<void> _onLoadCategorieDataJobM(
@@ -32,19 +40,23 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
   ) async {
     // String nomgroupe = "Metiers";
     // emit(state.copyWith3(isLoading2: true));
-    emit(state.copyWith(isLoading: true));
+    emit(state.copyWith(isLoading: true, error: ''));
 
     ApiClient apiClient = ApiClient();
-    print("Try");
     try {
       var nomgroupe = "Métiers";
       List<Categorie> list_categorie =
           await apiClient.fetchCategorie(nomgroupe);
-      print("List Categorie");
-      emit(state.copyWith(listItems: list_categorie, isLoading: false));
+      emit(state.copyWith(
+        listItems: list_categorie,
+        isLoading: false,
+        error: '',
+      ));
     } catch (error) {
-      //   emit(state.copyWith3(error2: error.toString(), isLoading2: false));
-      emit(state.copyWith(error: error.toString(), isLoading: false));
+      emit(state.copyWith(
+        error: userFacingNetworkMessage(error),
+        isLoading: false,
+      ));
     }
   }
 
@@ -52,15 +64,22 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
     LoadServiceDataJobM event,
     Emitter<JobPageStateM> emit,
   ) async {
-    emit(state.copyWith(isLoading2: true));
+    emit(state.copyWith(isLoading2: true, error2: ''));
 
     ApiClient apiClient = ApiClient();
     try {
       var nomGroupe = "Métiers";
       List<Service> listService = await apiClient.fetchServices(nomGroupe);
-      emit(state.copyWith(listItems2: listService, isLoading2: false));
+      emit(state.copyWith(
+        listItems2: listService,
+        isLoading2: false,
+        error2: '',
+      ));
     } catch (error) {
-      emit(state.copyWith(error2: error.toString(), isLoading2: false));
+      emit(state.copyWith(
+        error2: userFacingNetworkMessage(error),
+        isLoading2: false,
+      ));
     }
   }
 
@@ -335,27 +354,26 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
       print("📍 Rayon de recherche: ${event.radius} km");
       print("📍 Prestataires avant filtrage: ${allProviders.length}");
       
-      // ✅ NOUVEAU : Filtrage par distance via API backend
-      List<Prestataire> nearbyProviders = await _filterByDistance(
+      // ✅ Filtrage par distance + distances persistées
+      final filtered = await _filterByDistance(
         allProviders,
         event.latitude,
         event.longitude,
         event.radius,
       );
+      List<Prestataire> nearbyProviders = filtered.providers;
+      final distances = filtered.distances;
 
       print("📍 Prestataires après filtrage distance: ${nearbyProviders.length}");
 
-      // Trier par distance et note
+      // Trier par distance puis vérifié
       nearbyProviders.sort((a, b) {
-        // Priorité aux prestataires vérifiés
+        final da = distances[a.idprestataire] ?? 9999;
+        final db = distances[b.idprestataire] ?? 9999;
+        final cmp = da.compareTo(db);
+        if (cmp != 0) return cmp;
         if (a.verifier && !b.verifier) return -1;
         if (!a.verifier && b.verifier) return 1;
-
-        // Puis par note (conversion sécurisée)
-        final noteA = (a.note is num) ? (a.note as num).toDouble() : 0.0;
-        final noteB = (b.note is num) ? (b.note as num).toDouble() : 0.0;
-        if (noteB > noteA) return 1;
-        if (noteB < noteA) return -1;
         return 0;
       });
       
@@ -365,6 +383,7 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
 
       emit(state.copyWith(
         nearbyProviders: nearbyProviders,
+        providerDistances: distances,
         isNearbyLoading: false,
       ));
     } catch (error) {
@@ -410,20 +429,23 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
               false)
           .toList();
 
-      // ✅ NOUVEAU : Filtrer par distance via API backend si position disponible
+      // ✅ Filtrer par distance si position disponible
+      Map<String, double> distances = {};
       if (event.latitude != null && event.longitude != null) {
-        providers = await _filterByDistance(
+        final filtered = await _filterByDistance(
           providers,
           event.latitude!,
           event.longitude!,
           event.radius,
         );
+        providers = filtered.providers;
+        distances = filtered.distances;
       }
 
       // Trier par note (conversion sécurisée)
       providers.sort((a, b) {
-        final noteA = (a.note is num) ? (a.note as num).toDouble() : 0.0;
-        final noteB = (b.note is num) ? (b.note as num).toDouble() : 0.0;
+        final noteA = double.tryParse('${a.note ?? ''}'.replaceAll(',', '.')) ?? 0.0;
+        final noteB = double.tryParse('${b.note ?? ''}'.replaceAll(',', '.')) ?? 0.0;
         if (noteB > noteA) return 1;
         if (noteB < noteA) return -1;
         return 0;
@@ -433,6 +455,8 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
 
       emit(state.copyWith(
         nearbyProviders: providers,
+        providerDistances: distances,
+        selectedCategory: event.category,
         isNearbyLoading: false,
       ));
     } catch (error) {
@@ -473,22 +497,25 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
       // Pour l'instant, on filtre par prestataires vérifiés comme approximation
       providers = providers.where((p) => p.verifier).toList();
 
-      // ✅ NOUVEAU : Filtrer par distance via API backend si position disponible
+      // ✅ Filtrer par distance si position disponible
+      Map<String, double> distances = {};
       if (event.latitude != null && event.longitude != null) {
-        providers = await _filterByDistance(
+        final filtered = await _filterByDistance(
           providers,
           event.latitude!,
           event.longitude!,
           event.radius,
         );
+        providers = filtered.providers;
+        distances = filtered.distances;
       }
 
       // Trier par disponibilité et note
       providers.sort((a, b) {
         if (a.verifier && !b.verifier) return -1;
         if (!a.verifier && b.verifier) return 1;
-        final noteA = (a.note is num) ? (a.note as num).toDouble() : 0.0;
-        final noteB = (b.note is num) ? (b.note as num).toDouble() : 0.0;
+        final noteA = double.tryParse('${a.note ?? ''}'.replaceAll(',', '.')) ?? 0.0;
+        final noteB = double.tryParse('${b.note ?? ''}'.replaceAll(',', '.')) ?? 0.0;
         if (noteB > noteA) return 1;
         if (noteB < noteA) return -1;
         return 0;
@@ -498,6 +525,7 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
 
       emit(state.copyWith(
         nearbyProviders: providers,
+        providerDistances: distances,
         isNearbyLoading: false,
       ));
     } catch (error) {
@@ -509,53 +537,47 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
     }
   }
 
-  // ✅ NOUVEAU : Méthode utilitaire pour filtrer par distance
-  Future<List<Prestataire>> _filterByDistance(
+  // ✅ Filtre distance + map id → km
+  Future<({List<Prestataire> providers, Map<String, double> distances})>
+      _filterByDistance(
     List<Prestataire> providers,
     double userLat,
     double userLng,
     double radiusKm,
   ) async {
-    // 🚀 UTILISATION DES VRAIES COORDONNÉES !
-    List<Prestataire> nearbyProviders = [];
+    final nearbyProviders = <Prestataire>[];
+    final distances = <String, double>{};
 
     for (Prestataire provider in providers) {
-      // 📍 EXTRAIRE LES VRAIES COORDONNÉES DU PRESTATAIRE
       double? providerLat;
       double? providerLng;
 
-      // Récupérer les coordonnées depuis localisationMaps
       if (provider.localisationMaps != null) {
         try {
           providerLat = provider.localisationMaps?.latitude;
           providerLng = provider.localisationMaps?.longitude;
         } catch (e) {
-          print('Erreur extraction coordonnées prestataire ${provider.utilisateur?.idutilisateur}: $e');
-          continue; // Ignorer ce prestataire s'il n'a pas de coordonnées
+          continue;
         }
       }
 
-      // Vérifier que les coordonnées sont valides
-      if (providerLat == null || providerLng == null || 
-          providerLat == 0.0 || providerLng == 0.0) {
-        print('Prestataire ${provider.utilisateur.idutilisateur} ignoré: coordonnées invalides');
+      if (providerLat == null ||
+          providerLng == null ||
+          providerLat == 0.0 ||
+          providerLng == 0.0) {
         continue;
       }
 
-      // 🔢 CALCUL DE DISTANCE RÉEL
-      double distance = _calculateLocalDistance(userLat, userLng, providerLat, providerLng);
-
-      final providerName = '${provider.utilisateur?.prenom ?? ''} ${provider.utilisateur?.nom ?? ''}'.trim();
-      print('Distance pour $providerName: ${distance.toStringAsFixed(2)} km');
+      final distance =
+          _calculateLocalDistance(userLat, userLng, providerLat, providerLng);
 
       if (distance <= radiusKm) {
         nearbyProviders.add(provider);
-        print('✅ Prestataire $providerName ajouté (${distance.toStringAsFixed(2)} km)');
+        distances[provider.idprestataire] = distance;
       }
     }
 
-    print('🎯 ${nearbyProviders.length} prestataires dans un rayon de ${radiusKm} km');
-    return nearbyProviders;
+    return (providers: nearbyProviders, distances: distances);
   }
 
   // ✅ NOUVELLE MÉTHODE : Calculer la distance via l'API backend

@@ -4,8 +4,7 @@ import 'package:sdealsmobile/mobile/view/shoppingpagem/shoppingpageblocm/shoppin
 import 'package:sdealsmobile/mobile/view/shoppingpagem/shoppingpageblocm/shoppingPageEventM.dart';
 import 'package:sdealsmobile/mobile/view/shoppingpagem/shoppingpageblocm/shoppingPageStateM.dart';
 import 'package:sdealsmobile/mobile/view/seller_registration/screens/seller_form_screen.dart';
-import '../../../../design_system/colors.dart';
-import '../../../../design_system/typography.dart';
+import '../../../../design_system/design_system.dart';
 
 class SellerRegistrationScreen extends StatelessWidget {
   const SellerRegistrationScreen({Key? key}) : super(key: key);
@@ -15,9 +14,9 @@ class SellerRegistrationScreen extends StatelessWidget {
     return BlocProvider(
       create: (context) => ShoppingPageBlocM()..add(LoadCategorieDataM()),
       child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Devenir Vendeur', style: SDTypography.titleLarge),
-          backgroundColor: SDColors.secondary700,
+        backgroundColor: SDColors.white,
+        appBar: SDWhiteAppBar.appBar(
+          title: 'Devenir Vendeur',
         ),
         body: const _SellerRegistrationContent(),
       ),

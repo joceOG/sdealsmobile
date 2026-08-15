@@ -6,6 +6,7 @@ import '../locationpageblocm/locationPageEventM.dart';
 import '../locationpageblocm/locationPageStateM.dart';
 import '../../../../design_system/design_system.dart';
 
+/// Localisation — maquette Figma, sans adresses sauvegardées ni rayon inventés.
 class LocationPageScreenM extends StatefulWidget {
   const LocationPageScreenM({Key? key}) : super(key: key);
 
@@ -14,81 +15,119 @@ class LocationPageScreenM extends StatefulWidget {
 }
 
 class _LocationPageScreenMState extends State<LocationPageScreenM> {
+  static const double _hPad = 20;
   Set<Marker> _markers = {};
+  GoogleMapController? _mapController;
 
   @override
   void initState() {
     super.initState();
-    // Charger la position actuelle au démarrage
     context.read<LocationPageBlocM>().add(const GetCurrentLocationM());
   }
 
   @override
+  void dispose() {
+    _mapController?.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (context) => LocationPageBlocM(),
-      child: Scaffold(
-        appBar: SDWhiteAppBar.appBar(
-          title: 'Gestion de la localisation',
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.refresh_rounded),
-              onPressed: () {
-                context
-                    .read<LocationPageBlocM>()
-                    .add(const GetCurrentLocationM());
-              },
-            ),
-          ],
-        ),
-        body: BlocConsumer<LocationPageBlocM, LocationPageStateM>(
+    return Scaffold(
+      backgroundColor: SDColors.neutral50,
+      body: SafeArea(
+        child: BlocConsumer<LocationPageBlocM, LocationPageStateM>(
           listener: (context, state) {
-            if (state.error != null) {
+            if (state.error != null && state.error!.isNotEmpty) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text(state.error!, style: SDTypography.bodyMedium.copyWith(color: SDColors.white)),
+                  content: Text(
+                    state.error!,
+                    style: SDTypography.bodyMedium
+                        .copyWith(color: SDColors.white),
+                  ),
                   backgroundColor: SDColors.error500,
                 ),
               );
             }
+            _syncMarkers(state);
           },
           builder: (context, state) {
-            if (state.isLoading) {
-              return const Center(
-                child: CircularProgressIndicator(),
-              );
-            }
+            final placeLabel = _placeLabel(state);
 
-            return SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // En-tête avec statut
-                  _buildStatusCard(state),
-
-                  const SizedBox(height: 20),
-
-                  // Carte Google Maps
-                  if (state.isLocationAvailable) ...[
-                    _buildMapCard(state),
-                    const SizedBox(height: 20),
-                  ],
-
-                  // Informations de localisation
-                  _buildLocationInfoCard(state),
-
-                  const SizedBox(height: 20),
-
-                  // Actions de localisation
-                  _buildActionsCard(state),
-
-                  const SizedBox(height: 20),
-
-                  // Paramètres de localisation
-                  _buildSettingsCard(state),
+            return ListView(
+              padding: const EdgeInsets.only(bottom: 32),
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 4, _hPad, 0),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(
+                        Icons.arrow_back,
+                        color: SDColors.neutral900,
+                      ),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(_hPad, 4, _hPad, 8),
+                  child: Text(
+                    'Localisation',
+                    style: SDTypography.displayMedium.copyWith(
+                      color: SDColors.neutral900,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(_hPad, 0, _hPad, 16),
+                  child: Text(
+                    state.isLocationAvailable
+                        ? 'Votre position sert à afficher les services à proximité.'
+                        : 'Activez la localisation pour découvrir les services autour de vous.',
+                    style: SDTypography.bodyMedium
+                        .copyWith(color: SDColors.neutral600),
+                  ),
+                ),
+                if (state.isLoading)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 48),
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        color: SDColors.primary600,
+                      ),
+                    ),
+                  )
+                else ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: _hPad),
+                    child: _buildLocationCard(state, placeLabel),
+                  ),
+                  const SizedBox(height: 16),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: _hPad),
+                    child: _buildPermissionRow(state),
+                  ),
+                  const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: _hPad),
+                    child: TextButton.icon(
+                      onPressed: () {
+                        context
+                            .read<LocationPageBlocM>()
+                            .add(const GetCurrentLocationM());
+                      },
+                      icon: const Icon(Icons.my_location_outlined, size: 18),
+                      label: const Text('Actualiser ma position'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: SDColors.primary700,
+                      ),
+                    ),
+                  ),
                 ],
-              ),
+              ],
             );
           },
         ),
@@ -96,378 +135,191 @@ class _LocationPageScreenMState extends State<LocationPageScreenM> {
     );
   }
 
-  Widget _buildStatusCard(LocationPageStateM state) {
-    return Card(
-      color: state.isLocationAvailable
-          ? SDColors.success100
-          : SDColors.warning100,
-      elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium)),
-      child: Padding(
-        padding: EdgeInsets.all(SDSpacing.md),
-        child: Row(
-          children: [
-            Icon(
-              state.isLocationAvailable
-                  ? Icons.location_on
-                  : Icons.location_off,
-              color: state.isLocationAvailable ? SDColors.success600 : SDColors.warning600,
-              size: 32,
-            ),
-            SizedBox(width: SDSpacing.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    state.isLocationAvailable
-                        ? 'Localisation activée'
-                        : 'Localisation désactivée',
-                    style: SDTypography.titleMedium.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: state.isLocationAvailable
-                          ? SDColors.success600
-                          : SDColors.warning600,
-                    ),
-                  ),
-                  SizedBox(height: SDSpacing.xxs),
-                  Text(
-                    state.isLocationAvailable
-                        ? 'Votre position est partagée pour une meilleure expérience'
-                        : 'Activez la localisation pour découvrir les services à proximité',
-                    style: SDTypography.bodySmall.copyWith(color: SDColors.neutral600),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+  String _placeLabel(LocationPageStateM state) {
+    if (!state.isLocationAvailable) return 'Position indisponible';
+    final city = state.currentCity?.trim();
+    if (city != null && city.isNotEmpty) return city;
+    final address = state.address?.trim();
+    if (address != null && address.isNotEmpty) return address;
+    return 'Position actuelle';
   }
 
-  Widget _buildMapCard(LocationPageStateM state) {
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-        side: BorderSide(color: SDColors.neutral200),
+  Widget _buildLocationCard(LocationPageStateM state, String placeLabel) {
+    return Container(
+      decoration: BoxDecoration(
+        color: SDColors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: SDColors.neutral200),
       ),
-      child: Padding(
-        padding: EdgeInsets.all(SDSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          SizedBox(
+            height: 180,
+            width: double.infinity,
+            child: state.isLocationAvailable
+                ? GoogleMap(
+                    initialCameraPosition: CameraPosition(
+                      target: LatLng(state.latitude!, state.longitude!),
+                      zoom: 15,
+                    ),
+                    markers: _markers,
+                    onMapCreated: (controller) {
+                      _mapController = controller;
+                      _syncMarkers(state);
+                    },
+                    myLocationEnabled: true,
+                    myLocationButtonEnabled: false,
+                    zoomControlsEnabled: false,
+                    mapToolbarEnabled: false,
+                    compassEnabled: false,
+                  )
+                : Container(
+                    color: SDColors.neutral100,
+                    alignment: Alignment.center,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.location_off_outlined,
+                          size: 40,
+                          color: SDColors.neutral400,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Carte indisponible',
+                          style: SDTypography.bodyMedium.copyWith(
+                            color: SDColors.neutral500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+            child: Row(
               children: [
-                Icon(Icons.map, color: SDColors.primary600),
-                SizedBox(width: SDSpacing.xs),
-                Text(
-                  'Votre position actuelle',
-                  style: SDTypography.titleMedium.copyWith(
-                    fontWeight: FontWeight.bold,
+                const Icon(
+                  Icons.location_on,
+                  color: SDColors.primary600,
+                  size: 22,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        placeLabel,
+                        style: SDTypography.bodyLarge.copyWith(
+                          color: SDColors.neutral900,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Position actuelle',
+                        style: SDTypography.bodySmall.copyWith(
+                          color: SDColors.neutral500,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
-            SizedBox(height: SDSpacing.md),
-            Container(
-              height: 200,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-                border: Border.all(color: SDColors.primary200, width: 2),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-                child: GoogleMap(
-                  initialCameraPosition: CameraPosition(
-                    target: LatLng(state.latitude!, state.longitude!),
-                    zoom: 15.0,
-                  ),
-                  markers: _markers,
-                  onMapCreated: (GoogleMapController controller) {
-                    _updateMarkers(state);
+                Switch(
+                  value: state.isLocationEnabled,
+                  onChanged: (_) {
+                    context
+                        .read<LocationPageBlocM>()
+                        .add(const ToggleLocationServiceM());
                   },
-                  myLocationEnabled: true,
-                  myLocationButtonEnabled: true,
-                  zoomControlsEnabled: true,
-                  mapToolbarEnabled: false,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLocationInfoCard(LocationPageStateM state) {
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-        side: BorderSide(color: SDColors.neutral200),
-      ),
-      child: Padding(
-        padding: EdgeInsets.all(SDSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.info, color: SDColors.info500),
-                SizedBox(width: SDSpacing.xs),
-                Text(
-                  'Informations de localisation',
-                  style: SDTypography.titleMedium.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                  activeThumbColor: SDColors.white,
+                  activeTrackColor: SDColors.primary600,
+                  inactiveThumbColor: SDColors.white,
+                  inactiveTrackColor: SDColors.neutral300,
                 ),
               ],
             ),
-            SizedBox(height: SDSpacing.md),
-            if (state.isLocationAvailable) ...[
-              _buildInfoRow(
-                  'Adresse', state.address ?? 'Non disponible', Icons.home),
-              SizedBox(height: SDSpacing.xs),
-              _buildInfoRow('Ville', state.currentCity ?? 'Non disponible',
-                  Icons.location_city),
-              SizedBox(height: SDSpacing.xs),
-              _buildInfoRow(
-                  'Coordonnées',
-                  '${state.latitude?.toStringAsFixed(6)}, ${state.longitude?.toStringAsFixed(6)}',
-                  Icons.gps_fixed),
-            ] else ...[
-              Text(
-                'Activez la localisation pour voir vos informations de position',
-                style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral500),
-              ),
-            ],
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildInfoRow(String label, String value, IconData icon) {
-    return Row(
-      children: [
-        Icon(icon, color: SDColors.neutral500, size: 20),
-        SizedBox(width: SDSpacing.sm),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildPermissionRow(LocationPageStateM state) {
+    final enabled = state.isLocationAvailable || state.isLocationEnabled;
+    return Material(
+      color: SDColors.white,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: () {
+          context
+              .read<LocationPageBlocM>()
+              .add(const RequestLocationPermissionM());
+        },
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: SDColors.neutral200),
+          ),
+          child: Row(
             children: [
-              Text(
-                label,
-                style: SDTypography.labelSmall.copyWith(
-                  color: SDColors.neutral500,
-                  fontWeight: FontWeight.w500,
+              const Icon(
+                Icons.location_on_outlined,
+                color: SDColors.primary600,
+                size: 22,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Autorisation de localisation',
+                  style: SDTypography.bodyLarge.copyWith(
+                    color: SDColors.neutral900,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
               Text(
-                value,
-                style: SDTypography.bodyMedium.copyWith(
-                  fontWeight: FontWeight.w500,
+                enabled ? 'Activée' : 'Désactivée',
+                style: SDTypography.labelMedium.copyWith(
+                  color: enabled ? SDColors.primary700 : SDColors.neutral500,
+                  fontWeight: FontWeight.w600,
                 ),
+              ),
+              const SizedBox(width: 4),
+              const Icon(
+                Icons.chevron_right,
+                color: SDColors.neutral400,
+                size: 20,
               ),
             ],
           ),
         ),
-      ],
-    );
-  }
-
-  Widget _buildActionsCard(LocationPageStateM state) {
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-        side: BorderSide(color: SDColors.neutral200),
-      ),
-      child: Padding(
-        padding: EdgeInsets.all(SDSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.settings, color: SDColors.primary600),
-                SizedBox(width: SDSpacing.xs),
-                Text(
-                  'Actions de localisation',
-                  style: SDTypography.titleMedium.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: SDSpacing.md),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      context
-                          .read<LocationPageBlocM>()
-                          .add(const GetCurrentLocationM());
-                    },
-                    icon: const Icon(Icons.my_location),
-                    label: const Text('Ma position'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: SDColors.primary600,
-                      foregroundColor: SDColors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium)),
-                    ),
-                  ),
-                ),
-                SizedBox(width: SDSpacing.xs),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      context
-                          .read<LocationPageBlocM>()
-                          .add(const RequestLocationPermissionM());
-                    },
-                    icon: const Icon(Icons.security),
-                    label: const Text('Permissions'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: SDColors.info600,
-                      foregroundColor: SDColors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium)),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
       ),
     );
   }
 
-  Widget _buildSettingsCard(LocationPageStateM state) {
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-        side: BorderSide(color: SDColors.neutral200),
-      ),
-      child: Padding(
-        padding: EdgeInsets.all(SDSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.tune, color: SDColors.primary600),
-                SizedBox(width: SDSpacing.xs),
-                Text(
-                  'Paramètres de localisation',
-                  style: SDTypography.titleMedium.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: SDSpacing.md),
-            SwitchListTile(
-              title: const Text('Partager ma localisation'),
-              subtitle: const Text(
-                  'Permettre l\'accès à votre position pour les services'),
-              value: state.isLocationEnabled,
-              onChanged: (value) {
-                context
-                    .read<LocationPageBlocM>()
-                    .add(const ToggleLocationServiceM());
-              },
-              activeColor: SDColors.primary600,
-            ),
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.help_outline),
-              title: const Text('Pourquoi partager ma localisation ?'),
-              subtitle: const Text(
-                  'Découvrir les services à proximité, obtenir des recommandations personnalisées'),
-              onTap: () {
-                _showLocationHelpDialog();
-              },
-            ),
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.privacy_tip),
-              title: const Text('Confidentialité'),
-              subtitle: const Text(
-                  'Vos données de localisation sont sécurisées et privées'),
-              onTap: () {
-                _showPrivacyDialog();
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _updateMarkers(LocationPageStateM state) {
-    if (state.isLocationAvailable) {
-      setState(() {
-        _markers = {
-          Marker(
-            markerId: const MarkerId('user_location'),
-            position: LatLng(state.latitude!, state.longitude!),
-            infoWindow: const InfoWindow(
-              title: 'Votre position',
-              snippet: 'Position actuelle',
-            ),
-          ),
-        };
-      });
+  void _syncMarkers(LocationPageStateM state) {
+    if (!state.isLocationAvailable ||
+        state.latitude == null ||
+        state.longitude == null) {
+      return;
     }
-  }
-
-  void _showLocationHelpDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Pourquoi partager ma localisation ?'),
-        content: const Text(
-          '• Découvrir les services et prestataires à proximité\n'
-          '• Recevoir des recommandations personnalisées\n'
-          '• Calculer les distances et temps de trajet\n'
-          '• Améliorer votre expérience utilisateur\n\n'
-          'Vos données sont sécurisées et ne sont jamais partagées avec des tiers.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Compris'),
+    final target = LatLng(state.latitude!, state.longitude!);
+    setState(() {
+      _markers = {
+        Marker(
+          markerId: const MarkerId('current'),
+          position: target,
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            BitmapDescriptor.hueGreen,
           ),
-        ],
-      ),
-    );
-  }
-
-  void _showPrivacyDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confidentialité de la localisation'),
-        content: const Text(
-          '🔒 Vos données de localisation sont :\n\n'
-          '• Chiffrées et sécurisées\n'
-          '• Stockées localement sur votre appareil\n'
-          '• Utilisées uniquement pour améliorer votre expérience\n'
-          '• Jamais vendues ou partagées avec des tiers\n\n'
-          'Vous pouvez désactiver la localisation à tout moment.',
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Fermer'),
-          ),
-        ],
-      ),
-    );
+      };
+    });
+    _mapController?.animateCamera(CameraUpdate.newLatLng(target));
   }
 }

@@ -20,6 +20,7 @@ class SearchPageBlocM extends Bloc<SearchPageEventM, SearchPageStateM> {
     on<LoadHistory>(_onLoadHistory);
     on<AddToHistory>(_onAddToHistory);
     on<ClearHistory>(_onClearHistory);
+    on<RemoveFromHistory>(_onRemoveFromHistory);
     on<UpdateFilters>(_onUpdateFilters);
     
     // Legacy support
@@ -41,27 +42,32 @@ class SearchPageBlocM extends Bloc<SearchPageEventM, SearchPageStateM> {
     emit(state.copyWith(history: []));
   }
 
+  Future<void> _onRemoveFromHistory(
+    RemoveFromHistory event,
+    Emitter<SearchPageStateM> emit,
+  ) async {
+    await _localStorageService.removeFromHistory(event.query);
+    final history = await _localStorageService.getSearchHistory();
+    emit(state.copyWith(history: history));
+  }
+
   Future<void> _onFetchSuggestions(
     FetchSuggestions event,
     Emitter<SearchPageStateM> emit,
   ) async {
-    // Si vide ou trop court, on vide les suggestions API mais on garde l'historique dispo dans le state
-    if (event.query.isEmpty) {
+    // Si vide, on vide les suggestions API mais on garde l'historique
+    if (event.query.trim().isEmpty) {
       final history = await _localStorageService.getSearchHistory();
       emit(state.copyWith(suggestions: [], history: history));
       return;
     }
 
-    // Appel API seulement si > 2 caractères
-    if (event.query.length > 2) {
-      try {
-        final suggestions = await _apiClient.getSuggestions(event.query);
-        emit(state.copyWith(suggestions: suggestions));
-      } catch (e) {
-        print('Erreur suggestions: $e');
-        emit(state.copyWith(suggestions: []));
-      }
-    } else {
+    // Parité web : suggestions dès 1 caractère
+    try {
+      final suggestions = await _apiClient.getSuggestions(event.query.trim());
+      emit(state.copyWith(suggestions: suggestions));
+    } catch (e) {
+      print('Erreur suggestions: $e');
       emit(state.copyWith(suggestions: []));
     }
   }
@@ -93,6 +99,7 @@ class SearchPageBlocM extends Bloc<SearchPageEventM, SearchPageStateM> {
 
       emit(state.copyWith(
         isLoading: false,
+        hasSearched: true,
         services: results['services'] ?? [],
         articles: results['articles'] ?? [],
         freelances: results['freelances'] ?? [],
@@ -103,6 +110,7 @@ class SearchPageBlocM extends Bloc<SearchPageEventM, SearchPageStateM> {
     } catch (e) {
       emit(state.copyWith(
         isLoading: false,
+        hasSearched: true,
         error: "Erreur lors de la recherche: $e",
       ));
     }
@@ -118,7 +126,11 @@ class SearchPageBlocM extends Bloc<SearchPageEventM, SearchPageStateM> {
     // Ici, on met juste à jour l'état UI, l'event PerformGlobalSearch utilisera ces valeurs.
   }
 
-  void _onClearSearch(ClearSearch event, Emitter<SearchPageStateM> emit) {
-    emit(SearchPageStateM.initial());
+  Future<void> _onClearSearch(
+    ClearSearch event,
+    Emitter<SearchPageStateM> emit,
+  ) async {
+    final history = await _localStorageService.getSearchHistory();
+    emit(SearchPageStateM.initial().copyWith(history: history));
   }
 }

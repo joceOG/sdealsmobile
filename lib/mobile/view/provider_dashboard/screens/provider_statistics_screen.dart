@@ -5,8 +5,9 @@ import '../bloc/provider_statistics_bloc.dart';
 import '../bloc/provider_statistics_event.dart';
 import '../bloc/provider_statistics_state.dart';
 import '../../../../data/services/authCubit.dart';
+import '../../../../design_system/design_system.dart';
 
-// 📊 ÉCRAN STATISTIQUES PRESTATAIRE MAGNIFIQUE
+/// Statistiques prestataire — données réelles `/prestations/stats`.
 class ProviderStatisticsScreen extends StatefulWidget {
   final String? prestataireDocId;
   const ProviderStatisticsScreen({super.key, this.prestataireDocId});
@@ -17,22 +18,39 @@ class ProviderStatisticsScreen extends StatefulWidget {
 }
 
 class _ProviderStatisticsScreenState extends State<ProviderStatisticsScreen>
-    with TickerProviderStateMixin {
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   String? _prestataireId;
-  String _selectedPeriod = 'Mois';
+  final _money = NumberFormat('#,###', 'fr_FR');
+  static const _monthsFr = [
+    '',
+    'Jan',
+    'Fév',
+    'Mar',
+    'Avr',
+    'Mai',
+    'Juin',
+    'Juil',
+    'Aoû',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Déc',
+  ];
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
-
-    // Récupérer l'ID du prestataire (doc ID prioritaire)
+    _tabController = TabController(length: 3, vsync: this);
     final authState = context.read<AuthCubit>().state;
     if (authState is AuthAuthenticated) {
-      _prestataireId = widget.prestataireDocId ?? authState.utilisateur.idutilisateur;
+      _prestataireId =
+          widget.prestataireDocId ?? authState.utilisateur.idutilisateur;
+      context.read<ProviderStatisticsBloc>().setToken(authState.token);
       if (_prestataireId != null) {
-        context.read<ProviderStatisticsBloc>().add(LoadProviderStatistics(_prestataireId!));
+        context
+            .read<ProviderStatisticsBloc>()
+            .add(LoadProviderStatistics(_prestataireId!));
       }
     }
   }
@@ -47,16 +65,93 @@ class _ProviderStatisticsScreenState extends State<ProviderStatisticsScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[50],
-      appBar: _buildStatisticsAppBar(),
+      appBar: AppBar(
+        backgroundColor: SDColors.white,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
+        foregroundColor: SDColors.neutral900,
+        leading: IconButton(
+          onPressed: () => Navigator.pop(context),
+          icon: const Icon(Icons.arrow_back, color: SDColors.neutral900),
+        ),
+        title: Text(
+          'Mes Statistiques',
+          style: SDTypography.displayMedium.copyWith(
+            color: SDColors.neutral900,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        actions: [
+          IconButton(
+            onPressed: _showExportOptions,
+            icon: const Icon(Icons.download_outlined,
+                color: SDColors.neutral900),
+          ),
+          IconButton(
+            onPressed: _refreshStatistics,
+            icon: const Icon(Icons.refresh, color: SDColors.neutral900),
+          ),
+        ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(height: 1, color: SDColors.neutral200),
+        ),
+      ),
       body: BlocBuilder<ProviderStatisticsBloc, ProviderStatisticsState>(
         builder: (context, state) {
+          if (state is ProviderStatisticsLoading ||
+              state is ProviderStatisticsInitial) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (state is ProviderStatisticsError) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
+                    const SizedBox(height: 16),
+                    Text(state.message, textAlign: TextAlign.center),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: _refreshStatistics,
+                      child: const Text('Réessayer'),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+          if (state is! ProviderStatisticsLoaded) {
+            return const Center(child: Text('Aucune donnée'));
+          }
+
           return Column(
             children: [
-              _buildStatisticsHeader(state),
-              _buildPeriodSelector(),
-              _buildTabSelector(),
+              _buildHeader(state),
+              const SizedBox(height: 8),
+              TabBar(
+                controller: _tabController,
+                labelColor: SDColors.primary700,
+                unselectedLabelColor: SDColors.neutral500,
+                indicatorColor: SDColors.primary600,
+                tabs: const [
+                  Tab(text: 'Revenus'),
+                  Tab(text: 'Missions'),
+                  Tab(text: 'Villes'),
+                ],
+              ),
               Expanded(
-                child: _buildStatisticsContent(state),
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildRevenusTab(state),
+                    _buildMissionsTab(state),
+                    _buildVillesTab(state),
+                  ],
+                ),
               ),
             ],
           );
@@ -65,125 +160,54 @@ class _ProviderStatisticsScreenState extends State<ProviderStatisticsScreen>
     );
   }
 
-  // 🎨 APP BAR STATISTIQUES
-  PreferredSizeWidget _buildStatisticsAppBar() {
-    return AppBar(
-      backgroundColor: Colors.green.shade600,
-      elevation: 0,
-      leading: IconButton(
-        onPressed: () => Navigator.pop(context),
-        icon: Icon(Icons.arrow_back, color: Colors.white),
-      ),
-      title: Row(
-        children: [
-          Icon(Icons.analytics, color: Colors.white),
-          const SizedBox(width: 8),
-          Text(
-            'Mes Statistiques',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-      actions: [
-        IconButton(
-          onPressed: () => _showExportOptions(),
-          icon: Icon(Icons.download, color: Colors.white),
-        ),
-        const SizedBox(width: 8),
-      ],
-    );
-  }
+  Widget _buildHeader(ProviderStatisticsLoaded state) {
+    final revenue = _asDouble(state.revenus['total']);
+    final total = _asInt(state.missions['total'] ??
+        state.charts['totalPrestations']);
+    final note = _asDouble(state.missions['satisfaction']);
 
-  // 📊 EN-TÊTE DES STATISTIQUES
-  Widget _buildStatisticsHeader(ProviderStatisticsState state) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(24),
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            Colors.green.shade400,
-            Colors.green.shade600,
-            Colors.green.shade800,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.green.withOpacity(0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
+        color: SDColors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: SDColors.neutral200),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Titre et période
-          Row(
-            children: [
-              Icon(Icons.trending_up, color: Colors.white, size: 28),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Performance du mois',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(
-                      DateFormat('MMMM yyyy', 'fr').format(DateTime.now()),
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.9),
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.arrow_upward, color: Colors.white, size: 16),
-                    const SizedBox(width: 4),
-                    Text(
-                      '+15%',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+          Text(
+            'Vue d\'ensemble',
+            style: SDTypography.titleSmall.copyWith(
+              color: SDColors.neutral900,
+              fontWeight: FontWeight.w700,
+            ),
           ),
-          const SizedBox(height: 20),
-
-          // Statistiques principales
+          const SizedBox(height: 4),
+          Text(
+            'Données serveur (toutes périodes disponibles)',
+            style: SDTypography.bodySmall.copyWith(color: SDColors.neutral500),
+          ),
+          const SizedBox(height: 16),
           Row(
             children: [
-              _buildHeaderStat(
-                  'Revenus', '125K FCFA', Icons.monetization_on, Colors.amber),
-              _buildHeaderStat('Missions', '24', Icons.assignment, Colors.blue),
-              _buildHeaderStat('Note', '4.8/5', Icons.star, Colors.orange),
+              _headerStat(
+                'Revenus',
+                '${_money.format(revenue.round())} FCFA',
+                Icons.monetization_on_outlined,
+              ),
+              _headerStat(
+                'Prestations',
+                '$total',
+                Icons.assignment_outlined,
+              ),
+              _headerStat(
+                'Note',
+                note > 0 ? '${note.toStringAsFixed(1)}/5' : '—',
+                Icons.star_outline,
+              ),
             ],
           ),
         ],
@@ -191,1158 +215,412 @@ class _ProviderStatisticsScreenState extends State<ProviderStatisticsScreen>
     );
   }
 
-  // 📊 STATISTIQUE EN-TÊTE
-  Widget _buildHeaderStat(
-      String label, String value, IconData icon, Color color) {
+  Widget _headerStat(String label, String value, IconData icon) {
     return Expanded(
       child: Column(
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Icon(icon, color: Colors.white, size: 24),
-          ),
+          Icon(icon, color: SDColors.neutral700, size: 22),
           const SizedBox(height: 8),
           Text(
             value,
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
+            textAlign: TextAlign.center,
+            style: SDTypography.labelLarge.copyWith(
+              color: SDColors.neutral900,
+              fontWeight: FontWeight.w700,
             ),
           ),
           Text(
             label,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.9),
-              fontSize: 12,
-            ),
+            style:
+                SDTypography.labelSmall.copyWith(color: SDColors.neutral500),
           ),
         ],
       ),
     );
   }
 
-  // 📅 SÉLECTEUR DE PÉRIODE
-  Widget _buildPeriodSelector() {
-    return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(25),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _buildPeriodChip('Semaine', _selectedPeriod == 'Semaine'),
-          _buildPeriodChip('Mois', _selectedPeriod == 'Mois'),
-          _buildPeriodChip('Année', _selectedPeriod == 'Année'),
-        ],
-      ),
-    );
-  }
+  Widget _buildRevenusTab(ProviderStatisticsLoaded state) {
+    final revenue = _asDouble(state.revenus['total']);
+    final avg = _asDouble(state.revenus['averagePerMission']);
+    final mois = _listOf(state.charts['prestationsParMois']);
 
-  // 📅 CHIP DE PÉRIODE
-  Widget _buildPeriodChip(String period, bool selected) {
-    return GestureDetector(
-      onTap: () {
-        setState(() => _selectedPeriod = period);
-        _loadStatisticsForPeriod(period);
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: selected ? Colors.green.shade600 : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Text(
-          period,
-          style: TextStyle(
-            color: selected ? Colors.white : Colors.grey[600],
-            fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-          ),
-        ),
-      ),
-    );
-  }
-
-  // 📊 SÉLECTEUR D'ONGlets
-  Widget _buildTabSelector() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(25),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: TabBar(
-        controller: _tabController,
-        indicator: BoxDecoration(
-          color: Colors.green.shade600,
-          borderRadius: BorderRadius.circular(25),
-        ),
-        labelColor: Colors.white,
-        unselectedLabelColor: Colors.grey[600],
-        labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
-        tabs: const [
-          Tab(text: 'Revenus', icon: Icon(Icons.monetization_on, size: 16)),
-          Tab(text: 'Missions', icon: Icon(Icons.assignment, size: 16)),
-          Tab(text: 'Clients', icon: Icon(Icons.people, size: 16)),
-          Tab(text: 'Performance', icon: Icon(Icons.trending_up, size: 16)),
-        ],
-      ),
-    );
-  }
-
-  // 📊 CONTENU DES STATISTIQUES
-  Widget _buildStatisticsContent(ProviderStatisticsState state) {
-    if (state is ProviderStatisticsLoading) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
-    }
-
-    if (state is ProviderStatisticsError) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Row(
           children: [
-            Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
-            const SizedBox(height: 16),
-            Text(
-              'Erreur',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            Expanded(
+              child: _statCard(
+                'Revenus totaux',
+                '${_money.format(revenue.round())} FCFA',
+                Icons.account_balance_wallet,
+                SDColors.primary600,
+              ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              state.message,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey[600]),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () => _refreshStatistics(),
-              child: const Text('Réessayer'),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _statCard(
+                'Moyenne / mission',
+                '${_money.format(avg.round())} FCFA',
+                Icons.trending_up,
+                Colors.blue,
+              ),
             ),
           ],
         ),
-      );
-    }
-
-    return TabBarView(
-      controller: _tabController,
-      children: [
-        _buildRevenusTab(state),
-        _buildMissionsTab(state),
-        _buildClientsTab(state),
-        _buildPerformanceTab(state),
-      ],
-    );
-  }
-
-  // 💰 ONGLET REVENUS
-  Widget _buildRevenusTab(ProviderStatisticsState state) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          _buildRevenusCards(),
-          const SizedBox(height: 20),
-          _buildRevenusChart(),
-          const SizedBox(height: 20),
-          _buildRevenusBreakdown(),
-        ],
-      ),
-    );
-  }
-
-  // 💰 CARTES DE REVENUS
-  Widget _buildRevenusCards() {
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
-      childAspectRatio: 1.5,
-      crossAxisSpacing: 12,
-      mainAxisSpacing: 12,
-      children: [
-        _buildStatCard(
-          'Revenus totaux',
-          '125,000 FCFA',
-          '+15% vs mois dernier',
-          Icons.account_balance_wallet,
-          Colors.green,
-        ),
-        _buildStatCard(
-          'En attente',
-          '25,000 FCFA',
-          '3 paiements en cours',
-          Icons.pending,
-          Colors.orange,
-        ),
-        _buildStatCard(
-          'Moyenne/mission',
-          '5,200 FCFA',
-          '+8% cette semaine',
-          Icons.trending_up,
-          Colors.blue,
-        ),
-        _buildStatCard(
-          'Objectif',
-          '150,000 FCFA',
-          '83% atteint',
-          Icons.flag,
-          Colors.purple,
+        const SizedBox(height: 16),
+        _sectionCard(
+          title: 'Prestations par mois',
+          child: mois.isEmpty
+              ? _emptyChart('Aucune donnée mensuelle')
+              : _barList(
+                  mois.reversed.map((raw) {
+                    final m = Map<String, dynamic>.from(raw as Map);
+                    final id = m['_id'];
+                    final year = id is Map ? id['year'] : null;
+                    final month = id is Map ? _asInt(id['month']) : 0;
+                    final label = month >= 1 && month <= 12
+                        ? '${_monthsFr[month]} $year'
+                        : '$year-$month';
+                    return _BarItem(
+                      label: label,
+                      value: _asDouble(m['totalRevenu']),
+                      count: _asInt(m['count']),
+                      valueLabel:
+                          '${_money.format(_asDouble(m['totalRevenu']).round())} FCFA',
+                    );
+                  }).toList(),
+                ),
         ),
       ],
     );
   }
 
-  // 📈 GRAPHIQUE DES REVENUS
-  Widget _buildRevenusChart() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.show_chart, color: Colors.green.shade600, size: 24),
-              const SizedBox(width: 8),
-              Text(
-                'Évolution des revenus',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[800],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Container(
-            height: 200,
-            decoration: BoxDecoration(
-              color: Colors.grey[50],
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.bar_chart, size: 48, color: Colors.grey[400]),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Graphique en développement',
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget _buildMissionsTab(ProviderStatisticsLoaded state) {
+    final total = _asInt(state.missions['total']);
+    final completed = _asInt(state.missions['completed']);
+    final ongoing = _asInt(state.missions['ongoing']);
+    final rate = _asDouble(state.missions['successRate']);
+    final parStatut = _listOf(state.charts['statsParStatut']);
+    final mois = _listOf(state.charts['prestationsParMois']);
 
-  // 💰 DÉTAIL DES REVENUS
-  Widget _buildRevenusBreakdown() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.pie_chart, color: Colors.green.shade600, size: 24),
-              const SizedBox(width: 8),
-              Text(
-                'Répartition des revenus',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[800],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _buildBreakdownItem('Plomberie', '45,000 FCFA', 0.36, Colors.blue),
-          _buildBreakdownItem(
-              'Électricité', '35,000 FCFA', 0.28, Colors.orange),
-          _buildBreakdownItem('Peinture', '25,000 FCFA', 0.20, Colors.purple),
-          _buildBreakdownItem('Autres', '20,000 FCFA', 0.16, Colors.green),
-        ],
-      ),
-    );
-  }
-
-  // 📊 ÉLÉMENT DE RÉPARTITION
-  Widget _buildBreakdownItem(
-      String category, String amount, double percentage, Color color) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 12,
-                height: 12,
-                decoration: BoxDecoration(
-                  color: color,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  category,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey[800],
-                  ),
-                ),
-              ),
-              Text(
-                amount,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[800],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          LinearProgressIndicator(
-            value: percentage,
-            backgroundColor: Colors.grey[200],
-            valueColor: AlwaysStoppedAnimation<Color>(color),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 📋 ONGLET MISSIONS
-  Widget _buildMissionsTab(ProviderStatisticsState state) {
-    return SingleChildScrollView(
+    return ListView(
       padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          _buildMissionsCards(),
-          const SizedBox(height: 20),
-          _buildMissionsChart(),
-          const SizedBox(height: 20),
-          _buildMissionsTimeline(),
-        ],
-      ),
-    );
-  }
-
-  // 📋 CARTES DE MISSIONS
-  Widget _buildMissionsCards() {
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
-      childAspectRatio: 1.5,
-      crossAxisSpacing: 12,
-      mainAxisSpacing: 12,
       children: [
-        _buildStatCard(
-          'Total missions',
-          '24',
-          '+3 cette semaine',
-          Icons.assignment,
-          Colors.blue,
+        Row(
+          children: [
+            Expanded(
+              child: _statCard(
+                'Total',
+                '$total',
+                Icons.assignment,
+                Colors.blue,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _statCard(
+                'Terminées',
+                '$completed',
+                Icons.check_circle,
+                SDColors.primary600,
+              ),
+            ),
+          ],
         ),
-        _buildStatCard(
-          'Taux de réussite',
-          '96%',
-          '+2% ce mois',
-          Icons.check_circle,
-          Colors.green,
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _statCard(
+                'En cours / acceptées',
+                '$ongoing',
+                Icons.timelapse,
+                Colors.orange,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _statCard(
+                'Taux terminées',
+                '${(rate * 100).toStringAsFixed(0)}%',
+                Icons.pie_chart,
+                Colors.purple,
+              ),
+            ),
+          ],
         ),
-        _buildStatCard(
-          'Temps moyen',
-          '2.5h',
-          'Par mission',
-          Icons.timer,
-          Colors.orange,
+        const SizedBox(height: 16),
+        _sectionCard(
+          title: 'Répartition par statut',
+          child: parStatut.isEmpty
+              ? _emptyChart('Aucun statut disponible')
+              : _barList(
+                  parStatut.map((raw) {
+                    final m = Map<String, dynamic>.from(raw as Map);
+                    final count = _asInt(m['count']);
+                    return _BarItem(
+                      label: '${m['_id'] ?? '—'}',
+                      value: count.toDouble(),
+                      count: count,
+                      valueLabel: '$count',
+                    );
+                  }).toList(),
+                ),
         ),
-        _buildStatCard(
-          'Satisfaction',
-          '4.8/5',
-          'Note moyenne',
-          Icons.star,
-          Colors.purple,
+        const SizedBox(height: 16),
+        _sectionCard(
+          title: 'Volume par mois',
+          child: mois.isEmpty
+              ? _emptyChart('Aucune donnée mensuelle')
+              : _barList(
+                  mois.reversed.map((raw) {
+                    final m = Map<String, dynamic>.from(raw as Map);
+                    final id = m['_id'];
+                    final year = id is Map ? id['year'] : null;
+                    final month = id is Map ? _asInt(id['month']) : 0;
+                    final label = month >= 1 && month <= 12
+                        ? '${_monthsFr[month]} $year'
+                        : '$year-$month';
+                    final count = _asInt(m['count']);
+                    return _BarItem(
+                      label: label,
+                      value: count.toDouble(),
+                      count: count,
+                      valueLabel: '$count',
+                    );
+                  }).toList(),
+                ),
         ),
       ],
     );
   }
 
-  // 📈 GRAPHIQUE DES MISSIONS
-  Widget _buildMissionsChart() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.timeline, color: Colors.green.shade600, size: 24),
-              const SizedBox(width: 8),
-              Text(
-                'Évolution des missions',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[800],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Container(
-            height: 200,
-            decoration: BoxDecoration(
-              color: Colors.grey[50],
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.timeline, size: 48, color: Colors.grey[400]),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Graphique en développement',
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 📅 TIMELINE DES MISSIONS
-  Widget _buildMissionsTimeline() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.history, color: Colors.green.shade600, size: 24),
-              const SizedBox(width: 8),
-              Text(
-                'Activité récente',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[800],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _buildTimelineItem(
-            'Mission terminée',
-            'Réparation plomberie - Client Marie',
-            'Il y a 2 heures',
-            Icons.check_circle,
-            Colors.green,
-          ),
-          _buildTimelineItem(
-            'Nouvelle mission',
-            'Installation électrique - Client Paul',
-            'Il y a 4 heures',
-            Icons.assignment,
-            Colors.blue,
-          ),
-          _buildTimelineItem(
-            'Avis reçu',
-            '5 étoiles - Excellent travail !',
-            'Il y a 1 jour',
-            Icons.star,
-            Colors.amber,
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 📅 ÉLÉMENT DE TIMELINE
-  Widget _buildTimelineItem(String title, String description, String time,
-      IconData icon, Color color) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Icon(icon, color: color, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey[800],
-                  ),
-                ),
-                Text(
-                  description,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                  ),
-                ),
-                Text(
-                  time,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Colors.grey[500],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 👥 ONGLET CLIENTS
-  Widget _buildClientsTab(ProviderStatisticsState state) {
-    return SingleChildScrollView(
+  Widget _buildVillesTab(ProviderStatisticsLoaded state) {
+    final villes = _listOf(state.charts['statsParVille']);
+    return ListView(
       padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          _buildClientsCards(),
-          const SizedBox(height: 20),
-          _buildClientsChart(),
-          const SizedBox(height: 20),
-          _buildTopClients(),
-        ],
-      ),
-    );
-  }
-
-  // 👥 CARTES DE CLIENTS
-  Widget _buildClientsCards() {
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
-      childAspectRatio: 1.5,
-      crossAxisSpacing: 12,
-      mainAxisSpacing: 12,
       children: [
-        _buildStatCard(
-          'Clients totaux',
-          '18',
-          '+2 ce mois',
-          Icons.people,
-          Colors.blue,
-        ),
-        _buildStatCard(
-          'Clients fidèles',
-          '12',
-          '67% du total',
-          Icons.favorite,
-          Colors.red,
-        ),
-        _buildStatCard(
-          'Nouveaux clients',
-          '6',
-          'Ce mois',
-          Icons.person_add,
-          Colors.green,
-        ),
-        _buildStatCard(
-          'Satisfaction',
-          '4.8/5',
-          'Note moyenne',
-          Icons.star,
-          Colors.amber,
+        _sectionCard(
+          title: 'Prestations par ville',
+          child: villes.isEmpty
+              ? _emptyChart('Aucune donnée par ville')
+              : _barList(
+                  villes.map((raw) {
+                    final m = Map<String, dynamic>.from(raw as Map);
+                    final count = _asInt(m['count']);
+                    final revenu = _asDouble(m['totalRevenu']);
+                    return _BarItem(
+                      label: (m['_id']?.toString().isNotEmpty == true)
+                          ? m['_id'].toString()
+                          : 'Non renseignée',
+                      value: count.toDouble(),
+                      count: count,
+                      valueLabel:
+                          '$count · ${_money.format(revenu.round())} FCFA',
+                    );
+                  }).toList(),
+                ),
         ),
       ],
     );
   }
 
-  // 📈 GRAPHIQUE DES CLIENTS
-  Widget _buildClientsChart() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.people_alt, color: Colors.green.shade600, size: 24),
-              const SizedBox(width: 8),
-              Text(
-                'Évolution des clients',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[800],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Container(
-            height: 200,
-            decoration: BoxDecoration(
-              color: Colors.grey[50],
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.people, size: 48, color: Colors.grey[400]),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Graphique en développement',
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 🏆 TOP CLIENTS
-  Widget _buildTopClients() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.emoji_events, color: Colors.green.shade600, size: 24),
-              const SizedBox(width: 8),
-              Text(
-                'Top clients',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[800],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _buildClientItem('Marie K.', '4 missions', '45,000 FCFA', 1),
-          _buildClientItem('Paul M.', '3 missions', '35,000 FCFA', 2),
-          _buildClientItem('Ahmed T.', '2 missions', '25,000 FCFA', 3),
-        ],
-      ),
-    );
-  }
-
-  // 👤 ÉLÉMENT DE CLIENT
-  Widget _buildClientItem(
-      String name, String missions, String amount, int rank) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        children: [
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: rank == 1
-                  ? Colors.amber
-                  : rank == 2
-                      ? Colors.grey[400]
-                      : Colors.orange[300],
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Center(
-              child: Text(
-                '$rank',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey[800],
-                  ),
-                ),
-                Text(
-                  missions,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Text(
-            amount,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: Colors.green.shade600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 📈 ONGLET PERFORMANCE
-  Widget _buildPerformanceTab(ProviderStatisticsState state) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          _buildPerformanceCards(),
-          const SizedBox(height: 20),
-          _buildPerformanceChart(),
-          const SizedBox(height: 20),
-          _buildAchievements(),
-        ],
-      ),
-    );
-  }
-
-  // 📈 CARTES DE PERFORMANCE
-  Widget _buildPerformanceCards() {
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
-      childAspectRatio: 1.5,
-      crossAxisSpacing: 12,
-      mainAxisSpacing: 12,
-      children: [
-        _buildStatCard(
-          'Efficacité',
-          '92%',
-          '+5% ce mois',
-          Icons.speed,
-          Colors.blue,
-        ),
-        _buildStatCard(
-          'Ponctualité',
-          '98%',
-          '+2% ce mois',
-          Icons.schedule,
-          Colors.green,
-        ),
-        _buildStatCard(
-          'Qualité',
-          '4.8/5',
-          'Note moyenne',
-          Icons.star,
-          Colors.amber,
-        ),
-        _buildStatCard(
-          'Disponibilité',
-          '95%',
-          'Temps de réponse',
-          Icons.access_time,
-          Colors.purple,
-        ),
-      ],
-    );
-  }
-
-  // 📈 GRAPHIQUE DE PERFORMANCE
-  Widget _buildPerformanceChart() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.trending_up, color: Colors.green.shade600, size: 24),
-              const SizedBox(width: 8),
-              Text(
-                'Évolution de la performance',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[800],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Container(
-            height: 200,
-            decoration: BoxDecoration(
-              color: Colors.grey[50],
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.trending_up, size: 48, color: Colors.grey[400]),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Graphique en développement',
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 🏆 RÉCOMPENSES
-  Widget _buildAchievements() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.emoji_events, color: Colors.green.shade600, size: 24),
-              const SizedBox(width: 8),
-              Text(
-                'Récompenses',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[800],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              _buildAchievementBadge('Expert', Icons.star, Colors.amber),
-              _buildAchievementBadge('Fiable', Icons.verified, Colors.green),
-              _buildAchievementBadge('Rapide', Icons.speed, Colors.blue),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 🏅 BADGE DE RÉCOMPENSE
-  Widget _buildAchievementBadge(String title, IconData icon, Color color) {
-    return Container(
-      margin: const EdgeInsets.only(right: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(height: 4),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 📊 CARTE DE STATISTIQUE
-  Widget _buildStatCard(
-    String title,
-    String value,
-    String subtitle,
-    IconData icon,
-    Color color,
-  ) {
+  Widget _statCard(String title, String value, IconData icon, Color color) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: SDColors.neutral200),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(icon, color: color, size: 20),
-              ),
-              const Spacer(),
-              Icon(Icons.more_vert, color: Colors.grey[400], size: 20),
-            ],
-          ),
-          const SizedBox(height: 12),
+          Icon(icon, color: color, size: 22),
+          const SizedBox(height: 10),
           Text(
             value,
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey[800],
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             title,
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[600],
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            subtitle,
-            style: TextStyle(
-              fontSize: 12,
-              color: color,
-              fontWeight: FontWeight.w500,
-            ),
+            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
           ),
         ],
       ),
     );
   }
 
-  // 🔧 MÉTHODES UTILITAIRES
-
-  void _refreshStatistics() {
-    if (_prestataireId != null) {
-      context
-          .read<ProviderStatisticsBloc>()
-          .add(LoadProviderStatistics(_prestataireId!));
-    }
+  Widget _sectionCard({required String title, required Widget child}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: SDColors.neutral200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 14),
+          child,
+        ],
+      ),
+    );
   }
 
-  void _loadStatisticsForPeriod(String period) {
-    // TODO: Charger les statistiques pour la période sélectionnée
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Chargement des statistiques pour $period')),
+  Widget _emptyChart(String message) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 24),
+      child: Center(
+        child: Text(
+          message,
+          style: TextStyle(color: Colors.grey[600]),
+        ),
+      ),
     );
+  }
+
+  Widget _barList(List<_BarItem> items) {
+    final maxV = items.fold<double>(
+      1,
+      (a, b) => a > b.value ? a : (b.value > 0 ? b.value : a),
+    );
+    return Column(
+      children: items.map((item) {
+        final ratio = (item.value / maxV).clamp(0.0, 1.0);
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      item.label,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    item.valueLabel,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[700],
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: LinearProgressIndicator(
+                  value: ratio,
+                  minHeight: 8,
+                  backgroundColor: Colors.grey[200],
+                  valueColor:
+                      const AlwaysStoppedAnimation<Color>(SDColors.primary600),
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  void _refreshStatistics() {
+    if (_prestataireId == null) return;
+    final auth = context.read<AuthCubit>().state;
+    if (auth is AuthAuthenticated) {
+      context.read<ProviderStatisticsBloc>().setToken(auth.token);
+    }
+    context
+        .read<ProviderStatisticsBloc>()
+        .add(LoadProviderStatistics(_prestataireId!));
   }
 
   void _showExportOptions() {
     showModalBottomSheet(
       context: context,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: Icon(Icons.picture_as_pdf, color: Colors.red),
-              title: const Text('Exporter en PDF'),
-              onTap: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content: Text('Export PDF - En développement')),
-                );
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.table_chart, color: Colors.blue),
-              title: const Text('Exporter en Excel'),
-              onTap: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content: Text('Export Excel - En développement')),
-                );
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.share, color: Colors.green),
-              title: const Text('Partager'),
-              onTap: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Partage - En développement')),
-                );
-              },
-            ),
-          ],
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.picture_as_pdf, color: Colors.red),
+                title: const Text('Exporter en PDF'),
+                onTap: () {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(this.context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Export PDF — non disponible'),
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.table_chart, color: Colors.blue),
+                title: const Text('Exporter en Excel'),
+                onTap: () {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(this.context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Export Excel — non disponible'),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
+
+  List<dynamic> _listOf(dynamic v) {
+    if (v is List) return v;
+    return const [];
+  }
+
+  int _asInt(dynamic v, {int fallback = 0}) {
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    return int.tryParse('$v') ?? fallback;
+  }
+
+  double _asDouble(dynamic v, {double fallback = 0}) {
+    if (v is num) return v.toDouble();
+    return double.tryParse('$v') ?? fallback;
+  }
+}
+
+class _BarItem {
+  final String label;
+  final double value;
+  final int count;
+  final String valueLabel;
+
+  _BarItem({
+    required this.label,
+    required this.value,
+    required this.count,
+    required this.valueLabel,
+  });
 }

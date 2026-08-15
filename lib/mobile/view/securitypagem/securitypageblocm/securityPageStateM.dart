@@ -178,6 +178,16 @@ class LoginHistoryClearedStateM extends SecurityPageStateM {
   LoginHistoryClearedStateM({required this.message});
 }
 
+class SecurityDataExportedStateM extends SecurityPageStateM {
+  final Map<String, dynamic> data;
+  final String message;
+
+  SecurityDataExportedStateM({
+    required this.data,
+    required this.message,
+  });
+}
+
 // 🔍 ÉTATS POUR LA RECHERCHE
 class SecurityAlertsFilteredStateM extends SecurityPageStateM {
   final List<SecurityAlert> filteredAlerts;

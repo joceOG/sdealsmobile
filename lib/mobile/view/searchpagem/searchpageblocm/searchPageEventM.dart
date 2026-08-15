@@ -46,6 +46,15 @@ class AddToHistory extends SearchPageEventM {
 // 🟢 Effacer l'historique
 class ClearHistory extends SearchPageEventM {}
 
+// 🟢 Supprimer une entrée d'historique
+class RemoveFromHistory extends SearchPageEventM {
+  final String query;
+  const RemoveFromHistory(this.query);
+
+  @override
+  List<Object> get props => [query];
+}
+
 // 🟢 Mettre à jour les filtres (sans lancer la recherche)
 class UpdateFilters extends SearchPageEventM {
   final double? minPrice;

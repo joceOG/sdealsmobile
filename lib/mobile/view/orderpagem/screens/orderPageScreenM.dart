@@ -377,20 +377,22 @@ class _OrderPageScreenMState extends State<OrderPageScreenM>
   }
 
   void _navigateToDetails(CommandeModel commande) {
+    final bloc = context.read<CommandeBloc>();
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => CommandeDetailsScreen(commande: commande),
+        builder: (_) => BlocProvider.value(
+          value: bloc,
+          child: CommandeDetailsScreen(commande: commande),
+        ),
       ),
     );
   }
 
   void _openChat(CommandeModel commande) {
-    // Cette fonction serait implémentée pour ouvrir le chat
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Chat avec ${commande.prestataireName} ouvert'),
-        backgroundColor: SDColors.success500,
+      const SnackBar(
+        content: Text('Ouvrez Messages pour contacter le vendeur.'),
       ),
     );
   }

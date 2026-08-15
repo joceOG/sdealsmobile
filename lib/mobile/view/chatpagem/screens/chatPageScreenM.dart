@@ -126,6 +126,184 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
     return '${t.day} ${months[t.month - 1]}';
   }
 
+  /// Photo réseau / asset si dispo, sinon avatar initiales.
+  Widget _buildConversationAvatar(ConversationModel conversation) {
+    final img = conversation.participantImage.trim();
+    final hasNetwork = img.startsWith('http');
+    final hasAsset = img.startsWith('assets/') &&
+        img.isNotEmpty &&
+        img != 'assets/profil.png';
+    final initial = conversation.participantName.trim().isNotEmpty
+        ? conversation.participantName.trim()[0].toUpperCase()
+        : '?';
+
+    Widget initialsAvatar() {
+      return CircleAvatar(
+        radius: 26,
+        backgroundColor: SDColors.neutral200,
+        child: Text(
+          initial,
+          style: SDTypography.titleSmall.copyWith(
+            color: SDColors.neutral900,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      );
+    }
+
+    Widget avatar;
+    if (hasNetwork) {
+      avatar = ClipOval(
+        child: Image.network(
+          img,
+          width: 52,
+          height: 52,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => initialsAvatar(),
+        ),
+      );
+    } else if (hasAsset) {
+      avatar = CircleAvatar(
+        radius: 26,
+        backgroundColor: SDColors.neutral200,
+        backgroundImage: AssetImage(img),
+      );
+    } else {
+      avatar = initialsAvatar();
+    }
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        avatar,
+        if (conversation.isOnline)
+          Positioned(
+            right: 0,
+            bottom: 0,
+            child: Container(
+              width: 12,
+              height: 12,
+              decoration: BoxDecoration(
+                color: SDColors.success500,
+                shape: BoxShape.circle,
+                border: Border.all(color: SDColors.white, width: 2),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildInboxConversationRow(
+    ConversationModel conversation, {
+    required bool isSelected,
+  }) {
+    final snippet = conversation.lastMessage?.content.trim().isNotEmpty == true
+        ? conversation.lastMessage!.content
+        : 'Aucun message';
+
+    return InkWell(
+      onTap: () => _chatBloc.add(SelectConversation(conversation)),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+        decoration: BoxDecoration(
+          color: isSelected ? SDColors.neutral100 : null,
+          border: const Border(
+            bottom: BorderSide(color: SDColors.neutral200, width: 1),
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildConversationAvatar(conversation),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          conversation.participantName,
+                          style: SDTypography.titleSmall.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: SDColors.neutral900,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            _formatListRowTime(conversation.lastUpdated),
+                            style: SDTypography.labelSmall.copyWith(
+                              color: SDColors.neutral500,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          if (conversation.unreadCount > 0) ...[
+                            const SizedBox(height: 6),
+                            Container(
+                              constraints: const BoxConstraints(
+                                minWidth: 20,
+                                minHeight: 20,
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: const BoxDecoration(
+                                color: SDColors.neutral900,
+                                shape: BoxShape.circle,
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                '${conversation.unreadCount}',
+                                style: SDTypography.labelSmall.copyWith(
+                                  color: SDColors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    conversation.typeText,
+                    style: SDTypography.bodyMedium.copyWith(
+                      color: SDColors.neutral800,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    snippet,
+                    style: SDTypography.bodySmall.copyWith(
+                      color: SDColors.neutral500,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   bool _matchesInboxFilter(ConversationType type, _MessagesInboxFilter f) {
     switch (f) {
       case _MessagesInboxFilter.tous:
@@ -282,7 +460,7 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
     );
   }
 
-  /// Même ligne titre + action à droite que Freelance / Marketplace (`_buildTopHeader`).
+  /// Titre page aligné comme Profil (gauche, gros).
   Widget _buildMessagesTopHeader() {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -293,9 +471,9 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
             textAlign: TextAlign.start,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: SDTypography.headlineSmall.copyWith(
+            style: SDTypography.displayMedium.copyWith(
               color: SDColors.neutral900,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ),
@@ -316,71 +494,58 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
     );
   }
 
-  /// Gabarit identique à `FreelancePageScreen._buildSearchField` : pill blanche,
-  /// bordure `primary100`, ombre, loupe + zone centrale + bouton **tune** vert.
-  /// La zone centrale est un [TextField] pour filtrer la liste localement.
-  Widget _buildFreelanceStyleInboxSearch(BuildContext context) {
-    void openGlobalSearch() {
-      Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => const SearchPageScreenM(initialIndex: 0),
-        ),
-      );
-    }
-
+  /// Même design que `ExplorerPageScreen._buildSearchRow` (pill claire, contour noir).
+  Widget _buildExplorerStyleInboxSearch(BuildContext context) {
     return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: SDSpacing.sm,
-        vertical: SDSpacing.xs,
-      ),
+      height: 48,
+      padding: const EdgeInsets.only(left: 14, right: 10),
       decoration: BoxDecoration(
-        color: SDColors.white,
+        color: SDColors.neutral100,
         borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: SDColors.primary100, width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: SDColors.neutral900.withOpacity(0.05),
-            blurRadius: 6,
-            offset: const Offset(0, 1),
-          ),
-        ],
+        border: Border.all(color: SDColors.neutral900, width: 1),
       ),
       child: Row(
         children: [
-          Icon(Icons.search, color: SDColors.primary600, size: 20),
+          Icon(Icons.search, color: SDColors.neutral700, size: 22),
           SizedBox(width: SDSpacing.xs),
           Expanded(
             child: TextField(
               controller: _listSearchController,
               onChanged: (_) => setState(() {}),
               textInputAction: TextInputAction.search,
+              cursorColor: SDColors.neutral900,
               decoration: InputDecoration(
                 hintText: 'Rechercher une conversation…',
                 hintStyle: SDTypography.bodyMedium.copyWith(
-                  color: SDColors.neutral400,
-                  fontSize: 13,
+                  color: SDColors.neutral500,
+                  fontSize: 14,
                 ),
-                border: InputBorder.none,
+                filled: false,
                 isDense: true,
                 contentPadding: EdgeInsets.zero,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                disabledBorder: InputBorder.none,
+                errorBorder: InputBorder.none,
+                focusedErrorBorder: InputBorder.none,
               ),
               style: SDTypography.bodyMedium.copyWith(
+                fontSize: 14,
                 color: SDColors.neutral900,
-                fontSize: 13,
               ),
             ),
           ),
-          GestureDetector(
-            onTap: openGlobalSearch,
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: SDColors.primary600,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(Icons.tune, color: SDColors.white, size: 17),
+          IconButton(
+            onPressed: () => FocusScope.of(context).unfocus(),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+            icon: const Icon(
+              Icons.arrow_forward,
+              color: SDColors.neutral900,
+              size: 22,
             ),
+            tooltip: 'Rechercher',
           ),
         ],
       ),
@@ -446,7 +611,7 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      padding: EdgeInsets.fromLTRB(SDSpacing.md, 0, SDSpacing.md, SDSpacing.sm),
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
       child: Row(
         children: [
           chip(
@@ -631,118 +796,108 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
 
   // 🔐 Écran affiché quand l'utilisateur n'est pas connecté
   Widget _buildNotAuthenticatedScreen(BuildContext context) {
+    const hPad = 20.0;
     return Scaffold(
       backgroundColor: SDColors.white,
-      appBar: SDAppBarIconThemed(
-        style: SDAppBarIconStyles.onLightSurface,
-        bar: AppBar(
-        backgroundColor: SDColors.white,
-        elevation: 0,
-        title: Text(
-          'Messages',
-          style: SDTypography.titleLarge.copyWith(
-            color: SDColors.neutral900,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        ),
-      ),
       body: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Illustration
-                Container(
-                  width: 120,
-                  height: 120,
-                  decoration: BoxDecoration(
-                    color: SDColors.primary50,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.forum_outlined,
-                    size: 56,
-                    color: SDColors.primary600,
-                  ),
+        child: ListView(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(hPad, 12, hPad, 8),
+              child: Text(
+                'Messages',
+                style: SDTypography.displayMedium.copyWith(
+                  color: SDColors.neutral900,
+                  fontWeight: FontWeight.w700,
                 ),
-                const SizedBox(height: 28),
-                Text(
-                  'Pas encore de messages',
-                  style: SDTypography.titleLarge.copyWith(
-                    color: SDColors.neutral900,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 22,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Connectez-vous à votre compte ou créez-en un pour discuter avec des prestataires, vendeurs et freelances.',
-                  style: SDTypography.bodyMedium.copyWith(
-                    color: SDColors.neutral500,
-                    height: 1.5,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 36),
-                // Bouton Se connecter
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () => context.push('/login'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: SDColors.primary600,
-                      foregroundColor: SDColors.white,
-                      padding: EdgeInsets.symmetric(
-                        horizontal: SDSpacing.lg,
-                        vertical: SDSpacing.sm,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: Text(
-                      'Se connecter',
-                      style: SDTypography.labelMedium.copyWith(
-                        color: SDColors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-                SizedBox(height: SDSpacing.sm),
-                // Bouton Créer un compte
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton(
-                    onPressed: () => context.push('/register'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: SDColors.primary700,
-                      side: const BorderSide(color: SDColors.primary600, width: 1.5),
-                      padding: EdgeInsets.symmetric(
-                        horizontal: SDSpacing.lg,
-                        vertical: SDSpacing.sm,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-                      ),
-                    ),
-                    child: Text(
-                      'Créer un compte',
-                      style: SDTypography.labelMedium.copyWith(
-                        color: SDColors.primary700,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(hPad, 24, hPad, 32),
+              child: Column(
+                children: [
+                  Container(
+                    width: 120,
+                    height: 120,
+                    decoration: const BoxDecoration(
+                      color: SDColors.primary50,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.forum_outlined,
+                      size: 56,
+                      color: SDColors.primary600,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Pas encore de messages',
+                    style: SDTypography.titleMedium.copyWith(
+                      color: SDColors.neutral900,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Connectez-vous pour discuter avec des prestataires, vendeurs et freelances.',
+                    style: SDTypography.bodyMedium.copyWith(
+                      color: SDColors.neutral600,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => context.push('/login'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: SDColors.primary600,
+                        foregroundColor: SDColors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: Text(
+                        'Se connecter',
+                        style: SDTypography.labelLarge.copyWith(
+                          color: SDColors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: () => context.push('/register'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: SDColors.primary700,
+                        side: const BorderSide(
+                          color: SDColors.primary600,
+                          width: 1.2,
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: Text(
+                        'Créer un compte',
+                        style: SDTypography.labelLarge.copyWith(
+                          color: SDColors.primary700,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -808,18 +963,13 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
             children: [
               if (showConversationList) ...[
                 Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    SDSpacing.md,
-                    SDSpacing.sm,
-                    SDSpacing.md,
-                    0,
-                  ),
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       _buildMessagesTopHeader(),
                       SizedBox(height: SDSpacing.md),
-                      _buildFreelanceStyleInboxSearch(context),
+                      _buildExplorerStyleInboxSearch(context),
                     ],
                   ),
                 ),
@@ -895,233 +1045,16 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
                                                 itemBuilder: (context, index) {
                                                   final conversation =
                                                       filtered[index];
-                                                  final bool isSelected = state
+                                                  final isSelected = state
                                                           .selectedConversation
                                                           ?.id ==
                                                       conversation.id;
-                                                  final snippet = conversation
-                                                              .lastMessage !=
-                                                          null
-                                                      ? conversation
-                                                          .lastMessage!.content
-                                                      : 'Aucun message';
-                                                  final preview =
-                                                      '${_getInboxCategoryLabel(conversation.type)} : $snippet';
-                                                  final initial = conversation
-                                                          .participantName
-                                                          .trim()
-                                                          .isNotEmpty
-                                                      ? conversation
-                                                          .participantName
-                                                          .trim()[0]
-                                                          .toUpperCase()
-                                                      : '?';
-
-                                                  return InkWell(
-                                                onTap: () {
-                                                  _chatBloc.add(
-                                                      SelectConversation(
-                                                          conversation));
+                                                  return _buildInboxConversationRow(
+                                                    conversation,
+                                                    isSelected: isSelected,
+                                                  );
                                                 },
-                                                child: Container(
-                                                  padding: EdgeInsets
-                                                      .symmetric(
-                                                      vertical: SDSpacing.sm,
-                                                      horizontal: SDSpacing.sm),
-                                                  decoration: BoxDecoration(
-                                                    color: isSelected
-                                                        ? SDColors.primary600
-                                                            .withOpacity(0.08)
-                                                        : null,
-                                                    border: Border(
-                                                      bottom: BorderSide(
-                                                        color: SDColors.neutral300
-                                                            .withOpacity(0.35),
-                                                        width: 1,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  child: Row(
-                                                    crossAxisAlignment:
-                                                        CrossAxisAlignment.start,
-                                                    children: [
-                                                      Stack(
-                                                        clipBehavior: Clip.none,
-                                                        children: [
-                                                          Container(
-                                                            width: 48,
-                                                            height: 48,
-                                                            decoration:
-                                                                BoxDecoration(
-                                                              shape: BoxShape
-                                                                  .circle,
-                                                              color: SDColors
-                                                                  .neutral300,
-                                                              image: conversation
-                                                                      .participantImage
-                                                                      .isNotEmpty
-                                                                  ? DecorationImage(
-                                                                      image: AssetImage(
-                                                                          conversation
-                                                                              .participantImage),
-                                                                      fit: BoxFit
-                                                                          .cover,
-                                                                    )
-                                                                  : null,
-                                                            ),
-                                                            child: conversation
-                                                                    .participantImage
-                                                                    .isEmpty
-                                                                ? Center(
-                                                                    child: Text(
-                                                                      initial,
-                                                                      style: SDTypography
-                                                                          .titleSmall
-                                                                          .copyWith(
-                                                                        color: SDColors
-                                                                            .white,
-                                                                        fontWeight:
-                                                                            FontWeight.w800,
-                                                                      ),
-                                                                    ),
-                                                                  )
-                                                                : null,
-                                                          ),
-                                                          if (conversation
-                                                              .isOnline)
-                                                            Positioned(
-                                                              right: 0,
-                                                              bottom: 0,
-                                                              child: Container(
-                                                                width: 12,
-                                                                height: 12,
-                                                                decoration:
-                                                                    BoxDecoration(
-                                                                  color: SDColors
-                                                                      .success500,
-                                                                  shape: BoxShape
-                                                                      .circle,
-                                                                  border: Border.all(
-                                                                      color: SDColors
-                                                                          .white,
-                                                                      width: 2),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                        ],
-                                                      ),
-                                                      SizedBox(
-                                                          width: SDSpacing.sm),
-                                                      Expanded(
-                                                        child: Column(
-                                                          crossAxisAlignment:
-                                                              CrossAxisAlignment
-                                                                  .start,
-                                                          children: [
-                                                            Row(
-                                                              children: [
-                                                                Expanded(
-                                                                  child: Text(
-                                                                    conversation
-                                                                        .participantName,
-                                                                    style: SDTypography
-                                                                        .titleSmall
-                                                                        .copyWith(
-                                                                      fontWeight:
-                                                                          FontWeight
-                                                                              .w800,
-                                                                      color: SDColors
-                                                                          .neutral900,
-                                                                    ),
-                                                                    maxLines: 1,
-                                                                    overflow:
-                                                                        TextOverflow
-                                                                            .ellipsis,
-                                                                  ),
-                                                                ),
-                                                                Text(
-                                                                  _formatListRowTime(
-                                                                      conversation
-                                                                          .lastUpdated),
-                                                                  style: SDTypography
-                                                                      .labelSmall
-                                                                      .copyWith(
-                                                                    color: SDColors
-                                                                        .neutral500,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                                ),
-                                                              ],
-                                                            ),
-                                                            SizedBox(
-                                                                height: SDSpacing
-                                                                    .xxs),
-                                                            Text(
-                                                              preview,
-                                                              style: SDTypography
-                                                                  .bodySmall
-                                                                  .copyWith(
-                                                                color: SDColors
-                                                                    .neutral600,
-                                                              ),
-                                                              maxLines: 2,
-                                                              overflow:
-                                                                  TextOverflow
-                                                                      .ellipsis,
-                                                            ),
-                                                          ],
-                                                        ),
-                                                      ),
-                                                      SizedBox(
-                                                          width: SDSpacing.xs),
-                                                      if (conversation
-                                                              .unreadCount >
-                                                          0)
-                                                        Container(
-                                                          constraints:
-                                                              const BoxConstraints(
-                                                            minWidth: 22,
-                                                            minHeight: 22,
-                                                          ),
-                                                          padding:
-                                                              const EdgeInsets
-                                                                  .symmetric(
-                                                                  horizontal: 6,
-                                                                  vertical: 2),
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: SDColors
-                                                                .primary700,
-                                                            shape: BoxShape
-                                                                .circle,
-                                                          ),
-                                                          alignment:
-                                                              Alignment.center,
-                                                          child: Text(
-                                                            '${conversation.unreadCount}',
-                                                            style: SDTypography
-                                                                .labelSmall
-                                                                .copyWith(
-                                                              color: SDColors
-                                                                  .white,
-                                                              fontSize: 11,
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .w800,
-                                                            ),
-                                                          ),
-                                                        )
-                                                      else
-                                                        const SizedBox(
-                                                            width: 22),
-                                                    ],
-                                                  ),
-                                                ),
-                                              );
-                                            },
-                                          ),
+                                              ),
                               ),
                             ],
                           ),

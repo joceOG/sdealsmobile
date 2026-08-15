@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
+import 'package:sdealsmobile/data/models/avis.dart';
+
+import '../../../../design_system/design_system.dart';
 import '../avispageblocm/avisPageBlocM.dart';
 import '../avispageblocm/avisPageEventM.dart';
 import '../avispageblocm/avisPageStateM.dart';
-import 'package:sdealsmobile/data/models/avis.dart';
-import 'createAvisScreenM.dart';
 import 'avisDetailScreenM.dart';
 
-// ✅ Design System
-import '../../../../design_system/design_system.dart';
-
+/// Mes Avis — style Airbnb / Figma (titre à gauche comme les autres écrans).
 class AvisPageScreenM extends StatefulWidget {
   const AvisPageScreenM({super.key});
 
@@ -18,504 +18,508 @@ class AvisPageScreenM extends StatefulWidget {
 }
 
 class _AvisPageScreenMState extends State<AvisPageScreenM> {
+  static const double _hPad = 20;
+
+  /// 0 = Donnés, 1 = Reçus (UI Figma ; data reçus si API absente → vide).
+  int _tab = 0;
+  bool _searchOpen = false;
   final TextEditingController _searchController = TextEditingController();
-  String _selectedObjetType = '';
-  String _selectedStatut = '';
-  int? _selectedNote;
+  String _query = '';
 
   @override
   void initState() {
     super.initState();
-    // Charger les avis au démarrage
     context.read<AvisPageBlocM>().add(LoadAvisDataM());
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<Avis> _filterDonnes(List<Avis> all) {
+    final q = _query.trim().toLowerCase();
+    if (q.isEmpty) return all;
+    return all.where((a) {
+      final hay = [
+        a.titre ?? '',
+        a.commentaire ?? '',
+        a.objetType,
+        a.auteur.fullName,
+        a.localisation?.ville ?? '',
+      ].join(' ').toLowerCase();
+      return hay.contains(q);
+    }).toList();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: SDWhiteAppBar.appBar(
-        centerTitle: true,
-        title: 'Mes Avis & Évaluations',
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            onPressed: () {
-              context.read<AvisPageBlocM>().add(RefreshAvisM());
-            },
-          ),
-        ],
-      ),
-      body: BlocConsumer<AvisPageBlocM, AvisPageStateM>(
-        listener: (context, state) {
-          if (state.hasError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.error ?? 'Erreur inconnue'),
-                backgroundColor: SDColors.error500,
-              ),
+      backgroundColor: SDColors.neutral50,
+      body: SafeArea(
+        child: BlocConsumer<AvisPageBlocM, AvisPageStateM>(
+          listener: (context, state) {
+            if (state.hasError) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(state.error ?? 'Erreur inconnue'),
+                  backgroundColor: SDColors.error500,
+                ),
+              );
+            }
+          },
+          builder: (context, state) {
+            final donnes = _filterDonnes(state.avis ?? []);
+            // Pas d’endpoint « reçus » dédié pour l’instant → liste vide.
+            final recus = <Avis>[];
+            final list = _tab == 0 ? donnes : recus;
+            final donnesCount = (state.avis ?? []).length;
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildTopBar(context),
+                _buildHeader(),
+                if (_searchOpen) _buildSearchField(),
+                _buildTabs(
+                  donnesCount: donnesCount,
+                  recusCount: recus.length,
+                ),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: state.isLoading && state.avis == null
+                      ? const Center(child: CircularProgressIndicator())
+                      : RefreshIndicator(
+                          color: SDColors.primary600,
+                          onRefresh: () async {
+                            context
+                                .read<AvisPageBlocM>()
+                                .add(RefreshAvisM());
+                          },
+                          child: list.isEmpty
+                              ? ListView(
+                                  physics:
+                                      const AlwaysScrollableScrollPhysics(),
+                                  children: [
+                                    SizedBox(
+                                      height:
+                                          MediaQuery.sizeOf(context).height *
+                                              0.4,
+                                      child: _buildEmptyState(),
+                                    ),
+                                  ],
+                                )
+                              : ListView.separated(
+                                  physics:
+                                      const AlwaysScrollableScrollPhysics(),
+                                  padding: const EdgeInsets.fromLTRB(
+                                      _hPad, 8, _hPad, 24),
+                                  itemCount: list.length,
+                                  separatorBuilder: (_, __) =>
+                                      const SizedBox(height: 12),
+                                  itemBuilder: (context, i) =>
+                                      _buildAvisCard(list[i]),
+                                ),
+                        ),
+                ),
+              ],
             );
-          }
-        },
-        builder: (context, state) {
-          return Column(
-            children: [
-              // 🔍 BARRE DE RECHERCHE ET FILTRES
-              _buildSearchAndFilters(),
-
-              // 📊 STATISTIQUES
-              if (state.statsObjet != null) _buildStatsCard(state),
-
-              // 📋 LISTE DES AVIS
-              Expanded(
-                child: state.isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : state.hasAvis
-                        ? _buildAvisList(state.avis!)
-                        : _buildEmptyState(),
-              ),
-            ],
-          );
-        },
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showCreateAvisDialog(),
-        backgroundColor: SDColors.primary600,
-        child: const Icon(Icons.add, color: SDColors.white),
-      ),
-    );
-  }
-
-  // 🔍 BARRE DE RECHERCHE ET FILTRES
-  Widget _buildSearchAndFilters() {
-    return Container(
-      padding: EdgeInsets.all(SDSpacing.md),
-      decoration: BoxDecoration(
-        color: SDColors.neutral50,
-        border: Border(
-          bottom: BorderSide(color: SDColors.neutral200),
+          },
         ),
       ),
-      child: Column(
-        children: [
-          // Barre de recherche
-          TextField(
-            controller: _searchController,
-            decoration: InputDecoration(
-              hintText: 'Rechercher dans les avis...',
-              hintStyle: SDTypography.bodyMedium.copyWith(color: SDColors.neutral500),
-              prefixIcon: const Icon(Icons.search, color: SDColors.neutral500),
-              suffixIcon: IconButton(
-                icon: const Icon(Icons.clear, color: SDColors.neutral500),
-                onPressed: () {
-                  _searchController.clear();
-                  context.read<AvisPageBlocM>().add(SearchAvisM(query: ''));
-                },
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
-                borderSide: BorderSide(color: SDColors.neutral200),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
-                borderSide: BorderSide(color: SDColors.neutral200),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
-                borderSide: BorderSide(color: SDColors.primary600),
-              ),
-              filled: true,
-              fillColor: SDColors.white,
-            ),
-            onSubmitted: (value) {
-              context.read<AvisPageBlocM>().add(SearchAvisM(query: value));
-            },
-          ),
-
-          const SizedBox(height: 12),
-
-          // Filtres
-          Row(
-            children: [
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  value: _selectedObjetType.isEmpty ? null : _selectedObjetType,
-                  decoration: const InputDecoration(
-                    labelText: 'Type',
-                    border: OutlineInputBorder(),
-                    contentPadding:
-                        EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  ),
-                  items: const [
-                    DropdownMenuItem(value: '', child: Text('Tous')),
-                    DropdownMenuItem(
-                        value: 'PRESTATAIRE', child: Text('Prestataire')),
-                    DropdownMenuItem(value: 'VENDEUR', child: Text('Vendeur')),
-                    DropdownMenuItem(
-                        value: 'FREELANCE', child: Text('Freelance')),
-                    DropdownMenuItem(value: 'ARTICLE', child: Text('Article')),
-                    DropdownMenuItem(value: 'SERVICE', child: Text('Service')),
-                  ],
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedObjetType = value ?? '';
-                    });
-                    _applyFilters();
-                  },
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  value: _selectedStatut.isEmpty ? null : _selectedStatut,
-                  decoration: const InputDecoration(
-                    labelText: 'Statut',
-                    border: OutlineInputBorder(),
-                    contentPadding:
-                        EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  ),
-                  items: const [
-                    DropdownMenuItem(value: '', child: Text('Tous')),
-                    DropdownMenuItem(value: 'PUBLIE', child: Text('Publié')),
-                    DropdownMenuItem(
-                        value: 'EN_ATTENTE', child: Text('En attente')),
-                    DropdownMenuItem(value: 'MODERE', child: Text('Modéré')),
-                  ],
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedStatut = value ?? '';
-                    });
-                    _applyFilters();
-                  },
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: DropdownButtonFormField<int>(
-                  value: _selectedNote,
-                  decoration: const InputDecoration(
-                    labelText: 'Note',
-                    border: OutlineInputBorder(),
-                    contentPadding:
-                        EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  ),
-                  items: const [
-                    DropdownMenuItem(value: null, child: Text('Toutes')),
-                    DropdownMenuItem(value: 5, child: Text('5 étoiles')),
-                    DropdownMenuItem(value: 4, child: Text('4 étoiles')),
-                    DropdownMenuItem(value: 3, child: Text('3 étoiles')),
-                    DropdownMenuItem(value: 2, child: Text('2 étoiles')),
-                    DropdownMenuItem(value: 1, child: Text('1 étoile')),
-                  ],
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedNote = value;
-                    });
-                    _applyFilters();
-                  },
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 
-  // 📊 CARTE DE STATISTIQUES
-  Widget _buildStatsCard(AvisPageStateM state) {
-    return Container(
-      margin: EdgeInsets.all(SDSpacing.md),
-      padding: EdgeInsets.all(SDSpacing.md),
-      decoration: BoxDecoration(
-        color: SDColors.primary50,
-        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-        border: Border.all(color: SDColors.primary200),
-      ),
+  /// Écran poussé depuis Profil → retour + recherche (pas icône décorative).
+  Widget _buildTopBar(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 4, 8, 0),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildStatItem(
-              'Total', state.totalAvis.toString(), Icons.rate_review),
-          _buildStatItem('Moyenne', '${state.moyenneNote.toStringAsFixed(1)}/5',
-              Icons.star),
-          _buildStatItem(
-              'Utiles',
-              '${state.avis?.where((a) => a.utile > 0).length ?? 0}',
-              Icons.thumb_up),
+          IconButton(
+            onPressed: () => Navigator.of(context).maybePop(),
+            icon: const Icon(Icons.arrow_back, color: SDColors.neutral900),
+            tooltip: 'Retour',
+          ),
+          const Spacer(),
+          IconButton(
+            onPressed: () {
+              setState(() {
+                _searchOpen = !_searchOpen;
+                if (!_searchOpen) {
+                  _searchController.clear();
+                  _query = '';
+                }
+              });
+            },
+            icon: Icon(
+              _searchOpen ? Icons.close : Icons.search,
+              color: SDColors.neutral900,
+            ),
+            tooltip: _searchOpen ? 'Fermer la recherche' : 'Rechercher',
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildStatItem(String label, String value, IconData icon) {
-    return Column(
-      children: [
-        Icon(icon, color: SDColors.primary600, size: 24),
-        SizedBox(height: SDSpacing.xxs),
-        Text(
-          value,
-          style: SDTypography.titleLarge.copyWith(fontWeight: FontWeight.bold, color: SDColors.neutral900),
+  Widget _buildHeader() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(_hPad, 4, _hPad, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Mes Avis & Évaluations',
+            style: SDTypography.displayMedium.copyWith(
+              color: SDColors.neutral900,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Partagez votre expérience',
+            style: SDTypography.bodyMedium.copyWith(
+              color: SDColors.neutral600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSearchField() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(_hPad, 8, _hPad, 4),
+      child: TextField(
+        controller: _searchController,
+        autofocus: true,
+        onChanged: (v) => setState(() => _query = v),
+        style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral900),
+        decoration: InputDecoration(
+          hintText: 'Rechercher un avis…',
+          hintStyle: SDTypography.bodyMedium.copyWith(
+            color: SDColors.neutral500,
+          ),
+          prefixIcon: const Icon(Icons.search, color: SDColors.neutral500),
+          filled: true,
+          fillColor: SDColors.white,
+          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
         ),
-        Text(
+      ),
+    );
+  }
+
+  Widget _buildTabs({required int donnesCount, required int recusCount}) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(_hPad, 12, _hPad, 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: _segment(
+              label: 'Donnés ($donnesCount)',
+              selected: _tab == 0,
+              onTap: () => setState(() => _tab = 0),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: _segment(
+              label: 'Reçus ($recusCount)',
+              selected: _tab == 1,
+              onTap: () => setState(() => _tab = 1),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _segment({
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        height: 44,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected ? SDColors.primary600 : SDColors.neutral100,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(
           label,
-          style: SDTypography.bodySmall.copyWith(color: SDColors.neutral600),
+          style: SDTypography.labelLarge.copyWith(
+            color: selected ? SDColors.white : SDColors.neutral900,
+            fontWeight: FontWeight.w600,
+          ),
         ),
-      ],
+      ),
     );
   }
 
-  // 📋 LISTE DES AVIS
-  Widget _buildAvisList(List<Avis> avisList) {
-    return ListView.builder(
-      padding: EdgeInsets.all(SDSpacing.md),
-      itemCount: avisList.length,
-      itemBuilder: (context, index) {
-        final avis = avisList[index];
-        return _buildAvisCard(avis);
-      },
-    );
-  }
-
-  // 🎴 CARTE D'AVIS
   Widget _buildAvisCard(Avis avis) {
-    return Card(
-        margin: EdgeInsets.only(bottom: SDSpacing.sm),
-        elevation: 2,
-        color: SDColors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium)),
-        child: InkWell(
-          onTap: () => _navigateToDetail(avis),
-          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+    final title = (avis.titre != null && avis.titre!.isNotEmpty)
+        ? avis.titre!
+        : _fallbackTitle(avis);
+    final subtitle = _subtitleFor(avis);
+    final dateLabel = DateFormat('d MMM yyyy', 'fr_FR').format(avis.createdAt);
+
+    return Material(
+      color: SDColors.white,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: () => _navigateToDetail(avis),
+        borderRadius: BorderRadius.circular(16),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: SDColors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: SDColors.neutral200),
+            boxShadow: [
+              BoxShadow(
+                color: SDColors.neutral900.withValues(alpha: 0.04),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
           child: Padding(
-            padding: EdgeInsets.all(SDSpacing.md),
+            padding: const EdgeInsets.all(14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // En-tête avec auteur et note
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    CircleAvatar(
-                      radius: 20,
-                      backgroundImage: avis.auteur.photoProfil != null
-                          ? NetworkImage(avis.auteur.photoProfil!)
-                          : null,
-                      child: avis.auteur.photoProfil == null
-                          ? Text(avis.auteur.nom.isNotEmpty
-                              ? avis.auteur.nom[0]
-                              : '?')
-                          : null,
-                    ),
+                    _buildLeading(avis),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            avis.anonyme
-                                ? 'Anonyme'
-                                : '${avis.auteur.nom} ${avis.auteur.prenom}',
-                            style: SDTypography.titleMedium.copyWith(fontWeight: FontWeight.bold),
+                            title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: SDTypography.titleMedium.copyWith(
+                              color: SDColors.neutral900,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
+                          const SizedBox(height: 2),
                           Text(
-                            _formatDate(avis.createdAt),
-                            style: TextStyle(
-                                fontSize: 12, color: Colors.grey[600]),
+                            subtitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: SDTypography.bodyMedium.copyWith(
+                              color: SDColors.neutral600,
+                            ),
                           ),
                         ],
                       ),
                     ),
-                    _buildRatingStars(avis.note),
-                  ],
-                ),
-
-                const SizedBox(height: 12),
-
-                // Titre et commentaire (optionnels)
-                if (avis.titre != null && avis.titre!.isNotEmpty) ...[
-                  Text(
-                    avis.titre!,
-                    style: SDTypography.titleMedium
-                        .copyWith(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                ],
-                if (avis.commentaire != null && avis.commentaire!.isNotEmpty)
-                  Text(
-                    avis.commentaire!,
-                    style: const TextStyle(fontSize: 14),
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-
-                const SizedBox(height: 12),
-
-                // Informations supplémentaires
-                Row(
-                  children: [
-                    Chip(
-                      label: Text(avis.objetType),
-                      backgroundColor: SDColors.success100,
-                      labelStyle: SDTypography.labelSmall.copyWith(color: SDColors.success600),
-                      padding: EdgeInsets.zero,
-                    ),
-                    SizedBox(width: SDSpacing.xs),
-                    if (avis.recommande)
-                      Chip(
-                        label: const Text('Recommande'),
-                        backgroundColor: SDColors.info100,
-                        labelStyle: SDTypography.labelSmall.copyWith(color: SDColors.info600),
-                        padding: EdgeInsets.zero,
+                    PopupMenuButton<String>(
+                      icon: const Icon(
+                        Icons.more_vert,
+                        color: SDColors.neutral500,
                       ),
-                    const Spacer(),
-                    Text(
-                      '${avis.utile} utiles',
-                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                    ),
-                  ],
-                ),
-
-                // Réponse du professionnel
-                if (avis.reponse != null) ...[
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[100],
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                          Text(
-                            'Réponse du professionnel',
-                            style: SDTypography.labelMedium.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: SDColors.neutral700,
-                            ),
-                          ),
-                          SizedBox(height: SDSpacing.xxs),
-                          Text(
-                            avis.reponse!.contenu,
-                            style: SDTypography.bodyMedium,
-                          ),
+                      onSelected: (value) {
+                        if (value == 'detail') {
+                          _navigateToDetail(avis);
+                        } else if (value == 'delete') {
+                          _showDeleteDialog(avis);
+                        }
+                      },
+                      itemBuilder: (_) => const [
+                        PopupMenuItem(
+                          value: 'detail',
+                          child: Text('Voir le détail'),
+                        ),
+                        PopupMenuItem(
+                          value: 'delete',
+                          child: Text('Supprimer'),
+                        ),
                       ],
                     ),
-                  ),
-                ],
-
-                // Actions
-                const SizedBox(height: 12),
+                  ],
+                ),
+                const SizedBox(height: 10),
                 Row(
                   children: [
-                    IconButton(
-                      icon: const Icon(Icons.thumb_up, size: 20),
-                      onPressed: () {
-                        context.read<AvisPageBlocM>().add(
-                              MarquerUtileM(avisId: avis.id, utile: true),
-                            );
-                      },
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.thumb_down, size: 20),
-                      onPressed: () {
-                        context.read<AvisPageBlocM>().add(
-                              MarquerUtileM(avisId: avis.id, utile: false),
-                            );
-                      },
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      icon: const Icon(Icons.reply, size: 20),
-                      onPressed: () => _showReplyDialog(avis),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.report, size: 20),
-                      onPressed: () => _showReportDialog(avis),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.delete, size: 20),
-                      onPressed: () => _showDeleteDialog(avis),
+                    ...List.generate(5, (i) {
+                      return Icon(
+                        i < avis.note
+                            ? Icons.star_rounded
+                            : Icons.star_border_rounded,
+                        size: 18,
+                        color: SDColors.warning500,
+                      );
+                    }),
+                    const SizedBox(width: 6),
+                    Text(
+                      avis.note.toStringAsFixed(1),
+                      style: SDTypography.labelMedium.copyWith(
+                        color: SDColors.neutral900,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ],
+                ),
+                if (avis.commentaire != null &&
+                    avis.commentaire!.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    avis.commentaire!,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: SDTypography.bodyMedium.copyWith(
+                      color: SDColors.neutral900,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 10),
+                Text(
+                  dateLabel,
+                  style: SDTypography.bodySmall.copyWith(
+                    color: SDColors.neutral500,
+                  ),
                 ),
               ],
             ),
           ),
-        ));
-  }
-
-  // ⭐ AFFICHAGE DES ÉTOILES
-  Widget _buildRatingStars(int note) {
-    return Row(
-      children: List.generate(5, (index) {
-        return Icon(
-          index < note ? Icons.star : Icons.star_border,
-          color: SDColors.warning500,
-          size: 20,
-        );
-      }),
-    );
-  }
-
-  // 📅 FORMATAGE DE DATE
-  String _formatDate(DateTime date) {
-    final now = DateTime.now();
-    final difference = now.difference(date);
-
-    if (difference.inDays == 0) {
-      return 'Aujourd\'hui';
-    } else if (difference.inDays == 1) {
-      return 'Hier';
-    } else if (difference.inDays < 7) {
-      return 'Il y a ${difference.inDays} jours';
-    } else {
-      return '${date.day}/${date.month}/${date.year}';
-    }
-  }
-
-  // 🚫 ÉTAT VIDE
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.rate_review_outlined,
-            size: 64,
-            color: SDColors.neutral400,
-          ),
-          SizedBox(height: SDSpacing.md),
-          Text(
-            'Aucun avis trouvé',
-            style: SDTypography.titleMedium.copyWith(
-              color: SDColors.neutral600,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          SizedBox(height: SDSpacing.sm),
-          Text(
-            'Commencez par donner votre premier avis !',
-            style: SDTypography.bodyMedium.copyWith(
-              color: SDColors.neutral500,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 
-  // 🔍 APPLIQUER LES FILTRES
-  void _applyFilters() {
-    context.read<AvisPageBlocM>().add(LoadAvisDataM(
-          objetType: _selectedObjetType.isEmpty ? null : _selectedObjetType,
-          statut: _selectedStatut.isEmpty ? null : _selectedStatut,
-          note: _selectedNote,
-          searchTerm:
-              _searchController.text.isEmpty ? null : _searchController.text,
-        ));
+  Widget _buildLeading(Avis avis) {
+    final photo = avis.auteur.photoProfil;
+    final media = avis.medias?.isNotEmpty == true ? avis.medias!.first.url : null;
+    final isProduct = avis.objetType == 'ARTICLE' || avis.objetType == 'VENDEUR';
+
+    if (isProduct && media != null && media.isNotEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: SizedBox(
+          width: 48,
+          height: 48,
+          child: Image.network(
+            media,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => _avatarFallback(avis),
+          ),
+        ),
+      );
+    }
+
+    return CircleAvatar(
+      radius: 24,
+      backgroundColor: SDColors.neutral200,
+      backgroundImage:
+          photo != null && photo.isNotEmpty ? NetworkImage(photo) : null,
+      child: photo == null || photo.isEmpty
+          ? Text(
+              avis.auteur.nom.isNotEmpty
+                  ? avis.auteur.nom[0].toUpperCase()
+                  : '?',
+              style: SDTypography.titleMedium.copyWith(
+                color: SDColors.neutral700,
+                fontWeight: FontWeight.w700,
+              ),
+            )
+          : null,
+    );
   }
 
-  // 🔍 NAVIGATION VERS LE DÉTAIL
+  Widget _avatarFallback(Avis avis) {
+    return ColoredBox(
+      color: SDColors.neutral100,
+      child: Center(
+        child: Text(
+          avis.auteur.nom.isNotEmpty ? avis.auteur.nom[0].toUpperCase() : '?',
+          style: SDTypography.titleMedium.copyWith(
+            color: SDColors.neutral600,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _fallbackTitle(Avis avis) {
+    switch (avis.objetType) {
+      case 'FREELANCE':
+        return 'Prestation freelance';
+      case 'ARTICLE':
+        return 'Article marketplace';
+      case 'VENDEUR':
+        return 'Vendeur';
+      default:
+        return 'Service';
+    }
+  }
+
+  String _subtitleFor(Avis avis) {
+    final ville = avis.localisation?.ville;
+    if (ville != null && ville.isNotEmpty) return ville;
+    switch (avis.objetType) {
+      case 'FREELANCE':
+        return 'Freelance';
+      case 'ARTICLE':
+      case 'VENDEUR':
+        return 'Vente & Achat';
+      default:
+        return 'Métiers';
+    }
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.rate_review_outlined,
+              size: 64,
+              color: SDColors.neutral400,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _tab == 0 ? 'Aucun avis donné' : 'Aucun avis reçu',
+              style: SDTypography.titleMedium.copyWith(
+                color: SDColors.neutral900,
+                fontWeight: FontWeight.w700,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _tab == 0
+                  ? 'Vos avis sur les prestataires et produits apparaîtront ici.'
+                  : 'Les avis reçus sur vos annonces apparaîtront ici.',
+              style: SDTypography.bodyMedium.copyWith(
+                color: SDColors.neutral600,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _navigateToDetail(Avis avis) {
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -527,72 +531,29 @@ class _AvisPageScreenMState extends State<AvisPageScreenM> {
     );
   }
 
-  // 📝 DIALOGUE DE CRÉATION D'AVIS
-  void _showCreateAvisDialog() {
-    // Pour l'instant, on utilise des valeurs par défaut
-    // Dans une vraie app, ces valeurs viendraient de la navigation
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => BlocProvider(
-          create: (context) => AvisPageBlocM(),
-          child: const CreateAvisScreenM(
-            objetType: 'PRESTATAIRE',
-            objetId: 'default_id',
-            objetNom: 'Service par défaut',
-          ),
-        ),
-      ),
-    );
-  }
-
-  // 💬 DIALOGUE DE RÉPONSE
-  void _showReplyDialog(Avis avis) {
-    // TODO: Implémenter le dialogue de réponse
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Fonctionnalité de réponse en cours de développement'),
-      ),
-    );
-  }
-
-  // 🚨 DIALOGUE DE SIGNALEMENT
-  void _showReportDialog(Avis avis) {
-    // TODO: Implémenter le dialogue de signalement
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content:
-            Text('Fonctionnalité de signalement en cours de développement'),
-      ),
-    );
-  }
-
-  // 🗑️ DIALOGUE DE SUPPRESSION
   void _showDeleteDialog(Avis avis) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title: const Text('Supprimer l\'avis'),
         content: const Text('Êtes-vous sûr de vouloir supprimer cet avis ?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(ctx),
             child: const Text('Annuler'),
           ),
           TextButton(
             onPressed: () {
-              Navigator.pop(context);
+              Navigator.pop(ctx);
               context.read<AvisPageBlocM>().add(DeleteAvisM(avisId: avis.id));
             },
-            child: Text('Supprimer', style: SDTypography.labelLarge.copyWith(color: SDColors.error500)),
+            child: Text(
+              'Supprimer',
+              style: SDTypography.labelLarge.copyWith(color: SDColors.error500),
+            ),
           ),
         ],
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
   }
 }

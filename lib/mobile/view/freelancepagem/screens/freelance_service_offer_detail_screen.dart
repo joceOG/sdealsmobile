@@ -167,9 +167,11 @@ class _FreelanceServiceOfferDetailScreenState
               SliverAppBar(
                 expandedHeight: 280,
                 pinned: true,
-                backgroundColor: SDColors.primary600,
+                backgroundColor: SDColors.white,
+                foregroundColor: SDColors.neutral900,
+                iconTheme: const IconThemeData(color: SDColors.neutral900),
                 leading: IconButton(
-                  icon: const Icon(Icons.arrow_back, color: SDColors.white),
+                  icon: const Icon(Icons.arrow_back, color: SDColors.neutral900),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
                 flexibleSpace: FlexibleSpaceBar(
@@ -199,7 +201,7 @@ class _FreelanceServiceOfferDetailScreenState
                           fit: BoxFit.cover,
                         )
                       else
-                        Container(color: SDColors.primary400),
+                        Container(color: SDColors.neutral400),
                       Container(
                         decoration: BoxDecoration(
                           gradient: LinearGradient(

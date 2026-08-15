@@ -5,6 +5,7 @@ import '../jobpageblocm/jobPageEventM.dart';
 import '../jobpageblocm/jobPageStateM.dart';
 import '../utils/navigation_helper.dart';
 import '../../common/widgets/skeleton_loader.dart';
+import '../../../../data/utils/media_url.dart';
 // ✅ Design System
 import '../../../../design_system/design_system.dart';
 
@@ -137,7 +138,10 @@ class _ProvidersListScreenState extends State<ProvidersListScreen> {
     final serviceName = provider.service?.nomservice ?? 'Service';
     final note = provider.note?.toString() ?? 'N/A';
     final location = provider.localisation?.toString() ?? 'Localisation';
-    final image = provider.utilisateur?.photoProfil?.toString();
+    final image = providerPhotoUrl(
+      selfie: provider.selfie?.toString(),
+      photoProfil: provider.utilisateur?.photoProfil?.toString(),
+    );
     final isVerified = provider.verifier == true;
     final exp = provider.anneeExperience?.toString();
     final price = provider.prixprestataire != null
@@ -151,7 +155,7 @@ class _ProvidersListScreenState extends State<ProvidersListScreen> {
         title: fullName,
         subtitle: serviceName,
         fallbackIcon: Icons.handyman_rounded,
-        imageUrl: (image != null && image.startsWith('http')) ? image : null,
+        imageUrl: image,
         ratingText: '$note/5',
         metaText: isVerified
             ? '$location • Vérifié${exp != null ? ' • $exp ans' : ''}'

@@ -4,6 +4,7 @@ import 'package:sdealsmobile/mobile/view/serviceproviderwelcomepagem/screens/ser
 import 'package:sdealsmobile/mobile/view/jobpagem/screens/detailPageScreenM.dart';
 import 'package:sdealsmobile/mobile/view/common/screens/ai_assistant_chat_screen.dart';
 import 'package:sdealsmobile/mobile/view/common/widgets/ai_price_estimator_widget.dart';
+import 'package:sdealsmobile/design_system/design_system.dart';
 
 class JobPageScreenM extends StatelessWidget {
   final List<dynamic> categories;
@@ -142,40 +143,31 @@ class JobPageScreenM extends StatelessWidget {
     }
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: SDColors.white,
       // AppBar avec bouton SoutraPay comme dans les autres onglets
-      appBar: AppBar(
-        title: const Text('Métiers',
-            style: TextStyle(
-                color: Colors.white,
-                fontSize: 22,
-                fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.green,
-        elevation: 0,
+      appBar: SDWhiteAppBar.appBar(
+        title: 'Métiers',
         actions: [
           // Bouton SoutraPay inspiré de la page Freelance
           Padding(
-            padding: const EdgeInsets.only(right: 16.0),
-            child: ElevatedButton.icon(
+            padding: const EdgeInsets.only(right: 8.0),
+            child: TextButton.icon(
               onPressed: () {
                 Navigator.pushNamed(context, '/wallet');
               },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              icon: const Icon(Icons.account_balance_wallet_outlined, size: 18),
+              label: const Text(
+                'SoutraPay',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
               ),
-              icon: const Icon(Icons.account_balance_wallet, size: 16),
-              label: const Text('💳 SoutraPay',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              style: TextButton.styleFrom(
+                foregroundColor: SDColors.neutral900,
+              ),
             ),
           ),
           // Bouton Assistant IA
           IconButton(
-            icon: const Icon(Icons.smart_toy_outlined, color: Colors.white),
+            icon: const Icon(Icons.smart_toy_outlined),
             tooltip: 'Assistant IA',
             onPressed: () {
               Navigator.push(
@@ -186,7 +178,7 @@ class JobPageScreenM extends StatelessWidget {
           ),
           // Icône notifications
           IconButton(
-            icon: const Icon(Icons.notifications_outlined, color: Colors.white),
+            icon: const Icon(Icons.notifications_outlined),
             onPressed: () {},
           ),
         ],

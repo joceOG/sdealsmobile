@@ -79,12 +79,7 @@ class _FreelancePageScreenContentState
               slivers: [
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      SDSpacing.md,
-                      SDSpacing.xs,
-                      SDSpacing.md,
-                      SDSpacing.sm,
-                    ),
+                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -144,9 +139,9 @@ class _FreelancePageScreenContentState
             textAlign: TextAlign.start,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: SDTypography.headlineSmall.copyWith(
+            style: SDTypography.displayMedium.copyWith(
               color: SDColors.neutral900,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ),

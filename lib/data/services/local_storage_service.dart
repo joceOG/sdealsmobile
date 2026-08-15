@@ -41,7 +41,8 @@ class LocalStorageService {
     final prefs = await SharedPreferences.getInstance();
     List<String> history = prefs.getStringList(_searchHistoryKey) ?? [];
     
-    history.removeWhere((item) => item == query);
+    history.removeWhere(
+        (item) => item.toLowerCase() == query.trim().toLowerCase());
     
     await prefs.setStringList(_searchHistoryKey, history);
   }

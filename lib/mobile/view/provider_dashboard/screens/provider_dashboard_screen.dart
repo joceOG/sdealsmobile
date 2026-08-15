@@ -160,14 +160,17 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Titre de bienvenue
               Text(
                 'Bonjour, $providerName!',
-                style: SDTypography.displaySmall,
+                style: SDTypography.displayMedium.copyWith(
+                  color: SDColors.neutral900,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               const SizedBox(height: 4),
               Text(

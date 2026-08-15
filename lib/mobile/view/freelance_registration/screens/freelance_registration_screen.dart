@@ -4,8 +4,7 @@ import 'package:sdealsmobile/mobile/view/freelancepagem/freelancepageblocm/freel
 import 'package:sdealsmobile/mobile/view/freelancepagem/freelancepageblocm/freelancePageEventM.dart';
 import 'package:sdealsmobile/mobile/view/freelancepagem/freelancepageblocm/freelancePageStateM.dart';
 import 'package:sdealsmobile/mobile/view/freelance_registration/screens/freelance_form_screen.dart';
-import '../../../../design_system/colors.dart';
-import '../../../../design_system/typography.dart';
+import '../../../../design_system/design_system.dart';
 
 class FreelanceRegistrationScreen extends StatelessWidget {
   const FreelanceRegistrationScreen({Key? key}) : super(key: key);
@@ -49,15 +48,8 @@ class _FreelanceRegistrationContentState extends State<_FreelanceRegistrationCon
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: SDColors.white,
-      appBar: AppBar(
-        backgroundColor: SDColors.primary700,
-        elevation: 0,
-        title: const Text('Devenir Freelance', 
-          style: SDTypography.titleLarge),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: SDColors.white),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+      appBar: SDWhiteAppBar.appBar(
+        title: 'Devenir Freelance',
       ),
       body: BlocBuilder<FreelancePageBlocM, FreelancePageStateM>(
         builder: (context, state) {

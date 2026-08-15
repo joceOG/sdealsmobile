@@ -41,9 +41,9 @@ class JobAppBar extends StatelessWidget {
           SizedBox(height: SDSpacing.xs),
           Text(
             'De quoi avez-vous besoin ?',
-            style: SDTypography.displaySmall.copyWith(
+            style: SDTypography.displayMedium.copyWith(
               color: SDColors.neutral900,
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w700,
             ),
           ),
           SizedBox(height: SDSpacing.lg),

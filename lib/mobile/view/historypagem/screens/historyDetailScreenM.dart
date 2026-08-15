@@ -4,6 +4,7 @@ import '../historypageblocm/historyPageBlocM.dart';
 import '../historypageblocm/historyPageEventM.dart';
 import '../historypageblocm/historyPageStateM.dart';
 import '../../../../data/models/history.dart';
+import '../../../../design_system/design_system.dart';
 
 class HistoryDetailScreenM extends StatelessWidget {
   final History history;
@@ -96,11 +97,9 @@ class HistoryDetailScreenM extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Détails de la Consultation'),
-        backgroundColor: _getTypeColor(history.objetType),
-        foregroundColor: Colors.white,
-        elevation: 0,
+      backgroundColor: SDColors.white,
+      appBar: SDWhiteAppBar.appBar(
+        title: 'Détails de la Consultation',
         actions: [
           PopupMenuButton<String>(
             onSelected: (value) {

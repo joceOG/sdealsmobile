@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../data/models/security.dart';
 import '../../../../data/services/api_client.dart';
+import '../../../../design_system/design_system.dart';
 import '../securitypageblocm/securityPageBlocM.dart';
 import '../securitypageblocm/securityPageEventM.dart';
 import '../securitypageblocm/securityPageStateM.dart';
@@ -37,13 +38,12 @@ class _SecurityDetailScreenMState extends State<SecurityDetailScreenM> {
         apiClient: ApiClient(),
       ),
       child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Détail de l\'alerte'),
-          backgroundColor: Colors.green[600],
-          foregroundColor: Colors.white,
+        backgroundColor: SDColors.white,
+        appBar: SDWhiteAppBar.appBar(
+          title: 'Détail de l\'alerte',
           actions: [
             IconButton(
-              icon: const Icon(Icons.delete),
+              icon: const Icon(Icons.delete_outline),
               onPressed: () {
                 _showDeleteDialog();
               },

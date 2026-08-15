@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../alertpageblocm/alertPageBlocM.dart';
 import '../alertpageblocm/alertPageEventM.dart';
 import '../../../../data/models/alert.dart';
+import '../../../../design_system/design_system.dart';
 
 class AlertDetailScreenM extends StatelessWidget {
   final Alert alert;
@@ -144,11 +146,9 @@ class AlertDetailScreenM extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Détails de l\'Alerte'),
-        backgroundColor: _getTypeColor(alert.type),
-        foregroundColor: Colors.white,
-        elevation: 0,
+      backgroundColor: SDColors.white,
+      appBar: SDWhiteAppBar.appBar(
+        title: 'Détails de l\'Alerte',
         actions: [
           PopupMenuButton<String>(
             onSelected: (value) {
@@ -432,10 +432,7 @@ class AlertDetailScreenM extends StatelessWidget {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
-                          onPressed: () {
-                            // Ouvrir l'URL d'action
-                            // TODO: Implémenter l'ouverture de l'URL
-                          },
+                          onPressed: () => _openActionUrl(context, alert.urlAction!),
                           icon: const Icon(Icons.open_in_new),
                           label: const Text('Ouvrir l\'action'),
                           style: ElevatedButton.styleFrom(
@@ -583,5 +580,29 @@ class AlertDetailScreenM extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _openActionUrl(BuildContext context, String url) async {
+    final uri = Uri.tryParse(url.trim());
+    if (uri == null || !(uri.hasScheme && (uri.scheme == 'http' || uri.scheme == 'https'))) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('URL d\'action invalide')),
+      );
+      return;
+    }
+    try {
+      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!launched && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Impossible d\'ouvrir le lien')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur ouverture : $e')),
+        );
+      }
+    }
   }
 }

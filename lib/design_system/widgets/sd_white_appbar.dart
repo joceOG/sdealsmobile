@@ -30,7 +30,7 @@ class SDWhiteAppBar {
           title!,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: SDTypography.titleLarge.copyWith(
+          style: SDTypography.displayMedium.copyWith(
             color: SDColors.neutral900,
             fontWeight: FontWeight.w700,
           ),
@@ -47,7 +47,8 @@ class SDWhiteAppBar {
       bar: AppBar(
         elevation: 0,
         scrolledUnderElevation: 0,
-        toolbarHeight: toolbarHeight,
+        toolbarHeight: toolbarHeight ?? 64,
+        titleSpacing: 20,
         backgroundColor: backgroundColor ?? SDColors.white,
         surfaceTintColor: Colors.transparent,
         foregroundColor: SDColors.neutral900,

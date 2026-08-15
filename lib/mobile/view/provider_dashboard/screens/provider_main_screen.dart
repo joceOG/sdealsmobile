@@ -6,7 +6,6 @@ import 'package:sdealsmobile/data/services/authCubit.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sdealsmobile/data/services/api_client.dart';
-import 'package:intl/intl.dart';
 // ✅ Design System
 import '../../../../design_system/design_system.dart';
 import 'package:sdealsmobile/mobile/view/provider_dashboard/bloc/missions_bloc.dart';
@@ -24,6 +23,8 @@ import 'package:sdealsmobile/mobile/view/provider_dashboard/bloc/provider_profil
 import 'package:sdealsmobile/mobile/view/provider_dashboard/screens/provider_settings_screen.dart';
 import 'package:sdealsmobile/mobile/view/provider_dashboard/screens/provider_statistics_screen.dart';
 import 'package:sdealsmobile/mobile/view/provider_dashboard/bloc/provider_statistics_bloc.dart';
+import 'package:sdealsmobile/mobile/view/provider_dashboard/widgets/provider_home_dashboard.dart';
+import 'package:sdealsmobile/data/utils/media_url.dart';
 
 class ProviderMainScreen extends StatefulWidget {
   final Utilisateur? utilisateur; // ⚡ reçoit le prestataire (nullable)
@@ -34,7 +35,8 @@ class ProviderMainScreen extends StatefulWidget {
   _ProviderMainScreenState createState() => _ProviderMainScreenState();
 }
 
-class _ProviderMainScreenState extends State<ProviderMainScreen> {
+class _ProviderMainScreenState extends State<ProviderMainScreen>
+    with WidgetsBindingObserver {
   int _currentIndex = 0;
   final ApiClient _apiClient = ApiClient();
   
@@ -42,27 +44,57 @@ class _ProviderMainScreenState extends State<ProviderMainScreen> {
   int _pendingMissionsCount = 0;
   int _ongoingMissionsCount = 0;
   double _monthlyRevenue = 0.0;
-  double _acceptanceRate = 0.0;
   bool _isLoadingStats = true;
 
   // 🆔 ID du document prestataire (différent de l'ID utilisateur)
   String? _prestataireDocId;
   String _prestataireStatus = 'incomplete'; // 'incomplete', 'pending', 'active'
   int _unreadNotificationsCount = 0;
+  int _unreadMessagesCount = 0;
   Timer? _notifPollTimer;
+  /// Poll léger uniquement tant que le dossier n'est pas actif.
+  Timer? _statusPollTimer;
 
-  // Titres des écrans pour l'AppBar
+  // Profil Accueil (Figma)
+  Map<String, dynamic>? _prestataireDoc;
+  bool _isAvailable = true;
+  List<Map<String, dynamic>> _recentMissions = [];
+  List<Map<String, dynamic>> _recentReviews = [];
+  List<int> _weeklyActivity = List.filled(7, 0);
+  double _soldeDisponible = 0;
+  double _soldeEnAttente = 0;
+  int _totalDemandesMois = 0;
+  double _rating = 0;
+  int _reviewCount = 0;
+
+  /// Onglets stables (évite de recréer les BLoC à chaque setState).
+  String? _tabsBoundDocId;
+  Widget? _missionsTab;
+  Widget? _planningTab;
+  Widget? _messagesTab;
+  Widget? _profileTab;
+  final GlobalKey<ProviderMissionsScreenState> _missionsKey =
+      GlobalKey<ProviderMissionsScreenState>();
+  final GlobalKey<ProviderPlanningScreenState> _planningKey =
+      GlobalKey<ProviderPlanningScreenState>();
+  final GlobalKey<ProviderMessagesScreenState> _messagesKey =
+      GlobalKey<ProviderMessagesScreenState>();
+  final GlobalKey<ProviderProfileScreenState> _profileKey =
+      GlobalKey<ProviderProfileScreenState>();
+
+  // Titres des écrans pour l'AppBar (hors Accueil)
   final List<String> _titles = [
     'Espace Prestataire',
     'Missions',
     'Planning',
-    'Messages',
+    'Messagerie',
     'Profil'
   ];
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _initPrestataireData();
@@ -71,12 +103,68 @@ class _ProviderMainScreenState extends State<ProviderMainScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _notifPollTimer?.cancel();
+    _statusPollTimer?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      // Retour app / multitâche → statut à jour sans bouton
+      _initPrestataireData();
+    }
+  }
+
+  void _syncStatusPolling() {
+    final status = _resolveDashboardStatus();
+    final waiting = status == 'pending' || status == 'incomplete';
+    if (waiting) {
+      _statusPollTimer ??= Timer.periodic(const Duration(seconds: 45), (_) {
+        if (!mounted) return;
+        _refreshPrestataireStatusOnly();
+      });
+    } else {
+      _statusPollTimer?.cancel();
+      _statusPollTimer = null;
+    }
+  }
+
+  /// Recharge uniquement le doc prestataire (léger, pour passage pending → active).
+  Future<void> _refreshPrestataireStatusOnly() async {
+    if (!mounted) return;
+    final auth = context.read<AuthCubit>().state;
+    if (auth is! AuthAuthenticated) return;
+    final userId = auth.utilisateur.idutilisateur;
+    if (userId == null) return;
+    try {
+      final prestataireDoc =
+          await _apiClient.getPrestataireByUserId(userId, auth.token);
+      if (prestataireDoc == null || !mounted) return;
+      final previous = _resolveDashboardStatus();
+      setState(() {
+        _prestataireDoc = prestataireDoc;
+        _prestataireDocId = prestataireDoc['_id']?.toString();
+        _prestataireStatus =
+            (prestataireDoc['status']?.toString() ?? 'pending').toLowerCase();
+        if (prestataireDoc['verifier'] == true ||
+            prestataireDoc['verified'] == true) {
+          _prestataireStatus = 'active';
+        }
+      });
+      _syncStatusPolling();
+      if (previous != 'active' && _resolveDashboardStatus() == 'active') {
+        await _loadDashboardStats();
+      }
+    } catch (e) {
+      print('Erreur refresh statut prestataire: $e');
+    }
   }
 
   // 🆔 Initialiser les données prestataire (id réel + stats)
   Future<void> _initPrestataireData() async {
+    if (!mounted) return;
     final auth = context.read<AuthCubit>().state;
     if (auth is! AuthAuthenticated) return;
 
@@ -88,27 +176,138 @@ class _ProviderMainScreenState extends State<ProviderMainScreen> {
       final prestataireDoc = await _apiClient.getPrestataireByUserId(userId!, token);
       if (prestataireDoc != null && mounted) {
         setState(() {
+          _prestataireDoc = prestataireDoc;
           _prestataireDocId = prestataireDoc['_id']?.toString();
-          _prestataireStatus = prestataireDoc['status']?.toString() ?? 'pending';
+          _prestataireStatus =
+              (prestataireDoc['status']?.toString() ?? 'pending').toLowerCase();
+          if (prestataireDoc['verifier'] == true ||
+              prestataireDoc['verified'] == true) {
+            _prestataireStatus = 'active';
+          }
+          _isAvailable = prestataireDoc['disponible'] != false &&
+              prestataireDoc['disponibilite']?.toString().toLowerCase() !=
+                  'indisponible';
+          _rating = _asDouble(prestataireDoc['note']);
+          _reviewCount = (prestataireDoc['nbAvis'] ??
+                  prestataireDoc['nombreAvis'] ??
+                  prestataireDoc['nbMission'] ??
+                  0) is int
+              ? (prestataireDoc['nbAvis'] ??
+                      prestataireDoc['nombreAvis'] ??
+                      prestataireDoc['nbMission'] ??
+                      0) as int
+              : int.tryParse('${prestataireDoc['nbAvis'] ?? 0}') ?? 0;
         });
+        _syncStatusPolling();
       }
     } catch (e) {
       print('Erreur récupération prestataire doc: $e');
     }
 
+    if (!mounted) return;
+
     // Charger les stats dashboard
     await _loadDashboardStats();
 
-    // Charger le nombre de notifications non lues
-    await _loadUnreadNotificationsCount();
+    if (!mounted) return;
+
+    // Charger le nombre de notifications / messages non lus
+    await Future.wait([
+      _loadUnreadNotificationsCount(),
+      _loadUnreadMessagesCount(),
+      _loadRecentReviews(),
+    ]);
+    if (!mounted) return;
     _notifPollTimer?.cancel();
     _notifPollTimer = Timer.periodic(const Duration(seconds: 90), (_) {
+      if (!mounted) return;
       _loadUnreadNotificationsCount();
+      _loadUnreadMessagesCount();
     });
+  }
+
+  /// Persiste le toggle disponibilité via PUT `/prestataire/:id`.
+  Future<void> _setAvailability(bool value) async {
+    final previous = _isAvailable;
+    setState(() => _isAvailable = value);
+
+    final auth = context.read<AuthCubit>().state;
+    if (auth is! AuthAuthenticated) {
+      setState(() => _isAvailable = previous);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Session expirée — reconnectez-vous'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    final id = _prestataireDocId;
+    if (id == null || id.isEmpty) {
+      setState(() => _isAvailable = previous);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Profil prestataire introuvable'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    try {
+      final response = await _apiClient.put(
+        '/prestataire/$id',
+        body: {'disponible': value},
+        token: auth.token,
+      );
+      if (!mounted) return;
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              value
+                  ? 'Vous êtes maintenant disponible'
+                  : 'Vous êtes maintenant indisponible',
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      } else {
+        setState(() => _isAvailable = previous);
+        String message = 'Impossible de mettre à jour la disponibilité';
+        try {
+          final data = ApiClient.decodeJson(response);
+          if (data is Map && (data['error'] != null || data['message'] != null)) {
+            message = (data['error'] ?? data['message']).toString();
+          }
+        } catch (_) {}
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: Colors.red.shade700,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isAvailable = previous);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur réseau: $e'),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   // 🔔 Charger le nombre de notifications non lues
   Future<void> _loadUnreadNotificationsCount() async {
+    if (!mounted) return;
     final auth = context.read<AuthCubit>().state;
     if (auth is! AuthAuthenticated) return;
     try {
@@ -116,14 +315,77 @@ class _ProviderMainScreenState extends State<ProviderMainScreen> {
         token: auth.token,
         userId: auth.utilisateur.idutilisateur,
       );
-      if (mounted) setState(() => _unreadNotificationsCount = count);
+      if (!mounted) return;
+      setState(() => _unreadNotificationsCount = count);
     } catch (e) {
       print('Erreur unread count: $e');
     }
   }
 
+  Future<void> _loadUnreadMessagesCount() async {
+    if (!mounted) return;
+    final auth = context.read<AuthCubit>().state;
+    if (auth is! AuthAuthenticated) return;
+    final userId = auth.utilisateur.idutilisateur;
+    if (userId.isEmpty) {
+      if (mounted) setState(() => _unreadMessagesCount = 0);
+      return;
+    }
+    try {
+      final messages = await _apiClient.getUnreadMessages(userId, limit: 50);
+      if (!mounted) return;
+      setState(() => _unreadMessagesCount = messages.length);
+    } catch (e) {
+      print('Erreur unread messages: $e');
+      if (mounted) setState(() => _unreadMessagesCount = 0);
+    }
+  }
+
+  Future<void> _loadRecentReviews() async {
+    if (!mounted) return;
+    final auth = context.read<AuthCubit>().state;
+    if (auth is! AuthAuthenticated) return;
+    final objetId = _prestataireDocId;
+    if (objetId == null || objetId.isEmpty) {
+      if (mounted) setState(() => _recentReviews = []);
+      return;
+    }
+    try {
+      final response = await _apiClient.get(
+        '/avis?objetType=PRESTATAIRE&objetId=$objetId&limit=5',
+        token: auth.token,
+      );
+      if (!mounted) return;
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        List<dynamic> list = const [];
+        if (decoded is List) {
+          list = decoded;
+        } else if (decoded is Map) {
+          list = (decoded['avis'] ??
+                  decoded['data'] ??
+                  decoded['results'] ??
+                  []) as List<dynamic>? ??
+              [];
+        }
+        setState(() {
+          _recentReviews = list
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList();
+        });
+      } else {
+        setState(() => _recentReviews = []);
+      }
+    } catch (e) {
+      print('Erreur avis récents: $e');
+      if (mounted) setState(() => _recentReviews = []);
+    }
+  }
+
   // 🚀 Charger les statistiques du dashboard
   Future<void> _loadDashboardStats() async {
+    if (!mounted) return;
     setState(() => _isLoadingStats = true);
     
     try {
@@ -145,6 +407,30 @@ class _ProviderMainScreenState extends State<ProviderMainScreen> {
           status: 'EN_COURS',
           prestataireId: _prestataireDocId,
         );
+
+        // Missions acceptées / récentes pour la liste Figma
+        List<Map<String, dynamic>> accepted = [];
+        try {
+          accepted = await _apiClient.getPrestationsByStatus(
+            token: token,
+            status: 'ACCEPTEE',
+            prestataireId: _prestataireDocId,
+          );
+        } catch (_) {}
+
+        final recent = <Map<String, dynamic>>[
+          ...pendingMissions,
+          ...ongoingMissions,
+          ...accepted,
+        ];
+        recent.sort((a, b) {
+          final da = DateTime.tryParse('${a['createdAt'] ?? a['date'] ?? ''}');
+          final db = DateTime.tryParse('${b['createdAt'] ?? b['date'] ?? ''}');
+          if (da == null && db == null) return 0;
+          if (da == null) return 1;
+          if (db == null) return -1;
+          return db.compareTo(da);
+        });
         
         // Charger les statistiques (endpoint correct)
         Map<String, dynamic> stats = {};
@@ -161,13 +447,39 @@ class _ProviderMainScreenState extends State<ProviderMainScreen> {
             print('Erreur stats: $e');
           }
         }
+
+        final weekly = _buildWeeklyActivityFromMissions(recent);
+        final totalDemandes = (stats['total'] ??
+                stats['totalPrestations'] ??
+                pendingMissions.length +
+                    ongoingMissions.length +
+                    accepted.length) is num
+            ? ((stats['total'] ??
+                    stats['totalPrestations'] ??
+                    pendingMissions.length +
+                        ongoingMissions.length +
+                        accepted.length) as num)
+                .toInt()
+            : pendingMissions.length + ongoingMissions.length + accepted.length;
         
         if (mounted) {
           setState(() {
             _pendingMissionsCount = pendingMissions.length;
             _ongoingMissionsCount = ongoingMissions.length;
-            _monthlyRevenue = (stats['revenueTotal'] ?? 0).toDouble();
-            _acceptanceRate = _calculateAcceptanceRate(stats);
+            _monthlyRevenue = (stats['revenueTotal'] ??
+                    stats['revenus'] ??
+                    _prestataireDoc?['revenus'] ??
+                    0)
+                .toDouble();
+            _recentMissions = recent.take(5).toList();
+            _weeklyActivity = weekly;
+            _totalDemandesMois = totalDemandes;
+            _soldeDisponible = _asDouble(
+              stats['soldeDisponible'] ??
+                  _prestataireDoc?['solde'] ??
+                  _monthlyRevenue,
+            );
+            _soldeEnAttente = _asDouble(stats['soldeEnAttente'] ?? 0);
             _isLoadingStats = false;
           });
         }
@@ -178,1318 +490,807 @@ class _ProviderMainScreenState extends State<ProviderMainScreen> {
     }
   }
   
-  double _calculateAcceptanceRate(Map<String, dynamic> stats) {
-    final statsParStatut = stats['statsParStatut'] as List<dynamic>? ?? [];
-    int total = 0;
-    int accepted = 0;
-    
-    for (var stat in statsParStatut) {
-      final count = stat['count'] as int? ?? 0;
-      total += count;
-      if (stat['_id'] == 'ACCEPTEE' || stat['_id'] == 'TERMINEE') {
-        accepted += count;
-      }
+  double _asDouble(dynamic v, {double fallback = 0}) {
+    if (v == null) return fallback;
+    if (v is num) return v.toDouble();
+    return double.tryParse(v.toString()) ?? fallback;
+  }
+
+  String _cleanMetierLabel(dynamic raw) {
+    var s = raw?.toString().trim() ?? '';
+    if (s.isEmpty) return 'Prestataire';
+    if (s.startsWith('[') && s.endsWith(']')) {
+      s = s.substring(1, s.length - 1).trim();
     }
-    
-    return total > 0 ? (accepted / total) * 100 : 0.0;
+    if ((s.startsWith('"') && s.endsWith('"')) ||
+        (s.startsWith("'") && s.endsWith("'"))) {
+      s = s.substring(1, s.length - 1).trim();
+    }
+    return s.isEmpty ? 'Prestataire' : s;
+  }
+
+  List<int> _buildWeeklyActivityFromMissions(List<Map<String, dynamic>> missions) {
+    final counts = List<int>.filled(7, 0);
+    final now = DateTime.now();
+    final startOfWeek = DateTime(now.year, now.month, now.day)
+        .subtract(Duration(days: now.weekday - 1));
+    for (final m in missions) {
+      final raw = m['createdAt'] ?? m['date'] ?? m['datePrestation'];
+      final d = DateTime.tryParse('$raw');
+      if (d == null) continue;
+      final local = d.toLocal();
+      final day = DateTime(local.year, local.month, local.day);
+      final diff = day.difference(startOfWeek).inDays;
+      if (diff >= 0 && diff < 7) counts[diff]++;
+    }
+    // Zéros honnêtes si aucune activité (pas de silhouette fictive)
+    return counts;
   }
 
   // ✅ DASHBOARD AVEC VÉRIFICATION DU STATUT
   Widget _buildSimpleDashboard() {
-    // 🎯 VÉRIFIER LE STATUT DU PRESTATAIRE
-    final prestataireStatus = _getPrestataireStatus();
+    final prestataireStatus = _resolveDashboardStatus();
 
     if (prestataireStatus == 'incomplete') {
       return _buildIncompleteProfileDashboard();
     } else if (prestataireStatus == 'pending') {
       return _buildPendingValidationDashboard();
+    } else if (prestataireStatus == 'rejected' ||
+        prestataireStatus == 'suspended') {
+      return _buildBlockedDashboard(prestataireStatus);
     } else {
       return _buildActiveDashboard();
     }
   }
 
-  // 🚨 DASHBOARD POUR PROFIL INCOMPLET
+  /// Statut UI : `verifier: true` ou `active` → dashboard actif.
+  String _resolveDashboardStatus() {
+    final raw = (_prestataireDoc?['status'] ?? _prestataireStatus)
+        .toString()
+        .toLowerCase()
+        .trim();
+    final verified = _prestataireDoc?['verifier'] == true ||
+        _prestataireDoc?['verified'] == true;
+
+    if (raw == 'rejected' || raw == 'suspended') return raw;
+    if (verified || raw == 'active' || raw == 'valide' || raw == 'validated') {
+      return 'active';
+    }
+    if (raw == 'incomplete') return 'incomplete';
+    if (raw == 'pending') return 'pending';
+    // Doc présent mais statut inconnu : ne pas bloquer si vérifié
+    return verified ? 'active' : (raw.isEmpty ? 'pending' : raw);
+  }
+
+  // 🚨 DASHBOARD POUR PROFIL INCOMPLET (body only — pas de Scaffold imbriqué)
   Widget _buildIncompleteProfileDashboard() {
-    return Scaffold(
-      backgroundColor: Colors.grey[50],
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 🚨 MESSAGE D'ALERTE
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.green.shade400, Colors.green.shade600],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.warning, color: Colors.white, size: 28),
-                      SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          '⚠️ Votre inscription n\'est pas complète !',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    '📋 Finalisez votre profil pour accéder aux missions',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    '📄 Documents requis : CNI, selfie, localisation',
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // 🔘 BOUTON DE FINALISATION
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  context.push('/prestataire-finalization', extra: _prestataireDocId);
-                },
-                icon: Icon(Icons.check_circle, color: Colors.white),
-                label: Text(
-                  'Finaliser mon profil',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green.shade600,
-                  padding: EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // 📊 STATISTIQUES DÉSACTIVÉES
-            Container(
-              padding: EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.grey[200],
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey[300]!),
-              ),
-              child: Column(
-                children: [
-                  Icon(Icons.lock, color: Colors.grey[500], size: 48),
-                  SizedBox(height: 8),
-                  Text(
-                    'Fonctionnalités verrouillées',
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  SizedBox(height: 4),
-                  Text(
-                    'Finalisez votre profil pour débloquer toutes les fonctionnalités',
-                    style: TextStyle(
-                      color: Colors.grey[500],
-                      fontSize: 14,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ⏳ DASHBOARD POUR VALIDATION EN COURS
-  Widget _buildPendingValidationDashboard() {
-    return Scaffold(
-      backgroundColor: Colors.grey[50],
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ⏳ MESSAGE D'ATTENTE
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.blue.shade400, Colors.blue.shade600],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.hourglass_empty,
-                          color: Colors.white, size: 28),
-                      SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          '⏳ Votre profil est en cours de validation',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    '📋 Notre équipe vérifie vos documents',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    '📧 Vous recevrez une notification par email',
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // 🔘 BOUTON RETOUR CLIENT
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  context.read<AuthCubit>().switchActiveRole('CLIENT');
-                  context.push('/homepage');
-                },
-                icon: Icon(Icons.home, color: Colors.white),
-                label: Text(
-                  'Retour au mode Client',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue.shade600,
-                  padding: EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ✅ DASHBOARD ACTIF MAGNIFIQUE (FONCTIONNEL) - AMÉLIORÉ
-  Widget _buildActiveDashboard() {
-    return Scaffold(
-      backgroundColor: SDColors.neutral50,
-      body: RefreshIndicator(
-        onRefresh: _loadDashboardStats,
-        color: SDColors.primary600,
+    return ColoredBox(
+      color: SDColors.neutral50,
+      child: SafeArea(
+        bottom: false,
         child: SingleChildScrollView(
-          padding: EdgeInsets.all(SDSpacing.md),
+          padding: EdgeInsets.fromLTRB(SDSpacing.md, SDSpacing.md, SDSpacing.md, SDSpacing.xl),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 🎨 EN-TÊTE DE BIENVENUE MAGNIFIQUE
-              _buildMagnificentWelcomeHeader(),
-
-              SizedBox(height: SDSpacing.md),
-
-              // 📊 CARDS PRINCIPALES (Données réelles)
-              _buildMainStatsCards(),
-
-              SizedBox(height: SDSpacing.md),
-
-              // ⚡ ACTIONS RAPIDES INTELLIGENTES
-              _buildSmartActionsSection(),
-
-              SizedBox(height: SDSpacing.md),
-
-              // 🎯 RÉCAPITULATIF QUOTIDIEN
-              _buildDailySummarySection(),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // 🎨 EN-TÊTE DE BIENVENUE MAGNIFIQUE - AMÉLIORÉ AVEC DESIGN SYSTEM
-  Widget _buildMagnificentWelcomeHeader() {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(SDSpacing.lg),
-      decoration: BoxDecoration(
-        gradient: SDGradients.primaryGradient,
-        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
-        boxShadow: [
-          BoxShadow(
-            color: SDColors.primary600.withOpacity(0.3),
-            blurRadius: 20,
-            offset: Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
+              _buildBoutiqueHomeHeader(showActions: true),
+              SizedBox(height: SDSpacing.lg),
               Container(
-                padding: EdgeInsets.all(SDSpacing.sm),
+                width: double.infinity,
+                padding: EdgeInsets.all(SDSpacing.md),
                 decoration: BoxDecoration(
-                  color: SDColors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                  color: SDColors.neutral900,
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                child: Icon(
-                  Icons.handyman,
-                  color: SDColors.white,
-                  size: 28,
-                ),
-              ),
-              SizedBox(width: SDSpacing.md),
-              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Bonjour ${widget.utilisateur?.prenom ?? 'Prestataire'} !',
-                      style: SDTypography.titleLarge.copyWith(
+                      'Inscription incomplète',
+                      style: SDTypography.titleMedium.copyWith(
                         color: SDColors.white,
-                        fontWeight: FontWeight.bold,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
-                    SizedBox(height: SDSpacing.xxxs),
+                    SizedBox(height: SDSpacing.xs),
                     Text(
-                      'Expert Prestataire • ${DateFormat('dd/MM/yyyy').format(DateTime.now())}',
-                      style: SDTypography.bodySmall.copyWith(
-                        color: SDColors.white.withOpacity(0.9),
+                      'Finalisez votre profil (CNI, selfie, localisation) pour recevoir des missions.',
+                      style: SDTypography.bodyMedium.copyWith(
+                        color: SDColors.neutral300,
                       ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(height: SDSpacing.md),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    context.push('/prestataire-finalization', extra: _prestataireDocId);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: SDColors.primary600,
+                    foregroundColor: SDColors.white,
+                    padding: EdgeInsets.symmetric(vertical: SDSpacing.md),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(28),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: Text(
+                    'Finaliser mon profil',
+                    style: SDTypography.labelLarge.copyWith(
+                      color: SDColors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(height: SDSpacing.md),
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.all(SDSpacing.md),
+                decoration: BoxDecoration(
+                  color: SDColors.neutral100,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  children: [
+                    Icon(Icons.lock_outline, color: SDColors.neutral500, size: 40),
+                    SizedBox(height: SDSpacing.xs),
+                    Text(
+                      'Fonctionnalités verrouillées',
+                      style: SDTypography.titleSmall.copyWith(
+                        color: SDColors.neutral800,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    SizedBox(height: SDSpacing.xxs),
+                    Text(
+                      'Le tableau de bord s’ouvrira après validation de votre dossier.',
+                      textAlign: TextAlign.center,
+                      style: SDTypography.bodySmall.copyWith(color: SDColors.neutral500),
                     ),
                   ],
                 ),
               ),
             ],
           ),
-          SizedBox(height: SDSpacing.sm),
-          Text(
-            'Gérez vos missions efficacement',
-            style: SDTypography.bodyMedium.copyWith(
-              color: SDColors.white.withOpacity(0.9),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
-  
-  // 📊 CARDS PRINCIPALES AVEC DONNÉES RÉELLES
-  Widget _buildMainStatsCards() {
-    if (_isLoadingStats) {
-      return GridView.count(
-        shrinkWrap: true,
-        physics: NeverScrollableScrollPhysics(),
-        crossAxisCount: 2,
-        childAspectRatio: 1.2,
-        crossAxisSpacing: SDSpacing.sm,
-        mainAxisSpacing: SDSpacing.sm,
-        children: List.generate(4, (index) => _buildStatCardSkeleton()),
-      );
-    }
-    
-    return GridView.count(
-      shrinkWrap: true,
-      physics: NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
-      childAspectRatio: 1.2,
-      crossAxisSpacing: SDSpacing.sm,
-      mainAxisSpacing: SDSpacing.sm,
-      children: [
-        _buildMainStatCard(
-          'Missions en attente',
-          '$_pendingMissionsCount',
-          'Nouvelles demandes',
-          Icons.assignment_outlined,
-          SDColors.warning500,
-          SDColors.warning50,
-        ),
-        _buildMainStatCard(
-          'Missions en cours',
-          '$_ongoingMissionsCount',
-          'Actuellement',
-          Icons.play_circle_outline,
-          SDColors.info500,
-          SDColors.info50,
-        ),
-        _buildMainStatCard(
-          'Revenus du mois',
-          '${NumberFormat('#,###').format(_monthlyRevenue)} FCFA',
-          'Total cumulé',
-          Icons.monetization_on_outlined,
-          SDColors.success500,
-          SDColors.success50,
-        ),
-        _buildMainStatCard(
-          'Taux d\'acceptation',
-          '${_acceptanceRate.toStringAsFixed(0)}%',
-          'Performance',
-          Icons.check_circle_outline,
-          SDColors.primary600,
-          SDColors.primary50,
-        ),
-      ],
-    );
-  }
-  
-  Widget _buildMainStatCard(
-    String title,
-    String value,
-    String subtitle,
-    IconData icon,
-    Color color,
-    Color backgroundColor,
-  ) {
-    return Container(
-      padding: EdgeInsets.all(SDSpacing.md),
-      decoration: BoxDecoration(
-        color: SDColors.white,
-        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
-        boxShadow: [
-          BoxShadow(
-            color: SDColors.neutral200.withOpacity(0.5),
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: EdgeInsets.all(SDSpacing.xs),
-                decoration: BoxDecoration(
-                  color: backgroundColor,
-                  borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
-                ),
-                child: Icon(icon, color: color, size: 24),
-              ),
-              if (value == '$_pendingMissionsCount' && _pendingMissionsCount > 0)
+
+  // 🚫 Compte rejeté / suspendu — UI dédiée (pas le dashboard actif)
+  Widget _buildBlockedDashboard(String status) {
+    final isSuspended = status == 'suspended';
+    final title = isSuspended ? 'Compte suspendu' : 'Dossier refusé';
+    final message = isSuspended
+        ? 'Votre compte prestataire est suspendu. Contactez le support pour plus d\'informations.'
+        : 'Votre dossier prestataire a été refusé. Vous pouvez finaliser à nouveau vos documents ou contacter le support.';
+
+    return ColoredBox(
+      color: SDColors.neutral50,
+      child: SafeArea(
+        bottom: false,
+        child: RefreshIndicator(
+          onRefresh: _initPrestataireData,
+          color: SDColors.primary600,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.fromLTRB(
+                SDSpacing.md, SDSpacing.md, SDSpacing.md, SDSpacing.xl),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildBoutiqueHomeHeader(showActions: true),
+                SizedBox(height: SDSpacing.lg),
                 Container(
-                  padding: EdgeInsets.symmetric(horizontal: SDSpacing.xs, vertical: 2),
+                  width: double.infinity,
+                  padding: EdgeInsets.all(SDSpacing.md),
                   decoration: BoxDecoration(
-                    color: SDColors.error500,
-                    borderRadius: BorderRadius.circular(10),
+                    color: const Color(0xFF7F1D1D),
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  child: Text(
-                    '$_pendingMissionsCount',
-                    style: SDTypography.labelSmall.copyWith(
-                      color: SDColors.white,
-                      fontWeight: FontWeight.bold,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.block,
+                              color: SDColors.white, size: 22),
+                          SizedBox(width: SDSpacing.xs),
+                          Expanded(
+                            child: Text(
+                              title,
+                              style: SDTypography.titleMedium.copyWith(
+                                color: SDColors.white,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: SDSpacing.xs),
+                      Text(
+                        message,
+                        style: SDTypography.bodyMedium.copyWith(
+                          color: SDColors.neutral300,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: SDSpacing.md),
+                if (!isSuspended)
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        context.push('/prestataire-finalization',
+                            extra: _prestataireDocId);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: SDColors.primary600,
+                        foregroundColor: SDColors.white,
+                        padding:
+                            EdgeInsets.symmetric(vertical: SDSpacing.md),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(28),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: Text(
+                        'Mettre à jour mon dossier',
+                        style: SDTypography.labelLarge.copyWith(
+                          color: SDColors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                if (!isSuspended) SizedBox(height: SDSpacing.sm),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: () {
+                      context.read<AuthCubit>().switchActiveRole('CLIENT');
+                      context.push('/homepage');
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: SDColors.neutral900,
+                      side: BorderSide(color: SDColors.neutral300),
+                      padding: EdgeInsets.symmetric(vertical: SDSpacing.md),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(28),
+                      ),
+                    ),
+                    child: Text(
+                      'Retour au mode Client',
+                      style: SDTypography.labelLarge.copyWith(
+                        color: SDColors.neutral900,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ),
-            ],
+              ],
+            ),
           ),
-          Column(
+        ),
+      ),
+    );
+  }
+
+  // ⏳ DASHBOARD POUR VALIDATION EN COURS (body only)
+  Widget _buildPendingValidationDashboard() {
+    return ColoredBox(
+      color: SDColors.neutral50,
+      child: SafeArea(
+        bottom: false,
+        child: RefreshIndicator(
+          onRefresh: _initPrestataireData,
+          color: SDColors.primary600,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.fromLTRB(SDSpacing.md, SDSpacing.md, SDSpacing.md, SDSpacing.xl),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildBoutiqueHomeHeader(showActions: true),
+                SizedBox(height: SDSpacing.lg),
+                Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.all(SDSpacing.md),
+                  decoration: BoxDecoration(
+                    color: SDColors.neutral900,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Validation en cours',
+                        style: SDTypography.titleMedium.copyWith(
+                          color: SDColors.white,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      SizedBox(height: SDSpacing.xs),
+                      Text(
+                        'Notre équipe vérifie vos documents. Vous serez notifié dès que votre compte sera activé.',
+                        style: SDTypography.bodyMedium.copyWith(
+                          color: SDColors.neutral300,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: SDSpacing.md),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: () {
+                      context.read<AuthCubit>().switchActiveRole('CLIENT');
+                      context.push('/homepage');
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: SDColors.neutral900,
+                      side: BorderSide(color: SDColors.neutral300),
+                      padding: EdgeInsets.symmetric(vertical: SDSpacing.md),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(28),
+                      ),
+                    ),
+                    child: Text(
+                      'Retour au mode Client',
+                      style: SDTypography.labelLarge.copyWith(
+                        color: SDColors.neutral900,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ✅ Accueil actif — maquette Figma prestataire
+  Widget _buildActiveDashboard() {
+    final user = widget.utilisateur;
+    final auth = context.read<AuthCubit>().state;
+    final authUser = auth is AuthAuthenticated ? auth.utilisateur : null;
+    final displayName = [
+      user?.prenom ?? authUser?.prenom,
+      user?.nom ?? authUser?.nom,
+    ].where((e) => e != null && e.toString().trim().isNotEmpty).join(' ');
+
+    final specialite = _prestataireDoc?['specialite'];
+    String metier = 'Prestataire';
+    if (specialite is List && specialite.isNotEmpty) {
+      metier = _cleanMetierLabel(specialite.first);
+    } else if (specialite != null && specialite.toString().isNotEmpty) {
+      metier = _cleanMetierLabel(specialite);
+    } else if (_prestataireDoc?['metier'] != null) {
+      metier = _cleanMetierLabel(_prestataireDoc!['metier']);
+    }
+
+    String location = 'Abidjan';
+    final loc = _prestataireDoc?['localisation'];
+    if (loc is Map) {
+      location = (loc['adresse'] ?? loc['commune'] ?? loc['ville'] ?? location)
+          .toString();
+    } else if (loc != null && loc.toString().isNotEmpty) {
+      location = loc.toString();
+    }
+
+    final photo = providerPhotoUrl(
+      photoProfil: user?.photoProfil ?? authUser?.photoProfil,
+      utilisateurMap: {
+        'photoProfil': user?.photoProfil ?? authUser?.photoProfil,
+      },
+      prestataireMap: _prestataireDoc,
+    );
+
+    final verified = _prestataireDoc?['verifier'] == true ||
+        _prestataireStatus == 'active' ||
+        _prestataireStatus == 'VALIDE';
+
+    return ProviderHomeDashboard(
+      fullName: displayName.isEmpty ? 'Prestataire' : displayName,
+      photoUrl: photo,
+      metier: metier,
+      location: location,
+      rating: _rating,
+      reviewCount: _reviewCount,
+      isVerified: verified,
+      isAvailable: _isAvailable,
+      availabilityLocalOnly: false,
+      onAvailabilityChanged: _setAvailability,
+      demandesRecues: _totalDemandesMois > 0
+          ? _totalDemandesMois
+          : (_pendingMissionsCount + _ongoingMissionsCount),
+      commandesEnCours: _ongoingMissionsCount,
+      enAttente: _pendingMissionsCount,
+      revenusMois: _monthlyRevenue,
+      isLoadingStats: _isLoadingStats,
+      weeklyActivity: _weeklyActivity,
+      recentMissions: _recentMissions,
+      recentReviews: _recentReviews,
+      soldeDisponible: _soldeDisponible,
+      soldeEnAttente: _soldeEnAttente,
+      unreadMessages: _unreadMessagesCount,
+      unreadNotifications: _unreadNotificationsCount,
+      onRefresh: _initPrestataireData,
+      onOpenStats: _showProviderStatistics,
+      onOpenServices: () => setState(() => _currentIndex = 4),
+      onOpenMessages: () => setState(() => _currentIndex = 3),
+      onOpenPayments: _showSoutraPayScreen,
+      onOpenCalendar: () => setState(() => _currentIndex = 2),
+      onOpenMissions: () => setState(() => _currentIndex = 1),
+      onWithdraw: _showSoutraPayScreen,
+      onSwitchToClient: () {
+        context.read<AuthCubit>().switchActiveRole('CLIENT');
+        context.push('/homepage');
+      },
+      onOpenNotifications: _showNotificationsScreen,
+    );
+  }
+
+  Widget _buildBoutiqueHomeHeader({required bool showActions}) {
+    final name = (widget.utilisateur?.prenom ?? 'Prestataire').toUpperCase();
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            color: SDColors.neutral200,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(Icons.person_outline_rounded, color: SDColors.neutral900, size: 28),
+        ),
+        SizedBox(width: SDSpacing.sm),
+        Expanded(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                value,
-                style: SDTypography.titleMedium.copyWith(
-                  fontWeight: FontWeight.bold,
+                name,
+                style: SDTypography.titleLarge.copyWith(
                   color: SDColors.neutral900,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.4,
                 ),
               ),
-              SizedBox(height: SDSpacing.xxxs),
+              SizedBox(height: 2),
               Text(
-                title,
-                style: SDTypography.bodySmall.copyWith(
-                  color: SDColors.neutral600,
-                ),
-              ),
-              SizedBox(height: SDSpacing.xxxs),
-              Text(
-                subtitle,
-                style: SDTypography.bodySmall.copyWith(
-                  color: color,
-                  fontWeight: FontWeight.w500,
-                ),
+                'Espace prestataire',
+                style: SDTypography.bodySmall.copyWith(color: SDColors.neutral500),
               ),
             ],
           ),
-        ],
-      ),
-    );
-  }
-  
-  Widget _buildStatCardSkeleton() {
-    return Container(
-      padding: EdgeInsets.all(SDSpacing.md),
-      decoration: BoxDecoration(
-        color: SDColors.white,
-        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: SDColors.neutral200,
-              borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
-            ),
+        ),
+        if (showActions) ...[
+          _buildRoundIconButton(
+            icon: Icons.notifications_none_rounded,
+            onTap: _showNotificationsScreen,
+            badge: _unreadNotificationsCount,
           ),
-          SizedBox(height: SDSpacing.md),
-          Container(
-            width: 60,
-            height: 20,
-            decoration: BoxDecoration(
-              color: SDColors.neutral200,
-              borderRadius: BorderRadius.circular(4),
-            ),
-          ),
-          SizedBox(height: SDSpacing.xs),
-          Container(
-            width: 100,
-            height: 16,
-            decoration: BoxDecoration(
-              color: SDColors.neutral100,
-              borderRadius: BorderRadius.circular(4),
-            ),
+          SizedBox(width: SDSpacing.xs),
+          _buildRoundIconButton(
+            icon: Icons.close,
+            onTap: () {
+              context.read<AuthCubit>().switchActiveRole('CLIENT');
+              context.push('/homepage');
+            },
           ),
         ],
-      ),
-    );
-  }
-
-  // 📊 STATISTIQUES AVANCÉES
-  Widget _buildAdvancedStatsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(Icons.analytics, color: Colors.green.shade600, size: 24),
-            const SizedBox(width: 8),
-            Text(
-              'Vos performances',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey[800],
-              ),
-            ),
-            const Spacer(),
-            TextButton.icon(
-              onPressed: () => _showDetailedStats(),
-              icon: Icon(Icons.more_horiz, size: 16),
-              label: Text('Voir tout'),
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.green.shade600,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: 2,
-          childAspectRatio: 1.3,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
-          children: [
-            _buildAdvancedStatCard(
-              'Missions actives',
-              '8',
-              '+2 cette semaine',
-              Icons.assignment,
-              Colors.blue,
-              Colors.blue.shade50,
-            ),
-            _buildAdvancedStatCard(
-              'Revenus du mois',
-              '125K FCFA',
-              '+15% vs mois dernier',
-              Icons.monetization_on,
-              Colors.green,
-              Colors.green.shade50,
-            ),
-            _buildAdvancedStatCard(
-              'Clients satisfaits',
-              '4.8/5',
-              'Basé sur 24 avis',
-              Icons.star,
-              Colors.amber,
-              Colors.amber.shade50,
-            ),
-            _buildAdvancedStatCard(
-              'Taux de réussite',
-              '96%',
-              '+3% cette semaine',
-              Icons.check_circle,
-              Colors.purple,
-              Colors.purple.shade50,
-            ),
-          ],
-        ),
       ],
     );
   }
 
-  // 📈 GRAPHIQUES MINIATURES
-  Widget _buildMiniChartsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildRoundIconButton({
+    required IconData icon,
+    required VoidCallback onTap,
+    int badge = 0,
+  }) {
+    return Stack(
+      clipBehavior: Clip.none,
       children: [
-        Row(
-          children: [
-            Icon(Icons.show_chart, color: Colors.green.shade600, size: 24),
-            const SizedBox(width: 8),
-            Text(
-              'Évolution des revenus',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey[800],
-              ),
+        Material(
+          color: SDColors.neutral100,
+          shape: const CircleBorder(),
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: onTap,
+            child: SizedBox(
+              width: 40,
+              height: 40,
+              child: Icon(icon, color: SDColors.neutral900, size: 20),
             ),
-            const Spacer(),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.green.shade50,
-                borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        if (badge > 0)
+          Positioned(
+            right: -2,
+            top: -2,
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: const BoxDecoration(
+                color: SDColors.error500,
+                shape: BoxShape.circle,
               ),
+              constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
               child: Text(
-                '7 derniers jours',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.green.shade700,
-                  fontWeight: FontWeight.w600,
+                '$badge',
+                textAlign: TextAlign.center,
+                style: SDTypography.labelSmall.copyWith(
+                  color: SDColors.white,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        Container(
-          height: 120,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.grey.withOpacity(0.1),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
           ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Revenus hebdomadaires',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '45,200 FCFA',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.green.shade700,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Icon(Icons.trending_up, color: Colors.green, size: 16),
-                        const SizedBox(width: 4),
-                        Text(
-                          '+8.2% cette semaine',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.green.shade700,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Center(
-                    child: Text(
-                      '📈 Graphique\nen développement',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
       ],
     );
   }
 
-  // ⚡ ACTIONS RAPIDES INTELLIGENTES - AMÉLIORÉES
-  Widget _buildSmartActionsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(Icons.flash_on, color: SDColors.primary600, size: 24),
-            SizedBox(width: SDSpacing.xs),
-            Text(
-              'Actions rapides',
-              style: SDTypography.titleSmall.copyWith(
-                fontWeight: FontWeight.bold,
-                color: SDColors.neutral900,
-              ),
-            ),
-          ],
-        ),
-        SizedBox(height: SDSpacing.md),
-        Row(
-          children: [
-            Expanded(
-              child: _buildSmartActionButton(
-                'Nouvelles missions',
-                _pendingMissionsCount > 0 ? '$_pendingMissionsCount disponibles' : 'Aucune',
-                Icons.assignment_outlined,
-                SDColors.warning500,
-                () => setState(() => _currentIndex = 1),
-              ),
-            ),
-            SizedBox(width: SDSpacing.sm),
-            Expanded(
-              child: _buildSmartActionButton(
-                'Mon planning',
-                'Voir calendrier',
-                Icons.calendar_today_outlined,
-                SDColors.info500,
-                () => setState(() => _currentIndex = 2),
-              ),
-            ),
-          ],
-        ),
-        SizedBox(height: SDSpacing.sm),
-        Row(
-          children: [
-            Expanded(
-              child: _buildSmartActionButton(
-                'Messages',
-                'Conversations',
-                Icons.message_outlined,
-                SDColors.primary600,
-                () => setState(() => _currentIndex = 3),
-              ),
-            ),
-            SizedBox(width: SDSpacing.sm),
-            Expanded(
-              child: _buildSmartActionButton(
-                'Statistiques',
-                'Voir détails',
-                Icons.analytics_outlined,
-                SDColors.success500,
-                () => _showProviderStatistics(),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  // 🎯 RÉCAPITULATIF QUOTIDIEN - AMÉLIORÉ AVEC DESIGN SYSTEM
-  Widget _buildDailySummarySection() {
-    return Container(
-      padding: EdgeInsets.all(SDSpacing.md),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            SDColors.info50,
-            SDColors.success50,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
-        border: Border.all(color: SDColors.primary200, width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: SDColors.neutral200.withOpacity(0.3),
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.today, color: Colors.green.shade600, size: 24),
-              const SizedBox(width: 8),
-              Text(
-                'Récapitulatif du jour',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[800],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: _buildDailyStat(
-                  'Missions terminées',
-                  '2',
-                  Icons.check_circle,
-                  Colors.green,
-                ),
-              ),
-              Expanded(
-                child: _buildDailyStat(
-                  'Revenus du jour',
-                  '15K FCFA',
-                  Icons.monetization_on,
-                  Colors.blue,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _buildDailyStat(
-                  'Nouveaux clients',
-                  '1',
-                  Icons.person_add,
-                  Colors.orange,
-                ),
-              ),
-              Expanded(
-                child: _buildDailyStat(
-                  'Messages reçus',
-                  '3',
-                  Icons.message,
-                  Colors.purple,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 🎨 CARTE DE STATISTIQUE AVANCÉE
-  Widget _buildAdvancedStatCard(
-    String title,
-    String value,
-    String subtitle,
-    IconData icon,
-    Color color,
-    Color backgroundColor,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: backgroundColor,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(icon, color: color, size: 20),
-              ),
-              const Spacer(),
-              Icon(Icons.more_vert, color: Colors.grey[400], size: 20),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey[800],
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[600],
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            subtitle,
-            style: TextStyle(
-              fontSize: 12,
-              color: color,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ⚡ BOUTON D'ACTION INTELLIGENT - AMÉLIORÉ AVEC DESIGN SYSTEM
-  Widget _buildSmartActionButton(
-    String title,
-    String subtitle,
-    IconData icon,
-    Color color,
-    VoidCallback onTap,
-  ) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.all(SDSpacing.md),
-        decoration: BoxDecoration(
-          color: SDColors.white,
-          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
-          border: Border.all(color: color.withOpacity(0.2), width: 1),
-          boxShadow: [
-            BoxShadow(
-              color: SDColors.neutral200.withOpacity(0.5),
-              blurRadius: 8,
-              offset: Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(icon, color: color, size: 20),
-                ),
-                const Spacer(),
-                Icon(Icons.arrow_forward_ios,
-                    color: Colors.grey[400], size: 16),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey[800],
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              subtitle,
-              style: TextStyle(
-                fontSize: 12,
-                color: color,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // 📊 STATISTIQUE QUOTIDIENNE
-  Widget _buildDailyStat(
-      String title, String value, IconData icon, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.7),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 20),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey[800],
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[600],
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 📊 AFFICHER LES STATISTIQUES DÉTAILLÉES
-  void _showDetailedStats() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Statistiques détaillées'),
-        content: const Text('Fonctionnalité en développement...'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Fermer'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ✅ ÉCRANS STATIQUES SANS BLOCBUILDER
-  Widget _buildSimpleMissions() {
+  // ✅ Onglets stables — missions/planning/profil si docId change ; messages une seule fois
+  void _ensureTabScreens() {
     final auth = context.read<AuthCubit>().state;
     final token = auth is AuthAuthenticated ? auth.token : null;
-    return BlocProvider(
-      create: (context) {
+
+    // Messagerie ne dépend pas du docId → ne pas recréer (évite spam WebSocket).
+    _messagesTab ??= BlocProvider<MessagesBloc>(
+      create: (_) {
+        final bloc = MessagesBloc();
+        if (token != null) bloc.setToken(token);
+        return bloc;
+      },
+      child: ProviderMessagesScreen(key: _messagesKey),
+    );
+
+    if (_missionsTab != null && _tabsBoundDocId == _prestataireDocId) return;
+    _tabsBoundDocId = _prestataireDocId;
+
+    _missionsTab = BlocProvider(
+      create: (_) {
         final bloc = MissionsBloc();
         if (token != null) bloc.setToken(token);
         if (_prestataireDocId != null) bloc.setPrestataireId(_prestataireDocId!);
         return bloc;
       },
-      child: ProviderMissionsScreen(prestataireDocId: _prestataireDocId),
+      child: ProviderMissionsScreen(
+        key: _missionsKey,
+        prestataireDocId: _prestataireDocId,
+      ),
     );
-  }
 
-  Widget _buildSimplePlanning() {
-    final auth = context.read<AuthCubit>().state;
-    final token = auth is AuthAuthenticated ? auth.token : null;
-    return BlocProvider<PlanningBloc>(
-      create: (context) {
+    _planningTab = BlocProvider<PlanningBloc>(
+      create: (_) {
         final bloc = PlanningBloc();
         if (token != null) bloc.setToken(token);
         if (_prestataireDocId != null) bloc.setPrestataireId(_prestataireDocId!);
         return bloc;
       },
-      child: ProviderPlanningScreen(prestataireDocId: _prestataireDocId),
+      child: ProviderPlanningScreen(
+        key: _planningKey,
+        prestataireDocId: _prestataireDocId,
+      ),
     );
-  }
 
-  Widget _buildSimpleMessages() {
-    final auth = context.read<AuthCubit>().state;
-    final token = auth is AuthAuthenticated ? auth.token : null;
-    return BlocProvider<MessagesBloc>(
-      create: (context) {
-        final bloc = MessagesBloc();
-        if (token != null) bloc.setToken(token);
-        return bloc;
-      },
-      child: const ProviderMessagesScreen(),
-    );
-  }
-
-  Widget _buildSimpleProfile() {
-    final auth = context.read<AuthCubit>().state;
-    final token = auth is AuthAuthenticated ? auth.token : null;
-    return BlocProvider<ProviderProfileBloc>(
-      create: (context) {
+    _profileTab = BlocProvider<ProviderProfileBloc>(
+      create: (_) {
         final bloc = ProviderProfileBloc();
         if (token != null) bloc.setToken(token);
         return bloc;
       },
-      child: ProviderProfileScreen(prestataireDocId: _prestataireDocId),
+      child: ProviderProfileScreen(
+        key: _profileKey,
+        prestataireDocId: _prestataireDocId,
+        embeddedInTab: true,
+      ),
     );
   }
 
-  // 🎨 APP BAR MAGNIFIQUE POUR EXPERT PRESTATAIRE
-  PreferredSizeWidget _buildExpertAppBar(BuildContext context) {
+  PreferredSizeWidget _buildProAppBar(BuildContext context) {
+    // Chrome clair type Yango / Meta : blanc, texte sombre, vert seulement en accent ailleurs
     return AppBar(
       elevation: 0,
-      backgroundColor: Colors.transparent,
-      flexibleSpace: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Colors.green.shade600,
-              Colors.green.shade800,
+      scrolledUnderElevation: 0,
+      automaticallyImplyLeading: false,
+      backgroundColor: SDColors.white,
+      foregroundColor: SDColors.neutral900,
+      surfaceTintColor: Colors.transparent,
+      centerTitle: false,
+      titleSpacing: 20,
+      toolbarHeight: 64,
+      title: Text(
+        _titles[_currentIndex],
+        style: SDTypography.displayMedium.copyWith(
+          color: SDColors.neutral900,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      actions: [
+        if (_currentIndex == 1) ...[
+          IconButton(
+            tooltip: 'Rechercher',
+            icon: const Icon(Icons.search_rounded, color: SDColors.neutral900),
+            onPressed: () => _missionsKey.currentState?.toggleSearch(),
+          ),
+          IconButton(
+            tooltip: 'Filtrer',
+            icon: const Icon(Icons.tune_rounded, color: SDColors.neutral900),
+            onPressed: () => _missionsKey.currentState?.openFilters(),
+          ),
+        ],
+        if (_currentIndex == 2) ...[
+          IconButton(
+            tooltip: "Aujourd'hui",
+            icon: const Icon(Icons.today_outlined, color: SDColors.neutral900),
+            onPressed: () => _planningKey.currentState?.goToToday(),
+          ),
+          IconButton(
+            tooltip: 'Disponibilités',
+            icon: const Icon(Icons.event_available_outlined,
+                color: SDColors.neutral900),
+            onPressed: () => _planningKey.currentState?.openDisponibilites(),
+          ),
+        ],
+        if (_currentIndex == 3) ...[
+          IconButton(
+            tooltip: 'Rechercher',
+            icon: const Icon(Icons.search_rounded, color: SDColors.neutral900),
+            onPressed: () => _messagesKey.currentState?.toggleSearch(),
+          ),
+          IconButton(
+            tooltip: 'Filtrer',
+            icon: const Icon(Icons.tune_rounded, color: SDColors.neutral900),
+            onPressed: () => _messagesKey.currentState?.openFilters(),
+          ),
+        ],
+        if (_currentIndex == 4) ...[
+          IconButton(
+            tooltip: 'Modifier',
+            icon: const Icon(Icons.edit_outlined, color: SDColors.neutral900),
+            onPressed: () => _profileKey.currentState?.openEdit(),
+          ),
+        ],
+        IconButton(
+          icon: Badge(
+            isLabelVisible: _unreadNotificationsCount > 0,
+            backgroundColor: SDColors.error500,
+            label: Text(
+              '$_unreadNotificationsCount',
+              style: const TextStyle(fontSize: 10, color: Colors.white),
+            ),
+            child: const Icon(Icons.notifications_none_rounded),
+          ),
+          onPressed: _showNotificationsScreen,
+        ),
+        _buildExpertMenu(context),
+        const SizedBox(width: 4),
+      ],
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(1),
+        child: Container(height: 1, color: SDColors.neutral200),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    _ensureTabScreens();
+
+    return Scaffold(
+      backgroundColor: SDColors.neutral50,
+      // Accueil a son propre header (style boutique) → pas d'AppBar parent
+      appBar: _currentIndex == 0 ? null : _buildProAppBar(context),
+      body: IndexedStack(
+        index: _currentIndex,
+        children: [
+          _buildSimpleDashboard(),
+          _missionsTab!,
+          _planningTab!,
+          _messagesTab!,
+          _profileTab!,
+        ],
+      ),
+      bottomNavigationBar: _buildProBottomNavBar(),
+    );
+  }
+
+  Widget _buildProBottomNavBar() {
+    return Container(
+      decoration: BoxDecoration(
+        color: SDColors.white,
+        border: Border(top: BorderSide(color: SDColors.neutral200)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: SDSpacing.xs, vertical: 6),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildProNavItem(0, Icons.home_outlined, Icons.home_rounded, 'Accueil'),
+              _buildProNavItem(
+                  1, Icons.work_outline_rounded, Icons.work_rounded, 'Missions'),
+              _buildProNavItem(2, Icons.calendar_month_outlined,
+                  Icons.calendar_month_rounded, 'Planning'),
+              _buildProNavItem(3, Icons.chat_bubble_outline_rounded,
+                  Icons.chat_bubble_rounded, 'Messages'),
+              _buildProNavItem(4, Icons.person_outline_rounded,
+                  Icons.person_rounded, 'Profil'),
             ],
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.green.withOpacity(0.3),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProNavItem(
+    int index,
+    IconData outlineIcon,
+    IconData filledIcon,
+    String label,
+  ) {
+    final isActive = _currentIndex == index;
+    final color = isActive ? SDColors.neutral900 : SDColors.neutral900.withOpacity(0.45);
+
+    return InkWell(
+      onTap: () {
+        final wasHome = _currentIndex == 0;
+        setState(() => _currentIndex = index);
+        if (index == 0 && !wasHome) {
+          _refreshPrestataireStatusOnly();
+        }
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(isActive ? filledIcon : outlineIcon, color: color, size: 22),
+            const SizedBox(height: 3),
+            Text(
+              label,
+              style: SDTypography.labelSmall.copyWith(
+                color: color,
+                fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                fontSize: 11,
+              ),
+            ),
+            const SizedBox(height: 3),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              height: 3,
+              width: isActive ? 16 : 0,
+              decoration: BoxDecoration(
+                color: SDColors.neutral900,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
           ],
         ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(
-              children: [
-                // 🎯 TITRE AVEC AVATAR
-                Expanded(
-                  child: Row(
-                    children: [
-                      // Avatar du prestataire
-                      Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: LinearGradient(
-                            colors: [Colors.white, Colors.green.shade100],
-                          ),
-                          border: Border.all(color: Colors.white, width: 2),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: Icon(
-                          Icons.handyman,
-                          color: Colors.green.shade700,
-                          size: 20,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      // Titre et sous-titre
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              _titles[_currentIndex],
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                            ),
-                            const SizedBox(height: 1),
-                            Text(
-                              'Expert Prestataire',
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.8),
-                                fontSize: 10,
-                                fontWeight: FontWeight.w500,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // 🎯 ACTIONS EXPERT
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Notifications avec badge animé
-                    _buildNotificationButton(),
-                    const SizedBox(width: 6),
-
-                    // Solde SoutraPay élégant
-                    const SizedBox(width: 6),
-
-                    // Menu expert
-                    _buildExpertMenu(context),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
       ),
     );
   }
 
-  // 🔔 BOUTON NOTIFICATIONS AVEC BADGE
-  Widget _buildNotificationButton() {
-    return Stack(
-      children: [
-        Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: Colors.white.withOpacity(0.3)),
-          ),
-          child: IconButton(
-            icon: const Icon(Icons.notifications_outlined,
-                color: Colors.white, size: 20),
-            onPressed: () {
-              _showNotificationsScreen();
-            },
-            padding: EdgeInsets.zero,
-          ),
-        ),
-        if (_unreadNotificationsCount > 0)
-          Positioned(
-            right: 8,
-            top: 8,
-            child: Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: Colors.red,
-                borderRadius: BorderRadius.circular(10),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.red.withOpacity(0.3),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              constraints: const BoxConstraints(
-                minWidth: 18,
-                minHeight: 18,
-              ),
-              child: Text(
-                '$_unreadNotificationsCount',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-
-
-  // 🎯 MENU EXPERT
   Widget _buildExpertMenu(BuildContext context) {
     return PopupMenuButton<String>(
-      offset: const Offset(0, 50), // Afficher le menu EN DESSOUS
-      icon: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.2),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: Colors.white.withOpacity(0.3)),
-        ),
-        child: const Icon(Icons.more_vert, color: Colors.white, size: 20),
-      ),
+      offset: const Offset(0, 44),
+      icon: const Icon(Icons.more_vert, color: SDColors.neutral900, size: 22),
       onSelected: (value) {
         switch (value) {
           case 'profil':
@@ -1514,7 +1315,7 @@ class _ProviderMainScreenState extends State<ProviderMainScreen> {
           value: 'profil',
           child: Row(
             children: [
-              Icon(Icons.person, color: Colors.green.shade600),
+              Icon(Icons.person_outline_rounded, color: SDColors.neutral900),
               const SizedBox(width: 12),
               const Text('Mon Profil'),
             ],
@@ -1524,7 +1325,7 @@ class _ProviderMainScreenState extends State<ProviderMainScreen> {
           value: 'parametres',
           child: Row(
             children: [
-              Icon(Icons.settings, color: Colors.green.shade600),
+              Icon(Icons.settings_outlined, color: SDColors.neutral900),
               const SizedBox(width: 12),
               const Text('Paramètres'),
             ],
@@ -1534,7 +1335,7 @@ class _ProviderMainScreenState extends State<ProviderMainScreen> {
           value: 'statistiques',
           child: Row(
             children: [
-              Icon(Icons.analytics, color: Colors.green.shade600),
+              Icon(Icons.bar_chart_outlined, color: SDColors.neutral900),
               const SizedBox(width: 12),
               const Text('Statistiques'),
             ],
@@ -1545,10 +1346,9 @@ class _ProviderMainScreenState extends State<ProviderMainScreen> {
           value: 'retour_client',
           child: Row(
             children: [
-              Icon(Icons.home, color: Colors.blue.shade600),
+              Icon(Icons.home_outlined, color: SDColors.neutral900),
               const SizedBox(width: 12),
-              Text('Retour Client',
-                  style: TextStyle(color: Colors.blue.shade600)),
+              const Text('Retour Client'),
             ],
           ),
         ),
@@ -1556,9 +1356,10 @@ class _ProviderMainScreenState extends State<ProviderMainScreen> {
           value: 'deconnexion',
           child: Row(
             children: [
-              Icon(Icons.logout, color: Colors.red.shade600),
+              Icon(Icons.logout_rounded, color: SDColors.error600),
               const SizedBox(width: 12),
-              Text('Déconnexion', style: TextStyle(color: Colors.red.shade600)),
+              Text('Déconnexion',
+                  style: TextStyle(color: SDColors.error600)),
             ],
           ),
         ),
@@ -1604,114 +1405,7 @@ class _ProviderMainScreenState extends State<ProviderMainScreen> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    // ⚡ SOLUTION RADICALE : Écrans statiques pour éviter la boucle infinie
-    final List<Widget> _screens = [
-      _buildSimpleDashboard(),
-      _buildSimpleMissions(),
-      _buildSimplePlanning(),
-      _buildSimpleMessages(),
-      _buildSimpleProfile(),
-    ];
-
-    return Scaffold(
-      appBar: _buildExpertAppBar(context),
-      body: _screens[_currentIndex],
-      bottomNavigationBar: _buildExpertBottomNavBar(context),
-    );
-  }
-
-  // 🎨 BOTTOM NAV BAR MAGNIFIQUE POUR EXPERT PRESTATAIRE
-  Widget _buildExpertBottomNavBar(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Colors.green.shade600,
-            Colors.green.shade800,
-          ],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.green.withOpacity(0.3),
-            blurRadius: 15,
-            offset: const Offset(0, -5),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildExpertNavItem(
-                  0, Icons.home_outlined, Icons.home, 'Accueil'),
-              _buildExpertNavItem(
-                  1, Icons.assignment_outlined, Icons.assignment, 'Missions'),
-              _buildExpertNavItem(2, Icons.calendar_today_outlined,
-                  Icons.calendar_today, 'Planning'),
-              _buildExpertNavItem(
-                  3, Icons.message_outlined, Icons.message, 'Messages'),
-              _buildExpertNavItem(
-                  4, Icons.person_outline, Icons.person, 'Profil'),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // 🎯 ÉLÉMENT DE NAVIGATION EXPERT
-  Widget _buildExpertNavItem(
-      int index, IconData outlineIcon, IconData filledIcon, String label) {
-    final isActive = _currentIndex == index;
-
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _currentIndex = index;
-        });
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-        decoration: BoxDecoration(
-          color: isActive ? Colors.white.withOpacity(0.2) : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-          border: isActive
-              ? Border.all(color: Colors.white.withOpacity(0.3), width: 1)
-              : null,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Icône avec animation
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              child: Icon(
-                isActive ? filledIcon : outlineIcon,
-                color: isActive ? Colors.white : Colors.white.withOpacity(0.7),
-                size: isActive ? 24 : 22,
-              ),
-            ),
-            const SizedBox(height: 4),
-            // Label avec style adaptatif
-            Text(
-              label,
-              style: TextStyle(
-                color: isActive ? Colors.white : Colors.white.withOpacity(0.7),
-                fontSize: isActive ? 12 : 11,
-                fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  // (ancien build / bottom nav vert — remplacés par IndexedStack + _buildPro*)
 
   // 🔔 AFFICHER L'ÉCRAN DE NOTIFICATIONS
   void _showNotificationsScreen() {
@@ -1777,7 +1471,7 @@ class _ProviderMainScreenState extends State<ProviderMainScreen> {
             if (token != null) bloc.setToken(token);
             return bloc;
           },
-          child: const ProviderSettingsScreen(),
+          child: ProviderSettingsScreen(prestataireDocId: _prestataireDocId),
         ),
       ),
     );
@@ -1803,7 +1497,5 @@ class _ProviderMainScreenState extends State<ProviderMainScreen> {
   }
 
   // 🎯 MÉTHODE POUR VÉRIFIER LE STATUT DU PRESTATAIRE
-  String _getPrestataireStatus() {
-    return _prestataireStatus;
-  }
+  String _getPrestataireStatus() => _resolveDashboardStatus();
 }

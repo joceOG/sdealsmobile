@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../alertpageblocm/alertPageBlocM.dart';
 import '../alertpageblocm/alertPageEventM.dart';
 import '../alertpageblocm/alertPageStateM.dart';
+import '../../../../design_system/design_system.dart';
 
 class AlertSettingsScreenM extends StatefulWidget {
   const AlertSettingsScreenM({super.key});
@@ -160,18 +161,18 @@ class _AlertSettingsScreenMState extends State<AlertSettingsScreenM> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Paramètres des Alertes'),
-        backgroundColor: Colors.green[600],
-        foregroundColor: Colors.white,
-        elevation: 0,
+      backgroundColor: SDColors.white,
+      appBar: SDWhiteAppBar.appBar(
+        title: 'Paramètres des Alertes',
         actions: [
           TextButton(
             onPressed: _savePreferences,
-            child: const Text(
+            child: Text(
               'Sauvegarder',
-              style:
-                  TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              style: SDTypography.bodyMedium.copyWith(
+                color: SDColors.neutral900,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],

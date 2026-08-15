@@ -20,6 +20,9 @@ class SDListingPreviewCard extends StatelessWidget {
   final String? badgeText;
   /// Pastille haut-droite (ex. PROMO, -20 %).
   final String? promoBadgeText;
+  /// Cœur favori haut-droite (style Airbnb) — section Métiers.
+  final bool showFavoriteHeart;
+  final VoidCallback? onFavoriteTap;
   final bool squareImage;
   final VoidCallback? onTap;
 
@@ -45,6 +48,8 @@ class SDListingPreviewCard extends StatelessWidget {
     this.priceText,
     this.badgeText,
     this.promoBadgeText,
+    this.showFavoriteHeart = false,
+    this.onFavoriteTap,
     this.squareImage = false,
     this.onTap,
   });
@@ -164,7 +169,7 @@ class SDListingPreviewCard extends StatelessWidget {
                       if (promoBadgeText != null && promoBadgeText!.isNotEmpty)
                         Positioned(
                           top: 8,
-                          right: 8,
+                          right: showFavoriteHeart ? 44 : 8,
                           child: Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 8,
@@ -180,6 +185,30 @@ class SDListingPreviewCard extends StatelessWidget {
                                 color: SDColors.white,
                                 fontWeight: FontWeight.w700,
                                 fontSize: 11,
+                              ),
+                            ),
+                          ),
+                        ),
+                      if (showFavoriteHeart)
+                        Positioned(
+                          top: 6,
+                          right: 6,
+                          child: Material(
+                            color: SDColors.white.withOpacity(0.92),
+                            shape: const CircleBorder(),
+                            elevation: 1,
+                            shadowColor: SDColors.neutral900.withOpacity(0.12),
+                            child: InkWell(
+                              customBorder: const CircleBorder(),
+                              onTap: onFavoriteTap,
+                              child: const SizedBox(
+                                width: 34,
+                                height: 34,
+                                child: Icon(
+                                  Icons.favorite_border_rounded,
+                                  size: 18,
+                                  color: SDColors.neutral900,
+                                ),
                               ),
                             ),
                           ),

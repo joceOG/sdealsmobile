@@ -1,0 +1,7 @@
+# Copier vers android/key.properties (NE PAS COMMITTER)
+# Généré localement avec upload-keystore.jks
+
+storePassword=REMPLACE_MOI
+keyPassword=REMPLACE_MOI
+keyAlias=upload
+storeFile=upload-keystore.jks

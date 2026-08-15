@@ -13,19 +13,18 @@ class JobPageStateM extends Equatable {
   final List<Service> listItems2;
   final String error2;
 
-  // Estimation de prix IA
   final AIPriceEstimation? priceEstimation;
   final bool isPriceLoading;
   final String priceError;
 
-  // Matching prestataires IA
   final List<Prestataire> matchedProviders;
   final ProviderMatchExplanation? matchExplanation;
   final bool isMatchingLoading;
   final String matchError;
 
-  // ✅ NOUVEAU : Géolocalisation
   final List<Prestataire> nearbyProviders;
+  /// idprestataire → distance km (calcul Haversine)
+  final Map<String, double> providerDistances;
   final bool isNearbyLoading;
   final String nearbyError;
   final double? userLatitude;
@@ -33,6 +32,8 @@ class JobPageStateM extends Equatable {
   final double searchRadius;
   final String selectedCategory;
   final String selectedService;
+  final bool filterVerifiedOnly;
+  final double? filterMinRating;
 
   const JobPageStateM({
     required this.isLoading,
@@ -49,6 +50,7 @@ class JobPageStateM extends Equatable {
     required this.isMatchingLoading,
     required this.matchError,
     required this.nearbyProviders,
+    this.providerDistances = const {},
     required this.isNearbyLoading,
     required this.nearbyError,
     this.userLatitude,
@@ -56,13 +58,14 @@ class JobPageStateM extends Equatable {
     required this.searchRadius,
     required this.selectedCategory,
     required this.selectedService,
+    this.filterVerifiedOnly = false,
+    this.filterMinRating,
   });
 
-  /// État initial "safe"
   factory JobPageStateM.initial() {
     return const JobPageStateM(
       isLoading: true,
-      listItems: [], // ✅ liste vide, plus de null
+      listItems: [],
       error: '',
       isLoading2: true,
       listItems2: [],
@@ -70,11 +73,12 @@ class JobPageStateM extends Equatable {
       priceEstimation: null,
       isPriceLoading: false,
       priceError: '',
-      matchedProviders: [], // ✅ liste vide
+      matchedProviders: [],
       matchExplanation: null,
       isMatchingLoading: false,
       matchError: '',
       nearbyProviders: [],
+      providerDistances: {},
       isNearbyLoading: false,
       nearbyError: '',
       userLatitude: null,
@@ -82,7 +86,23 @@ class JobPageStateM extends Equatable {
       searchRadius: 5.0,
       selectedCategory: '',
       selectedService: '',
+      filterVerifiedOnly: false,
+      filterMinRating: null,
     );
+  }
+
+  /// Liste affichable (nearby prioritaire, sinon matching), après filtres chips.
+  List<Prestataire> get displayProviders {
+    final base =
+        nearbyProviders.isNotEmpty ? nearbyProviders : matchedProviders;
+    return base.where((p) {
+      if (filterVerifiedOnly && !p.verifier) return false;
+      if (filterMinRating != null) {
+        final n = double.tryParse('${p.note ?? ''}'.replaceAll(',', '.')) ?? 0;
+        if (n < filterMinRating!) return false;
+      }
+      return true;
+    }).toList();
   }
 
   JobPageStateM copyWith({
@@ -100,6 +120,7 @@ class JobPageStateM extends Equatable {
     bool? isMatchingLoading,
     String? matchError,
     List<Prestataire>? nearbyProviders,
+    Map<String, double>? providerDistances,
     bool? isNearbyLoading,
     String? nearbyError,
     double? userLatitude,
@@ -107,6 +128,9 @@ class JobPageStateM extends Equatable {
     double? searchRadius,
     String? selectedCategory,
     String? selectedService,
+    bool? filterVerifiedOnly,
+    double? filterMinRating,
+    bool clearMinRating = false,
   }) {
     return JobPageStateM(
       isLoading: isLoading ?? this.isLoading,
@@ -123,6 +147,7 @@ class JobPageStateM extends Equatable {
       isMatchingLoading: isMatchingLoading ?? this.isMatchingLoading,
       matchError: matchError ?? this.matchError,
       nearbyProviders: nearbyProviders ?? this.nearbyProviders,
+      providerDistances: providerDistances ?? this.providerDistances,
       isNearbyLoading: isNearbyLoading ?? this.isNearbyLoading,
       nearbyError: nearbyError ?? this.nearbyError,
       userLatitude: userLatitude ?? this.userLatitude,
@@ -130,6 +155,9 @@ class JobPageStateM extends Equatable {
       searchRadius: searchRadius ?? this.searchRadius,
       selectedCategory: selectedCategory ?? this.selectedCategory,
       selectedService: selectedService ?? this.selectedService,
+      filterVerifiedOnly: filterVerifiedOnly ?? this.filterVerifiedOnly,
+      filterMinRating:
+          clearMinRating ? null : (filterMinRating ?? this.filterMinRating),
     );
   }
 
@@ -149,6 +177,7 @@ class JobPageStateM extends Equatable {
         isMatchingLoading,
         matchError,
         nearbyProviders,
+        providerDistances,
         isNearbyLoading,
         nearbyError,
         userLatitude,
@@ -156,5 +185,7 @@ class JobPageStateM extends Equatable {
         searchRadius,
         selectedCategory,
         selectedService,
+        filterVerifiedOnly,
+        filterMinRating,
       ];
 }

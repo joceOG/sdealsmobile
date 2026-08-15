@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker_android/image_picker_android.dart';
+import 'package:image_picker_platform_interface/image_picker_platform_interface.dart';
 import 'package:responsive_builder/responsive_builder.dart';
 import 'package:sdealsmobile/data/models/vendeur.dart' hide Utilisateur;
 import 'data/models/utilisateur.dart';
@@ -10,7 +13,6 @@ import 'data/services/fcm_service.dart';
 import 'data/utils/go_router_refresh_stream.dart';
 import 'mobile/view/locationpagem/locationpageblocm/locationPageBlocM.dart';
 import 'mobile/view/home.dart';
-import 'mobile/view/loginpagem/loginpageblocm/loginPageBlocM.dart';
 import 'mobile/view/loginpagem/screens/loginPageScreenM.dart';
 import 'mobile/view/provider_dashboard/screens/provider_main_screen.dart';
 import 'mobile/view/provider_dashboard/screens/prestataire_finalization_screen.dart';
@@ -40,6 +42,29 @@ late final AuthCubit appAuthCubit;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Photo Picker système (Android) — pas de READ_MEDIA_IMAGES / galerie large.
+  final imagePickerImplementation = ImagePickerPlatform.instance;
+  if (imagePickerImplementation is ImagePickerAndroid) {
+    imagePickerImplementation.useAndroidPhotoPicker = true;
+  }
+
+  // Barre de statut + navigation Android en blanc
+  // contrastEnforced: false → obligatoire Android 10+ / edge-to-edge (sinon reste noire)
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.dark,
+      statusBarBrightness: Brightness.light,
+      systemNavigationBarColor: Colors.white,
+      systemNavigationBarDividerColor: Colors.transparent,
+      systemNavigationBarIconBrightness: Brightness.dark,
+      systemNavigationBarContrastEnforced: false,
+      systemStatusBarContrastEnforced: false,
+    ),
+  );
+
   await Hive.initFlutter();
   try {
     await dotenv.load(fileName: ".env");
@@ -58,7 +83,7 @@ void main() async {
 
   // Firebase + Crashlytics (no-op si non configuré)
   await CrashlyticsService.initialize();
-  // FCM : no-op si Firebase non configuré (pas de google-services.json)
+  // FCM local (permissions + token) — sans await réseau backend (voir FcmService).
   await FcmService.instance.initialize();
 
   appAuthCubit = AuthCubit();
@@ -79,6 +104,9 @@ class MyApp extends StatelessWidget {
     redirect: (context, state) {
       final loggedIn = appAuthCubit.state is AuthAuthenticated;
       final loc = state.matchedLocation;
+      if (loggedIn && (loc == '/login' || loc == '/register')) {
+        return '/homepage';
+      }
       final needsAuth =
           _authRequiredPrefixes.any((p) => loc == p || loc.startsWith('$p/'));
       if (needsAuth && !loggedIn) return '/login';
@@ -89,8 +117,9 @@ class MyApp extends StatelessWidget {
         path: '/',
         builder: (context, state) {
           return BlocProvider(
-            create: (_) => SplashscreenBlocM()..add(LoadSplashM()),
-            child: SplashScreenM(),
+            create: (_) => SplashscreenBlocM(authCubit: appAuthCubit)
+              ..add(LoadSplashM()),
+            child: const SplashScreenM(),
           );
         },
       ),
@@ -113,12 +142,7 @@ class MyApp extends StatelessWidget {
       ),
       GoRoute(
         path: '/login',
-        builder: (context, state) {
-          return BlocProvider(
-            create: (context) => LoginPageBlocM(),
-            child: LoginPageScreenM(),
-          );
-        },
+        builder: (context, state) => const LoginPageScreenM(),
       ),
       GoRoute(
         path: '/serviceProviderWelcome',
@@ -180,10 +204,9 @@ class MyApp extends StatelessWidget {
         builder: (context, state) {
           final missionId = state.pathParameters['missionId'] ?? '';
           return Scaffold(
-            appBar: AppBar(
-              title: const Text('Mission'),
-              backgroundColor: SDColors.primary600,
-              foregroundColor: Colors.white,
+            backgroundColor: SDColors.white,
+            appBar: SDWhiteAppBar.appBar(
+              title: 'Mission',
             ),
             body: Center(
               child: Padding(
@@ -266,7 +289,18 @@ class MyApp extends StatelessWidget {
         return ResponsiveBuilder(builder: (context, sizingInformation) {
         GoRouter router = mobileRouter;
 
-        return MaterialApp.router(
+        return AnnotatedRegion<SystemUiOverlayStyle>(
+          value: const SystemUiOverlayStyle(
+            statusBarColor: Colors.transparent,
+            statusBarIconBrightness: Brightness.dark,
+            statusBarBrightness: Brightness.light,
+            systemNavigationBarColor: Colors.white,
+            systemNavigationBarDividerColor: Colors.transparent,
+            systemNavigationBarIconBrightness: Brightness.dark,
+            systemNavigationBarContrastEnforced: false,
+            systemStatusBarContrastEnforced: false,
+          ),
+          child: MaterialApp.router(
           routerConfig: router,
           title: 'Soutrali Deals',
           debugShowCheckedModeBanner: false,
@@ -314,15 +348,28 @@ class MyApp extends StatelessWidget {
             // APPBAR
             // ═══════════════════════════════════════
             appBarTheme: AppBarTheme(
-              backgroundColor: SDColors.primary500,
+              backgroundColor: SDColors.white,
               elevation: 0,
-              centerTitle: true,
-              titleTextStyle: SDTypography.titleLarge.copyWith(
-                color: SDColors.white,
+              scrolledUnderElevation: 0,
+              centerTitle: false,
+              surfaceTintColor: Colors.transparent,
+              foregroundColor: SDColors.neutral900,
+              systemOverlayStyle: const SystemUiOverlayStyle(
+                statusBarColor: Colors.transparent,
+                statusBarIconBrightness: Brightness.dark,
+                statusBarBrightness: Brightness.light,
+                systemNavigationBarColor: Colors.white,
+                systemNavigationBarIconBrightness: Brightness.dark,
+                systemNavigationBarContrastEnforced: false,
+                systemStatusBarContrastEnforced: false,
+              ),
+              titleTextStyle: SDTypography.displayMedium.copyWith(
+                color: SDColors.neutral900,
+                fontWeight: FontWeight.w700,
               ),
               iconTheme: const IconThemeData(
-                color: SDColors.white,
-                size: 24,
+                color: SDColors.neutral900,
+                size: 22,
               ),
             ),
             
@@ -458,6 +505,7 @@ class MyApp extends StatelessWidget {
               ),
             ),
           ),
+        ),
         );
       });
       }),

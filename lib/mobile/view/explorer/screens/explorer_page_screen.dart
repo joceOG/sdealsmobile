@@ -25,6 +25,7 @@ import 'package:sdealsmobile/mobile/view/shoppingpagem/shoppingpageblocm/shoppin
     as shop_state;
 import 'package:go_router/go_router.dart';
 
+import 'package:sdealsmobile/mobile/view/explorer/widgets/explorer_metiers_map_panel.dart';
 import '../../../../design_system/design_system.dart';
 import '../../common/widgets/app_image.dart';
 import '../../common/widgets/skeleton_loader.dart';
@@ -32,7 +33,10 @@ import '../../common/widgets/skeleton_loader.dart';
 /// Filtre type Figma (chips sous la recherche).
 enum _ExplorerUniverse { tous, metiers, freelance, marketplace }
 
-/// Onglet **Explorer** : hub découverte (Figma) + lien vers recherche globale.
+enum _ExplorerViewMode { list, map }
+
+/// Onglet **Explorer** : hub découverte + recherche globale.
+/// Liste (feed multi-univers) | Carte (Métiers / géo) — même écran, style Airbnb.
 class ExplorerPageScreen extends StatelessWidget {
   const ExplorerPageScreen({super.key});
 
@@ -72,6 +76,7 @@ class _ExplorerBody extends StatefulWidget {
 class _ExplorerBodyState extends State<_ExplorerBody> {
   final TextEditingController _searchCtrl = TextEditingController();
   _ExplorerUniverse _universe = _ExplorerUniverse.tous;
+  _ExplorerViewMode _viewMode = _ExplorerViewMode.list;
 
   @override
   void dispose() {
@@ -115,53 +120,142 @@ class _ExplorerBodyState extends State<_ExplorerBody> {
       _universe == _ExplorerUniverse.tous ||
       _universe == _ExplorerUniverse.marketplace;
 
+  /// Carte utile pour Métiers (et Tous = markers métiers).
+  bool get _mapAvailable =>
+      _universe == _ExplorerUniverse.tous ||
+      _universe == _ExplorerUniverse.metiers;
+
+  void _selectUniverse(_ExplorerUniverse value) {
+    setState(() {
+      _universe = value;
+      // Airbnb-like : Marketplace / Freelance → Liste ; Métiers → Carte.
+      if (value == _ExplorerUniverse.metiers) {
+        _viewMode = _ExplorerViewMode.map;
+      } else if (value == _ExplorerUniverse.freelance ||
+          value == _ExplorerUniverse.marketplace) {
+        _viewMode = _ExplorerViewMode.list;
+      } else {
+        _viewMode = _ExplorerViewMode.list;
+      }
+    });
+  }
+
+  /// Affiche uniquement les cartes avec une vraie image (réseau ou asset).
+  bool _hasDisplayableImage(String? url) {
+    final v = url?.trim() ?? '';
+    if (v.isEmpty || v.toLowerCase() == 'null') return false;
+    final lower = v.toLowerCase();
+    if (lower.contains('default.png') ||
+        lower.contains('placeholder') ||
+        lower.endsWith('/null')) {
+      return false;
+    }
+    return v.startsWith('http') || v.startsWith('assets/');
+  }
+
   @override
   Widget build(BuildContext context) {
+    final showMap = _viewMode == _ExplorerViewMode.map && _mapAvailable;
+
     return Scaffold(
       backgroundColor: SDColors.white,
       body: SafeArea(
         top: true,
         bottom: false,
-        child: CustomScrollView(
-          physics: const BouncingScrollPhysics(),
-          slivers: [
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(
-                  SDSpacing.md,
-                  SDSpacing.xs,
-                  SDSpacing.md,
-                  SDSpacing.sm,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildTopTitle(context),
-                    SizedBox(height: SDSpacing.md),
-                    _buildSearchRow(context),
-                    SizedBox(height: SDSpacing.xs),
-                    _buildChips(),
-                    SizedBox(height: SDSpacing.lg),
-                    if (_showMetiers) ...[
-                      _buildMetiersSection(context),
-                      SizedBox(height: SDSpacing.xl),
-                    ],
-                    if (_showFreelance) ...[
-                      _buildFreelanceSection(context),
-                      SizedBox(height: SDSpacing.xl),
-                    ],
-                    if (_showMarketplace) ...[
-                      _buildProductsSection(context),
-                      SizedBox(height: SDSpacing.xl),
-                      _buildShopsSection(context),
-                    ],
-                    SizedBox(height: SDSpacing.xxl),
-                  ],
-                ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildTopTitle(context),
+                  SizedBox(height: SDSpacing.md),
+                  _buildSearchRow(context),
+                  SizedBox(height: SDSpacing.md),
+                  _buildUniverseIcons(),
+                  SizedBox(height: SDSpacing.sm),
+                  if (_mapAvailable) _buildListMapToggle(),
+                  if (!_mapAvailable &&
+                      _universe == _ExplorerUniverse.marketplace)
+                    Padding(
+                      padding: EdgeInsets.only(bottom: SDSpacing.xs),
+                      child: Text(
+                        'Marketplace en liste — la carte est pour les métiers près de vous.',
+                        style: SDTypography.labelSmall.copyWith(
+                          color: SDColors.neutral500,
+                        ),
+                      ),
+                    ),
+                ],
               ),
+            ),
+            Expanded(
+              child: showMap
+                  ? const Padding(
+                      padding: EdgeInsets.only(top: 4),
+                      child: ExplorerMetiersMapPanel(),
+                    )
+                  : CustomScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      slivers: [
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (_showMetiers) _buildMetiersSection(context),
+                                if (_showFreelance)
+                                  _buildFreelanceSection(context),
+                                if (_showMarketplace) ...[
+                                  _buildProductsSection(context),
+                                  _buildShopsSection(context),
+                                ],
+                                SizedBox(height: SDSpacing.lg),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildListMapToggle() {
+    return Container(
+      margin: EdgeInsets.only(bottom: SDSpacing.sm),
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: SDColors.neutral100,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _ViewModeBtn(
+              label: 'Liste',
+              icon: Icons.view_list_rounded,
+              selected: _viewMode == _ExplorerViewMode.list,
+              onTap: () =>
+                  setState(() => _viewMode = _ExplorerViewMode.list),
+            ),
+          ),
+          Expanded(
+            child: _ViewModeBtn(
+              label: 'Carte',
+              icon: Icons.map_outlined,
+              selected: _viewMode == _ExplorerViewMode.map,
+              onTap: () =>
+                  setState(() => _viewMode = _ExplorerViewMode.map),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -175,9 +269,9 @@ class _ExplorerBodyState extends State<_ExplorerBody> {
           'Explorer',
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: SDTypography.headlineSmall.copyWith(
+          style: SDTypography.displayMedium.copyWith(
             color: SDColors.neutral900,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w700,
           ),
         ),
         SizedBox(height: SDSpacing.xxxs),
@@ -194,311 +288,178 @@ class _ExplorerBodyState extends State<_ExplorerBody> {
     );
   }
 
-  /// Même barre que `_buildSearchField` (Freelance / Explorer) : pill 28, ombre légère.
+  /// Barre type YouTube : pill, fond clair, contour noir (pas de vert).
   Widget _buildSearchRow(BuildContext context) {
     return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: SDSpacing.sm,
-        vertical: SDSpacing.xs,
-      ),
+      height: 48,
+      padding: const EdgeInsets.only(left: 14, right: 10),
       decoration: BoxDecoration(
-        color: SDColors.white,
+        color: SDColors.neutral100,
         borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: SDColors.primary100, width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: SDColors.neutral900.withOpacity(0.05),
-            blurRadius: 6,
-            offset: const Offset(0, 1),
-          ),
-        ],
+        border: Border.all(color: SDColors.neutral900, width: 1),
       ),
       child: Row(
         children: [
-          Icon(Icons.search, color: SDColors.primary600, size: 20),
+          Icon(Icons.search, color: SDColors.neutral700, size: 22),
           SizedBox(width: SDSpacing.xs),
           Expanded(
             child: TextField(
               controller: _searchCtrl,
               textInputAction: TextInputAction.search,
               onSubmitted: (_) => _openSearch(),
+              cursorColor: SDColors.neutral900,
               decoration: InputDecoration(
-                hintText:
-                    'Rechercher service, produit ou prestataire..',
+                hintText: 'Rechercher service, produit ou prestataire..',
                 hintStyle: SDTypography.bodyMedium.copyWith(
-                  color: SDColors.neutral400,
-                  fontSize: 13,
+                  color: SDColors.neutral500,
+                  fontSize: 14,
                 ),
-                border: InputBorder.none,
+                // Le thème global applique un focusedBorder vert : on force tout à none.
+                filled: false,
                 isDense: true,
                 contentPadding: EdgeInsets.zero,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                disabledBorder: InputBorder.none,
+                errorBorder: InputBorder.none,
+                focusedErrorBorder: InputBorder.none,
               ),
-              style: SDTypography.bodyMedium.copyWith(fontSize: 13),
+              style: SDTypography.bodyMedium.copyWith(
+                fontSize: 14,
+                color: SDColors.neutral900,
+              ),
             ),
           ),
-          GestureDetector(
-            onTap: () => _openSearch(),
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: SDColors.primary600,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(Icons.tune, color: SDColors.white, size: 17),
+          IconButton(
+            onPressed: () => _openSearch(),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+            icon: const Icon(
+              Icons.arrow_forward,
+              color: SDColors.neutral900,
+              size: 22,
             ),
+            tooltip: 'Rechercher',
           ),
         ],
       ),
     );
   }
 
-  /// Segment **Tous | Métiers** (chip) ; titre de section : Prestataires près de moi.
-  Widget _buildChips() {
-    const peachBg = Color(0xFFF5E6D8);
-    const peachText = Color(0xFF5D4037);
-    const beigeFreelance = Color(0xFFF0EFEA);
+  /// Univers Figma : Métiers / Freelance / Vente & Achat / Plus — style pro.
+  Widget _buildUniverseIcons() {
+    const freelanceColor = Color(0xFF2F6FED);
+    const marketplaceColor = Color(0xFF2E7D32); // vert sac (Figma)
+    const plusColor = Color(0xFF9CA3AF);
 
-    /// Contenu d’un segment (le parent [Row] fournit la largeur via [Expanded]).
-    Widget segmentCell({
-      required String label,
-      required _ExplorerUniverse value,
-      required bool selected,
-    }) {
-      return Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => setState(() => _universe = value),
-          borderRadius: BorderRadius.circular(20),
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              child: Text(
-                label,
-                style: SDTypography.labelMedium.copyWith(
-                  color: selected
-                      ? SDColors.primary700
-                      : SDColors.neutral600,
-                  fontWeight:
-                      selected ? FontWeight.w800 : FontWeight.w600,
-                  fontSize: 13,
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
-    }
+    final items = <({
+      String label,
+      IconData icon,
+      Color color,
+      _ExplorerUniverse value,
+      bool usePillWhenSelected,
+    })>[
+      (
+        label: 'Métiers',
+        icon: Icons.person_rounded,
+        color: SDColors.primary600,
+        value: _ExplorerUniverse.metiers,
+        usePillWhenSelected: true,
+      ),
+      (
+        label: 'Freelance',
+        icon: Icons.person_rounded,
+        color: freelanceColor,
+        value: _ExplorerUniverse.freelance,
+        usePillWhenSelected: false,
+      ),
+      (
+        label: 'Vente & Achat',
+        icon: Icons.shopping_bag_rounded,
+        color: marketplaceColor,
+        value: _ExplorerUniverse.marketplace,
+        usePillWhenSelected: false,
+      ),
+      (
+        label: 'Plus',
+        icon: Icons.apps_rounded,
+        color: plusColor,
+        value: _ExplorerUniverse.tous,
+        usePillWhenSelected: false,
+      ),
+    ];
 
-    Widget standaloneChip({
-      required String label,
-      required _ExplorerUniverse value,
-      required Color background,
-      required Color textColor,
-      bool selectedBold = true,
-    }) {
-      final selected = _universe == value;
-      // Pas d'[AnimatedContainer] : bordure width 0 → 1.5 provoquait des tweens invalides
-      // et assert Widget.canUpdate après setState / hot reload.
-      return Padding(
-        key: ValueKey<String>('explorer_chip_$label'),
-        padding: const EdgeInsets.only(left: 8),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () => setState(() => _universe = value),
-            borderRadius: BorderRadius.circular(22),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: background,
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(
-                  color: selected
-                      ? SDColors.primary400
-                      : background,
-                  width: 1.5,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: SDColors.neutral900.withOpacity(0.04),
-                    blurRadius: 4,
-                    offset: const Offset(0, 1),
-                  ),
-                ],
-              ),
-              child: Text(
-                label,
-                style: SDTypography.labelMedium.copyWith(
-                  color: textColor,
-                  fontWeight: selected && selectedBold
-                      ? FontWeight.w800
-                      : FontWeight.w600,
-                  fontSize: 13,
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
-    }
+    return SizedBox(
+      height: 88,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: items.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 18),
+        itemBuilder: (context, index) {
+          final meta = items[index];
+          final selected = _universe == meta.value;
+          final labelColor = selected ? meta.color : SDColors.neutral900;
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          // Largeur fixe : obligatoire pour [Expanded] dans un scroll horizontal.
-          SizedBox(
-            key: const ValueKey('explorer_segment_tous_metiers'),
-            width: 200,
-            child: Container(
-              decoration: BoxDecoration(
-                color: SDColors.primary50,
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(
-                  color: SDColors.primary100.withOpacity(0.6),
-                ),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              child: Row(
+          return GestureDetector(
+            onTap: () => _selectUniverse(meta.value),
+            behavior: HitTestBehavior.opaque,
+            child: SizedBox(
+              width: meta.label == 'Vente & Achat' ? 78 : 72,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.only(right: 6),
-                      child: segmentCell(
-                        label: 'Tous',
-                        value: _ExplorerUniverse.tous,
-                        selected: _universe == _ExplorerUniverse.tous,
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOut,
+                    width: selected && meta.usePillWhenSelected ? 64 : 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: selected ? meta.color : SDColors.white,
+                      borderRadius: BorderRadius.circular(
+                        selected && meta.usePillWhenSelected ? 26 : 26,
                       ),
+                      border: Border.all(
+                        color: selected
+                            ? meta.color
+                            : SDColors.neutral200,
+                        width: 1.2,
+                      ),
+                      boxShadow: selected
+                          ? null
+                          : [
+                              BoxShadow(
+                                color: SDColors.neutral900
+                                    .withValues(alpha: 0.06),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                    ),
+                    child: Icon(
+                      meta.icon,
+                      color: selected ? SDColors.white : meta.color,
+                      size: 26,
                     ),
                   ),
-                  Container(
-                    width: 1,
-                    height: 22,
-                    margin: const EdgeInsets.symmetric(vertical: 4),
-                    color: SDColors.primary200.withOpacity(0.85),
-                  ),
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.only(left: 6),
-                      child: segmentCell(
-                        label: 'Métiers',
-                        value: _ExplorerUniverse.metiers,
-                        selected: _universe == _ExplorerUniverse.metiers,
-                      ),
+                  const SizedBox(height: 8),
+                  Text(
+                    meta.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: SDTypography.labelSmall.copyWith(
+                      color: labelColor,
+                      fontWeight:
+                          selected ? FontWeight.w800 : FontWeight.w600,
+                      fontSize: 12,
                     ),
                   ),
                 ],
               ),
             ),
-          ),
-          standaloneChip(
-            label: 'Freelance',
-            value: _ExplorerUniverse.freelance,
-            background: beigeFreelance,
-            textColor: SDColors.neutral800,
-          ),
-          standaloneChip(
-            label: 'Marketplace',
-            value: _ExplorerUniverse.marketplace,
-            background: peachBg,
-            textColor: peachText,
-          ),
-          Padding(
-            key: const ValueKey('explorer_chip_more'),
-            padding: const EdgeInsets.only(left: 8),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: () => _showExplorerMoreSheet(context),
-                borderRadius: BorderRadius.circular(22),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: SDColors.neutral100,
-                    borderRadius: BorderRadius.circular(22),
-                    boxShadow: [
-                      BoxShadow(
-                        color: SDColors.neutral900.withOpacity(0.04),
-                        blurRadius: 4,
-                        offset: const Offset(0, 1),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 4,
-                        height: 4,
-                        decoration: const BoxDecoration(
-                          color: SDColors.primary600,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 3),
-                      Container(
-                        width: 4,
-                        height: 4,
-                        decoration: const BoxDecoration(
-                          color: SDColors.primary600,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 3),
-                      Container(
-                        width: 4,
-                        height: 4,
-                        decoration: const BoxDecoration(
-                          color: SDColors.primary600,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showExplorerMoreSheet(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: EdgeInsets.all(SDSpacing.md),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Explorer',
-                style: SDTypography.titleMedium.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              SizedBox(height: SDSpacing.sm),
-              ListTile(
-                leading: Icon(Icons.manage_search, color: SDColors.primary600),
-                title: const Text('Vue complète — recherche globale'),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _openSearch();
-                },
-              ),
-            ],
-          ),
-        ),
+          );
+        },
       ),
     );
   }
@@ -508,124 +469,137 @@ class _ExplorerBodyState extends State<_ExplorerBody> {
     required String titleLight,
     required VoidCallback onSeeAll,
   }) {
+    final titleStyle = SDTypography.titleLarge.copyWith(
+      color: SDColors.neutral900,
+      fontWeight: FontWeight.w800,
+      fontSize: 22,
+      height: 1.15,
+    );
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Expanded(
           child: RichText(
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             text: TextSpan(
-              style: SDTypography.titleMedium.copyWith(
-                color: SDColors.neutral900,
-                fontWeight: FontWeight.w800,
-              ),
+              style: titleStyle,
               children: [
                 TextSpan(text: titleBold),
-                TextSpan(
-                  text: titleLight,
-                  style: SDTypography.titleMedium.copyWith(
-                    color: SDColors.neutral600,
-                    fontWeight: FontWeight.w600,
+                if (titleLight.trim().isNotEmpty)
+                  TextSpan(
+                    text: titleLight,
+                    style: titleStyle.copyWith(
+                      color: SDColors.neutral600,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
               ],
             ),
           ),
         ),
-        TextButton.icon(
-          onPressed: onSeeAll,
-          icon: const Icon(Icons.arrow_forward, size: 14),
-          label: Text('Voir tout', style: SDTypography.labelSmall),
-          style: TextButton.styleFrom(
-            foregroundColor: SDColors.primary600,
-            padding: SDSpacing.chipPadding,
-            minimumSize: const Size(0, 32),
+        GestureDetector(
+          onTap: onSeeAll,
+          behavior: HitTestBehavior.opaque,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Voir tout',
+                  style: SDTypography.labelMedium.copyWith(
+                    color: SDColors.neutral600,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(width: 2),
+                Icon(
+                  Icons.chevron_right,
+                  size: 18,
+                  color: SDColors.neutral600,
+                ),
+              ],
+            ),
           ),
         ),
       ],
     );
   }
 
+  /// Espacement compact entre sections (style Yango).
+  Widget _sectionGap({required Widget child}) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: SDSpacing.md + 4),
+      child: child,
+    );
+  }
+
   Widget _buildMetiersSection(BuildContext context) {
     return BlocBuilder<JobPageBlocM, JobPageStateM>(
       builder: (context, state) {
-        final list = state.matchedProviders;
+        final list = state.matchedProviders
+            .where((p) => _hasDisplayableImage(p.selfie))
+            .toList();
         if (state.isMatchingLoading && list.isEmpty) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _sectionHeader(
-                titleBold: 'Prestataires',
-                titleLight: ' près de moi',
-                onSeeAll: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const JobPageScreenM()),
-                ),
-              ),
-              SizedBox(height: SDSpacing.sm),
-              SizedBox(
-                height: 200,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: 4,
-                  separatorBuilder: (_, __) => SizedBox(width: SDSpacing.sm),
-                  itemBuilder: (_, __) => SkeletonWidget.rounded(
-                    width: 156,
-                    height: 196,
-                    borderRadius: 18,
+          return _sectionGap(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _sectionHeader(
+                  titleBold: 'Prestataires',
+                  titleLight: '',
+                  onSeeAll: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const JobPageScreenM()),
                   ),
                 ),
-              ),
-            ],
+                SizedBox(height: SDSpacing.xs),
+                SizedBox(
+                  height: 200,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: 4,
+                    separatorBuilder: (_, __) => SizedBox(width: SDSpacing.sm),
+                    itemBuilder: (_, __) => SkeletonWidget.rounded(
+                      width: 156,
+                      height: 196,
+                      borderRadius: 18,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           );
         }
         if (list.isEmpty) {
-          return Column(
+          return const SizedBox.shrink();
+        }
+        return _sectionGap(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _sectionHeader(
                 titleBold: 'Prestataires',
-                titleLight: ' près de moi',
+                titleLight: '',
                 onSeeAll: () => Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const JobPageScreenM()),
                 ),
               ),
-              SizedBox(height: SDSpacing.sm),
-              Text(
-                'Aucun prestataire pour le moment. Découvrez Métiers.',
-                style: SDTypography.bodySmall.copyWith(
-                  color: SDColors.neutral500,
+              SizedBox(height: SDSpacing.xs),
+              SizedBox(
+                height: 196,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: list.length,
+                  separatorBuilder: (_, __) => SizedBox(width: SDSpacing.sm),
+                  itemBuilder: (context, i) {
+                    return _MetierCard(prestataire: list[i]);
+                  },
                 ),
               ),
             ],
-          );
-        }
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _sectionHeader(
-              titleBold: 'Prestataires',
-              titleLight: ' près de moi',
-              onSeeAll: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const JobPageScreenM()),
-              ),
-            ),
-            SizedBox(height: SDSpacing.sm),
-            SizedBox(
-              height: 210,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: list.length,
-                separatorBuilder: (_, __) => SizedBox(width: SDSpacing.sm),
-                itemBuilder: (context, i) {
-                  return _MetierCard(
-                    prestataire: list[i],
-                    distanceKm: (0.4 + (i + 1) * 0.22).toStringAsFixed(1),
-                  );
-                },
-              ),
-            ),
-          ],
+          ),
         );
       },
     );
@@ -634,9 +608,48 @@ class _ExplorerBodyState extends State<_ExplorerBody> {
   Widget _buildFreelanceSection(BuildContext context) {
     return BlocBuilder<FreelancePageBlocM, FreelancePageStateM>(
       builder: (context, state) {
-        final list = state.freelancers.take(12).toList();
+        final list = state.freelancers
+            .where((f) => _hasDisplayableImage(f.imagePath))
+            .take(12)
+            .toList();
         if (state.isLoading && list.isEmpty) {
-          return Column(
+          return _sectionGap(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _sectionHeader(
+                  titleBold: 'Freelances',
+                  titleLight: ' populaires',
+                  onSeeAll: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          const FreelancePageScreen(categories: []),
+                    ),
+                  ),
+                ),
+                SizedBox(height: SDSpacing.xs),
+                SizedBox(
+                  height: 200,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: 4,
+                    separatorBuilder: (_, __) => SizedBox(width: SDSpacing.sm),
+                    itemBuilder: (_, __) => SkeletonWidget.rounded(
+                      width: 148,
+                      height: 188,
+                      borderRadius: 18,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+        if (list.isEmpty) {
+          return const SizedBox.shrink();
+        }
+        return _sectionGap(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _sectionHeader(
@@ -644,55 +657,25 @@ class _ExplorerBodyState extends State<_ExplorerBody> {
                 titleLight: ' populaires',
                 onSeeAll: () => Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (_) => const FreelancePageScreen(categories: []),
+                    builder: (_) =>
+                        const FreelancePageScreen(categories: []),
                   ),
                 ),
               ),
-              SizedBox(height: SDSpacing.sm),
+              SizedBox(height: SDSpacing.xs),
               SizedBox(
                 height: 200,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
-                  itemCount: 4,
+                  itemCount: list.length,
                   separatorBuilder: (_, __) => SizedBox(width: SDSpacing.sm),
-                  itemBuilder: (_, __) => SkeletonWidget.rounded(
-                    width: 148,
-                    height: 188,
-                    borderRadius: 18,
-                  ),
+                  itemBuilder: (context, i) {
+                    return _FreelanceExplorerCard(freelance: list[i]);
+                  },
                 ),
               ),
             ],
-          );
-        }
-        if (list.isEmpty) {
-          return const SizedBox.shrink();
-        }
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _sectionHeader(
-              titleBold: 'Freelances',
-              titleLight: ' populaires',
-              onSeeAll: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const FreelancePageScreen(categories: []),
-                ),
-              ),
-            ),
-            SizedBox(height: SDSpacing.sm),
-            SizedBox(
-              height: 200,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: list.length,
-                separatorBuilder: (_, __) => SizedBox(width: SDSpacing.sm),
-                itemBuilder: (context, i) {
-                  return _FreelanceExplorerCard(freelance: list[i]);
-                },
-              ),
-            ),
-          ],
+          ),
         );
       },
     );
@@ -702,9 +685,43 @@ class _ExplorerBodyState extends State<_ExplorerBody> {
     return BlocBuilder<ShoppingPageBlocM, shop_state.ShoppingPageStateM>(
       builder: (context, state) {
         final raw = state.filteredProducts ?? state.products ?? [];
-        final list = raw.take(10).toList();
+        final list = raw
+            .where((p) => _hasDisplayableImage(p.image))
+            .take(10)
+            .toList();
         if ((state.isLoading ?? false) && list.isEmpty) {
-          return Column(
+          return _sectionGap(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _sectionHeader(
+                  titleBold: 'Produits',
+                  titleLight: ' tendance',
+                  onSeeAll: _openMarketplace,
+                ),
+                SizedBox(height: SDSpacing.xs),
+                SizedBox(
+                  height: 220,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: 4,
+                    separatorBuilder: (_, __) => SizedBox(width: SDSpacing.sm),
+                    itemBuilder: (_, __) => SkeletonWidget.rounded(
+                      width: 152,
+                      height: 208,
+                      borderRadius: 16,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+        if (list.isEmpty) {
+          return const SizedBox.shrink();
+        }
+        return _sectionGap(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _sectionHeader(
@@ -712,53 +729,23 @@ class _ExplorerBodyState extends State<_ExplorerBody> {
                 titleLight: ' tendance',
                 onSeeAll: _openMarketplace,
               ),
-              SizedBox(height: SDSpacing.sm),
+              SizedBox(height: SDSpacing.xs),
               SizedBox(
-                height: 220,
+                height: 228,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
-                  itemCount: 4,
+                  itemCount: list.length,
                   separatorBuilder: (_, __) => SizedBox(width: SDSpacing.sm),
-                  itemBuilder: (_, __) => SkeletonWidget.rounded(
-                    width: 152,
-                    height: 208,
-                    borderRadius: 16,
-                  ),
+                  itemBuilder: (context, i) {
+                    return _ProductTrendCard(
+                      product: list[i],
+                      bloc: context.read<ShoppingPageBlocM>(),
+                    );
+                  },
                 ),
               ),
             ],
-          );
-        }
-        if (list.isEmpty) {
-          return const SizedBox.shrink();
-        }
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _sectionHeader(
-              titleBold: 'Produits',
-              titleLight: ' tendance',
-              onSeeAll: _openMarketplace,
-            ),
-            SizedBox(height: SDSpacing.sm),
-            SizedBox(
-              height: 228,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: list.length,
-                separatorBuilder: (_, __) => SizedBox(width: SDSpacing.sm),
-                itemBuilder: (context, i) {
-                  final p = list[i];
-                  final pct = 10 + (p.id.hashCode.abs() % 21);
-                  return _ProductTrendCard(
-                    product: p,
-                    discountPercent: pct,
-                    bloc: context.read<ShoppingPageBlocM>(),
-                  );
-                },
-              ),
-            ),
-          ],
+          ),
         );
       },
     );
@@ -768,78 +755,108 @@ class _ExplorerBodyState extends State<_ExplorerBody> {
     return BlocBuilder<ShoppingPageBlocM, shop_state.ShoppingPageStateM>(
       builder: (context, state) {
         final shops = state.filteredVendeurs ?? state.vendeurs ?? [];
-        final list = shops.take(8).toList();
+        final list = shops
+            .where((v) => _hasDisplayableImage(v.shopLogo))
+            .take(8)
+            .toList();
         if (list.isEmpty) {
-          return Column(
+          return const SizedBox.shrink();
+        }
+        return _sectionGap(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _sectionHeader(
                 titleBold: 'Boutiques',
-                titleLight: ' autour de moi',
+                titleLight: '',
                 onSeeAll: _openMarketplace,
               ),
-              SizedBox(height: SDSpacing.sm),
-              Text(
-                'Boutiques en cours de chargement…',
-                style: SDTypography.bodySmall.copyWith(
-                  color: SDColors.neutral500,
+              SizedBox(height: SDSpacing.xs),
+              SizedBox(
+                height: 104,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: list.length,
+                  separatorBuilder: (_, __) => SizedBox(width: SDSpacing.sm),
+                  itemBuilder: (context, i) {
+                    return _ShopPillCard(vendeur: list[i]);
+                  },
                 ),
               ),
             ],
-          );
-        }
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _sectionHeader(
-              titleBold: 'Boutiques',
-              titleLight: ' autour de moi',
-              onSeeAll: _openMarketplace,
-            ),
-            SizedBox(height: SDSpacing.sm),
-            SizedBox(
-              height: 104,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: list.length,
-                separatorBuilder: (_, __) => SizedBox(width: SDSpacing.sm),
-                itemBuilder: (context, i) {
-                  return _ShopPillCard(vendeur: list[i]);
-                },
-              ),
-            ),
-          ],
+          ),
         );
       },
     );
   }
 }
 
-class _MetierCard extends StatelessWidget {
-  final Prestataire prestataire;
-  final String distanceKm;
+class _ViewModeBtn extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
 
-  const _MetierCard({
-    required this.prestataire,
-    required this.distanceKm,
+  const _ViewModeBtn({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
   });
 
-  bool get _busy =>
-      prestataire.utilisateur.idutilisateur.hashCode % 3 == 0;
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? SDColors.white : Colors.transparent,
+      borderRadius: BorderRadius.circular(10),
+      elevation: selected ? 1 : 0,
+      shadowColor: SDColors.neutral900.withValues(alpha: 0.08),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 16,
+                color: selected ? SDColors.neutral900 : SDColors.neutral500,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: SDTypography.labelSmall.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: selected ? SDColors.neutral900 : SDColors.neutral500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MetierCard extends StatelessWidget {
+  final Prestataire prestataire;
+
+  const _MetierCard({required this.prestataire});
 
   @override
   Widget build(BuildContext context) {
     // Évite « null » si prenom est null (interpolation) ou si l'API renvoie le mot « null ».
     final raw = prestataire.utilisateur.fullName.trim();
     final shortName = raw
-            .split(RegExp(r'\s+'))
-            .where((w) =>
-                w.isNotEmpty && w.toLowerCase() != 'null')
-            .join(' ')
-            .trim();
-    final displayName =
-        shortName.isEmpty ? 'Prestataire' : shortName;
-    final note = double.tryParse(prestataire.note ?? '') ?? 4.5;
+        .split(RegExp(r'\s+'))
+        .where((w) => w.isNotEmpty && w.toLowerCase() != 'null')
+        .join(' ')
+        .trim();
+    final displayName = shortName.isEmpty ? 'Prestataire' : shortName;
+    final note = double.tryParse(prestataire.note ?? '');
+    final metier = prestataire.service.nomservice.trim();
 
     return GestureDetector(
       onTap: () {
@@ -900,48 +917,33 @@ class _MetierCard extends StatelessWidget {
                 ),
               ),
             ),
+            if (metier.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(10, 0, 10, 4),
+                child: Text(
+                  metier,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: SDTypography.labelSmall.copyWith(
+                    color: SDColors.neutral600,
+                  ),
+                ),
+              ),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10),
+              padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
               child: Row(
                 children: [
-                  Icon(Icons.near_me, size: 12, color: SDColors.primary600),
-                  Text(
-                    ' $distanceKm km',
-                    style: SDTypography.labelSmall.copyWith(
-                      color: SDColors.primary600,
-                      fontWeight: FontWeight.w600,
+                  if (note != null) ...[
+                    Icon(Icons.star_rounded,
+                        size: 14, color: SDColors.warning500),
+                    Text(
+                      ' ${note.toStringAsFixed(1)}',
+                      style: SDTypography.labelSmall.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  ),
-                  const Spacer(),
-                  Icon(Icons.star_rounded,
-                      size: 14, color: SDColors.warning500),
-                  Text(
-                    note.toStringAsFixed(1),
-                    style: SDTypography.labelSmall.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
+                  ],
                 ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(10, 6, 10, 10),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                decoration: BoxDecoration(
-                  color: _busy
-                      ? SDColors.error50
-                      : SDColors.success50,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  _busy ? 'Occupé(e)' : 'Disponible',
-                  textAlign: TextAlign.center,
-                  style: SDTypography.labelSmall.copyWith(
-                    color: _busy ? SDColors.error600 : SDColors.success700,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
               ),
             ),
           ],
@@ -1094,12 +1096,10 @@ class _FreelanceExplorerCard extends StatelessWidget {
 
 class _ProductTrendCard extends StatelessWidget {
   final shop_state.Product product;
-  final int discountPercent;
   final ShoppingPageBlocM bloc;
 
   const _ProductTrendCard({
     required this.product,
-    required this.discountPercent,
     required this.bloc,
   });
 
@@ -1134,54 +1134,29 @@ class _ProductTrendCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Expanded(
-              child: Stack(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(8),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: SDColors.neutral50,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: product.image.startsWith('http')
-                            ? AppImage(
-                                imageUrl: product.image,
-                                fit: BoxFit.contain,
-                                placeholderAsset:
-                                    'assets/products/default.png',
-                              )
-                            : Image.asset(
-                                product.image.isNotEmpty
-                                    ? product.image
-                                    : 'assets/products/default.png',
-                                fit: BoxFit.contain,
-                              ),
-                      ),
-                    ),
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: SDColors.neutral50,
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  Positioned(
-                    top: 10,
-                    right: 10,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: SDColors.error500,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        '-$discountPercent%',
-                        style: SDTypography.labelSmall.copyWith(
-                          color: SDColors.white,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 10,
-                        ),
-                      ),
-                    ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: product.image.startsWith('http')
+                        ? AppImage(
+                            imageUrl: product.image,
+                            fit: BoxFit.contain,
+                            placeholderAsset: 'assets/products/default.png',
+                          )
+                        : Image.asset(
+                            product.image.isNotEmpty
+                                ? product.image
+                                : 'assets/products/default.png',
+                            fit: BoxFit.contain,
+                          ),
                   ),
-                ],
+                ),
               ),
             ),
             Padding(

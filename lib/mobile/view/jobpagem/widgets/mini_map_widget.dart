@@ -32,26 +32,56 @@ class _MiniMapWidgetState extends State<MiniMapWidget> {
   }
 
   void _initializeMap() {
-    // Position du prestataire (simulée pour la démo)
-    final providerLat = 5.3599 + (widget.provider.hashCode % 100) * 0.001;
-    final providerLng = -4.0083 + (widget.provider.hashCode % 100) * 0.001;
-    final providerPosition = LatLng(providerLat, providerLng);
+    final providerPosition = _resolveProviderLatLng();
+    if (providerPosition == null) {
+      _distance = 'Position GPS du prestataire indisponible';
+      return;
+    }
 
-    // Calculer la distance si position utilisateur disponible
     if (widget.userLocation != null) {
       final distance = Geolocator.distanceBetween(
         widget.userLocation!.latitude,
         widget.userLocation!.longitude,
-        providerLat,
-        providerLng,
+        providerPosition.latitude,
+        providerPosition.longitude,
       );
-      _distance = '${distance.toInt()} m de votre emplacement actuel';
+      if (distance < 1000) {
+        _distance = '${distance.toInt()} m de votre emplacement';
+      } else {
+        _distance =
+            '${(distance / 1000).toStringAsFixed(1)} km de votre emplacement';
+      }
     } else {
-      _distance = 'Distance non calculée';
+      _distance = 'Activez la localisation pour voir la distance';
     }
 
-    // Créer les marqueurs
     _createMarkers(providerPosition);
+  }
+
+  /// Coordonnées réelles depuis localisationmaps (API), pas de position factice.
+  LatLng? _resolveProviderLatLng() {
+    final maps = _getProviderProperty('localisationmaps') ??
+        _getProviderProperty('localisationMaps');
+    double? lat;
+    double? lng;
+    if (maps is Map) {
+      lat = _toDouble(maps['latitude'] ?? maps['lat']);
+      lng = _toDouble(maps['longitude'] ?? maps['lng'] ?? maps['lon']);
+    } else if (maps != null) {
+      try {
+        lat = _toDouble(maps.latitude);
+        lng = _toDouble(maps.longitude);
+      } catch (_) {}
+    }
+    if (lat == null || lng == null) return null;
+    if (lat.abs() > 90 || lng.abs() > 180) return null;
+    return LatLng(lat, lng);
+  }
+
+  double? _toDouble(dynamic v) {
+    if (v == null) return null;
+    if (v is num) return v.toDouble();
+    return double.tryParse(v.toString().replaceAll(',', '.').trim());
   }
 
   Future<void> _createMarkers(LatLng providerPosition) async {
@@ -129,16 +159,12 @@ class _MiniMapWidgetState extends State<MiniMapWidget> {
   }
 
   String _getProviderPrice() {
-    // Générer un prix aléatoire pour la démo
-    final prices = [
-      '5 000 F CFA',
-      '8 000 F CFA',
-      '12 000 F CFA',
-      '15 000 F CFA',
-      '20 000 F CFA',
-      '25 000 F CFA',
-    ];
-    return prices[widget.provider.hashCode % prices.length];
+    final raw = _getProviderProperty('prixprestataire');
+    final amount = _toDouble(raw);
+    if (amount != null && amount > 0) {
+      return '${amount.toStringAsFixed(0)} F CFA';
+    }
+    return 'Sur devis';
   }
 
   // ✅ Helper pour accéder aux propriétés de façon universelle (Map ou Objet)
@@ -146,8 +172,12 @@ class _MiniMapWidgetState extends State<MiniMapWidget> {
     if (widget.provider == null) return null;
     
     // Si c'est un Map
-    if (widget.provider is Map<String, dynamic>) {
-      return widget.provider[key];
+    if (widget.provider is Map) {
+      final map = Map<String, dynamic>.from(widget.provider as Map);
+      if (map.containsKey(key)) return map[key];
+      if (key == 'localisationmaps') return map['localisationMaps'];
+      if (key == 'localisationMaps') return map['localisationmaps'];
+      return null;
     }
     
     // Si c'est un objet avec propriétés
@@ -165,6 +195,11 @@ class _MiniMapWidgetState extends State<MiniMapWidget> {
           return widget.provider.disponibilite;
         case 'note':
           return widget.provider.note;
+        case 'localisationmaps':
+        case 'localisationMaps':
+          return widget.provider.localisationMaps;
+        case 'prixprestataire':
+          return widget.provider.prixprestataire;
         default:
           return null;
       }
@@ -222,13 +257,16 @@ class _MiniMapWidgetState extends State<MiniMapWidget> {
   }
 
   Future<void> _getDirections() async {
-    // Position du prestataire
-    final providerLat = 5.3599 + (widget.provider.hashCode % 100) * 0.001;
-    final providerLng = -4.0083 + (widget.provider.hashCode % 100) * 0.001;
+    final pos = _resolveProviderLatLng();
+    if (pos == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Position du prestataire indisponible')),
+      );
+      return;
+    }
 
-    // Ouvrir Google Maps avec l'itinéraire
     final url =
-        'https://www.google.com/maps/dir/?api=1&destination=$providerLat,$providerLng';
+        'https://www.google.com/maps/dir/?api=1&destination=${pos.latitude},${pos.longitude}';
 
     try {
       if (await canLaunchUrl(Uri.parse(url))) {
@@ -246,10 +284,13 @@ class _MiniMapWidgetState extends State<MiniMapWidget> {
   }
 
   void _openFullMap() {
-    // Position du prestataire
-    final providerLat = 5.3599 + (widget.provider.hashCode % 100) * 0.001;
-    final providerLng = -4.0083 + (widget.provider.hashCode % 100) * 0.001;
-    final providerPosition = LatLng(providerLat, providerLng);
+    final providerPosition = _resolveProviderLatLng();
+    if (providerPosition == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Position du prestataire indisponible')),
+      );
+      return;
+    }
 
     // Récupérer les données de façon sécurisée
     final categorie = _getProviderProperty('categorie');
@@ -294,6 +335,8 @@ class _MiniMapWidgetState extends State<MiniMapWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final providerPosition = _resolveProviderLatLng();
+
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 16),
       decoration: BoxDecoration(
@@ -315,18 +358,32 @@ class _MiniMapWidgetState extends State<MiniMapWidget> {
               margin: const EdgeInsets.symmetric(horizontal: 16),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.green.shade200, width: 2),
+              border: Border.all(color: const Color(0xFFE5E5E5), width: 1),
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: Stack(
+              child: providerPosition == null
+                  ? Container(
+                      color: const Color(0xFFF5F5F5),
+                      alignment: Alignment.center,
+                      child: const Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Text(
+                          'Carte indisponible\n(GPS prestataire manquant)',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Color(0xFF171717),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    )
+                  : Stack(
                 children: [
                   GoogleMap(
                     initialCameraPosition: CameraPosition(
-                      target: LatLng(
-                        5.3599 + (widget.provider.hashCode % 100) * 0.001,
-                        -4.0083 + (widget.provider.hashCode % 100) * 0.001,
-                      ),
+                      target: providerPosition,
                       zoom: 15.0,
                     ),
                     markers: _markers,
@@ -363,7 +420,7 @@ class _MiniMapWidgetState extends State<MiniMapWidget> {
                         onPressed: _openFullMap,
                         icon: const Icon(
                           Icons.fullscreen,
-                          color: Colors.green,
+                          color: Color(0xFF171717),
                           size: 20,
                         ),
                         tooltip: 'Voir la carte complète',
@@ -395,19 +452,19 @@ class _MiniMapWidgetState extends State<MiniMapWidget> {
               ),
               child: Row(
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.location_on,
-                    color: Colors.amber.shade700,
-                    size: 11,
+                    color: Color(0xFF171717),
+                    size: 12,
                   ),
                   const SizedBox(width: 4),
                   Expanded(
                     child: Text(
                       _distance,
-                      style: TextStyle(
-                        color: Colors.amber.shade800,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w500,
+                      style: const TextStyle(
+                        color: Color(0xFF171717),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,

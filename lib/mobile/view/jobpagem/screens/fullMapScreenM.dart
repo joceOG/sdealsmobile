@@ -34,6 +34,17 @@ class FullMapScreenM extends StatefulWidget {
 }
 
 class _FullMapScreenMState extends State<FullMapScreenM> {
+  static const List<String> _defaultCategories = [
+    'Auto',
+    'Immobilier',
+    'Électronique',
+  ];
+  static const List<String> _defaultServices = [
+    'Plombier',
+    'Coiffeur',
+    'Photographe',
+  ];
+
   GoogleMapController? _mapController;
   Set<Marker> _markers = {};
   LatLng? _userLocation;
@@ -48,9 +59,31 @@ class _FullMapScreenMState extends State<FullMapScreenM> {
     super.initState();
     _userLocation = widget.initialPosition;
     _currentRadius = widget.searchRadius;
-    _selectedCategory = widget.selectedCategory ?? '';
-    _selectedService = widget.selectedService ?? '';
+    _selectedCategory = (widget.selectedCategory ?? '').trim();
+    _selectedService = (widget.selectedService ?? '').trim();
     _updateMapMarkers(widget.providers);
+  }
+
+  /// Valeurs affichables : defaults + valeur passée depuis la fiche (évite le crash Dropdown).
+  List<String> _categoryChoices() {
+    final names = <String>{..._defaultCategories};
+    final incoming = (widget.selectedCategory ?? '').trim();
+    if (incoming.isNotEmpty) names.add(incoming);
+    if (_selectedCategory.isNotEmpty) names.add(_selectedCategory);
+    return names.toList()..sort();
+  }
+
+  List<String> _serviceChoices() {
+    final names = <String>{..._defaultServices};
+    final incoming = (widget.selectedService ?? '').trim();
+    if (incoming.isNotEmpty) names.add(incoming);
+    if (_selectedService.isNotEmpty) names.add(_selectedService);
+    return names.toList()..sort();
+  }
+
+  String? _safeDropdownValue(String current, List<String> choices) {
+    if (current.isEmpty) return null;
+    return choices.contains(current) ? current : null;
   }
 
   void _updateMapMarkers(List<dynamic> providers) async {
@@ -229,7 +262,7 @@ class _FullMapScreenMState extends State<FullMapScreenM> {
     _mapController = controller;
   }
 
-  void _getCurrentLocation() async {
+  void _getCurrentLocation([BuildContext? blocContext]) async {
     try {
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
@@ -253,58 +286,65 @@ class _FullMapScreenMState extends State<FullMapScreenM> {
         CameraUpdate.newLatLng(_userLocation!),
       );
 
-      // Charger les prestataires à proximité
-      context.read<JobPageBlocM>().add(LoadNearbyProvidersM(
-            latitude: _userLocation!.latitude,
-            longitude: _userLocation!.longitude,
-            radius: _currentRadius,
-            category: _selectedCategory.isNotEmpty ? _selectedCategory : null,
-            service: _selectedService.isNotEmpty ? _selectedService : null,
-          ));
+      if (!mounted) return;
+      final ctx = blocContext ?? context;
+      try {
+        ctx.read<JobPageBlocM>().add(LoadNearbyProvidersM(
+              latitude: _userLocation!.latitude,
+              longitude: _userLocation!.longitude,
+              radius: _currentRadius,
+              category:
+                  _selectedCategory.isNotEmpty ? _selectedCategory : null,
+              service: _selectedService.isNotEmpty ? _selectedService : null,
+            ));
+      } catch (e) {
+        print('JobPageBlocM indisponible pour reload: $e');
+      }
     } catch (e) {
       print('Erreur de géolocalisation: $e');
     }
   }
 
-  void _searchNearbyProviders() {
-    if (_userLocation != null) {
-      context.read<JobPageBlocM>().add(LoadNearbyProvidersM(
-            latitude: _userLocation!.latitude,
-            longitude: _userLocation!.longitude,
-            radius: _currentRadius,
-            category: _selectedCategory.isNotEmpty ? _selectedCategory : null,
-            service: _selectedService.isNotEmpty ? _selectedService : null,
-          ));
-    }
+  void _searchNearbyProviders(BuildContext blocContext) {
+    if (_userLocation == null) return;
+    blocContext.read<JobPageBlocM>().add(LoadNearbyProvidersM(
+          latitude: _userLocation!.latitude,
+          longitude: _userLocation!.longitude,
+          radius: _currentRadius,
+          category: _selectedCategory.isNotEmpty ? _selectedCategory : null,
+          service: _selectedService.isNotEmpty ? _selectedService : null,
+        ));
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: SDWhiteAppBar.appBar(
-        title: 'Carte complète',
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.my_location_outlined),
-            onPressed: _getCurrentLocation,
-            tooltip: 'Ma position',
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            onPressed: _searchNearbyProviders,
-            tooltip: 'Actualiser',
-          ),
-        ],
-      ),
-      body: BlocProvider(
-        create: (_) => JobPageBlocM(),
-        child: BlocListener<JobPageBlocM, JobPageStateM>(
-          listener: (context, state) {
-            if (state.nearbyProviders.isNotEmpty) {
-              _updateMapMarkers(state.nearbyProviders);
-            }
-          },
-          child: Column(
+    return BlocProvider(
+      create: (_) => JobPageBlocM(),
+      child: Builder(
+        builder: (blocContext) {
+          return Scaffold(
+            appBar: SDWhiteAppBar.appBar(
+              title: 'Carte complète',
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.my_location_outlined),
+                  onPressed: () => _getCurrentLocation(blocContext),
+                  tooltip: 'Ma position',
+                ),
+                IconButton(
+                  icon: const Icon(Icons.refresh_rounded),
+                  onPressed: () => _searchNearbyProviders(blocContext),
+                  tooltip: 'Actualiser',
+                ),
+              ],
+            ),
+            body: BlocListener<JobPageBlocM, JobPageStateM>(
+              listener: (context, state) {
+                if (state.nearbyProviders.isNotEmpty) {
+                  _updateMapMarkers(state.nearbyProviders);
+                }
+              },
+              child: Column(
             children: [
               // Contrôles de la carte
               Container(
@@ -386,76 +426,93 @@ class _FullMapScreenMState extends State<FullMapScreenM> {
                     Row(
                       children: [
                         Expanded(
-                          child: DropdownButtonFormField<String>(
-                            value: _selectedCategory.isEmpty
-                                ? null
-                                : _selectedCategory,
-                            decoration: InputDecoration(
-                              labelText: 'Catégorie',
-                              labelStyle: SDTypography.bodyMedium,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-                              ),
-                              contentPadding: EdgeInsets.symmetric(
-                                  horizontal: SDSpacing.xs, vertical: SDSpacing.xxxs),
-                              isDense: true,
-                            ),
-                            style: SDTypography.bodyMedium,
-                            isExpanded: true,
-                            items: [
-                              DropdownMenuItem(
-                                  value: '', child: Text('Toutes', style: SDTypography.bodyMedium)),
-                              DropdownMenuItem(
-                                  value: 'Auto', child: Text('Auto', style: SDTypography.bodyMedium)),
-                              DropdownMenuItem(
-                                  value: 'Immobilier',
-                                  child: Text('Immobilier', style: SDTypography.bodyMedium)),
-                              DropdownMenuItem(
-                                  value: 'Électronique',
-                                  child: Text('Électronique', style: SDTypography.bodyMedium)),
-                            ],
-                            onChanged: (value) {
-                              setState(() {
-                                _selectedCategory = value ?? '';
-                              });
-                              _searchNearbyProviders();
+                          child: Builder(
+                            builder: (context) {
+                              final choices = _categoryChoices();
+                              return DropdownButtonFormField<String>(
+                                value: _safeDropdownValue(
+                                    _selectedCategory, choices),
+                                decoration: InputDecoration(
+                                  labelText: 'Catégorie',
+                                  labelStyle: SDTypography.bodyMedium,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(
+                                        SDSpacing.borderRadiusMedium),
+                                  ),
+                                  contentPadding: EdgeInsets.symmetric(
+                                      horizontal: SDSpacing.xs,
+                                      vertical: SDSpacing.xxxs),
+                                  isDense: true,
+                                ),
+                                style: SDTypography.bodyMedium,
+                                isExpanded: true,
+                                items: [
+                                  DropdownMenuItem(
+                                      value: '',
+                                      child: Text('Toutes',
+                                          style: SDTypography.bodyMedium)),
+                                  ...choices.map(
+                                    (name) => DropdownMenuItem(
+                                      value: name,
+                                      child: Text(name,
+                                          style: SDTypography.bodyMedium,
+                                          overflow: TextOverflow.ellipsis),
+                                    ),
+                                  ),
+                                ],
+                                onChanged: (value) {
+                                  setState(() {
+                                    _selectedCategory = value ?? '';
+                                  });
+                                  _searchNearbyProviders(blocContext);
+                                },
+                              );
                             },
                           ),
                         ),
                         SizedBox(width: SDSpacing.xs),
                         Expanded(
-                          child: DropdownButtonFormField<String>(
-                            value: _selectedService.isEmpty
-                                ? null
-                                : _selectedService,
-                            decoration: InputDecoration(
-                              labelText: 'Service',
-                              labelStyle: SDTypography.bodyMedium,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-                              ),
-                              contentPadding: EdgeInsets.symmetric(
-                                  horizontal: SDSpacing.xs, vertical: SDSpacing.xxxs),
-                              isDense: true,
-                            ),
-                            style: SDTypography.bodyMedium,
-                            isExpanded: true,
-                            items: [
-                              DropdownMenuItem(
-                                  value: '', child: Text('Tous', style: SDTypography.bodyMedium)),
-                              DropdownMenuItem(
-                                  value: 'Plombier', child: Text('Plombier', style: SDTypography.bodyMedium)),
-                              DropdownMenuItem(
-                                  value: 'Coiffeur', child: Text('Coiffeur', style: SDTypography.bodyMedium)),
-                              DropdownMenuItem(
-                                  value: 'Photographe',
-                                  child: Text('Photographe', style: SDTypography.bodyMedium)),
-                            ],
-                            onChanged: (value) {
-                              setState(() {
-                                _selectedService = value ?? '';
-                              });
-                              _searchNearbyProviders();
+                          child: Builder(
+                            builder: (context) {
+                              final choices = _serviceChoices();
+                              return DropdownButtonFormField<String>(
+                                value: _safeDropdownValue(
+                                    _selectedService, choices),
+                                decoration: InputDecoration(
+                                  labelText: 'Service',
+                                  labelStyle: SDTypography.bodyMedium,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(
+                                        SDSpacing.borderRadiusMedium),
+                                  ),
+                                  contentPadding: EdgeInsets.symmetric(
+                                      horizontal: SDSpacing.xs,
+                                      vertical: SDSpacing.xxxs),
+                                  isDense: true,
+                                ),
+                                style: SDTypography.bodyMedium,
+                                isExpanded: true,
+                                items: [
+                                  DropdownMenuItem(
+                                      value: '',
+                                      child: Text('Tous',
+                                          style: SDTypography.bodyMedium)),
+                                  ...choices.map(
+                                    (name) => DropdownMenuItem(
+                                      value: name,
+                                      child: Text(name,
+                                          style: SDTypography.bodyMedium,
+                                          overflow: TextOverflow.ellipsis),
+                                    ),
+                                  ),
+                                ],
+                                onChanged: (value) {
+                                  setState(() {
+                                    _selectedService = value ?? '';
+                                  });
+                                  _searchNearbyProviders(blocContext);
+                                },
+                              );
                             },
                           ),
                         ),
@@ -572,6 +629,8 @@ class _FullMapScreenMState extends State<FullMapScreenM> {
             ],
           ),
         ),
+      );
+        },
       ),
     );
   }

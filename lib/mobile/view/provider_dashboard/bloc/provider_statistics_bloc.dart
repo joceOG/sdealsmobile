@@ -15,6 +15,17 @@ class ProviderStatisticsBloc
     _currentToken = token;
   }
 
+  static int _asInt(dynamic v, {int fallback = 0}) {
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    return int.tryParse('$v') ?? fallback;
+  }
+
+  static double _asDouble(dynamic v, {double fallback = 0}) {
+    if (v is num) return v.toDouble();
+    return double.tryParse('$v') ?? fallback;
+  }
+
   static const _unavailable =
       'Cette vue stats n\'est pas encore branchée au serveur';
 
@@ -38,21 +49,31 @@ class ProviderStatisticsBloc
 
         final statsParStatut =
             statsData['statsParStatut'] as List<dynamic>? ?? [];
-        int totalMissions = 0;
+        final statsParVille =
+            statsData['statsParVille'] as List<dynamic>? ?? [];
+        final prestationsParMois =
+            statsData['prestationsParMois'] as List<dynamic>? ?? [];
+
         int completedMissions = 0;
         int ongoingMissions = 0;
+        int countFromStatut = 0;
 
         for (var stat in statsParStatut) {
-          final count = (stat['count'] as int? ?? 0);
-          totalMissions += count;
-          if (stat['_id'] == 'TERMINEE') completedMissions += count;
-          if (stat['_id'] == 'EN_COURS' || stat['_id'] == 'ACCEPTEE') {
+          final count = _asInt(stat is Map ? stat['count'] : null);
+          countFromStatut += count;
+          final id = (stat is Map ? stat['_id'] : null)?.toString();
+          if (id == 'TERMINEE') completedMissions += count;
+          if (id == 'EN_COURS' || id == 'ACCEPTEE') {
             ongoingMissions += count;
           }
         }
 
-        final revenueTotal = (statsData['revenueTotal'] ?? 0).toDouble();
-        final notesMoyenne = (statsData['notesMoyenne'] ?? 0).toDouble();
+        final totalMissions = _asInt(
+          statsData['totalPrestations'],
+          fallback: countFromStatut,
+        );
+        final revenueTotal = _asDouble(statsData['revenueTotal']);
+        final notesMoyenne = _asDouble(statsData['notesMoyenne']);
 
         emit(ProviderStatisticsLoaded(
           revenus: {
@@ -76,7 +97,11 @@ class ProviderStatisticsBloc
             'growth': null,
           },
           clients: {
-            'total': statsData['nombreClients'] ?? 0,
+            'total': statsParVille.fold<int>(
+              0,
+              (sum, v) =>
+                  sum + _asInt(v is Map ? v['count'] : null),
+            ),
             'loyal': null,
             'new': null,
             'satisfaction': notesMoyenne,
@@ -94,7 +119,13 @@ class ProviderStatisticsBloc
           achievements: const [],
           topClients: const [],
           recentActivity: const [],
-          charts: const {},
+          charts: {
+            'prestationsParMois': prestationsParMois,
+            'statsParVille': statsParVille,
+            'statsParStatut': statsParStatut,
+            'totalPrestations': totalMissions,
+            'revenueTotal': revenueTotal,
+          },
         ));
       } catch (e) {
         emit(ProviderStatisticsError(

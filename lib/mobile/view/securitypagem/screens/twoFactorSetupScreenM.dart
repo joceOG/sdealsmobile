@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../../../data/services/api_client.dart';
+import '../../../../design_system/design_system.dart';
 import '../securitypageblocm/securityPageBlocM.dart';
 import '../securitypageblocm/securityPageEventM.dart';
 import '../securitypageblocm/securityPageStateM.dart';
@@ -34,17 +34,12 @@ class _TwoFactorSetupScreenMState extends State<TwoFactorSetupScreenM> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (context) => SecurityPageBlocM(
-        apiClient: ApiClient(),
+    return Scaffold(
+      backgroundColor: SDColors.white,
+      appBar: SDWhiteAppBar.appBar(
+        title: 'Authentification à deux facteurs',
       ),
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Authentification à deux facteurs'),
-          backgroundColor: Colors.green[600],
-          foregroundColor: Colors.white,
-        ),
-        body: BlocConsumer<SecurityPageBlocM, SecurityPageStateM>(
+      body: BlocConsumer<SecurityPageBlocM, SecurityPageStateM>(
           listener: (context, state) {
             if (state is SecurityPageErrorStateM) {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -151,7 +146,6 @@ class _TwoFactorSetupScreenMState extends State<TwoFactorSetupScreenM> {
             );
           },
         ),
-      ),
     );
   }
 

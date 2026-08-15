@@ -275,12 +275,14 @@ class NotificationPreferences {
   final bool push;
   final bool sms;
   final String langue;
+  final NotificationTypes types;
 
   NotificationPreferences({
     required this.email,
     required this.push,
     required this.sms,
     required this.langue,
+    this.types = const NotificationTypes(),
   });
 
   factory NotificationPreferences.fromJson(Map<String, dynamic> json) {
@@ -289,6 +291,11 @@ class NotificationPreferences {
       push: json['push'] ?? true,
       sms: json['sms'] ?? false,
       langue: json['langue'] ?? 'fr',
+      types: NotificationTypes.fromJson(
+        json['types'] is Map
+            ? Map<String, dynamic>.from(json['types'] as Map)
+            : <String, dynamic>{},
+      ),
     );
   }
 
@@ -298,7 +305,82 @@ class NotificationPreferences {
       'push': push,
       'sms': sms,
       'langue': langue,
+      'types': types.toJson(),
     };
+  }
+
+  NotificationPreferences copyWith({
+    bool? email,
+    bool? push,
+    bool? sms,
+    String? langue,
+    NotificationTypes? types,
+  }) {
+    return NotificationPreferences(
+      email: email ?? this.email,
+      push: push ?? this.push,
+      sms: sms ?? this.sms,
+      langue: langue ?? this.langue,
+      types: types ?? this.types,
+    );
+  }
+}
+
+class NotificationTypes {
+  final bool newMissions;
+  final bool messages;
+  final bool payments;
+  final bool reviews;
+  final bool promotions;
+  final bool system;
+
+  const NotificationTypes({
+    this.newMissions = true,
+    this.messages = true,
+    this.payments = true,
+    this.reviews = true,
+    this.promotions = false,
+    this.system = true,
+  });
+
+  factory NotificationTypes.fromJson(Map<String, dynamic> json) {
+    return NotificationTypes(
+      newMissions: json['newMissions'] ?? true,
+      messages: json['messages'] ?? true,
+      payments: json['payments'] ?? true,
+      reviews: json['reviews'] ?? true,
+      promotions: json['promotions'] ?? false,
+      system: json['system'] ?? true,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'newMissions': newMissions,
+      'messages': messages,
+      'payments': payments,
+      'reviews': reviews,
+      'promotions': promotions,
+      'system': system,
+    };
+  }
+
+  NotificationTypes copyWith({
+    bool? newMissions,
+    bool? messages,
+    bool? payments,
+    bool? reviews,
+    bool? promotions,
+    bool? system,
+  }) {
+    return NotificationTypes(
+      newMissions: newMissions ?? this.newMissions,
+      messages: messages ?? this.messages,
+      payments: payments ?? this.payments,
+      reviews: reviews ?? this.reviews,
+      promotions: promotions ?? this.promotions,
+      system: system ?? this.system,
+    );
   }
 }
 

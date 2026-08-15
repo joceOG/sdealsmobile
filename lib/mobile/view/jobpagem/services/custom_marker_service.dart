@@ -2,13 +2,12 @@ import 'dart:ui' as ui;
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:http/http.dart' as http;
 
 class CustomMarkerService {
   static const double _markerSize = 100.0;
 
   // Couleurs adaptées à l'écosystème SOUTRALI DEALS
-  static const Color _userColor = Colors.blue; // Utilisateur
-
   // Couleurs par type d'activité (selon votre écosystème)
   static const Color _domicileColor = Colors.green; // Services à domicile
   static const Color _reparationColor =
@@ -227,14 +226,35 @@ class CustomMarkerService {
     }
   }
 
-  /// Créer un marqueur pour l'utilisateur
+  /// Marqueur « ma position » — point bleu pro (type Google / Uber).
   static Future<BitmapDescriptor> createUserMarker() async {
-    return createHumanMarker(
-      text: 'Moi',
-      backgroundColor: _userColor,
-      textColor: Colors.white,
-      icon: Icons.person,
+    const size = 56.0;
+    final cacheKey = 'user_dot_v2';
+    final cached = _bitmapCache[cacheKey];
+    if (cached != null) return cached;
+
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    final c = Offset(size / 2, size / 2);
+
+    // Halo
+    canvas.drawCircle(
+      c,
+      22,
+      Paint()..color = const Color(0xFF4285F4).withValues(alpha: 0.22),
     );
+    // Anneau blanc
+    canvas.drawCircle(c, 12, Paint()..color = Colors.white);
+    // Point bleu
+    canvas.drawCircle(c, 8, Paint()..color = const Color(0xFF4285F4));
+
+    final image =
+        await recorder.endRecording().toImage(size.toInt(), size.toInt());
+    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+    final descriptor =
+        BitmapDescriptor.fromBytes(bytes!.buffer.asUint8List());
+    _bitmapCache[cacheKey] = descriptor;
+    return descriptor;
   }
 
   /// Créer un marqueur pour un prestataire
@@ -687,5 +707,228 @@ class CustomMarkerService {
     final Uint8List uint8List = byteData!.buffer.asUint8List();
 
     return BitmapDescriptor.fromBytes(uint8List);
+  }
+
+  // ─── Cache mémoire markers (photo+prix / clusters) ───
+  static final Map<String, BitmapDescriptor> _bitmapCache = {};
+
+  /// Marker Figma : avatar rond + pilule prix (avec cache mémoire).
+  static Future<BitmapDescriptor> createAvatarPriceMarker({
+    required String priceLabel,
+    required String initials,
+    String? photoUrl,
+    bool isVerified = false,
+  }) async {
+    final cacheKey =
+        'av|$photoUrl|$priceLabel|$initials|${isVerified ? 1 : 0}';
+    final cached = _bitmapCache[cacheKey];
+    if (cached != null) return cached;
+
+    const double avatarSize = 88.0;
+    const double bubbleH = 34.0;
+    const double gap = 6.0;
+    const double width = 120.0;
+    const double height = avatarSize + gap + bubbleH + 4;
+    final avatarCx = width / 2;
+    final avatarCy = avatarSize / 2;
+    final avatarR = avatarSize / 2 - 3;
+
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+
+    // Ombre légère sous l'avatar
+    final shadow = Paint()
+      ..color = Colors.black.withValues(alpha: 0.18)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
+    canvas.drawCircle(Offset(avatarCx, avatarCy + 2), avatarR, shadow);
+
+    // Photo ou placeholder
+    ui.Image? photo;
+    if (photoUrl != null && photoUrl.startsWith('http')) {
+      photo = await _loadNetworkImage(photoUrl, size: avatarSize.toInt());
+    }
+
+    canvas.save();
+    canvas.clipPath(
+      Path()
+        ..addOval(Rect.fromCircle(
+          center: Offset(avatarCx, avatarCy),
+          radius: avatarR,
+        )),
+    );
+    if (photo != null) {
+      paintImage(
+        canvas: canvas,
+        rect: Rect.fromCenter(
+          center: Offset(avatarCx, avatarCy),
+          width: avatarSize,
+          height: avatarSize,
+        ),
+        image: photo,
+        fit: BoxFit.cover,
+      );
+    } else {
+      canvas.drawCircle(
+        Offset(avatarCx, avatarCy),
+        avatarR,
+        Paint()..color = const Color(0xFFE5E5E5),
+      );
+      final tp = TextPainter(textDirection: TextDirection.ltr);
+      tp.text = TextSpan(
+        text: initials.isEmpty ? '?' : initials.toUpperCase(),
+        style: const TextStyle(
+          color: Color(0xFF262626),
+          fontSize: 28,
+          fontWeight: FontWeight.w800,
+        ),
+      );
+      tp.layout();
+      tp.paint(
+        canvas,
+        Offset(avatarCx - tp.width / 2, avatarCy - tp.height / 2),
+      );
+    }
+    canvas.restore();
+
+    // Bordure verte
+    canvas.drawCircle(
+      Offset(avatarCx, avatarCy),
+      avatarR,
+      Paint()
+        ..color = const Color(0xFF1CBF3F)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 4,
+    );
+
+    // Badge vérifié
+    if (isVerified) {
+      final badgeC = Offset(avatarCx + avatarR * 0.65, avatarCy + avatarR * 0.65);
+      canvas.drawCircle(badgeC, 11, Paint()..color = Colors.white);
+      canvas.drawCircle(badgeC, 9, Paint()..color = const Color(0xFF1CBF3F));
+      final check = TextPainter(textDirection: TextDirection.ltr);
+      check.text = TextSpan(
+        text: String.fromCharCode(Icons.check.codePoint),
+        style: const TextStyle(
+          fontFamily: 'MaterialIcons',
+          fontSize: 12,
+          color: Colors.white,
+        ),
+      );
+      check.layout();
+      check.paint(
+        canvas,
+        Offset(badgeC.dx - check.width / 2, badgeC.dy - check.height / 2),
+      );
+    }
+
+    // Pilule prix
+    final label = (priceLabel.trim().isEmpty || priceLabel == '—')
+        ? 'Devis'
+        : priceLabel;
+    final priceTp = TextPainter(textDirection: TextDirection.ltr);
+    priceTp.text = TextSpan(
+      text: label,
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 13,
+        fontWeight: FontWeight.w800,
+      ),
+    );
+    priceTp.layout();
+    final bubbleW = (priceTp.width + 22).clamp(56.0, width);
+    final bubbleTop = avatarSize + gap;
+    final bubbleLeft = (width - bubbleW) / 2;
+    final bubbleRect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(bubbleLeft, bubbleTop, bubbleW, bubbleH),
+      const Radius.circular(18),
+    );
+    canvas.drawRRect(bubbleRect, Paint()..color = const Color(0xFF158622));
+    priceTp.paint(
+      canvas,
+      Offset(
+        bubbleLeft + (bubbleW - priceTp.width) / 2,
+        bubbleTop + (bubbleH - priceTp.height) / 2,
+      ),
+    );
+
+    final image = await recorder.endRecording().toImage(
+          width.toInt(),
+          height.toInt(),
+        );
+    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+    final descriptor =
+        BitmapDescriptor.fromBytes(bytes!.buffer.asUint8List());
+    _bitmapCache[cacheKey] = descriptor;
+    // Limite cache mémoire
+    if (_bitmapCache.length > 120) {
+      _bitmapCache.remove(_bitmapCache.keys.first);
+    }
+    return descriptor;
+  }
+
+  /// Marker cluster (nombre).
+  static Future<BitmapDescriptor> createClusterMarker(int count) async {
+    final cacheKey = 'cl|$count';
+    final cached = _bitmapCache[cacheKey];
+    if (cached != null) return cached;
+
+    const size = 72.0;
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    final center = Offset(size / 2, size / 2);
+
+    canvas.drawCircle(
+      center,
+      30,
+      Paint()..color = Colors.black.withValues(alpha: 0.15),
+    );
+    canvas.drawCircle(center, 28, Paint()..color = const Color(0xFF1CBF3F));
+    canvas.drawCircle(
+      center,
+      28,
+      Paint()
+        ..color = Colors.white
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3,
+    );
+
+    final tp = TextPainter(textDirection: TextDirection.ltr);
+    tp.text = TextSpan(
+      text: count > 99 ? '99+' : '$count',
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 18,
+        fontWeight: FontWeight.w800,
+      ),
+    );
+    tp.layout();
+    tp.paint(canvas, Offset(center.dx - tp.width / 2, center.dy - tp.height / 2));
+
+    final image =
+        await recorder.endRecording().toImage(size.toInt(), size.toInt());
+    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+    final descriptor =
+        BitmapDescriptor.fromBytes(bytes!.buffer.asUint8List());
+    _bitmapCache[cacheKey] = descriptor;
+    return descriptor;
+  }
+
+  static Future<ui.Image?> _loadNetworkImage(String url,
+      {int size = 88}) async {
+    try {
+      final response = await http
+          .get(Uri.parse(url))
+          .timeout(const Duration(seconds: 6));
+      if (response.statusCode != 200) return null;
+      final codec = await ui.instantiateImageCodec(
+        response.bodyBytes,
+        targetWidth: size,
+        targetHeight: size,
+      );
+      final frame = await codec.getNextFrame();
+      return frame.image;
+    } catch (_) {
+      return null;
+    }
   }
 }

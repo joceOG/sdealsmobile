@@ -35,6 +35,7 @@ class SecurityPageBlocM extends Bloc<SecurityPageEventM, SecurityPageStateM> {
     on<ChangePasswordEventM>(_onChangePassword);
     on<LoadLoginHistoryEventM>(_onLoadLoginHistory);
     on<ClearLoginHistoryEventM>(_onClearLoginHistory);
+    on<ExportSecurityDataEventM>(_onExportSecurityData);
     on<SearchSecurityAlertsEventM>(_onSearchSecurityAlerts);
     on<FilterSecurityAlertsEventM>(_onFilterSecurityAlerts);
     on<SortSecurityAlertsEventM>(_onSortSecurityAlerts);
@@ -274,9 +275,46 @@ class SecurityPageBlocM extends Bloc<SecurityPageEventM, SecurityPageStateM> {
     TerminateAllOtherSessionsEventM event,
     Emitter<SecurityPageStateM> emit,
   ) async {
-    emit(SecurityPageErrorStateM(
-      message: 'Terminaison groupée non disponible sur le serveur',
-    ));
+    try {
+      if (!_hasAuth) {
+        emit(SecurityPageErrorStateM(message: 'Session requise'));
+        return;
+      }
+      final response = await _apiClient.delete(
+        '$_base/sessions',
+        token: _token,
+        body: event.keepSessionId != null
+            ? {'keepSessionId': event.keepSessionId}
+            : null,
+      );
+
+      if (response.statusCode == 200) {
+        String message = 'Autres sessions terminées';
+        try {
+          final data = ApiClient.decodeJson(response);
+          if (data is Map && data['message'] != null) {
+            message = data['message'].toString();
+          }
+        } catch (_) {}
+        emit(SessionTerminatedStateM(message: message));
+        add(LoadSessionsEventM());
+        add(LoadSecurityDataEventM());
+      } else {
+        String message = 'Erreur terminaison des sessions';
+        try {
+          final data = ApiClient.decodeJson(response);
+          if (data is Map &&
+              (data['error'] != null || data['message'] != null)) {
+            message = (data['error'] ?? data['message']).toString();
+          }
+        } catch (_) {}
+        emit(SecurityPageErrorStateM(message: message));
+      }
+    } catch (e) {
+      emit(SecurityPageErrorStateM(
+        message: 'Erreur de connexion: ${e.toString()}',
+      ));
+    }
   }
 
   Future<void> _onLoadSecurityAlerts(
@@ -340,18 +378,75 @@ class SecurityPageBlocM extends Bloc<SecurityPageEventM, SecurityPageStateM> {
     MarkAllAlertsAsReadEventM event,
     Emitter<SecurityPageStateM> emit,
   ) async {
-    emit(SecurityPageErrorStateM(
-      message: 'Marquage global des alertes non disponible sur le serveur',
-    ));
+    try {
+      if (!_hasAuth) {
+        emit(SecurityPageErrorStateM(message: 'Session requise'));
+        return;
+      }
+      final response = await _apiClient.patch(
+        '$_base/alerts/read-all',
+        token: _token,
+      );
+
+      if (response.statusCode == 200) {
+        emit(SecurityPageSuccessStateM(
+          message: 'Toutes les alertes marquées comme lues',
+        ));
+        add(LoadSecurityAlertsEventM());
+      } else {
+        String message = 'Erreur marquage des alertes';
+        try {
+          final data = ApiClient.decodeJson(response);
+          if (data is Map &&
+              (data['error'] != null || data['message'] != null)) {
+            message = (data['error'] ?? data['message']).toString();
+          }
+        } catch (_) {}
+        emit(SecurityPageErrorStateM(message: message));
+      }
+    } catch (e) {
+      emit(SecurityPageErrorStateM(
+        message: 'Erreur de connexion: ${e.toString()}',
+      ));
+    }
   }
 
   Future<void> _onDeleteAlert(
     DeleteAlertEventM event,
     Emitter<SecurityPageStateM> emit,
   ) async {
-    emit(SecurityPageErrorStateM(
-      message: 'Suppression d\'alerte non disponible sur le serveur',
-    ));
+    try {
+      if (!_hasAuth) {
+        emit(SecurityPageErrorStateM(message: 'Session requise'));
+        return;
+      }
+      final response = await _apiClient.delete(
+        '$_base/alerts/${event.alertId}',
+        token: _token,
+      );
+
+      if (response.statusCode == 200) {
+        emit(AlertDeletedStateM(
+          alertId: event.alertId,
+          message: 'Alerte supprimée',
+        ));
+        add(LoadSecurityAlertsEventM());
+      } else {
+        String message = 'Erreur suppression alerte';
+        try {
+          final data = ApiClient.decodeJson(response);
+          if (data is Map &&
+              (data['error'] != null || data['message'] != null)) {
+            message = (data['error'] ?? data['message']).toString();
+          }
+        } catch (_) {}
+        emit(SecurityPageErrorStateM(message: message));
+      }
+    } catch (e) {
+      emit(SecurityPageErrorStateM(
+        message: 'Erreur de connexion: ${e.toString()}',
+      ));
+    }
   }
 
   Future<void> _onLoadTrustedDevices(
@@ -546,9 +641,75 @@ class SecurityPageBlocM extends Bloc<SecurityPageEventM, SecurityPageStateM> {
     ClearLoginHistoryEventM event,
     Emitter<SecurityPageStateM> emit,
   ) async {
-    emit(SecurityPageErrorStateM(
-      message: 'Effacement de l\'historique non disponible sur le serveur',
-    ));
+    try {
+      if (!_hasAuth) {
+        emit(SecurityPageErrorStateM(message: 'Session requise'));
+        return;
+      }
+      final response = await _apiClient.delete(
+        '$_base/history',
+        token: _token,
+      );
+
+      if (response.statusCode == 200) {
+        emit(LoginHistoryClearedStateM(message: 'Historique effacé'));
+        add(LoadLoginHistoryEventM());
+      } else {
+        String message = 'Erreur effacement historique';
+        try {
+          final data = ApiClient.decodeJson(response);
+          if (data is Map &&
+              (data['error'] != null || data['message'] != null)) {
+            message = (data['error'] ?? data['message']).toString();
+          }
+        } catch (_) {}
+        emit(SecurityPageErrorStateM(message: message));
+      }
+    } catch (e) {
+      emit(SecurityPageErrorStateM(
+        message: 'Erreur de connexion: ${e.toString()}',
+      ));
+    }
+  }
+
+  Future<void> _onExportSecurityData(
+    ExportSecurityDataEventM event,
+    Emitter<SecurityPageStateM> emit,
+  ) async {
+    try {
+      if (!_hasAuth) {
+        emit(SecurityPageErrorStateM(message: 'Session requise'));
+        return;
+      }
+      final response = await _apiClient.get(
+        '$_base/export',
+        token: _token,
+      );
+
+      if (response.statusCode == 200) {
+        final data = ApiClient.decodeJson(response);
+        emit(SecurityDataExportedStateM(
+          data: data is Map
+              ? Map<String, dynamic>.from(data)
+              : {'raw': data},
+          message: 'Données de sécurité exportées',
+        ));
+      } else {
+        String message = 'Erreur export sécurité';
+        try {
+          final data = ApiClient.decodeJson(response);
+          if (data is Map &&
+              (data['error'] != null || data['message'] != null)) {
+            message = (data['error'] ?? data['message']).toString();
+          }
+        } catch (_) {}
+        emit(SecurityPageErrorStateM(message: message));
+      }
+    } catch (e) {
+      emit(SecurityPageErrorStateM(
+        message: 'Erreur de connexion: ${e.toString()}',
+      ));
+    }
   }
 
   Future<void> _onSearchSecurityAlerts(

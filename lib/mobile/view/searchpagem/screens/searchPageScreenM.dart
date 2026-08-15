@@ -4,8 +4,13 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../design_system/design_system.dart'; // ✅ Import DS
 import '../../jobpagem/screens/detailPageScreenM.dart';
 import '../../jobpagem/screens/provider_profile_screen.dart';
+import '../../freelancepagem/models/freelance_model.dart';
+import '../../freelancepagem/screens/freelance_details_screen.dart';
 import '../../shoppingpagem/screens/productDetailsScreenM.dart';
+import '../../shoppingpagem/screens/vendorDetailsScreenM.dart';
+import '../../shoppingpagem/shoppingpageblocm/shoppingPageBlocM.dart';
 import '../../shoppingpagem/shoppingpageblocm/shoppingPageStateM.dart' as shop_model;
+import '../../../../data/models/vendeur.dart';
 import '../../common/widgets/empty_state_widget.dart';
 import 'package:sdealsmobile/mobile/view/searchpagem/searchpageblocm/searchPageBlocM.dart';
 import 'package:sdealsmobile/mobile/view/searchpagem/searchpageblocm/searchPageEventM.dart';
@@ -48,6 +53,17 @@ class _SearchBody extends StatefulWidget {
 }
 
 class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderStateMixin {
+  static const _popularSearches = [
+    'Plombier',
+    'Électricien',
+    'Coiffeur',
+    'Développeur web',
+    'Menuisier',
+    'Maçon',
+    'Couturier',
+    'Photographe',
+  ];
+
   final TextEditingController _searchController = TextEditingController();
   late TabController _tabController;
   Timer? _debounce;
@@ -56,7 +72,8 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this, initialIndex: widget.initialIndex); // ✅ 5 Tabs
+    final safeIndex = widget.initialIndex.clamp(0, 5);
+    _tabController = TabController(length: 6, vsync: this, initialIndex: safeIndex);
     
     // Listen to tab changes to dismiss keyboard
     _tabController.addListener(() {
@@ -72,6 +89,8 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
       if (q != null && q.isNotEmpty) {
         _searchController.text = q;
         context.read<SearchPageBlocM>().add(PerformGlobalSearch(q));
+      } else {
+        setState(() => _showSuggestions = true);
       }
     });
   }
@@ -128,21 +147,29 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
             return Center(child: Text('Erreur: ${state.error}'));
           }
 
-          // Case 1: Show Suggestions OR History Overlay
-          if (_showSuggestions) {
-            if (state.query.isEmpty && state.history.isNotEmpty) {
-               return _buildHistoryList(state.history);
-            } else if (state.suggestions.isNotEmpty) {
-               return _buildSuggestionsList(state.suggestions);
+          final typedQuery = _searchController.text.trim();
+          final hasResults = state.services.isNotEmpty ||
+              state.articles.isNotEmpty ||
+              state.freelances.isNotEmpty ||
+              state.prestataires.isNotEmpty ||
+              state.vendeurs.isNotEmpty;
+
+          // Overlay discovery / suggestions (avant ou pendant la saisie)
+          if (_showSuggestions && !state.hasSearched) {
+            if (typedQuery.isEmpty) {
+              return _buildDiscoveryPanel(state.history);
             }
+            if (state.suggestions.isNotEmpty) {
+              return _buildSuggestionsList(state.suggestions, typedQuery);
+            }
+            return _buildDiscoveryPanel(state.history, filterQuery: typedQuery);
           }
 
-          // Case 2: Show Results (if any data exists)
-          bool hasResults = state.services.isNotEmpty || 
-                           state.articles.isNotEmpty || 
-                           state.freelances.isNotEmpty || 
-                           state.prestataires.isNotEmpty || // ✅ Check Prestas
-                           state.vendeurs.isNotEmpty;
+          if (_showSuggestions && state.hasSearched && typedQuery.isNotEmpty) {
+            if (state.suggestions.isNotEmpty) {
+              return _buildSuggestionsList(state.suggestions, typedQuery);
+            }
+          }
 
           if (hasResults) {
             return Column(
@@ -152,11 +179,12 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
                   child: TabBarView(
                     controller: _tabController,
                     children: [
-                      _buildAllTab(state),       // Tout
-                      _buildServicesTab(state),  // Services
-                      _buildFreelancesTab(state),// Freelances
-                      _buildPrestatairesTab(state), // ✅ Prestataires Tab
-                      _buildShopTab(state),      // Boutique
+                      _buildAllTab(state),
+                      _buildServicesTab(state),
+                      _buildFreelancesTab(state),
+                      _buildPrestatairesTab(state),
+                      _buildShopTab(state),
+                      _buildVendorsTab(state),
                     ],
                   ),
                 ),
@@ -164,8 +192,11 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
             );
           }
 
-          // Case 3: Empty State / Initial View
-          return _buildEmptyState();
+          if (state.hasSearched) {
+            return _buildNoResultsState(state.query);
+          }
+
+          return _buildDiscoveryPanel(state.history);
         },
       ),
     );
@@ -195,14 +226,19 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
               child: TextField(
                 controller: _searchController,
                 onChanged: (value) {
-                  setState(() {});
+                  if (value.trim().isEmpty) {
+                    context.read<SearchPageBlocM>().add(ClearSearch());
+                    context.read<SearchPageBlocM>().add(LoadHistory());
+                    setState(() => _showSuggestions = true);
+                  } else {
+                    setState(() => _showSuggestions = true);
+                  }
                   _onSearchChanged(value);
                 },
                 onSubmitted: _onSubmit,
                 onTap: () {
-                  if (_searchController.text.isEmpty) {
-                    _onSearchChanged('');
-                  }
+                  setState(() => _showSuggestions = true);
+                  _onSearchChanged(_searchController.text);
                 },
                 decoration: InputDecoration(
                   hintText: 'Rechercher services, produits...',
@@ -214,8 +250,10 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
                           icon: Icon(Icons.close, color: SDColors.neutral500, size: 18),
                           onPressed: () {
                             _searchController.clear();
+                            context.read<SearchPageBlocM>().add(ClearSearch());
+                            context.read<SearchPageBlocM>().add(LoadHistory());
+                            setState(() => _showSuggestions = true);
                             _onSearchChanged('');
-                            setState(() {});
                           },
                         )
                       : null,
@@ -400,56 +438,123 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
       color: SDColors.white,
       child: TabBar(
         controller: _tabController,
-        labelColor: SDColors.primary600, // ✅ Standard Green
+        isScrollable: true,
+        tabAlignment: TabAlignment.start,
+        labelColor: SDColors.primary600,
         unselectedLabelColor: SDColors.neutral500,
-        indicatorColor: SDColors.primary600, // ✅ Standard Green
+        indicatorColor: SDColors.primary600,
         indicatorWeight: 3,
         labelStyle: SDTypography.labelMedium.copyWith(fontWeight: FontWeight.bold),
         tabs: [
           const Tab(text: 'Tout'),
-          Tab(text: 'Services (${counts['services']})'),
-          Tab(text: 'Freelances (${counts['freelances']})'),
-          Tab(text: 'Presta. (${counts['prestataires']})'), // ✅ Tab Label
-          Tab(text: 'Shop (${counts['articles']})'),
+          Tab(text: 'Services (${counts['services'] ?? 0})'),
+          Tab(text: 'Freelances (${counts['freelances'] ?? 0})'),
+          Tab(text: 'Presta. (${counts['prestataires'] ?? 0})'),
+          Tab(text: 'Shop (${counts['articles'] ?? 0})'),
+          Tab(text: 'Boutiques (${counts['vendeurs'] ?? 0})'),
         ],
       ),
     );
   }
 
-  Widget _buildHistoryList(List<String> history) {
+  Widget _buildDiscoveryPanel(List<String> history, {String filterQuery = ''}) {
+    final filteredHistory = filterQuery.isEmpty
+        ? history
+        : history
+            .where((h) => h.toLowerCase().contains(filterQuery.toLowerCase()))
+            .toList();
+
     return Container(
       color: SDColors.white,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: ListView(
+        padding: EdgeInsets.only(bottom: SDSpacing.lg),
         children: [
           Padding(
-            padding: EdgeInsets.fromLTRB(SDSpacing.sm, SDSpacing.xs, SDSpacing.sm, SDSpacing.xs),
+            padding: EdgeInsets.fromLTRB(
+                SDSpacing.md, SDSpacing.md, SDSpacing.md, SDSpacing.xs),
+            child: Text(
+              'Que cherchez-vous ?',
+              style: SDTypography.titleMedium.copyWith(fontWeight: FontWeight.w800),
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: SDSpacing.md),
+            child: Text(
+              'Services, freelances, produits ou boutiques à Abidjan…',
+              style: SDTypography.bodySmall.copyWith(color: SDColors.neutral600),
+            ),
+          ),
+          if (filteredHistory.isNotEmpty) ...[
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                  SDSpacing.md, SDSpacing.md, SDSpacing.md, SDSpacing.xs),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Récents',
+                    style: SDTypography.titleSmall.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: SDColors.neutral500,
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () =>
+                        context.read<SearchPageBlocM>().add(ClearHistory()),
+                    child: Text(
+                      'Effacer tout',
+                      style: SDTypography.bodySmall
+                          .copyWith(color: SDColors.error500),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            ...filteredHistory.map((item) {
+              return ListTile(
+                leading:
+                    Icon(Icons.history, color: SDColors.neutral500, size: 20),
+                title: Text(item, style: SDTypography.bodyMedium),
+                trailing: IconButton(
+                  icon: Icon(Icons.close, size: 18, color: SDColors.neutral400),
+                  onPressed: () => context
+                      .read<SearchPageBlocM>()
+                      .add(RemoveFromHistory(item)),
+                ),
+                onTap: () => _onSuggestionTap(item),
+              );
+            }),
+          ],
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+                SDSpacing.md, SDSpacing.md, SDSpacing.md, SDSpacing.sm),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text("Récents", style: SDTypography.titleSmall.copyWith(fontWeight: FontWeight.bold, color: SDColors.neutral500)),
-                GestureDetector(
-                  onTap: () {
-                     context.read<SearchPageBlocM>().add(ClearHistory());
-                  },
-                  child: Text("Effacer", style: SDTypography.bodySmall.copyWith(color: SDColors.error500)),
-                )
+                Icon(Icons.trending_up, size: 18, color: SDColors.primary600),
+                SizedBox(width: SDSpacing.xxs),
+                Text(
+                  'Populaires',
+                  style: SDTypography.titleSmall.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: SDColors.neutral700,
+                  ),
+                ),
               ],
             ),
           ),
-          Expanded(
-            child: ListView.separated(
-              itemCount: history.length,
-              separatorBuilder: (_, __) => Divider(height: 1, indent: SDSpacing.sm, color: SDColors.neutral200),
-              itemBuilder: (context, index) {
-                final item = history[index];
-                return ListTile(
-                  leading: Icon(Icons.history, color: SDColors.neutral500, size: 20),
-                  title: Text(item, style: SDTypography.bodyMedium),
-                  trailing: Icon(Icons.north_west, size: 16, color: SDColors.neutral500),
-                  onTap: () => _onSuggestionTap(item),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: SDSpacing.md),
+            child: Wrap(
+              spacing: SDSpacing.xs,
+              runSpacing: SDSpacing.xs,
+              children: _popularSearches.map((term) {
+                return ActionChip(
+                  label: Text(term, style: SDTypography.labelMedium),
+                  backgroundColor: SDColors.primary50,
+                  side: BorderSide(color: SDColors.primary100),
+                  onPressed: () => _onSuggestionTap(term),
                 );
-              },
+              }).toList(),
             ),
           ),
         ],
@@ -457,17 +562,53 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
     );
   }
 
-  Widget _buildSuggestionsList(List<String> suggestions) {
+  Widget _buildHighlightedText(String text, String query) {
+    if (query.isEmpty) {
+      return Text(text, style: SDTypography.bodyMedium);
+    }
+    final lower = text.toLowerCase();
+    final q = query.toLowerCase();
+    final idx = lower.indexOf(q);
+    if (idx < 0) {
+      return Text(text, style: SDTypography.bodyMedium);
+    }
+    return Text.rich(
+      TextSpan(
+        children: [
+          TextSpan(
+            text: text.substring(0, idx),
+            style: SDTypography.bodyMedium,
+          ),
+          TextSpan(
+            text: text.substring(idx, idx + query.length),
+            style: SDTypography.bodyMedium.copyWith(
+              fontWeight: FontWeight.w800,
+              color: SDColors.primary700,
+            ),
+          ),
+          TextSpan(
+            text: text.substring(idx + query.length),
+            style: SDTypography.bodyMedium,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSuggestionsList(List<String> suggestions, String query) {
     return Container(
       color: SDColors.white,
       child: ListView.separated(
         itemCount: suggestions.length,
-        separatorBuilder: (_, __) => Divider(height: 1, indent: SDSpacing.sm, color: SDColors.neutral200),
+        separatorBuilder: (_, __) =>
+            Divider(height: 1, indent: SDSpacing.sm, color: SDColors.neutral200),
         itemBuilder: (context, index) {
           final suggestion = suggestions[index];
           return ListTile(
-            leading: Icon(Icons.search, color: SDColors.primary700, size: 20), // 🔍 for active search
-            title: Text(suggestion, style: SDTypography.bodyMedium),
+            leading: Icon(Icons.search, color: SDColors.primary700, size: 20),
+            title: _buildHighlightedText(suggestion, query),
+            trailing:
+                Icon(Icons.north_west, size: 16, color: SDColors.neutral400),
             onTap: () => _onSuggestionTap(suggestion),
           );
         },
@@ -475,12 +616,13 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
     );
   }
 
-  // 🎨 EMPTY STATE (No Query / No Results)
-  Widget _buildEmptyState() {
+  Widget _buildNoResultsState(String query) {
     return EmptyStateWidget(
       imagePath: 'assets/recherche_vide.png',
       title: 'Aucun résultat',
-      message: 'Essayez avec d\'autres mots-clés ou filtres',
+      message: query.isEmpty
+          ? 'Essayez avec d\'autres mots-clés ou filtres'
+          : 'Rien pour « $query ». Essayez un autre mot ou changez d\'onglet.',
       imageSize: 180,
     );
   }
@@ -499,7 +641,10 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
         if (state.freelances.isNotEmpty) ...[
           _buildSectionHeader('Freelances', 2, state.counts['freelances'] ?? 0),
           _buildHorizontalScroll(
-            state.freelances.take(5).map((f) => _buildFreelanceSquare(f)).toList()
+            state.freelances
+                .take(5)
+                .map((f) => _buildPersonSquare(f, isFreelance: true))
+                .toList(),
           ),
           SizedBox(height: SDSpacing.sm),
         ],
@@ -507,14 +652,23 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
         if (state.prestataires.isNotEmpty) ...[
           _buildSectionHeader('Prestataires', 3, state.counts['prestataires'] ?? 0),
           _buildHorizontalScroll(
-            state.prestataires.take(5).map((p) => _buildFreelanceSquare(p)).toList() 
+            state.prestataires
+                .take(5)
+                .map((p) => _buildPersonSquare(p, isFreelance: false))
+                .toList(),
           ),
           SizedBox(height: SDSpacing.sm),
         ],
 
         if (state.articles.isNotEmpty) ...[
           _buildSectionHeader('Boutique', 4, state.counts['articles'] ?? 0),
-          _buildArticleGrid(state.articles.take(2).toList()), 
+          _buildArticleGrid(state.articles.take(2).toList()),
+          SizedBox(height: SDSpacing.sm),
+        ],
+
+        if (state.vendeurs.isNotEmpty) ...[
+          _buildSectionHeader('Boutiques', 5, state.counts['vendeurs'] ?? 0),
+          ...state.vendeurs.take(3).map(_buildVendorCard),
         ],
       ],
     );
@@ -536,7 +690,8 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
     return ListView.builder(
       padding: EdgeInsets.all(SDSpacing.sm),
       itemCount: state.freelances.length,
-      itemBuilder: (context, index) => _buildFreelanceCard(state.freelances[index]),
+      itemBuilder: (context, index) =>
+          _buildPersonCard(state.freelances[index], isFreelance: true),
     );
   }
 
@@ -546,7 +701,8 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
     return ListView.builder(
       padding: EdgeInsets.all(SDSpacing.sm),
       itemCount: state.prestataires.length,
-      itemBuilder: (context, index) => _buildFreelanceCard(state.prestataires[index]), // Reuse Card
+      itemBuilder: (context, index) =>
+          _buildPersonCard(state.prestataires[index], isFreelance: false),
     );
   }
 
@@ -563,6 +719,82 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
       ),
       itemCount: state.articles.length,
       itemBuilder: (context, index) => _buildArticleCard(state.articles[index]),
+    );
+  }
+
+  // --- TAB: BOUTIQUES ---
+  Widget _buildVendorsTab(SearchPageStateM state) {
+    if (state.vendeurs.isEmpty) {
+      return Center(
+        child: Text(
+          'Aucune boutique trouvée',
+          style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral600),
+        ),
+      );
+    }
+    return ListView.builder(
+      padding: EdgeInsets.all(SDSpacing.sm),
+      itemCount: state.vendeurs.length,
+      itemBuilder: (context, index) => _buildVendorCard(state.vendeurs[index]),
+    );
+  }
+
+  void _openVendor(dynamic raw) {
+    try {
+      final map = Map<String, dynamic>.from(raw as Map);
+      final vendeur = Vendeur.fromJson(map);
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => VendorDetailsScreenM(vendeur: vendeur),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Impossible d’ouvrir la boutique : $e')),
+      );
+    }
+  }
+
+  Widget _buildVendorCard(dynamic vendeur) {
+    final name = vendeur['shopName']?.toString() ?? 'Boutique';
+    final logo = vendeur['shopLogo']?.toString() ?? '';
+    final ville = vendeur['ville']?.toString() ?? '';
+    final rating = vendeur['rating']?.toString() ?? '0';
+
+    return Container(
+      margin: EdgeInsets.only(bottom: SDSpacing.xs),
+      decoration: BoxDecoration(
+        color: SDColors.white,
+        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+        boxShadow: [
+          BoxShadow(color: SDColors.neutral900.withOpacity(0.05), blurRadius: 4)
+        ],
+      ),
+      child: ListTile(
+        leading: CircleAvatar(
+          radius: 25,
+          backgroundColor: SDColors.secondary50,
+          backgroundImage:
+              logo.isNotEmpty ? CachedNetworkImageProvider(logo) : null,
+          child: logo.isEmpty
+              ? Icon(Icons.storefront_rounded, color: SDColors.secondary600)
+              : null,
+        ),
+        title: Text(
+          name,
+          style: SDTypography.titleSmall.copyWith(fontWeight: FontWeight.bold),
+        ),
+        subtitle: Text(
+          [
+            if (ville.isNotEmpty) ville,
+            '★ $rating',
+          ].join(' · '),
+          style: SDTypography.bodySmall.copyWith(color: SDColors.neutral600),
+        ),
+        trailing: Icon(Icons.arrow_forward_ios, size: 14, color: SDColors.neutral400),
+        onTap: () => _openVendor(vendeur),
+      ),
     );
   }
 
@@ -657,75 +889,117 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
     );
   }
 
-  Widget _buildFreelanceSquare(dynamic freelance) {
-    final String name = freelance['name'] ?? 'John Doe';
-    final String job = freelance['job'] ?? 'Prestataire';
-    final String image = freelance['imagePath'] ?? '';
+  void _openSearchPerson(dynamic person, {required bool isFreelance}) {
+    final id = person['_id']?.toString() ?? '';
+    if (id.isEmpty) return;
 
-    return Container(
-      width: 100,
-      padding: EdgeInsets.all(SDSpacing.xs),
-      decoration: BoxDecoration(
-        color: SDColors.white,
-        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-        boxShadow: [BoxShadow(color: SDColors.neutral900.withOpacity(0.05), blurRadius: 4)],
-      ),
-      child: Column(
-        children: [
-          CircleAvatar(
-            radius: 30,
-            backgroundImage: image.isNotEmpty ? CachedNetworkImageProvider(image) : null,
-            child: image.isEmpty ? Icon(Icons.person, color: SDColors.neutral400) : null,
-          ),
-          SizedBox(height: SDSpacing.xs),
-          Text(name, maxLines: 1, overflow: TextOverflow.ellipsis,
-              style: SDTypography.bodySmall.copyWith(fontWeight: FontWeight.bold)),
-          Text(job, maxLines: 1, overflow: TextOverflow.ellipsis,
-              style: SDTypography.labelSmall.copyWith(color: SDColors.neutral500)),
-        ],
+    if (isFreelance) {
+      final model = FreelanceModel.fromBackend(
+        Map<String, dynamic>.from(person as Map),
+      );
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => FreelanceDetailsScreen(freelance: model),
+        ),
+      );
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ProviderProfileScreen(
+          providerId: id,
+          providerData: Map<String, dynamic>.from(person as Map),
+        ),
       ),
     );
   }
 
-    Widget _buildFreelanceCard(dynamic freelance) {
-    final String name = freelance['name'] ?? 'John Doe';
-    final String job = freelance['job'] ?? 'Prestataire';
-    final String image = freelance['imagePath'] ?? '';
-    final dynamic rating = freelance['rating'] ?? 0.0;
+  Widget _buildPersonSquare(dynamic person, {required bool isFreelance}) {
+    final String name = person['name'] ?? 'Profil';
+    final String job = person['job'] ?? (isFreelance ? 'Freelance' : 'Prestataire');
+    final String image = person['imagePath']?.toString() ?? '';
+
+    return GestureDetector(
+      onTap: () => _openSearchPerson(person, isFreelance: isFreelance),
+      child: Container(
+        width: 100,
+        padding: EdgeInsets.all(SDSpacing.xs),
+        decoration: BoxDecoration(
+          color: SDColors.white,
+          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+          boxShadow: [
+            BoxShadow(color: SDColors.neutral900.withOpacity(0.05), blurRadius: 4)
+          ],
+        ),
+        child: Column(
+          children: [
+            CircleAvatar(
+              radius: 30,
+              backgroundImage:
+                  image.isNotEmpty ? CachedNetworkImageProvider(image) : null,
+              child: image.isEmpty
+                  ? Icon(Icons.person, color: SDColors.neutral400)
+                  : null,
+            ),
+            SizedBox(height: SDSpacing.xs),
+            Text(name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: SDTypography.bodySmall
+                    .copyWith(fontWeight: FontWeight.bold)),
+            Text(job,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: SDTypography.labelSmall
+                    .copyWith(color: SDColors.neutral500)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPersonCard(dynamic person, {required bool isFreelance}) {
+    final String name = person['name'] ?? 'Profil';
+    final String job = person['job'] ?? (isFreelance ? 'Freelance' : 'Prestataire');
+    final String image = person['imagePath']?.toString() ?? '';
+    final dynamic rating = person['rating'] ?? 0.0;
 
     return Container(
       margin: EdgeInsets.only(bottom: SDSpacing.xs),
       decoration: BoxDecoration(
         color: SDColors.white,
         borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-        boxShadow: [BoxShadow(color: SDColors.neutral900.withOpacity(0.05), blurRadius: 4)],
+        boxShadow: [
+          BoxShadow(color: SDColors.neutral900.withOpacity(0.05), blurRadius: 4)
+        ],
       ),
       child: ListTile(
         leading: CircleAvatar(
           radius: 25,
-          backgroundImage: image.isNotEmpty ? CachedNetworkImageProvider(image) : null,
-          child: image.isEmpty ? Icon(Icons.person, color: SDColors.neutral400) : null,
+          backgroundImage:
+              image.isNotEmpty ? CachedNetworkImageProvider(image) : null,
+          child:
+              image.isEmpty ? Icon(Icons.person, color: SDColors.neutral400) : null,
         ),
-        title: Text(name, style: SDTypography.titleSmall.copyWith(fontWeight: FontWeight.bold)),
+        title: Text(name,
+            style: SDTypography.titleSmall.copyWith(fontWeight: FontWeight.bold)),
         subtitle: Row(
           children: [
-            Text(job, style: SDTypography.bodySmall),
+            Flexible(
+              child: Text(job,
+                  style: SDTypography.bodySmall,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis),
+            ),
             SizedBox(width: SDSpacing.xs),
             Icon(Icons.star, size: 14, color: SDColors.warning500),
             Text(' $rating', style: SDTypography.bodySmall),
           ],
         ),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => ProviderProfileScreen(
-                providerId: freelance['_id'] ?? '',
-                providerData: freelance,
-              ),
-            ),
-          );
-        },
+        onTap: () => _openSearchPerson(person, isFreelance: isFreelance),
       ),
     );
   }
@@ -752,7 +1026,10 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => ProductDetails(product: product),
+            builder: (_) => BlocProvider(
+              create: (_) => ShoppingPageBlocM(),
+              child: ProductDetails(product: product),
+            ),
           ),
         );
       },

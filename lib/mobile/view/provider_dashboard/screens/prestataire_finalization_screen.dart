@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'dart:io';
 import '../bloc/prestataire_finalization_bloc.dart';
 import '../../../../data/services/authCubit.dart';
+import '../../../../design_system/design_system.dart';
 
 import 'package:geolocator/geolocator.dart';
 
@@ -89,14 +90,9 @@ class _PrestataireFinalizationScreenState
           }
         },
         child: Scaffold(
-          appBar: AppBar(
-            title: Text('Finalisation du profil'),
-            backgroundColor: Colors.green.shade600,
-            foregroundColor: Colors.white,
-            leading: IconButton(
-              icon: Icon(Icons.arrow_back),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
+          backgroundColor: SDColors.white,
+          appBar: SDWhiteAppBar.appBar(
+            title: 'Finalisation du profil',
           ),
           body: Column(
             children: [

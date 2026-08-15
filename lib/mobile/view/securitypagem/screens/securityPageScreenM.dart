@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../../../data/services/api_client.dart';
+import '../../../../data/models/security.dart';
 import '../securitypageblocm/securityPageBlocM.dart';
 import '../securitypageblocm/securityPageEventM.dart';
 import '../securitypageblocm/securityPageStateM.dart';
 import 'twoFactorSetupScreenM.dart';
 import 'securitySettingsScreenM.dart';
-
-// ✅ Design System
 import '../../../../design_system/design_system.dart';
 
+/// Sécurité — maquette Figma. Pas de PIN / biométrie (absents backend).
 class SecurityPageScreenM extends StatefulWidget {
   const SecurityPageScreenM({Key? key}) : super(key: key);
 
@@ -17,55 +16,21 @@ class SecurityPageScreenM extends StatefulWidget {
   State<SecurityPageScreenM> createState() => _SecurityPageScreenMState();
 }
 
-class _SecurityPageScreenMState extends State<SecurityPageScreenM>
-    with TickerProviderStateMixin {
-  late TabController _tabController;
-  final TextEditingController _searchController = TextEditingController();
-  String _selectedFilter = 'all';
+class _SecurityPageScreenMState extends State<SecurityPageScreenM> {
+  static const double _hPad = 20;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
-
-    // Charger les données de sécurité au démarrage
     context.read<SecurityPageBlocM>().add(LoadSecurityDataEventM());
   }
 
   @override
-  void dispose() {
-    _tabController.dispose();
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (context) => SecurityPageBlocM(
-        apiClient: ApiClient(),
-      ),
-      child: Scaffold(
-        appBar: SDWhiteAppBar.appBar(
-          title: 'Sécurité du compte',
-          bottom: TabBar(
-            controller: _tabController,
-            indicatorColor: SDColors.primary600,
-            indicatorWeight: 3,
-            labelColor: SDColors.primary700,
-            unselectedLabelColor: SDColors.neutral500,
-            dividerColor: SDColors.neutral200,
-            labelStyle: SDTypography.labelMedium.copyWith(fontWeight: FontWeight.bold),
-            unselectedLabelStyle: SDTypography.labelMedium,
-            tabs: const [
-              Tab(icon: Icon(Icons.security), text: 'Général'),
-              Tab(icon: Icon(Icons.phone_android_outlined), text: 'Sessions'),
-              Tab(icon: Icon(Icons.notifications_outlined), text: 'Alertes'),
-              Tab(icon: Icon(Icons.settings_outlined), text: 'Paramètres'),
-            ],
-          ),
-        ),
-        body: BlocConsumer<SecurityPageBlocM, SecurityPageStateM>(
+    return Scaffold(
+      backgroundColor: SDColors.neutral50,
+      body: SafeArea(
+        child: BlocConsumer<SecurityPageBlocM, SecurityPageStateM>(
           listener: (context, state) {
             if (state is SecurityPageErrorStateM) {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -81,631 +46,605 @@ class _SecurityPageScreenMState extends State<SecurityPageScreenM>
                   backgroundColor: SDColors.success500,
                 ),
               );
+            } else if (state is SessionTerminatedStateM) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(state.message),
+                  backgroundColor: SDColors.success500,
+                ),
+              );
+              context.read<SecurityPageBlocM>().add(LoadSecurityDataEventM());
+            } else if (state is LoginHistoryClearedStateM) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(state.message),
+                  backgroundColor: SDColors.success500,
+                ),
+              );
+            } else if (state is SecuritySettingsUpdatedStateM) {
+              context.read<SecurityPageBlocM>().add(LoadSecurityDataEventM());
             }
           },
           builder: (context, state) {
-            if (state is SecurityPageLoadingStateM) {
-              return const Center(
-                child: CircularProgressIndicator(),
-              );
-            }
+            final loaded =
+                state is SecurityPageLoadedStateM ? state : null;
 
-            return TabBarView(
-              controller: _tabController,
+            return ListView(
+              padding: const EdgeInsets.only(bottom: 32),
               children: [
-                _buildGeneralTab(state),
-                _buildSessionsTab(state),
-                _buildAlertsTab(state),
-                _buildSettingsTab(state),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 4, _hPad, 0),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(
+                        Icons.arrow_back,
+                        color: SDColors.neutral900,
+                      ),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(_hPad, 4, _hPad, 16),
+                  child: Text(
+                    'Sécurité',
+                    style: SDTypography.displayMedium.copyWith(
+                      color: SDColors.neutral900,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                if (state is SecurityPageLoadingStateM && loaded == null)
+                  const Padding(
+                    padding: EdgeInsets.all(48),
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        color: SDColors.primary600,
+                      ),
+                    ),
+                  )
+                else ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: _hPad),
+                    child: _settingsCard(loaded),
+                  ),
+                  const SizedBox(height: 24),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(_hPad, 0, _hPad, 12),
+                    child: Text(
+                      'Appareils récents',
+                      style: SDTypography.titleMedium.copyWith(
+                        color: SDColors.neutral900,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  if (loaded == null)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: _hPad),
+                      child: Text(
+                        'Impossible de charger les sessions.',
+                        style: SDTypography.bodyMedium
+                            .copyWith(color: SDColors.neutral500),
+                      ),
+                    )
+                  else if (loaded.sessions.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: _hPad),
+                      child: Text(
+                        'Aucune session active',
+                        style: SDTypography.bodyMedium
+                            .copyWith(color: SDColors.neutral500),
+                      ),
+                    )
+                  else
+                    ..._buildSessionCards(loaded.sessions),
+                  if (loaded != null && loaded.sessions.length > 1) ...[
+                    const SizedBox(height: 8),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: _hPad),
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          final sorted = [...loaded.sessions]..sort((a, b) {
+                                final aT = a.lastActivity ?? a.createdAt;
+                                final bT = b.lastActivity ?? b.createdAt;
+                                return bT.compareTo(aT);
+                              });
+                          final currentId = sorted.isNotEmpty ? sorted.first.id : null;
+                          context.read<SecurityPageBlocM>().add(
+                                TerminateAllOtherSessionsEventM(
+                                  keepSessionId: currentId,
+                                ),
+                              );
+                        },
+                        icon: const Icon(Icons.logout),
+                        label: const Text('Déconnecter les autres appareils'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: SDColors.error500,
+                          side: BorderSide(color: SDColors.error500.withValues(alpha: 0.4)),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ],
             );
           },
         ),
-        floatingActionButton: FloatingActionButton(
-          onPressed: () {
-            context.read<SecurityPageBlocM>().add(RefreshSecurityDataEventM());
-          },
-          backgroundColor: Colors.teal,
-          child: const Icon(Icons.refresh, color: Colors.white),
-        ),
       ),
     );
   }
 
-  // 🔐 ONGLET GÉNÉRAL
-  Widget _buildGeneralTab(SecurityPageStateM state) {
-    return SingleChildScrollView(
-      padding: EdgeInsets.all(SDSpacing.md),
+  Widget _settingsCard(SecurityPageLoadedStateM? loaded) {
+    return Container(
+      decoration: BoxDecoration(
+        color: SDColors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: SDColors.neutral200),
+      ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Carte de sécurité générale
-          Card(
-            color: SDColors.white,
-            elevation: 2,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium)),
-            child: Padding(
-              padding: EdgeInsets.all(SDSpacing.md),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.security, color: SDColors.primary600),
-                      SizedBox(width: SDSpacing.xs),
-                      Text(
-                        'Sécurité générale',
-                        style: SDTypography.titleMedium.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: SDSpacing.md),
-                  if (state is SecurityPageLoadedStateM) ...[
-                    _buildSecurityItem(
-                      'Authentification à deux facteurs',
-                      state.twoFactorEnabled ? 'Activée' : 'Désactivée',
-                      state.twoFactorEnabled ? SDColors.success500 : SDColors.warning500,
-                      Icons.phone_android,
-                    ),
-                    _buildSecurityItem(
-                      'Sessions actives',
-                      '${state.sessions.length}',
-                      SDColors.info500,
-                      Icons.devices,
-                    ),
-                    _buildSecurityItem(
-                      'Alertes non lues',
-                      '${state.alerts.where((a) => !a.isRead).length}',
-                      SDColors.error500,
-                      Icons.notifications,
-                    ),
-                    _buildSecurityItem(
-                      'Appareils de confiance',
-                      '${state.trustedDevices.length}',
-                      SDColors.secondary500,
-                      Icons.verified_user,
-                    ),
-                  ],
-                ],
+          _navTile(
+            icon: Icons.lock_outline,
+            title: 'Mot de passe',
+            trailing: Text(
+              '********',
+              style: SDTypography.bodyMedium.copyWith(
+                color: SDColors.neutral500,
               ),
             ),
+            onTap: () => _openWithBloc(const SecuritySettingsScreenM()),
           ),
-
-          SizedBox(height: SDSpacing.md),
-
-          // Actions rapides
-          Card(
-            color: SDColors.white,
-            elevation: 2,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium)),
-            child: Padding(
-              padding: EdgeInsets.all(SDSpacing.md),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                   Text(
-                    'Actions rapides',
-                    style: SDTypography.titleMedium.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  SizedBox(height: SDSpacing.md),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    const TwoFactorSetupScreenM(),
-                              ),
-                            );
-                          },
-                          icon: const Icon(Icons.phone_android),
-                          label: const Text('2FA'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: SDColors.primary600,
-                            foregroundColor: SDColors.white,
-                            padding: EdgeInsets.symmetric(vertical: SDSpacing.sm),
-                          ),
-                        ),
-                      ),
-                      SizedBox(width: SDSpacing.xs),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    const SecuritySettingsScreenM(),
-                              ),
-                            );
-                          },
-                          icon: const Icon(Icons.settings),
-                          label: const Text('Paramètres'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: SDColors.info600,
-                            foregroundColor: SDColors.white,
-                            padding: EdgeInsets.symmetric(vertical: SDSpacing.sm),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+          _divider(),
+          _navTile(
+            icon: Icons.security_outlined,
+            title: 'Authentification à deux facteurs',
+            trailing: Switch(
+              value: loaded?.twoFactorEnabled ?? false,
+              onChanged: (_) =>
+                  _openWithBloc(const TwoFactorSetupScreenM()),
+              activeThumbColor: SDColors.white,
+              activeTrackColor: SDColors.primary600,
+              inactiveThumbColor: SDColors.white,
+              inactiveTrackColor: SDColors.neutral300,
             ),
+            showChevron: false,
+            onTap: () => _openWithBloc(const TwoFactorSetupScreenM()),
           ),
-        ],
-      ),
-    );
-  }
-
-  // 📱 ONGLET SESSIONS
-  Widget _buildSessionsTab(SecurityPageStateM state) {
-    return Column(
-      children: [
-        // Barre d'actions
-        Padding(
-          padding: EdgeInsets.all(SDSpacing.md),
-          child: Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    context.read<SecurityPageBlocM>().add(LoadSessionsEventM());
-                  },
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('Actualiser'),
-                  style: ElevatedButton.styleFrom(
-                    padding: EdgeInsets.symmetric(vertical: SDSpacing.sm),
-                    backgroundColor: SDColors.primary600,
-                    foregroundColor: SDColors.white,
-                  ),
-                ),
-              ),
-              SizedBox(width: SDSpacing.sm),
-              ElevatedButton.icon(
-                onPressed: () {
-                  _showTerminateAllDialog();
-                },
-                icon: const Icon(Icons.logout),
-                label: const Text('Tout fermer'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: SDColors.error600,
-                  foregroundColor: SDColors.white,
-                  padding: EdgeInsets.symmetric(vertical: SDSpacing.sm, horizontal: SDSpacing.md),
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        // Liste des sessions
-        Expanded(
-          child: _buildSessionsList(state),
-        ),
-      ],
-    );
-  }
-
-  // 🚨 ONGLET ALERTES
-  Widget _buildAlertsTab(SecurityPageStateM state) {
-    return Column(
-      children: [
-        // Barre de recherche et filtres
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  hintText: 'Rechercher des alertes...',
-                  hintStyle: SDTypography.bodyMedium.copyWith(color: SDColors.neutral500),
-                  prefixIcon: const Icon(Icons.search, color: SDColors.neutral500),
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.clear, color: SDColors.neutral500),
-                    onPressed: () {
-                      _searchController.clear();
-                      context
-                          .read<SecurityPageBlocM>()
-                          .add(LoadSecurityAlertsEventM());
-                    },
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-                    borderSide: BorderSide(color: SDColors.neutral300),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-                    borderSide: BorderSide(color: SDColors.neutral300),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-                    borderSide: BorderSide(color: SDColors.primary600),
-                  ),
-                ),
-                onChanged: (value) {
-                  if (value.isNotEmpty) {
-                    context.read<SecurityPageBlocM>().add(
-                          SearchSecurityAlertsEventM(query: value),
-                        );
-                  }
-                },
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      value: _selectedFilter,
-                      decoration: InputDecoration(
-                        labelText: 'Filtrer par',
-                        labelStyle: SDTypography.bodyMedium.copyWith(color: SDColors.neutral600),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-                          borderSide: BorderSide(color: SDColors.neutral300),
-                        ),
-                        contentPadding: EdgeInsets.symmetric(horizontal: SDSpacing.sm, vertical: SDSpacing.sm),
-                      ),
-                      items: const [
-                        DropdownMenuItem(value: 'all', child: Text('Toutes')),
-                        DropdownMenuItem(value: 'high', child: Text('Élevée')),
-                        DropdownMenuItem(
-                            value: 'medium', child: Text('Moyenne')),
-                        DropdownMenuItem(value: 'low', child: Text('Faible')),
-                      ],
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedFilter = value!;
-                        });
-                        if (value != 'all') {
-                          context.read<SecurityPageBlocM>().add(
-                                FilterSecurityAlertsEventM(severity: value!),
-                              );
-                        } else {
-                          context
-                              .read<SecurityPageBlocM>()
-                              .add(LoadSecurityAlertsEventM());
-                        }
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    onPressed: () {
-                      context
-                          .read<SecurityPageBlocM>()
-                          .add(MarkAllAlertsAsReadEventM());
-                    },
-                    icon: const Icon(Icons.mark_email_read),
-                    tooltip: 'Marquer tout comme lu',
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-
-        // Liste des alertes
-        Expanded(
-          child: _buildAlertsList(state),
-        ),
-      ],
-    );
-  }
-
-  // ⚙️ ONGLET PARAMÈTRES
-  Widget _buildSettingsTab(SecurityPageStateM state) {
-    return SingleChildScrollView(
-      padding: EdgeInsets.all(SDSpacing.md),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Card(
-            color: SDColors.white,
-            elevation: 2,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium)),
-            child: Padding(
-              padding: EdgeInsets.all(SDSpacing.md),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Paramètres de sécurité',
-                    style: SDTypography.titleMedium.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  SizedBox(height: SDSpacing.md),
-                  if (state is SecurityPageLoadedStateM) ...[
-                    _buildSettingItem(
-                      'Notifications de connexion',
-                      state.settings.loginNotifications,
-                      (value) {
-                        context.read<SecurityPageBlocM>().add(
-                              UpdateSecuritySettingsEventM(
-                                settings: {'loginNotifications': value},
-                              ),
-                            );
-                      },
-                    ),
-                    _buildSettingItem(
-                      'Authentification à deux facteurs requise',
-                      state.settings.twoFactorRequired,
-                      (value) {
-                        context.read<SecurityPageBlocM>().add(
-                              UpdateSecuritySettingsEventM(
-                                settings: {'twoFactorRequired': value},
-                              ),
-                            );
-                      },
-                    ),
-                    _buildSettingItem(
-                      'Délai d\'expiration de session',
-                      state.settings.sessionTimeout,
-                      (value) {
-                        context.read<SecurityPageBlocM>().add(
-                              UpdateSecuritySettingsEventM(
-                                settings: {'sessionTimeout': value},
-                              ),
-                            );
-                      },
-                    ),
-                    _buildSettingItem(
-                      'Sessions multiples autorisées',
-                      state.settings.allowMultipleSessions,
-                      (value) {
-                        context.read<SecurityPageBlocM>().add(
-                              UpdateSecuritySettingsEventM(
-                                settings: {'allowMultipleSessions': value},
-                              ),
-                            );
-                      },
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 🔧 MÉTHODES UTILITAIRES
-  Widget _buildSecurityItem(
-      String title, String value, Color color, IconData icon) {
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: SDSpacing.sm),
-      child: Row(
-        children: [
-          Icon(icon, color: color, size: 20),
-          SizedBox(width: SDSpacing.sm),
-          Expanded(
-            child: Text(title, style: SDTypography.bodyMedium),
-          ),
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: SDSpacing.sm, vertical: SDSpacing.xxs),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
-            ),
-            child: Text(
-              value,
-              style: SDTypography.labelSmall.copyWith(
-                color: color,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSettingItem(String title, bool value, Function(bool) onChanged) {
-    return SwitchListTile(
-      title: Text(title, style: SDTypography.bodyMedium),
-      value: value,
-      onChanged: onChanged,
-      activeColor: SDColors.primary600,
-      contentPadding: EdgeInsets.zero,
-    );
-  }
-
-  Widget _buildSessionsList(SecurityPageStateM state) {
-    if (state is SecurityPageLoadedStateM) {
-      final sessions = state.sessions;
-
-      if (sessions.isEmpty) {
-        return const Center(
-          child: Text('Aucune session active'),
-        );
-      }
-
-      return ListView.builder(
-        itemCount: sessions.length,
-        itemBuilder: (context, index) {
-          final session = sessions[index];
-          return Card(
-            margin: EdgeInsets.symmetric(horizontal: SDSpacing.md, vertical: SDSpacing.xxs),
-            color: SDColors.white,
-            elevation: 1,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium)),
-            child: ListTile(
-              leading: Icon(
-                _getDeviceIcon(session.deviceType),
-                color: session.isActive ? SDColors.success500 : SDColors.neutral400,
-              ),
-              title: Text(session.deviceName, style: SDTypography.bodyLarge.copyWith(fontWeight: FontWeight.bold)),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('${session.deviceType} • ${session.location}', style: SDTypography.bodySmall),
-                  Text('IP: ${session.ipAddress}', style: SDTypography.bodySmall),
-                  if (session.lastActivity != null)
-                    Text(
-                        'Dernière activité: ${_formatDate(session.lastActivity!)}',
-                        style: SDTypography.bodySmall,
-                    ),
-                ],
-              ),
-              trailing: session.isActive
-                  ? IconButton(
-                      icon: const Icon(Icons.logout, color: SDColors.error500),
-                      onPressed: () {
-                        context.read<SecurityPageBlocM>().add(
-                              TerminateSessionEventM(sessionId: session.id!),
-                            );
-                      },
-                    )
-                  : const Icon(Icons.check_circle, color: SDColors.neutral400),
-            ),
-          );
-        },
-      );
-    }
-
-    return const Center(
-      child: Text('Chargement des sessions...'),
-    );
-  }
-
-  Widget _buildAlertsList(SecurityPageStateM state) {
-    if (state is SecurityAlertsLoadedStateM) {
-      final alerts = state.alerts;
-
-      if (alerts.isEmpty) {
-        return const Center(
-          child: Text('Aucune alerte de sécurité'),
-        );
-      }
-
-      return ListView.builder(
-        itemCount: alerts.length,
-        itemBuilder: (context, index) {
-          final alert = alerts[index];
-          return Card(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            child: ListTile(
-              leading: Icon(
-                _getAlertIcon(alert.severity),
-                color: _getAlertColor(alert.severity),
-              ),
-              title: Text(alert.title),
-              subtitle: Text(alert.message),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (!alert.isRead)
-                    const Icon(Icons.circle, color: Colors.red, size: 12),
-                  IconButton(
-                    icon: const Icon(Icons.delete),
-                    onPressed: () {
-                      context.read<SecurityPageBlocM>().add(
-                            DeleteAlertEventM(alertId: alert.id!),
-                          );
-                    },
-                  ),
-                ],
-              ),
-              onTap: () {
-                if (!alert.isRead) {
+          _divider(),
+          if (loaded != null) ...[
+            _navTile(
+              icon: Icons.notifications_none_outlined,
+              title: 'Alertes de connexion',
+              trailing: Switch(
+                value: loaded.settings.loginNotifications,
+                onChanged: (v) {
                   context.read<SecurityPageBlocM>().add(
-                        MarkAlertAsReadEventM(alertId: alert.id!),
+                        UpdateSecuritySettingsEventM(
+                          settings: {'loginNotifications': v},
+                        ),
+                      );
+                },
+                activeThumbColor: SDColors.white,
+                activeTrackColor: SDColors.primary600,
+                inactiveThumbColor: SDColors.white,
+                inactiveTrackColor: SDColors.neutral300,
+              ),
+              showChevron: false,
+              onTap: null,
+            ),
+            _divider(),
+          ],
+          _navTile(
+            icon: Icons.history,
+            title: 'Historique des connexions',
+            onTap: () => _openWithBloc(const _HistorySubScreen()),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildSessionCards(List<SecuritySession> sessions) {
+    final sorted = [...sessions]..sort((a, b) {
+        final aT = a.lastActivity ?? a.createdAt;
+        final bT = b.lastActivity ?? b.createdAt;
+        return bT.compareTo(aT);
+      });
+    final currentId = sorted.isNotEmpty ? sorted.first.id : null;
+
+    return [
+      for (final session in sorted)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(_hPad, 0, _hPad, 10),
+          child: _sessionCard(
+            session: session,
+            isCurrent: session.id != null && session.id == currentId,
+          ),
+        ),
+    ];
+  }
+
+  Widget _sessionCard({
+    required SecuritySession session,
+    required bool isCurrent,
+  }) {
+    final when = _formatActivity(session.lastActivity ?? session.createdAt);
+    final loc = session.location.trim().isEmpty
+        ? 'Localisation inconnue'
+        : session.location;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 14, 10, 14),
+      decoration: BoxDecoration(
+        color: SDColors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: SDColors.neutral200),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            _deviceIcon(session.deviceType),
+            color: SDColors.neutral700,
+            size: 26,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: session.isActive
+                            ? SDColors.primary600
+                            : SDColors.neutral400,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        session.deviceName,
+                        style: SDTypography.bodyLarge.copyWith(
+                          color: SDColors.neutral900,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    if (isCurrent) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: SDColors.primary600.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          'Appareil actuel',
+                          style: SDTypography.labelSmall.copyWith(
+                            color: SDColors.primary700,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '$loc · $when',
+                  style: SDTypography.bodySmall.copyWith(
+                    color: SDColors.neutral500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (!isCurrent && session.id != null)
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert, color: SDColors.neutral500),
+              onSelected: (value) {
+                if (value == 'disconnect') {
+                  context.read<SecurityPageBlocM>().add(
+                        TerminateSessionEventM(sessionId: session.id!),
                       );
                 }
               },
+              itemBuilder: (_) => [
+                PopupMenuItem(
+                  value: 'disconnect',
+                  child: Text(
+                    'Déconnecter',
+                    style: SDTypography.bodyMedium.copyWith(
+                      color: SDColors.error500,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          );
-        },
-      );
-    }
-
-    return const Center(
-      child: Text('Chargement des alertes...'),
+        ],
+      ),
     );
   }
 
-  IconData _getDeviceIcon(String deviceType) {
+  Widget _navTile({
+    required IconData icon,
+    required String title,
+    Widget? trailing,
+    bool showChevron = true,
+    VoidCallback? onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        child: Row(
+          children: [
+            Icon(icon, color: SDColors.neutral800, size: 22),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                title,
+                style: SDTypography.bodyLarge.copyWith(
+                  color: SDColors.neutral900,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            if (trailing != null) trailing,
+            if (showChevron) ...[
+              const SizedBox(width: 4),
+              const Icon(
+                Icons.chevron_right,
+                color: SDColors.neutral400,
+                size: 20,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _divider() =>
+      const Divider(height: 1, color: SDColors.neutral200, indent: 48);
+
+  void _openWithBloc(Widget child) {
+    final bloc = context.read<SecurityPageBlocM>();
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => BlocProvider.value(
+          value: bloc,
+          child: child,
+        ),
+      ),
+    );
+  }
+
+  static IconData _deviceIcon(String deviceType) {
     switch (deviceType.toLowerCase()) {
       case 'mobile':
-        return Icons.phone_android;
+      case 'phone':
+      case 'android':
+      case 'ios':
+        return Icons.smartphone_outlined;
       case 'tablet':
-        return Icons.tablet;
+        return Icons.tablet_outlined;
       case 'desktop':
-        return Icons.computer;
+      case 'web':
+        return Icons.laptop_outlined;
       case 'laptop':
-        return Icons.laptop;
+        return Icons.laptop_outlined;
       default:
-        return Icons.device_unknown;
+        return Icons.devices_outlined;
     }
   }
 
-  IconData _getAlertIcon(String severity) {
-    switch (severity.toLowerCase()) {
-      case 'high':
-        return Icons.warning;
-      case 'medium':
-        return Icons.info;
-      case 'low':
-        return Icons.check_circle;
-      default:
-        return Icons.notifications;
+  static String _formatActivity(DateTime dt) {
+    final now = DateTime.now();
+    final diff = now.difference(dt);
+    if (diff.inMinutes < 5) return 'Maintenant';
+    if (diff.inHours < 1) return 'il y a ${diff.inMinutes} min';
+    if (diff.inHours < 24) return 'il y a ${diff.inHours} h';
+    if (diff.inDays == 1) {
+      final h = dt.hour.toString().padLeft(2, '0');
+      final m = dt.minute.toString().padLeft(2, '0');
+      return 'Hier à $h:$m';
     }
+    return '${dt.day.toString().padLeft(2, '0')}/'
+        '${dt.month.toString().padLeft(2, '0')}/'
+        '${dt.year}';
+  }
+}
+
+// ─── Historique des connexions (API existante) ─────────────────────
+
+class _HistorySubScreen extends StatefulWidget {
+  const _HistorySubScreen();
+
+  @override
+  State<_HistorySubScreen> createState() => _HistorySubScreenState();
+}
+
+class _HistorySubScreenState extends State<_HistorySubScreen> {
+  @override
+  void initState() {
+    super.initState();
+    context.read<SecurityPageBlocM>().add(LoadLoginHistoryEventM());
   }
 
-  Color _getAlertColor(String severity) {
-    switch (severity.toLowerCase()) {
-      case 'high':
-        return SDColors.error500;
-      case 'medium':
-        return SDColors.warning500;
-      case 'low':
-        return SDColors.success500;
-      default:
-        return SDColors.info500;
-    }
-  }
-
-  String _formatDate(DateTime date) {
-    return '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
-  }
-
-  void _showTerminateAllDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Terminer toutes les sessions'),
-        content: const Text(
-          'Êtes-vous sûr de vouloir terminer toutes les autres sessions ? '
-          'Vous devrez vous reconnecter sur tous vos autres appareils.',
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) {
+          context.read<SecurityPageBlocM>().add(LoadSecurityDataEventM());
+        }
+      },
+      child: Scaffold(
+      backgroundColor: SDColors.neutral50,
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            IconButton(
+              onPressed: () => Navigator.pop(context),
+              icon: const Icon(Icons.arrow_back, color: SDColors.neutral900),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Historique des connexions',
+                      style: SDTypography.displaySmall.copyWith(
+                        color: SDColors.neutral900,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      showDialog(
+                        context: context,
+                        builder: (dialogCtx) => AlertDialog(
+                          title: const Text('Effacer l\'historique ?'),
+                          content: const Text(
+                            'Tous les enregistrements d\'historique de connexion seront supprimés.',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(dialogCtx),
+                              child: const Text('Annuler'),
+                            ),
+                            ElevatedButton(
+                              onPressed: () {
+                                Navigator.pop(dialogCtx);
+                                context
+                                    .read<SecurityPageBlocM>()
+                                    .add(ClearLoginHistoryEventM());
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: SDColors.error500,
+                              ),
+                              child: const Text(
+                                'Effacer',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                    child: Text(
+                      'Effacer',
+                      style: SDTypography.labelLarge.copyWith(
+                        color: SDColors.error500,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: BlocBuilder<SecurityPageBlocM, SecurityPageStateM>(
+                builder: (context, state) {
+                  if (state is LoginHistoryClearedStateM) {
+                    return Center(
+                      child: Text(
+                        'Aucun historique',
+                        style: SDTypography.bodyMedium
+                            .copyWith(color: SDColors.neutral500),
+                      ),
+                    );
+                  }
+                  if (state is! LoginHistoryLoadedStateM) {
+                    return const Center(
+                      child: CircularProgressIndicator(
+                        color: SDColors.primary600,
+                      ),
+                    );
+                  }
+                  final history = state.loginHistory;
+                  if (history.isEmpty) {
+                    return Center(
+                      child: Text(
+                        'Aucun historique',
+                        style: SDTypography.bodyMedium
+                            .copyWith(color: SDColors.neutral500),
+                      ),
+                    );
+                  }
+                  return ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                    itemCount: history.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 8),
+                    itemBuilder: (context, index) {
+                      final item = history[index];
+                      final when = _SecurityPageScreenMState._formatActivity(
+                        item.lastActivity ?? item.createdAt,
+                      );
+                      return Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: SDColors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: SDColors.neutral200),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              _SecurityPageScreenMState._deviceIcon(
+                                item.deviceType,
+                              ),
+                              color: SDColors.neutral700,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    item.deviceName,
+                                    style: SDTypography.bodyLarge.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                      color: SDColors.neutral900,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '${item.location.isEmpty ? '—' : item.location} · $when',
+                                    style: SDTypography.bodySmall.copyWith(
+                                      color: SDColors.neutral500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Annuler'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              context
-                  .read<SecurityPageBlocM>()
-                  .add(TerminateAllOtherSessionsEventM());
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: SDColors.error600),
-            child:
-                Text('Terminer', style: SDTypography.labelLarge.copyWith(color: SDColors.white)),
-          ),
-        ],
       ),
+    ),
     );
   }
 }

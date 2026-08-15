@@ -166,9 +166,9 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
             textAlign: TextAlign.start,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: SDTypography.headlineSmall.copyWith(
+            style: SDTypography.displayMedium.copyWith(
               color: SDColors.neutral900,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ),
@@ -625,12 +625,7 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
               slivers: [
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      SDSpacing.md,
-                      SDSpacing.xs,
-                      SDSpacing.md,
-                      SDSpacing.sm,
-                    ),
+                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -1274,22 +1269,14 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
       floating: true,
       pinned: true,
       snap: false,
-      backgroundColor: Colors.transparent,
+      backgroundColor: SDColors.white,
       elevation: 0,
+      surfaceTintColor: Colors.transparent,
+      foregroundColor: SDColors.neutral900,
       automaticallyImplyLeading: false,
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                SDColors.primary600,
-                SDColors.primary700,
-                SDColors.primary800,
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
+          color: SDColors.white,
           child: SafeArea(
             child: Padding(
               padding: EdgeInsets.symmetric(horizontal: SDSpacing.sm),
@@ -1328,18 +1315,18 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                                 child: Container(
                                   padding: EdgeInsets.all(SDSpacing.xxs),
                                   decoration: BoxDecoration(
-                                    color: SDColors.white.withOpacity(0.15),
+                                    color: SDColors.neutral100,
                                     shape: BoxShape.circle,
                                     border: Border.all(
-                                      color: SDColors.white.withOpacity(0.3),
+                                      color: SDColors.neutral200,
                                       width: 1,
                                     ),
                                   ),
                                   child: Stack(
                                     alignment: Alignment.topRight,
                                     children: [
-                                      Icon(Icons.shopping_cart,
-                                          color: SDColors.white, size: 20),
+                                      Icon(Icons.shopping_cart_outlined,
+                                          color: SDColors.neutral900, size: 20),
                                       if (cartCount > 0)
                                         Positioned(
                                           top: -4,
@@ -1385,55 +1372,48 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                           Container(
                             padding: EdgeInsets.all(SDSpacing.xxs),
                             decoration: BoxDecoration(
-                              color: SDColors.white.withOpacity(0.15),
+                              color: SDColors.neutral100,
                               shape: BoxShape.circle,
                               border: Border.all(
-                                color: SDColors.white.withOpacity(0.3),
+                                color: SDColors.neutral200,
                                 width: 1,
                               ),
                             ),
                             child: Icon(Icons.notifications_outlined,
-                                color: SDColors.white, size: 20),
+                                color: SDColors.neutral900, size: 20),
                           ),
                         ],
                       ),
                     ],
                   ),
                   SizedBox(height: SDSpacing.sm),
-                  // Barre de recherche avec Glassmorphism
+                  // Barre de recherche
                   Container(
                     height: 50,
                     decoration: BoxDecoration(
-                      color: SDColors.white.withOpacity(0.2),
+                      color: SDColors.neutral50,
                       borderRadius: BorderRadius.circular(25),
                       border: Border.all(
-                        color: SDColors.white.withOpacity(0.3),
+                        color: SDColors.neutral200,
                         width: 1,
                       ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: SDColors.neutral900.withOpacity(0.1),
-                          blurRadius: 10,
-                          offset: Offset(0, 4),
-                        ),
-                      ],
                     ),
                     child: TextField(
                       readOnly: true,
-                      style: TextStyle(color: SDColors.white),
+                      style: TextStyle(color: SDColors.neutral900),
                       decoration: InputDecoration(
                         hintText: 'Rechercher un produit...',
                         hintStyle: SDTypography.bodyMedium.copyWith(
-                          color: SDColors.white.withOpacity(0.7),
+                          color: SDColors.neutral500,
                         ),
                         prefixIcon: Icon(
                           Icons.search,
-                          color: SDColors.white.withOpacity(0.9),
+                          color: SDColors.neutral500,
                         ),
                         suffixIcon: IconButton(
                           icon: Icon(
-                            Icons.filter_alt,
-                            color: SDColors.white.withOpacity(0.9),
+                            Icons.filter_alt_outlined,
+                            color: SDColors.neutral700,
                           ),
                           onPressed: () =>
                               _showAdvancedFilterDialog(context),
@@ -1460,6 +1440,10 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
         ),
         titlePadding: EdgeInsets.zero,
         expandedTitleScale: 1,
+      ),
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(1),
+        child: Divider(height: 1, thickness: 1, color: SDColors.neutral200),
       ),
     );
   }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:sdealsmobile/ai_services/interfaces/ai_assistant_service.dart';
 import 'package:sdealsmobile/ai_services/mock_implementations/mock_ai_assistant_service.dart';
+import 'package:sdealsmobile/design_system/design_system.dart';
 
 class AIAssistantChatScreen extends StatefulWidget {
   const AIAssistantChatScreen({Key? key}) : super(key: key);
@@ -81,14 +82,9 @@ class _AIAssistantChatScreenState extends State<AIAssistantChatScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          children: [
-            Icon(Icons.smart_toy, color: Theme.of(context).primaryColor),
-            SizedBox(width: 10),
-            Text('Assistant IA'),
-          ],
-        ),
+      backgroundColor: SDColors.white,
+      appBar: SDWhiteAppBar.appBar(
+        title: 'Assistant IA',
         actions: [
           IconButton(
             icon: Icon(Icons.help_outline),

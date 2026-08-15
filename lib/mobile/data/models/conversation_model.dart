@@ -110,8 +110,11 @@ class ConversationModel {
           interlocuteur?['id']?.toString() ??
           '',
       participantName: participantName,
-      participantImage:
-          interlocuteur?['photoProfil']?.toString() ?? 'assets/profil.png',
+      participantImage: () {
+        final photo = interlocuteur?['photoProfil']?.toString().trim() ?? '';
+        if (photo.isEmpty || photo == 'null') return '';
+        return photo;
+      }(),
       lastMessage: lastMessage,
       lastUpdated: json['updatedAt'] != null
           ? DateTime.parse(json['updatedAt'].toString())

@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:geolocator/geolocator.dart';
 import 'dart:io';
 import '../../../../../design_system/design_system.dart';
 import '../../../../../data/services/api_client.dart';
 import '../../../../../data/models/categorie.dart';
 import '../../../../../data/models/service.dart';
 
+/// Étape 1 Figma — identité + catégorie / service (sans zones / GPS).
 class ProviderPersonalInfoStep extends StatefulWidget {
   final Map<String, dynamic> formData;
   final Function(Map<String, dynamic>) onDataChanged;
@@ -28,29 +27,18 @@ class _ProviderPersonalInfoStepState extends State<ProviderPersonalInfoStep> {
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _confirmPasswordController = TextEditingController();
+  final TextEditingController _confirmPasswordController =
+      TextEditingController();
 
   File? _profileImage;
   String? _selectedCategory;
   String? _selectedService;
-  List<String> _selectedAreas = [];
-
-  LatLng? _selectedPosition;
-  String? _selectedAddress;
-  bool _isLoadingLocation = false;
 
   List<Categorie> _categories = [];
   List<Service> _services = [];
   bool _isLoadingCategories = false;
   bool _isLoadingServices = false;
   final ApiClient _apiClient = ApiClient();
-
-  final List<String> _availableAreas = [
-    'Abidjan', 'Abobo', 'Adjamé', 'Attécoubé', 'Cocody',
-    'Koumassi', 'Marcory', 'Plateau', 'Port-Bouët', 'Treichville',
-    'Yopougon', 'Bingerville', 'Yamoussoukro', 'Bouaké', 'Daloa',
-    'San Pedro', 'Korhogo', 'Anyama', 'Divo',
-  ];
 
   @override
   void initState() {
@@ -67,7 +55,11 @@ class _ProviderPersonalInfoStepState extends State<ProviderPersonalInfoStep> {
         _categories = categories;
         _isLoadingCategories = false;
       });
-    } catch (e) {
+      final cat = widget.formData['category'] as String?;
+      if (cat != null && cat.isNotEmpty) {
+        await _loadServicesForCategory(cat);
+      }
+    } catch (_) {
       setState(() => _isLoadingCategories = false);
     }
   }
@@ -79,12 +71,19 @@ class _ProviderPersonalInfoStepState extends State<ProviderPersonalInfoStep> {
     });
     try {
       final services = await _apiClient.fetchServices('Métiers');
-      final filtered = services.where((s) => s.categorie?.idcategorie == categoryId).toList();
+      final filtered = services
+          .where((s) => s.categorie?.idcategorie == categoryId)
+          .toList();
       setState(() {
         _services = filtered;
         _isLoadingServices = false;
+        final prev = widget.formData['service'] as String?;
+        if (prev != null && filtered.any((s) => s.idservice == prev)) {
+          _selectedService = prev;
+        }
       });
-    } catch (e) {
+      _updateFormData();
+    } catch (_) {
       setState(() => _isLoadingServices = false);
     }
   }
@@ -95,26 +94,26 @@ class _ProviderPersonalInfoStepState extends State<ProviderPersonalInfoStep> {
     _emailController.text = widget.formData['email'] ?? '';
     _selectedCategory = widget.formData['category'];
     _selectedService = widget.formData['service'];
-    _selectedAreas = List<String>.from(widget.formData['serviceAreas'] ?? []);
     if (widget.formData['profileImage'] != null) {
       _profileImage = File(widget.formData['profileImage']);
-    }
-    if (widget.formData['position'] != null) {
-      _selectedPosition = widget.formData['position'] as LatLng;
-      _selectedAddress = widget.formData['address'];
     }
   }
 
   @override
   void didUpdateWidget(ProviderPersonalInfoStep oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Synchroniser quand le parent met à jour formData (pré-remplissage auth)
-    final newName = widget.formData['fullName'] ?? '';
-    final newPhone = widget.formData['phone'] ?? '';
-    final newEmail = widget.formData['email'] ?? '';
-    if (_nameController.text != newName) _nameController.text = newName;
-    if (_phoneController.text != newPhone) _phoneController.text = newPhone;
-    if (_emailController.text != newEmail) _emailController.text = newEmail;
+    final newName = (widget.formData['fullName'] ?? '').toString();
+    final newPhone = (widget.formData['phone'] ?? '').toString();
+    final newEmail = (widget.formData['email'] ?? '').toString();
+    if (_nameController.text.isEmpty && newName.isNotEmpty) {
+      _nameController.text = newName;
+    }
+    if (_phoneController.text.isEmpty && newPhone.isNotEmpty) {
+      _phoneController.text = newPhone;
+    }
+    if (_emailController.text.isEmpty && newEmail.isNotEmpty) {
+      _emailController.text = newEmail;
+    }
   }
 
   @override
@@ -146,9 +145,16 @@ class _ProviderPersonalInfoStepState extends State<ProviderPersonalInfoStep> {
         ? _selectedService
         : null;
     final categoryName = validCategory != null
-        ? _categories.firstWhere((c) => c.idcategorie == validCategory,
+        ? _categories
+            .firstWhere((c) => c.idcategorie == validCategory,
                 orElse: () => _categories.first)
             .nomcategorie
+        : '';
+    final serviceName = validService != null
+        ? _services
+            .firstWhere((s) => s.idservice == validService,
+                orElse: () => _services.first)
+            .nomservice
         : '';
 
     widget.onDataChanged({
@@ -160,122 +166,101 @@ class _ProviderPersonalInfoStepState extends State<ProviderPersonalInfoStep> {
       'category': validCategory,
       'categoryName': categoryName,
       'service': validService,
-      'serviceAreas': _selectedAreas,
+      'serviceName': serviceName,
       'profileImage': _profileImage?.path,
-      'position': _selectedPosition,
-      'address': _selectedAddress,
     });
-  }
-
-  Future<void> _getCurrentLocation() async {
-    setState(() => _isLoadingLocation = true);
-    try {
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          _showSnack('Permission de localisation refusée');
-          setState(() => _isLoadingLocation = false);
-          return;
-        }
-      }
-      if (permission == LocationPermission.deniedForever) {
-        _showSnack('Permission de localisation refusée définitivement');
-        setState(() => _isLoadingLocation = false);
-        return;
-      }
-      final position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high);
-      setState(() {
-        _selectedPosition = LatLng(position.latitude, position.longitude);
-        _selectedAddress = 'Position actuelle';
-        _isLoadingLocation = false;
-      });
-      _updateFormData();
-    } catch (e) {
-      setState(() => _isLoadingLocation = false);
-      _showSnack('Erreur lors de la récupération de la position');
-    }
-  }
-
-  void _showSnack(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   @override
   Widget build(BuildContext context) {
+    final connected = widget.formData['requirePassword'] != true;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Informations de base', style: SDTypography.titleMedium.copyWith(fontWeight: FontWeight.w700)),
-        SizedBox(height: SDSpacing.xs),
-        Text('Remplissez ces informations essentielles pour commencer',
-            style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral500)),
-        SizedBox(height: SDSpacing.md),
-
-        // Photo de profil
         Center(
           child: Column(
             children: [
               GestureDetector(
                 onTap: _pickImage,
-                child: CircleAvatar(
-                  radius: 44,
-                  backgroundColor: SDColors.neutral100,
-                  backgroundImage:
-                      _profileImage != null ? FileImage(_profileImage!) : null,
-                  child: _profileImage == null
-                      ? Icon(Icons.add_a_photo_outlined, size: 28, color: SDColors.neutral500)
-                      : null,
+                child: Stack(
+                  children: [
+                    CircleAvatar(
+                      radius: 48,
+                      backgroundColor: SDColors.neutral100,
+                      backgroundImage: _profileImage != null
+                          ? FileImage(_profileImage!)
+                          : null,
+                      child: _profileImage == null
+                          ? const Icon(Icons.person_outline_rounded,
+                              size: 40, color: SDColors.neutral400)
+                          : null,
+                    ),
+                    Positioned(
+                      right: 0,
+                      bottom: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: SDColors.primary600,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: SDColors.white, width: 2),
+                        ),
+                        child: const Icon(Icons.photo_camera_outlined,
+                            size: 14, color: SDColors.white),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              SizedBox(height: SDSpacing.xs),
-              Text('Photo de profil (optionnelle)',
-                  style: SDTypography.bodySmall.copyWith(color: SDColors.neutral500)),
+              const SizedBox(height: 8),
+              GestureDetector(
+                onTap: _pickImage,
+                child: Text(
+                  'Ajouter une photo',
+                  style: SDTypography.labelMedium.copyWith(
+                    color: SDColors.primary700,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
             ],
           ),
         ),
         SizedBox(height: SDSpacing.md),
-
-        // Nom complet
         SDInput(
           label: 'Nom complet *',
-          hint: 'Ex: Kouamé Jean',
+          hint: 'Ex. Kouadio Jean',
           controller: _nameController,
           prefixIcon: Icons.person_outline,
-          validator: (v) => (v == null || v.trim().isEmpty) ? 'Requis' : null,
           onChanged: (_) => _updateFormData(),
         ),
         SizedBox(height: SDSpacing.sm),
-
-        // Téléphone
         SDInput(
           label: 'Téléphone *',
           hint: 'Ex: 07 XX XX XX XX',
           controller: _phoneController,
           prefixIcon: Icons.phone_outlined,
           keyboardType: TextInputType.phone,
-          validator: (v) => (v == null || v.trim().isEmpty) ? 'Requis' : null,
           onChanged: (_) => _updateFormData(),
         ),
         SizedBox(height: SDSpacing.sm),
-
-        // Email optionnel
         SDInput(
           label: 'Email (optionnel)',
-          hint: 'Ex: nom@exemple.com',
+          hint: 'exemple@email.com',
           controller: _emailController,
           prefixIcon: Icons.email_outlined,
           keyboardType: TextInputType.emailAddress,
-          validator: (v) {
-            if (v != null && v.isNotEmpty && !v.contains('@')) {
-              return 'Email invalide';
-            }
-            return null;
-          },
           onChanged: (_) => _updateFormData(),
         ),
-        // Mot de passe — obligatoire si nouveau compte (non connecté)
+        if (connected) ...[
+          SizedBox(height: SDSpacing.sm),
+          _InfoBanner(
+            icon: Icons.info_outline_rounded,
+            text:
+                'Vous êtes déjà connecté — les champs mot de passe ne sont pas demandés.',
+          ),
+        ],
         if (widget.formData['requirePassword'] == true) ...[
           SizedBox(height: SDSpacing.sm),
           SDInput(
@@ -296,19 +281,27 @@ class _ProviderPersonalInfoStepState extends State<ProviderPersonalInfoStep> {
             onChanged: (_) => _updateFormData(),
           ),
         ],
-        SizedBox(height: SDSpacing.md),
-
-        // Catégorie
+        SizedBox(height: SDSpacing.lg),
+        Text(
+          'Votre activité',
+          style: SDTypography.titleSmall.copyWith(
+            fontWeight: FontWeight.w800,
+            color: SDColors.neutral900,
+          ),
+        ),
+        SizedBox(height: SDSpacing.sm),
         _buildDropdownField(
-          label: 'Votre catégorie *',
+          label: 'Catégorie *',
           icon: Icons.category_outlined,
           isLoading: _isLoadingCategories,
           loadingLabel: 'Chargement des catégories...',
           value: _selectedCategory,
-          items: _categories.map((c) => DropdownMenuItem(
-                value: c.idcategorie,
-                child: Text(c.nomcategorie),
-              )).toList(),
+          items: _categories
+              .map((c) => DropdownMenuItem(
+                    value: c.idcategorie,
+                    child: Text(c.nomcategorie),
+                  ))
+              .toList(),
           onChanged: (value) {
             setState(() {
               _selectedCategory = value;
@@ -321,23 +314,23 @@ class _ProviderPersonalInfoStepState extends State<ProviderPersonalInfoStep> {
           hint: 'Sélectionnez une catégorie',
         ),
         SizedBox(height: SDSpacing.sm),
-
-        // Service
         _buildDropdownField(
-          label: 'Votre service *',
+          label: 'Service *',
           icon: Icons.build_outlined,
           isLoading: _isLoadingServices,
           loadingLabel: _selectedCategory == null
-              ? 'Sélectionnez d\'abord une catégorie'
+              ? 'Sélectionnez d’abord une catégorie'
               : 'Chargement des services...',
           value: _selectedService != null &&
                   _services.any((s) => s.idservice == _selectedService)
               ? _selectedService
               : null,
-          items: _services.map((s) => DropdownMenuItem(
-                value: s.idservice,
-                child: Text(s.nomservice),
-              )).toList(),
+          items: _services
+              .map((s) => DropdownMenuItem(
+                    value: s.idservice,
+                    child: Text(s.nomservice),
+                  ))
+              .toList(),
           onChanged: _selectedCategory == null
               ? null
               : (value) {
@@ -346,137 +339,11 @@ class _ProviderPersonalInfoStepState extends State<ProviderPersonalInfoStep> {
                 },
           hint: 'Sélectionnez un service',
         ),
-        SizedBox(height: SDSpacing.md),
-
-        // Zones d'intervention
-        Text('Où travaillez-vous ? *',
-            style: SDTypography.labelLarge.copyWith(
-                color: SDColors.neutral700, fontWeight: FontWeight.w600)),
-        SizedBox(height: SDSpacing.xs),
-        Wrap(
-          spacing: SDSpacing.xs,
-          runSpacing: SDSpacing.xs,
-          children: _availableAreas.map((zone) {
-            final isSelected = _selectedAreas.contains(zone);
-            return FilterChip(
-              label: Text(zone,
-                  style: SDTypography.bodySmall.copyWith(
-                      color: isSelected ? SDColors.primary700 : SDColors.neutral700)),
-              selected: isSelected,
-              onSelected: (selected) {
-                setState(() {
-                  if (selected) {
-                    _selectedAreas.add(zone);
-                  } else {
-                    _selectedAreas.remove(zone);
-                  }
-                });
-                _updateFormData();
-              },
-              selectedColor: SDColors.primary50,
-              checkmarkColor: SDColors.primary700,
-              backgroundColor: SDColors.neutral50,
-              side: BorderSide(
-                  color: isSelected ? SDColors.primary300 : SDColors.neutral200),
-            );
-          }).toList(),
-        ),
-        SizedBox(height: SDSpacing.md),
-
-        // Position GPS
-        Text('Votre position *',
-            style: SDTypography.labelLarge.copyWith(
-                color: SDColors.neutral700, fontWeight: FontWeight.w600)),
-        SizedBox(height: SDSpacing.xs),
-        Container(
-          padding: EdgeInsets.all(SDSpacing.sm),
-          decoration: BoxDecoration(
-            border: Border.all(
-                color: _selectedPosition != null
-                    ? SDColors.primary300
-                    : SDColors.neutral200),
-            borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-            color: _selectedPosition != null ? SDColors.primary50 : SDColors.white,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (_selectedPosition != null) ...[
-                Row(
-                  children: [
-                    Icon(Icons.location_on, color: SDColors.primary600, size: 18),
-                    SizedBox(width: SDSpacing.xs),
-                    Expanded(
-                      child: Text(_selectedAddress ?? 'Position sélectionnée',
-                          style: SDTypography.bodySmall.copyWith(
-                              color: SDColors.primary700,
-                              fontWeight: FontWeight.w500)),
-                    ),
-                    IconButton(
-                      onPressed: () {
-                        setState(() {
-                          _selectedPosition = null;
-                          _selectedAddress = null;
-                        });
-                        _updateFormData();
-                      },
-                      icon: Icon(Icons.close, color: SDColors.neutral500, size: 18),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
-                  ],
-                ),
-                SizedBox(height: SDSpacing.xxs),
-              ] else ...[
-                Row(
-                  children: [
-                    Icon(Icons.location_off, color: SDColors.neutral400, size: 18),
-                    SizedBox(width: SDSpacing.xs),
-                    Text('Aucune position sélectionnée',
-                        style: SDTypography.bodySmall.copyWith(
-                            color: SDColors.neutral500)),
-                  ],
-                ),
-                SizedBox(height: SDSpacing.xs),
-              ],
-              SDButton(
-                text: _isLoadingLocation
-                    ? 'Récupération...'
-                    : 'Utiliser ma position actuelle',
-                icon: _isLoadingLocation ? null : Icons.my_location,
-                isLoading: _isLoadingLocation,
-                onPressed: _isLoadingLocation ? null : _getCurrentLocation,
-                fullWidth: true,
-                type: _selectedPosition != null
-                    ? SDButtonType.outlined
-                    : SDButtonType.primary,
-              ),
-            ],
-          ),
-        ),
-        SizedBox(height: SDSpacing.md),
-
-        // Note info
-        Container(
-          padding: EdgeInsets.all(SDSpacing.sm),
-          decoration: BoxDecoration(
-            color: SDColors.primary50,
-            borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-            border: Border.all(color: SDColors.primary100),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(Icons.info_outline, color: SDColors.primary600, size: 18),
-              SizedBox(width: SDSpacing.xs),
-              Expanded(
-                child: Text(
-                  'Profil de base — vous pourrez le compléter pour être vérifié ✓',
-                  style: SDTypography.bodySmall.copyWith(color: SDColors.primary700),
-                ),
-              ),
-            ],
-          ),
+        SizedBox(height: SDSpacing.sm),
+        _InfoBanner(
+          icon: Icons.filter_alt_outlined,
+          text:
+              'Les services proposés dépendent de la catégorie sélectionnée.',
         ),
       ],
     );
@@ -512,26 +379,62 @@ class _ProviderPersonalInfoStepState extends State<ProviderPersonalInfoStep> {
                   horizontal: SDSpacing.sm, vertical: SDSpacing.xs),
               prefixIcon: Icon(icon, color: SDColors.neutral500, size: 20),
             ),
-            // Valider que value existe dans items avant de l'utiliser
             value: (!isLoading &&
                     value != null &&
                     items.any((item) => item.value == value))
                 ? value
                 : null,
             hint: Text(isLoading ? loadingLabel : hint,
-                style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral400)),
+                style: SDTypography.bodyMedium
+                    .copyWith(color: SDColors.neutral400)),
             items: isLoading ? [] : items,
             onChanged: isLoading ? null : onChanged,
-            validator: (v) => v == null ? 'Requis' : null,
             isExpanded: true,
             icon: isLoading
                 ? const SizedBox(
-                    width: 16, height: 16,
+                    width: 16,
+                    height: 16,
                     child: CircularProgressIndicator(strokeWidth: 2))
                 : const Icon(Icons.keyboard_arrow_down),
           ),
         ),
       ],
+    );
+  }
+}
+
+class _InfoBanner extends StatelessWidget {
+  final IconData icon;
+  final String text;
+
+  const _InfoBanner({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: SDColors.primary50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: SDColors.primary100),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: SDColors.primary700, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: SDTypography.bodySmall.copyWith(
+                color: SDColors.primary800,
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

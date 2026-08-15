@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../data/models/prestataire.dart';
+import '../../../../data/utils/media_url.dart';
 import '../utils/navigation_helper.dart';
 import '../../../../design_system/design_system.dart';
 
@@ -44,7 +45,10 @@ class ProviderPopup extends StatelessWidget {
         'description': p.description,
         'note': p.note ?? '4.5',
         'isVerified': p.verifier,
-        'photoProfil': p.utilisateur.photoProfil,
+        'photoProfil': providerPhotoUrl(
+          selfie: p.selfie,
+          photoProfil: p.utilisateur.photoProfil,
+        ),
         'price': '${p.prixprestataire.toStringAsFixed(0)} FCFA/h',
         'location': p.localisation,
       };
@@ -60,7 +64,12 @@ class ProviderPopup extends StatelessWidget {
         'description': provider['description'] ?? 'Service professionnel de qualité.',
         'note': provider['note']?.toString() ?? '4.5',
         'isVerified': provider['verifier'] == true,
-        'photoProfil': utilisateur?['photoProfil'],
+        'photoProfil': providerPhotoUrl(
+          selfie: provider['selfie']?.toString(),
+          photoProfil: utilisateur?['photoProfil']?.toString(),
+          utilisateurMap: utilisateur,
+          prestataireMap: provider,
+        ),
         'price': '${(provider['prixprestataire'] ?? 0).toString()} FCFA/h',
         'location': provider['localisation'] ?? 'Localisation',
       };
@@ -111,9 +120,9 @@ class ProviderPopup extends StatelessWidget {
                             title: data['fullName']?.toString() ?? 'Prestataire',
                             subtitle: data['serviceName']?.toString() ?? 'Service',
                             fallbackIcon: Icons.handyman_rounded,
-                            imageUrl: (data['photoProfil']?.toString().startsWith('http') ?? false)
-                                ? data['photoProfil']?.toString()
-                                : null,
+                            imageUrl: normalizeMediaUrl(
+                              data['photoProfil']?.toString(),
+                            ),
                             ratingText: '${data['note'] ?? 'N/A'}/5',
                             metaText: data['isVerified'] == true
                                 ? '${data['location'] ?? ''} • ✓ Identité vérifiée'

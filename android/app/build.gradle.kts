@@ -10,15 +10,37 @@ plugins {
     id("com.google.firebase.crashlytics")
 }
 
+fun readMapsApiKeyFromDotEnv(file: java.io.File): String? {
+    if (!file.exists()) return null
+    file.readLines().forEach { line ->
+        val trimmed = line.trim()
+        if (trimmed.isEmpty() || trimmed.startsWith("#")) return@forEach
+        if (trimmed.startsWith("GOOGLE_MAPS_API_KEY=")) {
+            val value = trimmed.substringAfter("=").trim().trim('"').trim('\'')
+            if (value.isNotEmpty()) return value
+        }
+    }
+    return null
+}
+
 val secretsFile = rootProject.file("secrets.properties")
 val secrets = Properties()
 if (secretsFile.exists()) {
     secrets.load(FileInputStream(secretsFile))
 }
+// Ordre : secrets.properties → env process → sdealsmobile/.env (même clé que Flutter)
 val mapsApiKey: String =
     (secrets.getProperty("GOOGLE_MAPS_API_KEY")
         ?: System.getenv("GOOGLE_MAPS_API_KEY")
+        ?: readMapsApiKeyFromDotEnv(rootProject.file("../.env"))
         ?: "")
+
+val keystorePropertiesFile = rootProject.file("key.properties")
+val keystoreProperties = Properties()
+val hasReleaseKeystore = keystorePropertiesFile.exists()
+if (hasReleaseKeystore) {
+    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+}
 
 android {
     namespace = "com.sdealsmobile.app"
@@ -37,23 +59,36 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.sdealsmobile.app"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
-        targetSdk = 35
+        targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         multiDexEnabled = true
         manifestPlaceholders["GOOGLE_MAPS_API_KEY"] = mapsApiKey
     }
 
+    signingConfigs {
+        if (hasReleaseKeystore) {
+            create("release") {
+                keyAlias = keystoreProperties["keyAlias"] as String
+                keyPassword = keystoreProperties["keyPassword"] as String
+                storeFile = rootProject.file(keystoreProperties["storeFile"] as String)
+                storePassword = keystoreProperties["storePassword"] as String
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            if (hasReleaseKeystore) {
+                signingConfig = signingConfigs.getByName("release")
+            } else {
+                // Fallback debug uniquement si key.properties absent (jamais pour Play Store)
+                signingConfig = signingConfigs.getByName("debug")
+            }
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
 }
@@ -64,4 +99,5 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    implementation("androidx.core:core-ktx:1.15.0")
 }

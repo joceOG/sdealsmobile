@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -5,6 +7,7 @@ import 'package:go_router/go_router.dart';
 // ✅ import de ton AuthCubit
 import '../../../../data/models/utilisateur.dart';
 import '../../../../data/services/authCubit.dart';
+import '../../../../data/services/api_client.dart';
 import '../loginpageblocm/loginPageBlocM.dart';
 import '../loginpageblocm/loginPageEventM.dart';
 import '../loginpageblocm/loginPageStateM.dart';
@@ -13,6 +16,7 @@ import '../../common/utils/app_snackbar.dart';
 // ✅ Design System
 import '../../../../design_system/design_system.dart';
 
+/// Fournit toujours [LoginPageBlocM] (go_router ou MaterialPageRoute).
 class LoginPageScreenM extends StatefulWidget {
   const LoginPageScreenM({super.key});
 
@@ -68,7 +72,12 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return BlocProvider(
+      create: (_) => LoginPageBlocM(),
+      // Builder = context *sous* le provider (sinon Google Sign-In plante).
+      child: Builder(
+        builder: (context) {
+        return Scaffold(
         backgroundColor: SDColors.white,
         appBar: SDAppBar(
           title: '', // Empty title for minimal look
@@ -94,8 +103,16 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
                     activeRole: activeRole,
                     refreshToken: state.refreshToken,
                   );
+              // Rôles réels (Métiers / Freelance / Boutique) ≠ role user seul
+              unawaited(context.read<AuthCubit>().refreshRoles());
 
-              context.push('/homepage');
+              // `go` remplace la pile (évite de rester sur /login).
+              // Si le login a été ouvert via MaterialPageRoute, on le retire aussi.
+              final router = GoRouter.of(context);
+              if (Navigator.of(context).canPop()) {
+                Navigator.of(context).pop();
+              }
+              router.go('/homepage');
               print('🔐 Connecté en tant que $activeRole avec rôles: $roles');
             } else if (state is LoginPageFailureM) {
               AppSnackBar.error(context, state.error);
@@ -187,12 +204,7 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
                       Align(
                         alignment: Alignment.centerRight,
                         child: TextButton(
-                          onPressed: () {
-                            AppSnackBar.info(
-                              context,
-                              'Contactez le support pour réinitialiser votre mot de passe.',
-                            );
-                          },
+                          onPressed: _showForgotPasswordDialog,
                           style: TextButton.styleFrom(
                             padding: EdgeInsets.symmetric(
                               horizontal: SDSpacing.xs,
@@ -311,6 +323,60 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
             ),
           ),
         ),
+      );
+        },
+      ),
     );
+  }
+
+  Future<void> _showForgotPasswordDialog() async {
+    final emailField = TextEditingController(
+      text: identifiantController.text.trim().contains('@')
+          ? identifiantController.text.trim()
+          : '',
+    );
+    final submitted = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Réinitialiser le mot de passe'),
+        content: TextField(
+          controller: emailField,
+          keyboardType: TextInputType.emailAddress,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'Email',
+            hintText: 'votre@email.com',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Envoyer'),
+          ),
+        ],
+      ),
+    );
+    if (submitted != true || !mounted) return;
+    final email = emailField.text.trim();
+    if (email.isEmpty || !email.contains('@')) {
+      AppSnackBar.error(context, 'Veuillez saisir un email valide.');
+      return;
+    }
+    try {
+      await ApiClient().forgotPassword(email: email);
+      if (!mounted) return;
+      AppSnackBar.success(
+        context,
+        'Si cet email existe, un lien de réinitialisation a été envoyé.',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      AppSnackBar.error(context, 'Impossible d\'envoyer la demande : $e');
+    }
   }
 }

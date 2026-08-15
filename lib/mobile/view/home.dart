@@ -182,7 +182,7 @@ class _HomeState extends State<Home> {
     final iconWidget = Icon(
       isActive ? activeIcon : icon,
       size: 25,
-      color: isActive ? SDColors.primary700 : SDColors.neutral700,
+      color: isActive ? SDColors.neutral900 : SDColors.neutral700,
     );
 
     return Expanded(
@@ -201,7 +201,7 @@ class _HomeState extends State<Home> {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: SDTypography.labelMedium.copyWith(
-                  color: isActive ? SDColors.primary700 : SDColors.neutral800,
+                  color: isActive ? SDColors.neutral900 : SDColors.neutral800,
                   fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
                   fontSize: 11,
                 ),
@@ -287,7 +287,7 @@ class _HomeState extends State<Home> {
           child: Icon(
             isActive ? Icons.chat_bubble : Icons.chat_bubble_outline,
             size: 25,
-            color: isActive ? SDColors.primary700 : SDColors.neutral700,
+            color: isActive ? SDColors.neutral900 : SDColors.neutral700,
           ),
         );
       },
@@ -295,25 +295,24 @@ class _HomeState extends State<Home> {
   }
 
   void _showPublishOptions() {
+    final auth = context.read<AuthCubit>().state;
+    final roles = auth is AuthAuthenticated ? auth.roles : const <String>[];
+    final isProvider = roles.contains('PRESTATAIRE');
+    final isFreelance = roles.contains('FREELANCE');
+    final isSeller = roles.contains('VENDEUR');
+
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) => Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           color: SDColors.white,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
-          boxShadow: [
-            BoxShadow(
-              color: SDColors.neutral900.withOpacity(0.12),
-              blurRadius: 28,
-              offset: const Offset(0, -6),
-            ),
-          ],
+          borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
         ),
         child: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 10, 20, 22),
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 16),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -328,76 +327,80 @@ class _HomeState extends State<Home> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 18),
                 Text(
-                  'Que voulez-vous faire ?',
+                  'Que souhaitez-vous publier ?',
                   style: SDTypography.titleLarge.copyWith(
                     fontWeight: FontWeight.w800,
                     color: SDColors.neutral900,
+                    fontSize: 22,
                     height: 1.2,
                   ),
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Choisissez comment vous lancer sur Soutrali Deals',
+                  'Choisissez une catégorie pour continuer — métiers, freelance ou boutique.',
                   style: SDTypography.bodySmall.copyWith(
                     color: SDColors.neutral600,
                     height: 1.35,
                   ),
                 ),
                 const SizedBox(height: 18),
-                _buildPublishActionTile(
+                _buildPartnerCard(
                   icon: Icons.handyman_rounded,
-                  title: 'Proposer un service (Métiers)',
-                  subtitle: 'Inscription ou publication côté prestataire',
+                  iconColor: SDColors.primary500,
+                  title: isProvider ? 'Espace Métiers' : 'Métiers',
+                  benefit: isProvider
+                      ? 'Gérer missions, planning et profil prestataire'
+                      : 'Recevez des demandes près de chez vous',
+                  ctaLabel: isProvider
+                      ? 'Gérer mon espace'
+                      : 'Proposer un service',
+                  alreadyPartner: isProvider,
                   onTap: () async {
                     Navigator.pop(sheetContext);
                     await _openProviderPublishFlow();
                   },
                 ),
-                _buildPublishActionTile(
-                  icon: Icons.work_outline_rounded,
-                  title: 'Devenir freelance',
-                  subtitle: 'Publiez vos compétences en freelance',
+                _buildPartnerCard(
+                  icon: Icons.laptop_mac_rounded,
+                  iconColor: SDColors.info600,
+                  title: isFreelance ? 'Espace Freelance' : 'Freelance',
+                  benefit: isFreelance
+                      ? 'Mettre à jour compétences et offres'
+                      : 'Vendez vos compétences digitales',
+                  ctaLabel: isFreelance
+                      ? 'Gérer mon profil'
+                      : 'Devenir freelance',
+                  alreadyPartner: isFreelance,
                   onTap: () {
                     Navigator.pop(sheetContext);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const FreelanceRegistrationScreen(),
-                      ),
-                    );
+                    _openFreelancePublishFlow(already: isFreelance);
                   },
                 ),
-                _buildPublishActionTile(
-                  icon: Icons.storefront_outlined,
-                  title: 'Vendre un produit',
-                  subtitle: 'Créez votre espace vendeur',
+                _buildPartnerCard(
+                  icon: Icons.shopping_bag_rounded,
+                  iconColor: SDColors.primary600,
+                  title: isSeller ? 'Espace Boutique' : 'Boutique',
+                  benefit: isSeller
+                      ? 'Gérer produits et commandes'
+                      : 'Vendez vos produits partout en CI',
+                  ctaLabel:
+                      isSeller ? 'Gérer ma boutique' : 'Ouvrir une boutique',
+                  alreadyPartner: isSeller,
                   onTap: () {
                     Navigator.pop(sheetContext);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const SellerRegistrationScreen(),
-                      ),
-                    );
+                    _openSellerPublishFlow(already: isSeller);
                   },
                 ),
-                const SizedBox(height: 6),
-                OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: SDColors.primary700,
-                    side: const BorderSide(color: SDColors.primary600, width: 1.5),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
+                const SizedBox(height: 4),
+                TextButton(
                   onPressed: () => Navigator.pop(sheetContext),
                   child: Text(
-                    'Annuler',
-                    style: SDTypography.labelLarge.copyWith(
-                      color: SDColors.primary700,
+                    'Fermer',
+                    style: SDTypography.labelMedium.copyWith(
+                      color: SDColors.neutral500,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
@@ -413,7 +416,7 @@ class _HomeState extends State<Home> {
     final authState = context.read<AuthCubit>().state;
     if (authState is! AuthAuthenticated) {
       if (!mounted) return;
-      context.push('/serviceProviderRegistration');
+      context.push('/login');
       return;
     }
 
@@ -424,76 +427,181 @@ class _HomeState extends State<Home> {
       return;
     }
 
+    // Rôle déjà présent → dashboard directement
+    if (authState.roles.contains('PRESTATAIRE')) {
+      if (!mounted) return;
+      context.read<AuthCubit>().switchActiveRole('PRESTATAIRE');
+      context.push('/providermain', extra: authState.utilisateur);
+      return;
+    }
+
     final existingProvider =
         await _apiClient.getPrestataireByUserId(userId, authState.token);
 
     if (!mounted) return;
     if (existingProvider != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Vous avez deja un compte prestataire. Redirection vers votre dashboard.',
-          ),
-        ),
-      );
+      context.read<AuthCubit>().switchActiveRole('PRESTATAIRE');
       context.push('/providermain', extra: authState.utilisateur);
       return;
     }
 
-    context.push('/serviceProviderRegistration');
+    // Landing courte existante (catégories vides OK — CTA inscription reste)
+    context.push('/serviceProviderWelcome', extra: <dynamic>[]);
   }
 
-  Widget _buildPublishActionTile({
+  void _openFreelancePublishFlow({required bool already}) {
+    final authState = context.read<AuthCubit>().state;
+    if (authState is! AuthAuthenticated) {
+      context.push('/login');
+      return;
+    }
+    if (already) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Vous êtes déjà freelance. L’espace de gestion arrive bientôt.',
+          ),
+        ),
+      );
+      return;
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const FreelanceRegistrationScreen(),
+      ),
+    );
+  }
+
+  void _openSellerPublishFlow({required bool already}) {
+    final authState = context.read<AuthCubit>().state;
+    if (authState is! AuthAuthenticated) {
+      context.push('/login');
+      return;
+    }
+    if (already) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Vous avez déjà une boutique. L’espace de gestion arrive bientôt.',
+          ),
+        ),
+      );
+      return;
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const SellerRegistrationScreen(),
+      ),
+    );
+  }
+
+  Widget _buildPartnerCard({
     required IconData icon,
+    required Color iconColor,
     required String title,
-    required String subtitle,
+    required String benefit,
+    required String ctaLabel,
+    required bool alreadyPartner,
     required VoidCallback onTap,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Material(
-        color: SDColors.neutral50,
-        elevation: 1,
-        shadowColor: SDColors.neutral900.withOpacity(0.07),
+        color: SDColors.white,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: SDColors.neutral200),
+          borderRadius: BorderRadius.circular(18),
+          side: BorderSide(
+            color: alreadyPartner ? SDColors.primary200 : SDColors.neutral200,
+            width: alreadyPartner ? 1.5 : 1,
+          ),
         ),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(18),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            padding: const EdgeInsets.fromLTRB(14, 14, 12, 14),
             child: Row(
               children: [
                 Container(
-                  width: 50,
-                  height: 50,
+                  width: 54,
+                  height: 54,
                   decoration: BoxDecoration(
-                    color: SDColors.primary50,
-                    borderRadius: BorderRadius.circular(14),
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        Color.lerp(iconColor, SDColors.white, 0.22)!,
+                        iconColor,
+                      ],
+                      center: const Alignment(-0.2, -0.25),
+                      radius: 0.95,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: iconColor.withValues(alpha: 0.28),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                  child: Icon(icon, color: SDColors.primary700, size: 26),
+                  child: Icon(icon, color: SDColors.white, size: 26),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        title,
-                        style: SDTypography.titleSmall.copyWith(
-                          color: SDColors.neutral900,
-                          fontWeight: FontWeight.w700,
-                          height: 1.25,
-                        ),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              title,
+                              style: SDTypography.titleSmall.copyWith(
+                                color: SDColors.neutral900,
+                                fontWeight: FontWeight.w800,
+                                height: 1.2,
+                              ),
+                            ),
+                          ),
+                          if (alreadyPartner) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: SDColors.primary50,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                'Actif',
+                                style: SDTypography.labelSmall.copyWith(
+                                  color: SDColors.primary700,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 10,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        subtitle,
+                        benefit,
                         style: SDTypography.bodySmall.copyWith(
                           color: SDColors.neutral600,
-                          height: 1.4,
+                          height: 1.35,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        ctaLabel,
+                        style: SDTypography.labelMedium.copyWith(
+                          color: iconColor,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
                         ),
                       ),
                     ],

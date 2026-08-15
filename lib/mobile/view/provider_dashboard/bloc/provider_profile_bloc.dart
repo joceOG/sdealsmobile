@@ -41,25 +41,41 @@ class ProviderProfileBloc
 
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body) as Map<String, dynamic>;
-          final utilisateur = data['utilisateur'] as Map<String, dynamic>? ?? {};
+          final utilisateurRaw = data['utilisateur'];
+          final utilisateur = utilisateurRaw is Map<String, dynamic>
+              ? utilisateurRaw
+              : <String, dynamic>{};
+
+          final fullName =
+              '${utilisateur['prenom'] ?? ''} ${utilisateur['nom'] ?? ''}'
+                  .trim();
+
+          services = _extractServices(data);
+          final locationLabel = _extractLocation(data);
 
           profile = {
             'id': data['_id'] ?? event.prestataireId,
-            'fullName': '${utilisateur['prenom'] ?? ''} ${utilisateur['nom'] ?? ''}'.trim(),
+            'fullName': fullName,
             'email': utilisateur['email'] ?? '',
-            'phone': utilisateur['telephone'] ?? '',
+            'phone': utilisateur['telephone'] ?? data['telephone'] ?? '',
             'joinDate': data['createdAt'] ?? '',
             'status': data['status'] ?? 'pending',
-            'profileImage': utilisateur['photoProfil'],
-            'bio': data['description'] ?? '',
-            'location': data['localisation'] is Map
-                ? '${data['localisation']['ville'] ?? ''}, ${data['localisation']['pays'] ?? ''}'.trim()
-                : (data['localisation']?.toString() ?? 'Abidjan'),
+            'profileImage':
+                utilisateur['photoProfil'] ?? data['photoProfil'],
+            'bio': data['description'] ?? data['bio'] ?? '',
+            'location': locationLabel,
+            'metier': services.isNotEmpty
+                ? services.first
+                : (data['metier']?.toString() ?? ''),
             'serviceRadius': _asDouble(data['rayonIntervention'], fallback: 10),
-            'availability': '7j/7',
+            'disponible': data['disponible'] != false,
             'note': _asDouble(data['note']),
             'nbMission': data['nbMission'] ?? 0,
-            'verifier': data['verifier'] ?? false,
+            'nbAvis': data['nbAvis'] ??
+                data['nombreAvis'] ??
+                data['nbMission'] ??
+                0,
+            'verifier': data['verifier'] == true || data['verified'] == true,
             'prixprestataire': data['prixprestataire'] ?? 0,
             'anneeExperience': data['anneeExperience'] ?? 0,
           };
@@ -67,30 +83,40 @@ class ProviderProfileBloc
           stats = {
             'missionsCompleted': data['nbMission'] ?? 0,
             'averageRating': _asDouble(data['note']),
-            'totalReviews': data['nbMission'] ?? 0,
+            'totalReviews': profile['nbAvis'],
             'monthlyEarnings': _asDouble(data['revenus']),
-            'successRate': 90.0,
-            'responseTime': '2h',
-            'completionRate': 95.0,
+            'responseTime': data['tempsReponse']?.toString() ?? '—',
           };
 
-          services = data['specialite'] is List
-              ? (data['specialite'] as List).map((e) => e.toString()).toList()
-              : <String>[];
-
           serviceZone = {
-            'address': data['localisation'] is Map
-                ? data['localisation']['adresse'] ?? 'Abidjan'
-                : (data['localisation']?.toString() ?? 'Abidjan'),
-            'latitude': _asDouble(data['localisationmaps']?['latitude'], fallback: 5.3600),
-            'longitude': _asDouble(data['localisationmaps']?['longitude'], fallback: -4.0083),
+            'address': locationLabel,
+            'latitude': _asDouble(
+                data['localisationmaps'] is Map
+                    ? data['localisationmaps']['latitude']
+                    : null,
+                fallback: 5.3600),
+            'longitude': _asDouble(
+                data['localisationmaps'] is Map
+                    ? data['localisationmaps']['longitude']
+                    : null,
+                fallback: -4.0083),
             'radius': _asDouble(data['rayonIntervention'], fallback: 10),
             'coverage': 'Zone d\'intervention',
           };
         } else {
           // Fallback avec données vides
-          profile = {'id': event.prestataireId, 'fullName': '', 'status': 'unknown'};
-          stats = {'missionsCompleted': 0, 'averageRating': 0.0, 'monthlyEarnings': 0.0};
+          profile = {
+            'id': event.prestataireId,
+            'fullName': '',
+            'status': 'unknown',
+            'nbAvis': 0,
+          };
+          stats = {
+            'missionsCompleted': 0,
+            'averageRating': 0.0,
+            'monthlyEarnings': 0.0,
+            'totalReviews': 0,
+          };
           services = <String>[];
           serviceZone = {'address': 'Abidjan', 'radius': 10.0};
         }
@@ -150,10 +176,13 @@ class ProviderProfileBloc
           token: _currentToken,
         );
         if (response.statusCode == 200) {
-          final updatedProfile = jsonDecode(response.body) as Map<String, dynamic>;
+          final updatedProfile =
+              jsonDecode(response.body) as Map<String, dynamic>;
           emit(ProviderProfileUpdated(updatedProfile));
+          add(LoadProviderProfile(event.prestataireId));
         } else {
-          emit(ProviderProfileError('Erreur mise à jour (${response.statusCode})'));
+          emit(ProviderProfileError(
+              'Erreur mise à jour (${response.statusCode})'));
         }
       } catch (e) {
         emit(ProviderProfileError('Erreur lors de la mise à jour: $e'));
@@ -283,21 +312,145 @@ class ProviderProfileBloc
       }
     });
 
-    // 👤 DÉSACTIVER LE COMPTE
+    // 👤 DÉSACTIVER LE COMPTE (espace Métiers)
     on<DeactivateAccount>((event, emit) async {
-      emit(ProviderProfileError(
-          'Désactivation de compte non disponible pour le moment'));
+      try {
+        if (_currentToken == null || _currentToken!.isEmpty) {
+          emit(ProviderProfileError('Session expirée — reconnectez-vous'));
+          return;
+        }
+        if (event.prestataireId.isEmpty) {
+          emit(ProviderProfileError('Profil prestataire introuvable'));
+          return;
+        }
+        final response = await _apiClient.post(
+          '/prestataire/${event.prestataireId}/deactivate',
+          token: _currentToken,
+        );
+        if (response.statusCode == 200) {
+          String message = 'Espace Métiers désactivé';
+          try {
+            final data = ApiClient.decodeJson(response);
+            if (data is Map && data['message'] != null) {
+              message = data['message'].toString();
+            }
+          } catch (_) {}
+          emit(AccountDeactivated(message));
+        } else {
+          String message = 'Impossible de désactiver le compte';
+          try {
+            final data = ApiClient.decodeJson(response);
+            if (data is Map &&
+                (data['error'] != null || data['message'] != null)) {
+              message = (data['error'] ?? data['message']).toString();
+            }
+          } catch (_) {}
+          emit(ProviderProfileError(message));
+        }
+      } catch (e) {
+        emit(ProviderProfileError('Erreur désactivation: $e'));
+      }
     });
 
-    // 👤 SUPPRIMER LE COMPTE
+    // 👤 SUPPRIMER / DÉSACTIVER LE COMPTE UTILISATEUR
     on<DeleteAccount>((event, emit) async {
-      emit(ProviderProfileError(
-          'Suppression de compte non branchée — contactez le support'));
+      try {
+        if (_currentToken == null || _currentToken!.isEmpty) {
+          emit(ProviderProfileError('Session expirée — reconnectez-vous'));
+          return;
+        }
+        final response = await _apiClient.post(
+          '/utilisateur/deactivate',
+          token: _currentToken,
+        );
+        if (response.statusCode == 200) {
+          String message = 'Compte désactivé';
+          try {
+            final data = ApiClient.decodeJson(response);
+            if (data is Map && data['message'] != null) {
+              message = data['message'].toString();
+            }
+          } catch (_) {}
+          emit(AccountDeleted(message));
+        } else {
+          String message = 'Impossible de supprimer le compte';
+          try {
+            final data = ApiClient.decodeJson(response);
+            if (data is Map &&
+                (data['error'] != null || data['message'] != null)) {
+              message = (data['error'] ?? data['message']).toString();
+            }
+          } catch (_) {}
+          emit(ProviderProfileError(message));
+        }
+      } catch (e) {
+        emit(ProviderProfileError('Erreur suppression compte: $e'));
+      }
     });
 
     // 👤 ACTUALISER LE PROFIL
     on<RefreshProviderProfile>((event, emit) async {
       add(LoadProviderProfile(event.prestataireId));
     });
+  }
+
+  /// Nettoie un label métier (évite `["Bâtiment…"]` brut).
+  String _cleanLabel(dynamic raw) {
+    var s = raw?.toString().trim() ?? '';
+    if (s.isEmpty) return '';
+    if (s.startsWith('[') && s.endsWith(']')) {
+      s = s.substring(1, s.length - 1).trim();
+    }
+    if ((s.startsWith('"') && s.endsWith('"')) ||
+        (s.startsWith("'") && s.endsWith("'"))) {
+      s = s.substring(1, s.length - 1).trim();
+    }
+    return s;
+  }
+
+  List<String> _extractServices(Map<String, dynamic> data) {
+    final out = <String>[];
+    void addOne(dynamic v) {
+      final label = _cleanLabel(v);
+      if (label.isNotEmpty && !out.contains(label)) out.add(label);
+    }
+
+    for (final key in ['specialite', 'specialites', 'categories', 'categorie']) {
+      final v = data[key];
+      if (v is List) {
+        for (final e in v) {
+          addOne(e);
+        }
+      } else if (v != null) {
+        addOne(v);
+      }
+    }
+    if (out.isEmpty && data['metier'] != null) addOne(data['metier']);
+    return out;
+  }
+
+  String _extractLocation(Map<String, dynamic> data) {
+    final loc = data['localisation'];
+    if (loc is Map) {
+      final parts = [
+        loc['adresse'],
+        loc['commune'],
+        loc['ville'],
+      ]
+          .map((e) => e?.toString().trim() ?? '')
+          .where((e) => e.isNotEmpty)
+          .toList();
+      if (parts.isNotEmpty) {
+        // Prefer commune/ville like Accueil (Port-Bouët) when adresse vide
+        if ((loc['commune'] ?? loc['ville']) != null) {
+          return (loc['commune'] ?? loc['ville'] ?? parts.first).toString();
+        }
+        return parts.first;
+      }
+    }
+    if (loc != null && loc.toString().trim().isNotEmpty) {
+      return _cleanLabel(loc);
+    }
+    return 'Abidjan';
   }
 }

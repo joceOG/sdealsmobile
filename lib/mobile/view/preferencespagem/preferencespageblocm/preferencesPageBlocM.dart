@@ -104,6 +104,9 @@ class PreferencesPageBlocM
     Emitter<PreferencesPageStateM> emit,
   ) async {
     try {
+      final previous = state is PreferencesPageLoadedM
+          ? (state as PreferencesPageLoadedM).preferences
+          : null;
       final response = await _apiClient.patch(
         '/preferences/user/${event.utilisateurId}/language',
         body: {'langue': event.langue},
@@ -111,6 +114,13 @@ class PreferencesPageBlocM
 
       if (response.statusCode == 200) {
         emit(LanguageUpdatedM(langue: event.langue));
+        if (previous != null) {
+          emit(PreferencesPageLoadedM(
+            preferences: previous.copyWith(langue: event.langue),
+          ));
+        } else {
+          add(LoadPreferencesM(utilisateurId: event.utilisateurId));
+        }
       } else {
         emit(PreferencesPageErrorM(
           message: 'Erreur lors de la mise à jour de la langue',
@@ -130,6 +140,9 @@ class PreferencesPageBlocM
     Emitter<PreferencesPageStateM> emit,
   ) async {
     try {
+      final previous = state is PreferencesPageLoadedM
+          ? (state as PreferencesPageLoadedM).preferences
+          : null;
       final response = await _apiClient.patch(
         '/preferences/user/${event.utilisateurId}/currency',
         body: {'devise': event.devise},
@@ -137,6 +150,13 @@ class PreferencesPageBlocM
 
       if (response.statusCode == 200) {
         emit(CurrencyUpdatedM(devise: event.devise));
+        if (previous != null) {
+          emit(PreferencesPageLoadedM(
+            preferences: previous.copyWith(devise: event.devise),
+          ));
+        } else {
+          add(LoadPreferencesM(utilisateurId: event.utilisateurId));
+        }
       } else {
         emit(PreferencesPageErrorM(
           message: 'Erreur lors de la mise à jour de la devise',
@@ -320,6 +340,7 @@ class PreferencesPageBlocM
             'push': event.push,
             'sms': event.sms,
             'langue': event.langue,
+            if (event.types != null) 'types': event.types,
           }
         },
       );

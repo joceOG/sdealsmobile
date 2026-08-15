@@ -4,8 +4,7 @@ import 'package:sdealsmobile/mobile/view/seller_registration/screens/steps/selle
 import 'package:sdealsmobile/mobile/view/seller_registration/screens/steps/seller_products_step.dart';
 import 'package:sdealsmobile/mobile/view/seller_registration/screens/steps/seller_verification_step.dart';
 import 'package:sdealsmobile/mobile/view/seller_registration/screens/steps/seller_payment_step.dart';
-import '../../../../design_system/colors.dart';
-import '../../../../design_system/typography.dart';
+import '../../../../design_system/design_system.dart';
 
 class SellerFormScreen extends StatefulWidget {
   final Set<String>? preSelectedCategories;
@@ -177,9 +176,9 @@ class _SellerFormScreenState extends State<SellerFormScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Création de Boutique', style: SDTypography.titleLarge),
-        backgroundColor: SDColors.secondary700,
+      backgroundColor: SDColors.white,
+      appBar: SDWhiteAppBar.appBar(
+        title: 'Création de Boutique',
       ),
       body: Form(
         key: _formKey,

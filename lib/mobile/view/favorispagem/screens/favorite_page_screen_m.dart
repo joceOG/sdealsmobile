@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:sdealsmobile/data/models/favorite.dart';
+import 'package:sdealsmobile/data/services/authCubit.dart';
+
+import '../../../../design_system/design_system.dart';
+import '../../common/widgets/empty_state_widget.dart';
+import '../../common/widgets/unauthenticated_banner.dart';
 import '../favorispageblocm/favoritePageBlocM.dart';
 import '../favorispageblocm/favoritePageEventM.dart';
 import '../favorispageblocm/favoritePageStateM.dart';
-import 'package:sdealsmobile/data/models/favorite.dart';
-import '../../../../design_system/design_system.dart'; // ✅ Import DS
 import 'favoriteDetailScreenM.dart';
-import 'addFavoriteScreenM.dart';
-import '../../common/widgets/empty_state_widget.dart';
-import '../../common/widgets/unauthenticated_banner.dart';
-import '../../../../data/services/authCubit.dart';
 
+/// Mes Favoris — style Airbnb / Figma (titre à gauche, chips univers, cards).
 class FavoritePageScreenM extends StatefulWidget {
   const FavoritePageScreenM({super.key});
 
@@ -18,24 +19,87 @@ class FavoritePageScreenM extends StatefulWidget {
   State<FavoritePageScreenM> createState() => _FavoritePageScreenMState();
 }
 
-class _FavoritePageScreenMState extends State<FavoritePageScreenM>
-    with TickerProviderStateMixin {
-  final TextEditingController _searchController = TextEditingController();
-  String _selectedObjetType = '';
-  String _selectedStatut = 'ACTIF';
-  String _selectedCategorie = '';
-  String _selectedVille = '';
+class _FavoritePageScreenMState extends State<FavoritePageScreenM> {
+  static const double _hPad = 20;
 
-  late TabController _tabController;
+  /// null = Tous ; sinon filtre univers Figma.
+  String? _universe;
+  bool _searchOpen = false;
+  final TextEditingController _searchController = TextEditingController();
+  String _query = '';
+
+  static const _universes = <({String? id, String label})>[
+    (id: null, label: 'Tous'),
+    (id: 'metiers', label: 'Métiers'),
+    (id: 'freelance', label: 'Freelance'),
+    (id: 'marketplace', label: 'Vente & Achat'),
+  ];
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
-    // Charger les favoris au démarrage
     context.read<FavoritePageBlocM>().add(LoadFavoritesM());
-    context.read<FavoritePageBlocM>().add(LoadFavoriteStatsM());
-    context.read<FavoritePageBlocM>().add(LoadCustomListsM());
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<Favorite> _filter(List<Favorite> all) {
+    var list = all.where((f) => f.estActif).toList();
+    switch (_universe) {
+      case 'metiers':
+        list = list
+            .where((f) =>
+                f.objetType == 'PRESTATAIRE' ||
+                f.objetType == 'SERVICE' ||
+                f.objetType == 'PRESTATION')
+            .toList();
+        break;
+      case 'freelance':
+        list = list.where((f) => f.objetType == 'FREELANCE').toList();
+        break;
+      case 'marketplace':
+        list = list
+            .where((f) =>
+                f.objetType == 'ARTICLE' ||
+                f.objetType == 'VENDEUR' ||
+                f.objetType == 'COMMANDE')
+            .toList();
+        break;
+    }
+    final q = _query.trim().toLowerCase();
+    if (q.isEmpty) return list;
+    return list.where((f) {
+      final hay = [
+        f.titre,
+        f.description ?? '',
+        f.categorie ?? '',
+        f.localisation?.ville ?? '',
+        f.objetType,
+      ].join(' ').toLowerCase();
+      return hay.contains(q);
+    }).toList();
+  }
+
+  String _subtitleFor(Favorite f) {
+    final loc = f.localisation?.ville;
+    if (loc != null && loc.isNotEmpty) return loc;
+    switch (f.objetType) {
+      case 'FREELANCE':
+        return 'Freelance';
+      case 'ARTICLE':
+      case 'VENDEUR':
+        return 'Vente & Achat';
+      case 'PRESTATAIRE':
+      case 'SERVICE':
+      case 'PRESTATION':
+        return f.categorie?.isNotEmpty == true ? f.categorie! : 'Métiers';
+      default:
+        return f.categorie ?? f.objetType;
+    }
   }
 
   @override
@@ -46,226 +110,136 @@ class _FavoritePageScreenMState extends State<FavoritePageScreenM>
         appBarTitle: 'Mes favoris',
         icon: Icons.favorite_outline_rounded,
         title: 'Vos coups de cœur',
-        description: 'Connectez-vous pour sauvegarder vos prestataires, freelances et produits favoris et les retrouver facilement.',
+        description:
+            'Connectez-vous pour sauvegarder vos prestataires, freelances et produits favoris et les retrouver facilement.',
       );
     }
 
     return Scaffold(
-      backgroundColor: SDColors.neutral50,
-      appBar: SDWhiteAppBar.appBar(
-        centerTitle: true,
-        title: 'Mes Favoris',
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            onPressed: () {
-              context.read<FavoritePageBlocM>().add(RefreshFavoritesM());
-            },
-          ),
-        ],
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: SDColors.primary700,
-          unselectedLabelColor: SDColors.neutral500,
-          indicatorColor: SDColors.primary600,
-          indicatorWeight: 3,
-          dividerColor: SDColors.neutral200,
-          tabs: const [
-            Tab(text: 'Tous', icon: Icon(Icons.favorite_outline)),
-            Tab(text: 'Actifs', icon: Icon(Icons.check_circle_outline)),
-            Tab(text: 'Archivés', icon: Icon(Icons.archive_outlined)),
-          ],
-        ),
-      ),
-      body: BlocConsumer<FavoritePageBlocM, FavoritePageStateM>(
-        listener: (context, state) {
-          if (state.hasError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.error ?? 'Erreur inconnue'),
-                backgroundColor: SDColors.error,
-              ),
-            );
-          }
-        },
-        builder: (context, state) {
-          return Column(
-            children: [
-              // 🔍 BARRE DE RECHERCHE ET FILTRES
-              _buildSearchAndFilters(),
-
-              // 📊 STATISTIQUES
-              if (state.hasStats) _buildStatsCard(state),
-
-              // 📋 LISTE DES FAVORIS
-              Expanded(
-                child: TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _buildFavoritesList(state.favorites ?? []),
-                    _buildFavoritesList(
-                        state.favorites?.where((f) => f.estActif).toList() ??
-                            []),
-                    _buildFavoritesList(
-                        state.favorites?.where((f) => f.estArchive).toList() ??
-                            []),
-                  ],
+      backgroundColor: SDColors.white,
+      body: SafeArea(
+        child: BlocConsumer<FavoritePageBlocM, FavoritePageStateM>(
+          listener: (context, state) {
+            if (state.hasError) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(state.error ?? 'Erreur inconnue'),
+                  backgroundColor: SDColors.error,
                 ),
-              ),
-            ],
-          );
-        },
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddFavoriteDialog(),
-        backgroundColor: SDColors.primary600,
-        child: Icon(Icons.add, color: SDColors.white),
-      ),
-    );
-  }
-
-  // 🔍 BARRE DE RECHERCHE ET FILTRES
-  Widget _buildSearchAndFilters() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: SDColors.neutral50,
-        border: Border(
-          bottom: BorderSide(color: SDColors.neutral300),
-        ),
-      ),
-      child: Column(
-        children: [
-          // Barre de recherche
-          TextField(
-            controller: _searchController,
-            decoration: InputDecoration(
-              hintText: 'Rechercher dans les favoris...',
-              prefixIcon: const Icon(Icons.search),
-              suffixIcon: IconButton(
-                icon: const Icon(Icons.clear),
-                onPressed: () {
-                  _searchController.clear();
-                  context
-                      .read<FavoritePageBlocM>()
-                      .add(SearchFavoritesM(query: ''));
-                },
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(25),
-                borderSide: BorderSide(color: SDColors.neutral300),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(25),
-                borderSide: BorderSide(color: SDColors.neutral300),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(25),
-                borderSide: BorderSide(color: SDColors.primary600),
-              ),
-              filled: true,
-              fillColor: SDColors.white,
-            ),
-            onSubmitted: (value) {
-              context
-                  .read<FavoritePageBlocM>()
-                  .add(SearchFavoritesM(query: value));
-            },
-          ),
-
-          const SizedBox(height: 12),
-
-          // Filtres
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
+              );
+            }
+          },
+          builder: (context, state) {
+            final items = _filter(state.favorites ?? []);
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildFilterDropdown(
-                  'Type',
-                  _selectedObjetType,
-                  [
-                    '',
-                    'PRESTATAIRE',
-                    'VENDEUR',
-                    'FREELANCE',
-                    'ARTICLE',
-                    'SERVICE',
-                    'PRESTATION',
-                    'COMMANDE'
-                  ],
-                  [
-                    'Tous',
-                    'Prestataire',
-                    'Vendeur',
-                    'Freelance',
-                    'Article',
-                    'Service',
-                    'Prestation',
-                    'Commande'
-                  ],
-                  (value) {
-                    setState(() => _selectedObjetType = value);
-                    _applyFilters();
-                  },
-                ),
-                const SizedBox(width: 8),
-                _buildFilterDropdown(
-                  'Statut',
-                  _selectedStatut,
-                  ['ACTIF', 'ARCHIVE', 'SUPPRIME'],
-                  ['Actif', 'Archivé', 'Supprimé'],
-                  (value) {
-                    setState(() => _selectedStatut = value);
-                    _applyFilters();
-                  },
-                ),
-                const SizedBox(width: 8),
-                _buildFilterDropdown(
-                  'Catégorie',
-                  _selectedCategorie,
-                  [
-                    '',
-                    ...(context
-                        .read<FavoritePageBlocM>()
-                        .state
-                        .categoriesDisponibles)
-                  ],
-                  [
-                    'Toutes',
-                    ...(context
-                        .read<FavoritePageBlocM>()
-                        .state
-                        .categoriesDisponibles)
-                  ],
-                  (value) {
-                    setState(() => _selectedCategorie = value);
-                    _applyFilters();
-                  },
-                ),
-                const SizedBox(width: 8),
-                _buildFilterDropdown(
-                  'Ville',
-                  _selectedVille,
-                  [
-                    '',
-                    ...(context
-                        .read<FavoritePageBlocM>()
-                        .state
-                        .villesDisponibles)
-                  ],
-                  [
-                    'Toutes',
-                    ...(context
-                        .read<FavoritePageBlocM>()
-                        .state
-                        .villesDisponibles)
-                  ],
-                  (value) {
-                    setState(() => _selectedVille = value);
-                    _applyFilters();
-                  },
+                _buildTopBar(context),
+                _buildHeader(),
+                if (_searchOpen) _buildSearchField(),
+                _buildUniverseChips(),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: state.isLoading && (state.favorites == null)
+                      ? const Center(child: CircularProgressIndicator())
+                      : RefreshIndicator(
+                          color: SDColors.primary600,
+                          onRefresh: () async {
+                            context
+                                .read<FavoritePageBlocM>()
+                                .add(RefreshFavoritesM());
+                          },
+                          child: items.isEmpty
+                              ? ListView(
+                                  physics:
+                                      const AlwaysScrollableScrollPhysics(),
+                                  children: [
+                                    SizedBox(
+                                      height:
+                                          MediaQuery.sizeOf(context).height *
+                                              0.45,
+                                      child: const EmptyStateWidget(
+                                        imagePath: 'assets/favoris_vides.png',
+                                        title: 'Aucun favori',
+                                        message:
+                                            'Explorez Métiers, Freelance ou Marketplace et enregistrez vos coups de cœur.',
+                                        imageSize: 160,
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : ListView.separated(
+                                  physics:
+                                      const AlwaysScrollableScrollPhysics(),
+                                  padding: const EdgeInsets.fromLTRB(
+                                      _hPad, 8, _hPad, 24),
+                                  itemCount: items.length,
+                                  separatorBuilder: (_, __) =>
+                                      const SizedBox(height: 12),
+                                  itemBuilder: (context, i) =>
+                                      _buildFavoriteCard(items[i]),
+                                ),
+                        ),
                 ),
               ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  /// Écran poussé depuis Profil → retour (pas cloche notifs Figma).
+  Widget _buildTopBar(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 4, 8, 0),
+      child: Row(
+        children: [
+          IconButton(
+            onPressed: () => Navigator.of(context).maybePop(),
+            icon: const Icon(Icons.arrow_back, color: SDColors.neutral900),
+            tooltip: 'Retour',
+          ),
+          const Spacer(),
+          IconButton(
+            onPressed: () {
+              setState(() {
+                _searchOpen = !_searchOpen;
+                if (!_searchOpen) {
+                  _searchController.clear();
+                  _query = '';
+                }
+              });
+            },
+            icon: Icon(
+              _searchOpen ? Icons.close : Icons.search,
+              color: SDColors.neutral900,
+            ),
+            tooltip: _searchOpen ? 'Fermer la recherche' : 'Rechercher',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(_hPad, 4, _hPad, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Mes Favoris',
+            style: SDTypography.displayMedium.copyWith(
+              color: SDColors.neutral900,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Retrouvez vos coups de cœur',
+            style: SDTypography.bodyMedium.copyWith(
+              color: SDColors.neutral600,
             ),
           ),
         ],
@@ -273,331 +247,203 @@ class _FavoritePageScreenMState extends State<FavoritePageScreenM>
     );
   }
 
-  Widget _buildFilterDropdown(
-    String label,
-    String value,
-    List<String> values,
-    List<String> labels,
-    Function(String) onChanged,
-  ) {
-    return Container(
-      width: 120,
-      child: DropdownButtonFormField<String>(
-        value: value.isEmpty ? null : value,
+  Widget _buildSearchField() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(_hPad, 8, _hPad, 4),
+      child: TextField(
+        controller: _searchController,
+        autofocus: true,
+        onChanged: (v) => setState(() => _query = v),
+        style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral900),
         decoration: InputDecoration(
-          labelText: label,
-          labelStyle: SDTypography.bodySmall.copyWith(color: SDColors.neutral600),
+          hintText: 'Rechercher un favori…',
+          hintStyle: SDTypography.bodyMedium.copyWith(
+            color: SDColors.neutral500,
+          ),
+          prefixIcon: const Icon(Icons.search, color: SDColors.neutral500),
+          filled: true,
+          fillColor: SDColors.neutral100,
+          contentPadding: const EdgeInsets.symmetric(vertical: 12),
           border: OutlineInputBorder(
-            borderSide: BorderSide(color: SDColors.neutral300),
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
           ),
-          enabledBorder: OutlineInputBorder(
-            borderSide: BorderSide(color: SDColors.neutral300),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderSide: BorderSide(color: SDColors.primary600),
-          ),
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         ),
-        items: values.asMap().entries.map((entry) {
-          return DropdownMenuItem(
-            value: entry.value,
-            child: Text(
-              labels[entry.key],
-              style: const TextStyle(fontSize: 12),
-              overflow: TextOverflow.ellipsis,
+      ),
+    );
+  }
+
+  Widget _buildUniverseChips() {
+    return SizedBox(
+      height: 44,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: _hPad, vertical: 4),
+        itemCount: _universes.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final u = _universes[index];
+          final selected = _universe == u.id;
+          return GestureDetector(
+            onTap: () => setState(() => _universe = u.id),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: selected ? SDColors.primary600 : SDColors.neutral100,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                u.label,
+                style: SDTypography.labelLarge.copyWith(
+                  color: selected ? SDColors.white : SDColors.neutral900,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           );
-        }).toList(),
-        onChanged: (value) => onChanged(value ?? ''),
+        },
       ),
     );
   }
 
-  // 📊 CARTE DE STATISTIQUES
-  Widget _buildStatsCard(FavoritePageStateM state) {
-    return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: SDColors.primary50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: SDColors.primary200),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _buildStatItem(
-              'Total', state.totalFavorites.toString(), Icons.favorite),
-          _buildStatItem(
-              'Actifs', state.totalActifs.toString(), Icons.check_circle),
-          _buildStatItem(
-              'Archivés', state.totalArchives.toString(), Icons.archive),
-          _buildStatItem(
-              'Récents', state.totalRecents.toString(), Icons.schedule),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatItem(String label, String value, IconData icon) {
-    return Column(
-      children: [
-        Icon(icon, color: SDColors.primary600, size: 24),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: SDTypography.headlineSmall.copyWith(fontWeight: FontWeight.bold, fontSize: 18),
-        ),
-        Text(
-          label,
-          style: SDTypography.bodySmall.copyWith(color: SDColors.neutral600),
-        ),
-      ],
-    );
-  }
-
-  // 📋 LISTE DES FAVORIS
-  Widget _buildFavoritesList(List<Favorite> favorites) {
-    if (favorites.isEmpty) {
-      return _buildEmptyState();
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: favorites.length,
-      itemBuilder: (context, index) {
-        final favorite = favorites[index];
-        return _buildFavoriteCard(favorite);
-      },
-    );
-  }
-
-  // 🎴 CARTE DE FAVORI
   Widget _buildFavoriteCard(Favorite favorite) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: 0, // Design system preference for flat/subtle cards
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-        side: BorderSide(color: SDColors.neutral200),
-      ),
+    final note = favorite.note;
+    final subtitle = _subtitleFor(favorite);
+
+    return Material(
       color: SDColors.white,
+      borderRadius: BorderRadius.circular(16),
       child: InkWell(
         onTap: () => _navigateToDetail(favorite),
-        borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // En-tête avec titre et type
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          favorite.titre,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
+        borderRadius: BorderRadius.circular(16),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: SDColors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: SDColors.neutral200),
+            boxShadow: [
+              BoxShadow(
+                color: SDColors.neutral900.withValues(alpha: 0.04),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildThumb(favorite),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              favorite.titre,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: SDTypography.titleMedium.copyWith(
+                                color: SDColors.neutral900,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                           ),
+                          const SizedBox(width: 8),
+                          GestureDetector(
+                            onTap: () => _showRemoveDialog(favorite),
+                            child: const Icon(
+                              Icons.favorite,
+                              color: SDColors.primary600,
+                              size: 22,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: SDTypography.bodyMedium.copyWith(
+                          color: SDColors.neutral600,
                         ),
-                        const SizedBox(height: 4),
+                      ),
+                      if (note != null) ...[
+                        const SizedBox(height: 6),
                         Row(
                           children: [
-                            _buildTypeChip(favorite.objetType),
-                            const SizedBox(width: 8),
-                            if (favorite.categorie != null)
-                              Chip(
-                                label: Text(favorite.categorie!),
-                                backgroundColor: Colors.blue[100],
-                                labelStyle: const TextStyle(fontSize: 12),
+                            const Icon(
+                              Icons.star_rounded,
+                              size: 16,
+                              color: SDColors.warning500,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              note.toStringAsFixed(1).replaceAll('.', ','),
+                              style: SDTypography.labelMedium.copyWith(
+                                color: SDColors.neutral900,
+                                fontWeight: FontWeight.w600,
                               ),
+                            ),
                           ],
                         ),
                       ],
-                    ),
+                    ],
                   ),
-                  _buildStatusChip(favorite.statut),
-                ],
-              ),
-
-              const SizedBox(height: 12),
-
-              // Description
-              if (favorite.description != null) ...[
-                Text(
-                  favorite.description!,
-                  style: const TextStyle(fontSize: 14),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 8),
-              ],
-
-              // Informations supplémentaires
-              Row(
-                children: [
-                  if (favorite.prix != null) ...[
-                    Icon(Icons.attach_money,
-                        size: 16, color: Colors.green[700]),
-                    const SizedBox(width: 4),
-                    Text(
-                      favorite.prixFormate,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.green[700],
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                  ],
-                  if (favorite.localisation != null) ...[
-                    Icon(Icons.location_on, size: 16, color: Colors.grey[600]),
-                    const SizedBox(width: 4),
-                    Text(
-                      favorite.localisation!.ville,
-                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                    ),
-                    const SizedBox(width: 16),
-                  ],
-                  Icon(Icons.visibility, size: 16, color: Colors.grey[600]),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${favorite.vues} vues',
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                  ),
-                ],
-              ),
-
-              // Tags
-              if (favorite.tags != null && favorite.tags!.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 4,
-                  children: favorite.tags!.take(3).map((tag) {
-                    return Chip(
-                      label: Text(tag),
-                      backgroundColor: Colors.grey[200],
-                      labelStyle: const TextStyle(fontSize: 10),
-                    );
-                  }).toList(),
                 ),
               ],
-
-              // Actions
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.visibility, size: 20),
-                    onPressed: () => _navigateToDetail(favorite),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.edit, size: 20),
-                    onPressed: () => _showEditDialog(favorite),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.archive, size: 20),
-                    onPressed: () => _showArchiveDialog(favorite),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.delete, size: 20),
-                    onPressed: () => _showDeleteDialog(favorite),
-                  ),
-                ],
-              ),
-            ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildTypeChip(String type) {
-    Color color;
-    switch (type) {
-      case 'PRESTATAIRE':
-        color = Colors.blue;
-        break;
-      case 'VENDEUR':
-        color = Colors.orange;
-        break;
+  Widget _buildThumb(Favorite favorite) {
+    final url = favorite.image;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: SizedBox(
+        width: 72,
+        height: 72,
+        child: url != null && url.isNotEmpty
+            ? Image.network(
+                url,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => _thumbFallback(favorite),
+              )
+            : _thumbFallback(favorite),
+      ),
+    );
+  }
+
+  Widget _thumbFallback(Favorite favorite) {
+    IconData icon;
+    switch (favorite.objetType) {
       case 'FREELANCE':
-        color = Colors.purple;
+        icon = Icons.laptop_mac_rounded;
         break;
       case 'ARTICLE':
-        color = Colors.green;
-        break;
-      case 'SERVICE':
-        color = Colors.red;
+      case 'VENDEUR':
+        icon = Icons.shopping_bag_outlined;
         break;
       default:
-        color = Colors.grey;
+        icon = Icons.handyman_outlined;
     }
-
-    return Chip(
-      label: Text(type),
-      backgroundColor: color.withOpacity(0.1),
-      labelStyle: TextStyle(
-        fontSize: 12,
-        color: color,
-        fontWeight: FontWeight.bold,
-      ),
+    return ColoredBox(
+      color: SDColors.neutral100,
+      child: Icon(icon, color: SDColors.neutral400, size: 28),
     );
   }
 
-  Widget _buildStatusChip(String status) {
-    Color color;
-    switch (status) {
-      case 'ACTIF':
-        color = Colors.green;
-        break;
-      case 'ARCHIVE':
-        color = Colors.orange;
-        break;
-      case 'SUPPRIME':
-        color = Colors.red;
-        break;
-      default:
-        color = Colors.grey;
-    }
-
-    return Chip(
-      label: Text(status),
-      backgroundColor: color.withOpacity(0.1),
-      labelStyle: TextStyle(
-        fontSize: 12,
-        color: color,
-        fontWeight: FontWeight.bold,
-      ),
-    );
-  }
-
-  // 🚫 ÉTAT VIDE
-  Widget _buildEmptyState() {
-    return EmptyStateWidget(
-      imagePath: 'assets/favoris_vides.png',
-      title: 'Aucun favori',
-      message: 'Commencez par ajouter vos premiers favoris en explorant nos services et produits !',
-      imageSize: 180,
-    );
-  }
-
-  // 🔍 APPLIQUER LES FILTRES
-  void _applyFilters() {
-    context.read<FavoritePageBlocM>().add(LoadFavoritesM(
-          objetType: _selectedObjetType.isEmpty ? null : _selectedObjetType,
-          statut: _selectedStatut,
-          categorie: _selectedCategorie.isEmpty ? null : _selectedCategorie,
-          ville: _selectedVille.isEmpty ? null : _selectedVille,
-        ));
-  }
-
-  // 🔍 NAVIGATION VERS LE DÉTAIL
   void _navigateToDetail(Favorite favorite) {
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -609,88 +455,32 @@ class _FavoritePageScreenMState extends State<FavoritePageScreenM>
     );
   }
 
-  // 📝 DIALOGUE D'AJOUT DE FAVORI
-  void _showAddFavoriteDialog() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => BlocProvider(
-          create: (context) => FavoritePageBlocM(),
-          child: const AddFavoriteScreenM(),
-        ),
-      ),
-    );
-  }
-
-  // ✏️ DIALOGUE DE MODIFICATION
-  void _showEditDialog(Favorite favorite) {
-    // TODO: Implémenter le dialogue de modification
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content:
-            Text('Fonctionnalité de modification en cours de développement'),
-      ),
-    );
-  }
-
-  // 🔄 DIALOGUE D'ARCHIVAGE
-  void _showArchiveDialog(Favorite favorite) {
+  void _showRemoveDialog(Favorite favorite) {
+    if (favorite.id == null) return;
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Archiver le favori'),
-        content:
-            Text('Êtes-vous sûr de vouloir archiver "${favorite.titre}" ?'),
+      builder: (ctx) => AlertDialog(
+        title: const Text('Retirer des favoris'),
+        content: Text('Retirer « ${favorite.titre} » de vos favoris ?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(ctx),
             child: const Text('Annuler'),
           ),
           TextButton(
             onPressed: () {
-              Navigator.pop(context);
-              context
-                  .read<FavoritePageBlocM>()
-                  .add(ArchiveFavoriteM(favoriteId: favorite.id!));
-            },
-            child:
-                const Text('Archiver', style: TextStyle(color: Colors.orange)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 🗑️ DIALOGUE DE SUPPRESSION
-  void _showDeleteDialog(Favorite favorite) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Supprimer le favori'),
-        content:
-            Text('Êtes-vous sûr de vouloir supprimer "${favorite.titre}" ?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Annuler'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
+              Navigator.pop(ctx);
               context
                   .read<FavoritePageBlocM>()
                   .add(DeleteFavoriteM(favoriteId: favorite.id!));
             },
-            child: const Text('Supprimer', style: TextStyle(color: Colors.red)),
+            child: Text(
+              'Retirer',
+              style: SDTypography.labelLarge.copyWith(color: SDColors.error500),
+            ),
           ),
         ],
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    _tabController.dispose();
-    super.dispose();
   }
 }

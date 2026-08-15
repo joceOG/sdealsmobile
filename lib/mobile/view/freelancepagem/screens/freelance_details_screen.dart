@@ -7,6 +7,7 @@ import '../../chatpagem/chatpageblocm/chatPageBlocM.dart';
 import '../../../data/models/conversation_model.dart';
 import '../../../../data/services/authCubit.dart';
 import '../../../../data/utils/conversation_id.dart';
+import '../../../../design_system/design_system.dart';
 import 'package:go_router/go_router.dart';
 
 /// 📄 Page de détails d'un freelance
@@ -83,9 +84,10 @@ class FreelanceDetailsScreen extends StatelessWidget {
     return SliverAppBar(
       expandedHeight: 250,
       pinned: true,
-      backgroundColor: Colors.green,
+      backgroundColor: SDColors.white,
+      foregroundColor: SDColors.neutral900,
       leading: IconButton(
-        icon: const Icon(Icons.arrow_back, color: Colors.white),
+        icon: const Icon(Icons.arrow_back, color: SDColors.neutral900),
         onPressed: () => Navigator.of(context).pop(),
       ),
       flexibleSpace: FlexibleSpaceBar(
@@ -98,9 +100,9 @@ class FreelanceDetailsScreen extends StatelessWidget {
                     freelance.imagePath,
                     fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) => Container(
-                      color: Colors.green.shade100,
+                      color: SDColors.neutral100,
                       child: Icon(Icons.person,
-                          size: 100, color: Colors.green.shade700),
+                          size: 100, color: SDColors.neutral500),
                     ),
                   )
                 : Image.asset(
@@ -109,9 +111,9 @@ class FreelanceDetailsScreen extends StatelessWidget {
                         : 'assets/profile_picture.jpg',
                     fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) => Container(
-                      color: Colors.green.shade100,
+                      color: SDColors.neutral100,
                       child: Icon(Icons.person,
-                          size: 100, color: Colors.green.shade700),
+                          size: 100, color: SDColors.neutral500),
                     ),
                   ),
 

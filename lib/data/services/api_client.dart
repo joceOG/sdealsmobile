@@ -41,6 +41,9 @@ class ApiClient {
   // Callback déclenché quand le token est invalide/expiré — pour forcer logout
   static void Function()? onUnauthorized;
 
+  /// Après un refresh réussi — pour resynchroniser AuthCubit.token
+  static void Function(String newAccessToken)? onTokenRefreshed;
+
   bool _refreshInFlight = false;
 
   // 🔧 MÉTHODES HTTP GÉNÉRIQUES
@@ -83,6 +86,7 @@ class ApiClient {
         accessToken: newAccess,
         refreshToken: newRefresh,
       );
+      onTokenRefreshed?.call(newAccess);
       return newAccess;
     } catch (_) {
       return null;
@@ -137,61 +141,127 @@ class ApiClient {
     }
   }
 
+  /// GET avec refresh automatique sur 401 (évite logout pendant saisie / polling).
   Future<http.Response> get(String endpoint, {String? token}) async {
-    final response = await http.get(
-      Uri.parse('$apiUrl$endpoint'),
-      headers: _headers(token: token),
-    ).timeout(const Duration(seconds: 30));
-    if (token != null) _checkUnauthorized(response);
+    Future<http.Response> once(String? access) {
+      return http
+          .get(
+            Uri.parse('$apiUrl$endpoint'),
+            headers: _headers(token: access),
+          )
+          .timeout(const Duration(seconds: 30));
+    }
+
+    var access = token;
+    var response = await once(access);
+    if (access != null && response.statusCode == 401) {
+      final refreshed = await refreshAccessToken();
+      if (refreshed != null) {
+        access = refreshed;
+        response = await once(access);
+      }
+    }
+    if (access != null) _checkUnauthorized(response);
     return response;
   }
 
   Future<http.Response> post(String endpoint,
       {Map<String, dynamic>? body, String? token}) async {
-    final response = await http
-        .post(
-          Uri.parse('$apiUrl$endpoint'),
-          headers: _headers(token: token),
-          body: body != null ? jsonEncode(body) : null,
-        )
-        .timeout(const Duration(seconds: 30));
-    if (token != null) _checkUnauthorized(response);
+    Future<http.Response> once(String? access) {
+      return http
+          .post(
+            Uri.parse('$apiUrl$endpoint'),
+            headers: _headers(token: access),
+            body: body != null ? jsonEncode(body) : null,
+          )
+          .timeout(const Duration(seconds: 30));
+    }
+
+    var access = token;
+    var response = await once(access);
+    if (access != null && response.statusCode == 401) {
+      final refreshed = await refreshAccessToken();
+      if (refreshed != null) {
+        access = refreshed;
+        response = await once(access);
+      }
+    }
+    if (access != null) _checkUnauthorized(response);
     return response;
   }
 
   Future<http.Response> put(String endpoint,
       {Map<String, dynamic>? body, String? token}) async {
-    final response = await http
-        .put(
-          Uri.parse('$apiUrl$endpoint'),
-          headers: _headers(token: token),
-          body: body != null ? jsonEncode(body) : null,
-        )
-        .timeout(const Duration(seconds: 30));
-    if (token != null) _checkUnauthorized(response);
+    Future<http.Response> once(String? access) {
+      return http
+          .put(
+            Uri.parse('$apiUrl$endpoint'),
+            headers: _headers(token: access),
+            body: body != null ? jsonEncode(body) : null,
+          )
+          .timeout(const Duration(seconds: 30));
+    }
+
+    var access = token;
+    var response = await once(access);
+    if (access != null && response.statusCode == 401) {
+      final refreshed = await refreshAccessToken();
+      if (refreshed != null) {
+        access = refreshed;
+        response = await once(access);
+      }
+    }
+    if (access != null) _checkUnauthorized(response);
     return response;
   }
 
-  Future<http.Response> delete(String endpoint, {String? token, Map<String, dynamic>? body}) async {
-    final response = await http.delete(
-      Uri.parse('$apiUrl$endpoint'),
-      headers: _headers(token: token),
-      body: body != null ? jsonEncode(body) : null,
-    ).timeout(const Duration(seconds: 30));
-    if (token != null) _checkUnauthorized(response);
+  Future<http.Response> delete(String endpoint,
+      {String? token, Map<String, dynamic>? body}) async {
+    Future<http.Response> once(String? access) {
+      return http
+          .delete(
+            Uri.parse('$apiUrl$endpoint'),
+            headers: _headers(token: access),
+            body: body != null ? jsonEncode(body) : null,
+          )
+          .timeout(const Duration(seconds: 30));
+    }
+
+    var access = token;
+    var response = await once(access);
+    if (access != null && response.statusCode == 401) {
+      final refreshed = await refreshAccessToken();
+      if (refreshed != null) {
+        access = refreshed;
+        response = await once(access);
+      }
+    }
+    if (access != null) _checkUnauthorized(response);
     return response;
   }
 
   Future<http.Response> patch(String endpoint,
       {Map<String, dynamic>? body, String? token}) async {
-    final response = await http
-        .patch(
-          Uri.parse('$apiUrl$endpoint'),
-          headers: _headers(token: token),
-          body: body != null ? jsonEncode(body) : null,
-        )
-        .timeout(const Duration(seconds: 30));
-    if (token != null) _checkUnauthorized(response);
+    Future<http.Response> once(String? access) {
+      return http
+          .patch(
+            Uri.parse('$apiUrl$endpoint'),
+            headers: _headers(token: access),
+            body: body != null ? jsonEncode(body) : null,
+          )
+          .timeout(const Duration(seconds: 30));
+    }
+
+    var access = token;
+    var response = await once(access);
+    if (access != null && response.statusCode == 401) {
+      final refreshed = await refreshAccessToken();
+      if (refreshed != null) {
+        access = refreshed;
+        response = await once(access);
+      }
+    }
+    if (access != null) _checkUnauthorized(response);
     return response;
   }
 
@@ -356,12 +426,15 @@ class ApiClient {
     }
   }
 
-  // ✅ Favoris: ajouter
-  Future<void> addFavorite(
-      {required String token,
-      String? serviceId,
-      required String title,
-      String? image}) async {
+  // ✅ Favoris: ajouter (shape alignée backend + favoritePageBlocM)
+  Future<void> addFavorite({
+    required String token,
+    required String objetType,
+    required String objetId,
+    required String titre,
+    String? description,
+    String? image,
+  }) async {
     final uri = Uri.parse('$apiUrl/favorites');
     final response = await http.post(
       uri,
@@ -370,8 +443,10 @@ class ApiClient {
         if (token.isNotEmpty) 'Authorization': 'Bearer $token',
       },
       body: jsonEncode({
-        if (serviceId != null) 'service': serviceId,
-        'title': title,
+        'objetType': objetType,
+        'objetId': objetId,
+        'titre': titre,
+        if (description != null) 'description': description,
         if (image != null) 'image': image,
       }),
     );
@@ -379,6 +454,60 @@ class ApiClient {
       throw Exception(
           'Erreur favoris: ${response.statusCode} ${response.body}');
     }
+  }
+
+  // ✅ Favoris: supprimer par id
+  Future<void> deleteFavorite({
+    required String token,
+    required String favoriteId,
+  }) async {
+    final uri = Uri.parse('$apiUrl/favorites/$favoriteId');
+    final response = await http.delete(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        if (token.isNotEmpty) 'Authorization': 'Bearer $token',
+      },
+    );
+    if (response.statusCode != 200 && response.statusCode != 204) {
+      throw Exception(
+          'Erreur suppression favori: ${response.statusCode} ${response.body}');
+    }
+  }
+
+  /// Toggle favori (ajout / retrait) via objetType + objetId.
+  /// Retourne `true` si désormais en favori, `false` sinon.
+  Future<bool> toggleFavorite({
+    required String token,
+    required String objetType,
+    required String objetId,
+    String? titre,
+    String? image,
+  }) async {
+    final uri = Uri.parse('$apiUrl/favorites/toggle');
+    final response = await http.post(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        if (token.isNotEmpty) 'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({
+        'objetType': objetType,
+        'objetId': objetId,
+        if (titre != null) 'titre': titre,
+        if (image != null) 'image': image,
+      }),
+    );
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      final data = decodeJson(response);
+      if (data is Map && data.containsKey('isFavorite')) {
+        return data['isFavorite'] == true;
+      }
+      // create path returns the favorite doc → considered added
+      return true;
+    }
+    throw Exception(
+        'Erreur toggle favori: ${response.statusCode} ${response.body}');
   }
 
   // ✅ Signalement: créer
@@ -400,9 +529,23 @@ class ApiClient {
         'reason': reason,
       }),
     );
-    if (response.statusCode != 201) {
+    if (response.statusCode != 201 && response.statusCode != 200) {
       throw Exception(
           'Erreur signalement: ${response.statusCode} ${response.body}');
+    }
+  }
+
+  // ✅ Mot de passe oublié
+  Future<void> forgotPassword({required String email}) async {
+    final uri = Uri.parse('$apiUrl/forgot-password');
+    final response = await http.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email.trim().toLowerCase()}),
+    );
+    if (response.statusCode != 200) {
+      throw Exception(
+          'Erreur réinitialisation: ${response.statusCode} ${response.body}');
     }
   }
 
@@ -693,11 +836,16 @@ class ApiClient {
     );
   }
 
-  // ✅ NOUVEAU : Récupérer les rôles d'un utilisateur
-  Future<Map<String, dynamic>> getUserRoles(String userId) async {
+  // ✅ Récupérer les rôles d'un utilisateur (CLIENT + PRESTATAIRE/FREELANCE/VENDEUR)
+  Future<Map<String, dynamic>> getUserRoles(
+    String userId, {
+    String? token,
+  }) async {
     try {
-      final response =
-          await http.get(Uri.parse('$apiUrl/utilisateur/$userId/roles'));
+      final response = await get(
+        '/utilisateur/$userId/roles',
+        token: token,
+      );
       if (response.statusCode == 200) {
         return decodeJson(response) as Map<String, dynamic>;
       }
@@ -835,7 +983,7 @@ class ApiClient {
       final response = await http
           .get(Uri.parse('${dotenv.env['API_URL']}/prestataire'), headers: {
         'Content-Type': 'application/json'
-      }).timeout(Duration(seconds: 10));
+      }).timeout(const Duration(seconds: 25));
 
       print('📡 Status Code: ${response.statusCode}');
       print('📋 Response Headers: ${response.headers}');
@@ -2253,15 +2401,30 @@ extension MessagerieApi on ApiClient {
     try {
       final uri = Uri.parse('$apiUrl/notification/user/$userId/unread-count');
 
-      final response = await http.get(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      ).timeout(const Duration(seconds: 5));
+      Future<http.Response> once(String access) {
+        return http.get(
+          uri,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $access',
+          },
+        ).timeout(const Duration(seconds: 5));
+      }
 
-      _checkUnauthorized(response);
+      var access = token;
+      var response = await once(access);
+      if (response.statusCode == 401) {
+        final refreshed = await refreshAccessToken();
+        if (refreshed != null) {
+          access = refreshed;
+          response = await once(access);
+        }
+      }
+
+      // Ne pas forcer logout ici : un compteur de notifs ne doit pas détruire
+      // la session pendant un formulaire. Retourner 0 si toujours 401.
+      if (response.statusCode == 401) return 0;
+
       if (response.statusCode == 200) {
         final data = ApiClient.decodeJson(response);
         return data['count'] ?? 0;

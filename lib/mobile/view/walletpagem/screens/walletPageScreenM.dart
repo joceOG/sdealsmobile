@@ -23,10 +23,8 @@ class WalletPageScreenM extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: SDColors.neutral50,
-      appBar: AppBar(
-        title: const Text('SoutraPay'),
-        backgroundColor: SDColors.primary600,
-        foregroundColor: Colors.white,
+      appBar: SDWhiteAppBar.appBar(
+        title: 'SoutraPay',
       ),
       body: Center(
         child: Padding(

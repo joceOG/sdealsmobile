@@ -1,9 +1,10 @@
+import 'dart:async';
+import 'dart:convert';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter/foundation.dart';
-import 'dart:convert';
 import '../models/utilisateur.dart';
 import 'api_client.dart';
 import 'token_store.dart';
@@ -43,6 +44,19 @@ class AuthCubit extends Cubit<AuthState> {
   AuthCubit() : super(AuthInitial()) {
     ApiClient.onUnauthorized = () {
       logout();
+    };
+    ApiClient.onTokenRefreshed = (newToken) {
+      final current = state;
+      if (current is AuthAuthenticated && current.token != newToken) {
+        emit(AuthAuthenticated(
+          token: newToken,
+          utilisateur: current.utilisateur,
+          roles: current.roles,
+          activeRole: current.activeRole,
+          roleDetails: current.roleDetails,
+          refreshToken: current.refreshToken,
+        ));
+      }
     };
     _loadAuthFromStorage();
   }
@@ -108,6 +122,8 @@ class AuthCubit extends Cubit<AuthState> {
           activeRole: activeRole ?? (roles.isNotEmpty ? roles.first : 'CLIENT'),
           refreshToken: refreshToken,
         ));
+        // Met à jour PRESTATAIRE / FREELANCE / VENDEUR si le doc existe
+        unawaited(refreshRoles());
       }
     } catch (e) {
       if (kDebugMode) {
@@ -189,6 +205,54 @@ class AuthCubit extends Cubit<AuthState> {
         refreshToken: current.refreshToken,
       ));
     }
+  }
+
+  /// Recharge CLIENT + PRESTATAIRE / FREELANCE / VENDEUR depuis l’API.
+  Future<void> refreshRoles() async {
+    final current = state;
+    if (current is! AuthAuthenticated) return;
+    final userId = current.utilisateur.idutilisateur;
+    if (userId.isEmpty) return;
+
+    try {
+      final data = await ApiClient().getUserRoles(userId, token: current.token);
+      final raw = data['roles'];
+      final roles = raw is List
+          ? raw.map((e) => e.toString().toUpperCase()).toList()
+          : <String>['CLIENT'];
+      if (!roles.contains('CLIENT')) {
+        roles.insert(0, 'CLIENT');
+      }
+      final details = data['details'] is Map
+          ? Map<String, dynamic>.from(data['details'] as Map)
+          : null;
+      setRoles(roles: roles, roleDetails: details);
+    } catch (e) {
+      if (kDebugMode) {
+        print('refreshRoles: $e');
+      }
+    }
+  }
+
+  /// Met à jour l'utilisateur en session (ex. après édition profil).
+  void updateUtilisateur(Utilisateur utilisateur) {
+    final current = state;
+    if (current is! AuthAuthenticated) return;
+    _saveAuthToStorage(
+      current.token,
+      utilisateur,
+      current.roles,
+      current.activeRole,
+      current.refreshToken,
+    );
+    emit(AuthAuthenticated(
+      token: current.token,
+      utilisateur: utilisateur,
+      roles: current.roles,
+      activeRole: current.activeRole,
+      roleDetails: current.roleDetails,
+      refreshToken: current.refreshToken,
+    ));
   }
 
   void switchActiveRole(String role) {

@@ -8,12 +8,16 @@ import 'package:sdealsmobile/mobile/view/freelancepagem/screens/freelance_detail
 import 'package:sdealsmobile/mobile/view/freelancepagem/screens/freelance_service_offer_detail_screen.dart';
 import 'package:sdealsmobile/mobile/view/freelancepagem/models/freelance_model.dart';
 import 'package:sdealsmobile/mobile/view/jobpagem/screens/jobPageScreenM.dart';
+import 'package:sdealsmobile/mobile/view/jobpagem/utils/navigation_helper.dart';
 import 'package:sdealsmobile/mobile/view/notificationpagem/bloc/notification_bloc.dart';
+import 'package:sdealsmobile/mobile/view/shoppingpagem/screens/productDetailsScreenM.dart';
+import 'package:sdealsmobile/mobile/view/shoppingpagem/shoppingpageblocm/shoppingPageStateM.dart'
+    as shop_model;
 import 'package:sdealsmobile/mobile/view/notificationpagem/bloc/notification_event.dart';
 import 'package:sdealsmobile/mobile/view/notificationpagem/bloc/notification_state.dart';
-import 'package:sdealsmobile/mobile/view/notificationpagem/screens/notification_screen.dart';
-import 'package:sdealsmobile/mobile/view/orderpagem/orderpageblocm/commande_bloc.dart';
-import 'package:sdealsmobile/mobile/view/orderpagem/screens/orderPageScreenM.dart';
+import 'package:sdealsmobile/mobile/view/alertpagem/alertpageblocm/alertPageBlocM.dart';
+import 'package:sdealsmobile/mobile/view/alertpagem/screens/alertPageScreenM.dart';
+import 'package:sdealsmobile/mobile/view/orderpagem/screens/service_requests_list_screen.dart';
 import 'package:sdealsmobile/mobile/view/shoppingpagem/screens/shoppingPageScreenM.dart';
 import 'package:sdealsmobile/mobile/view/shoppingpagem/shoppingpageblocm/shoppingPageBlocM.dart';
 import 'package:sdealsmobile/data/services/api_client.dart';
@@ -147,23 +151,63 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
     return '${amount.toStringAsFixed(0)} FCFA';
   }
 
-  String _ratingWithReviews(dynamic noteRaw, dynamic reviewsRaw) {
+  String? _ratingWithReviews(dynamic noteRaw, dynamic reviewsRaw) {
     final note = _toDouble(noteRaw);
     final reviews = _toInt(reviewsRaw) ?? 0;
-    final score = (note != null && note > 0) ? note.toStringAsFixed(1) : 'Nouveau';
-    if (reviews > 0 && note != null && note > 0) {
-      return '$score ($reviews avis)';
+    // Pas de label "Nouveau" : si pas de note, on n'affiche rien.
+    if (note == null || note <= 0) return null;
+    if (reviews > 0) {
+      return '${note.toStringAsFixed(1)} ($reviews avis)';
     }
-    return score;
+    return note.toStringAsFixed(1);
   }
 
+  /// Libellé lieu prestataire (texte réel uniquement — pas de faux "Abidjan").
+  String? _prestataireLocationLabel(Map<String, dynamic> p) {
+    final loc = p['localisation']?.toString().trim();
+    if (loc != null && loc.isNotEmpty) return loc;
+
+    final zones = p['zoneIntervention'];
+    if (zones is List && zones.isNotEmpty) {
+      final labels = zones
+          .map((e) => e.toString().trim())
+          .where((s) => s.isNotEmpty)
+          .take(2)
+          .toList();
+      if (labels.isNotEmpty) return labels.join(', ');
+    }
+    // localisationmaps = lat/lng seulement → pas de nom d'adresse fiable
+    return null;
+  }
+
+  /// Normalise une URL média (Cloudinary / http / protocole-relatif).
+  String? _normalizeMediaUrl(String? raw) {
+    if (raw == null) return null;
+    final v = raw.trim();
+    if (v.isEmpty) return null;
+    if (v.startsWith('https://') || v.startsWith('http://')) return v;
+    if (v.startsWith('//')) return 'https:$v';
+    return null;
+  }
+
+  /// Cherche une image dans les champs usuels API (utilisateur, article, freelance…).
   String? _pickImageUrl(Map<String, dynamic> source) {
-    final candidateKeys = ['photoProfil', 'avatar', 'image', 'photo', 'profilePhoto'];
+    const candidateKeys = [
+      'photoArticle',
+      'imageArticle',
+      'photoProfil',
+      'coverImage',
+      'imagePath',
+      'selfie',
+      'avatar',
+      'image',
+      'photo',
+      'profilePhoto',
+      'url',
+    ];
     for (final key in candidateKeys) {
-      final value = source[key]?.toString();
-      if (value != null && value.isNotEmpty && value.startsWith('http')) {
-        return value;
-      }
+      final normalized = _normalizeMediaUrl(source[key]?.toString());
+      if (normalized != null) return normalized;
     }
     return null;
   }
@@ -186,6 +230,17 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
   }
 
   /// Libellé « ce qu’il / elle fait » pour la carte Métiers (plusieurs formes API).
+
+  /// Une carte d'accueil n'est affichée que si elle a une vraie image.
+  bool _hasDisplayableImage(String? url) {
+    final v = url?.trim() ?? '';
+    return v.isNotEmpty;
+  }
+
+  List<_HomeMiniItem> _onlyItemsWithImages(Iterable<_HomeMiniItem> items) {
+    return items.where((e) => _hasDisplayableImage(e.imageUrl)).toList();
+  }
+
   String _metierLabelForPrestataire(Map<String, dynamic> p) {
     final service = p['service'] as Map<String, dynamic>? ?? const {};
     for (final key in ['nomservice', 'nomService', 'nom', 'label']) {
@@ -208,20 +263,22 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
   }
 
   List<_HomeMiniItem> _buildMetiersItems(List<Map<String, dynamic>> data) {
-    return data.take(3).map((p) {
+    return _onlyItemsWithImages(data.map((p) {
       final utilisateur = p['utilisateur'] as Map<String, dynamic>? ?? const {};
       final prenom = utilisateur['prenom']?.toString() ?? '';
       final nom = utilisateur['nom']?.toString() ?? '';
       final fullName = ('$prenom $nom').trim().isEmpty ? 'Prestataire' : ('$prenom $nom').trim();
       final metier = _metierLabelForPrestataire(p);
-      final location = p['localisation']?.toString() ?? 'Abidjan';
+      final location = _prestataireLocationLabel(p);
       final isVerified = p['verifier'] == true;
       final expYears = _toInt(p['anneeExperience']);
-      final imageUrl = _pickImageUrl(utilisateur);
+      final imageUrl = _pickImageUrl(utilisateur) ?? _pickImageUrl(p);
       final rating = _ratingWithReviews(p['note'], p['nbAvis']);
-      final meta = isVerified
-          ? '$location • Vérifié${expYears != null && expYears > 0 ? ' • $expYears ans' : ''}'
-          : '$location${expYears != null && expYears > 0 ? ' • $expYears ans' : ''}';
+      final metaParts = <String>[
+        if (location != null) location,
+        if (isVerified) 'Vérifié',
+        if (expYears != null && expYears > 0) '$expYears ans',
+      ];
       return _HomeMiniItem(
         cardType: SDEntityCardType.provider,
         title: fullName,
@@ -230,18 +287,21 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
         listingLayout: true,
         imageUrl: imageUrl,
         ratingText: rating,
-        metaText: meta,
+        metaText: metaParts.isEmpty ? null : metaParts.join(' • '),
         priceText: _formatPricePerHour(p['prixprestataire']) ?? 'Sur devis',
-        statusText: 'Disponible rapidement',
+        statusText: null, // plus de "Disponible rapidement"
+        showFavoriteHeart: true,
         ctaText: 'Contacter',
+        onCardTap: () => _openProviderFromHome(p),
+        onFavoriteTap: () => _addProviderFavorite(p),
       );
-    }).toList();
+    })).take(5).toList();
   }
 
   List<_HomeMiniItem> _buildFreelanceServiceOfferItems(List<Map<String, dynamic>> data) {
-    return data.take(8).map((o) {
+    return _onlyItemsWithImages(data.map((o) {
       final title = o['displayTitle']?.toString() ?? 'Service';
-      final cover = o['coverImage']?.toString();
+      final cover = _normalizeMediaUrl(o['coverImage']?.toString());
       final priceVal = _toDouble(o['startingPrice']);
       final priceText = priceVal != null && priceVal > 0
           ? 'À partir de ${priceVal.toStringAsFixed(0)} FCFA'
@@ -250,15 +310,15 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
       final reviews = _toInt(o['reviewsCount']) ?? 0;
       final ratingText = (note != null && note > 0)
           ? (reviews > 0 ? '${note.toStringAsFixed(1)} ($reviews avis)' : note.toStringAsFixed(1))
-          : 'Nouveau';
+          : null;
       final par = o['par']?.toString() ?? '';
       final delivery = o['deliveryTime']?.toString() ?? '';
       final meta = delivery.isNotEmpty ? 'Livraison $delivery' : 'Freelance';
       final freelance = o['freelance'] as Map<String, dynamic>?;
       final u = freelance?['utilisateur'] as Map<String, dynamic>?;
-      final avatar = u?['photoProfil']?.toString() ??
-          freelance?['imagePath']?.toString() ??
-          '';
+      final avatar = _pickImageUrl(u ?? const {}) ??
+          _pickImageUrl(freelance ?? const {}) ??
+          _normalizeMediaUrl(freelance?['imagePath']?.toString());
       final freelanceId = freelance?['_id']?.toString();
       final offerId = o['_id']?.toString();
 
@@ -267,7 +327,7 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
         title: title,
         subtitle: par.isNotEmpty ? 'Par $par' : 'Freelance',
         icon: Icons.work_outline_rounded,
-        imageUrl: (cover != null && cover.isNotEmpty) ? cover : (avatar.isNotEmpty ? avatar : null),
+        imageUrl: cover ?? avatar,
         ratingText: ratingText,
         metaText: meta,
         priceText: priceText,
@@ -278,11 +338,11 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
             ? () => _openFreelanceServiceOffer(offerId)
             : (freelanceId != null ? () => _openFreelanceById(freelanceId) : null),
       );
-    }).toList();
+    })).take(8).toList();
   }
 
   List<_HomeMiniItem> _buildFreelanceItems(List<Map<String, dynamic>> data) {
-    return data.take(3).map((f) {
+    return _onlyItemsWithImages(data.map((f) {
       final utilisateur = f['utilisateur'] as Map<String, dynamic>? ?? const {};
       final nom = f['nom']?.toString() ??
           f['fullName']?.toString() ??
@@ -299,6 +359,7 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
           ? 'Remote/Projet • Vérifié${expYears != null && expYears > 0 ? ' • $expYears ans' : ''}'
           : 'Remote/Projet${expYears != null && expYears > 0 ? ' • $expYears ans' : ''}';
 
+      final freelanceId = f['_id']?.toString() ?? f['idfreelance']?.toString();
       return _HomeMiniItem(
         cardType: SDEntityCardType.freelance,
         title: nom,
@@ -312,12 +373,15 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
             _formatPricePerHour(f['tarifHoraire'] ?? f['hourlyRate'] ?? f['tarif']) ?? 'Sur devis',
         statusText: 'Répond rapidement',
         ctaText: 'Voir profil',
+        onCardTap: freelanceId != null && freelanceId.isNotEmpty
+            ? () => _openFreelanceById(freelanceId)
+            : () => _openFreelance(const []),
       );
-    }).toList();
+    })).take(5).toList();
   }
 
   List<_HomeMiniItem> _buildProductItems(List<dynamic> data) {
-    return data.take(3).map((a) {
+    return _onlyItemsWithImages(data.map((a) {
       final item = _extractArticleData(a);
       final name =
           (item['nomArticle']?.toString() ?? '').isEmpty ? 'Produit' : item['nomArticle'].toString();
@@ -350,8 +414,9 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
         priceText: price,
         promoText: promoBadge,
         ctaText: 'Commander',
+        onCardTap: () => _openProductFromHome(item),
       );
-    }).toList();
+    })).take(5).toList();
   }
 
   /// Promo réelle côté backend (pas de mock : la section reste masquée si vide).
@@ -370,7 +435,7 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
     final promos = data.where((a) => _isArticleRealPromo(_extractArticleData(a))).take(8).toList();
     if (promos.isEmpty) return const [];
 
-    return promos.map((a) {
+    final mapped = promos.map((a) {
       final item = _extractArticleData(a);
       final name = (item['nomArticle']?.toString() ?? '').isEmpty
           ? 'Produit en promo'
@@ -411,8 +476,10 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
         priceText: price ?? 'Sur devis',
         promoText: promoBadge,
         ctaText: 'Commander',
+        onCardTap: () => _openProductFromHome(item),
       );
-    }).toList();
+    });
+    return _onlyItemsWithImages(mapped).take(8).toList();
   }
 
   @override
@@ -439,37 +506,63 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
   }
 
   void _openNotifications() {
-    final authState = context.read<AuthCubit>().state;
-    if (authState is AuthAuthenticated) {
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => BlocProvider.value(
-            value: _notificationBloc,
-            child: const NotificationScreen(),
-          ),
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => BlocProvider(
+          create: (_) => AlertPageBlocM(),
+          child: const AlertPageScreenM(),
         ),
-      );
-    } else {
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => BlocProvider(
-            create: (_) => NotificationBloc(),
-            child: const NotificationScreen(),
-          ),
-        ),
-      );
-    }
+      ),
+    );
   }
 
   void _openOrders() {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => BlocProvider(
-          create: (_) => CommandeBloc(),
-          child: const OrderPageScreenM(),
-        ),
+        builder: (_) => const ServiceRequestsListScreen(),
       ),
     );
+  }
+
+  Future<void> _addProviderFavorite(Map<String, dynamic> p) async {
+    final auth = context.read<AuthCubit>().state;
+    if (auth is! AuthAuthenticated) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Connectez-vous pour ajouter en favoris.')),
+      );
+      return;
+    }
+    final id = p['_id']?.toString() ?? p['idprestataire']?.toString() ?? '';
+    if (id.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Prestataire invalide')),
+      );
+      return;
+    }
+    final utilisateur = p['utilisateur'] as Map<String, dynamic>? ?? const {};
+    final prenom = utilisateur['prenom']?.toString() ?? '';
+    final nom = utilisateur['nom']?.toString() ?? '';
+    final fullName =
+        ('$prenom $nom').trim().isEmpty ? 'Prestataire' : ('$prenom $nom').trim();
+    final imageUrl = _pickImageUrl(utilisateur) ?? _pickImageUrl(p);
+    try {
+      await _apiClient.addFavorite(
+        token: auth.token,
+        objetType: 'PRESTATAIRE',
+        objetId: id,
+        titre: fullName,
+        image: imageUrl,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ajouté aux favoris')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Échec favoris : $e')),
+      );
+    }
   }
 
   void _openMetiers() {
@@ -519,6 +612,48 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
         builder: (_) => BlocProvider(
           create: (_) => ShoppingPageBlocM(),
           child: const ShoppingPageScreenM(),
+        ),
+      ),
+    );
+  }
+
+  void _openProviderFromHome(Map<String, dynamic> p) {
+    final id = p['_id']?.toString() ?? p['idprestataire']?.toString() ?? '';
+    if (id.isEmpty) {
+      _openMetiers();
+      return;
+    }
+    NavigationHelper.navigateToProviderProfile(
+      context,
+      providerId: id,
+      providerData: p,
+    );
+  }
+
+  void _openProductFromHome(Map<String, dynamic> item) {
+    final id = item['_id']?.toString() ?? item['idArticle']?.toString() ?? '';
+    final name = item['nomArticle']?.toString() ?? 'Produit';
+    final image = _pickImageUrl(item) ?? '';
+    final price = item['prixArticle']?.toString() ?? '0';
+    final vendeur = item['vendeur'];
+    final vendeurId = vendeur is Map
+        ? vendeur['_id']?.toString()
+        : vendeur?.toString();
+    final product = shop_model.Product(
+      id: id,
+      name: name,
+      image: image,
+      size: '',
+      price: price,
+      brand: item['marque']?.toString() ?? 'Générique',
+      rating: _toDouble(item['rating']) ?? 4.5,
+      vendeurId: vendeurId,
+    );
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => BlocProvider(
+          create: (_) => ShoppingPageBlocM(),
+          child: ProductDetails(product: product),
         ),
       ),
     );
@@ -575,13 +710,6 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
   Widget build(BuildContext context) {
     return BlocBuilder<HomePageBlocM, HomePageStateM>(
       builder: (context, state) {
-        if (state.isLoading && (state.listItems == null || state.listItems!.isEmpty)) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if ((state.error ?? '').isNotEmpty) {
-          return _buildError(state.error ?? 'Erreur inconnue');
-        }
-
         final categories = state.listItems ?? [];
         final authState = context.watch<AuthCubit>().state;
         final firstName = authState is AuthAuthenticated
@@ -598,6 +726,7 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
             : 0.0;
         final listBottomPadding =
             SDSpacing.md + systemBottomInset + reserveWhenNavHidden;
+        final hasCategoryError = (state.error ?? '').isNotEmpty;
 
         return Scaffold(
           backgroundColor: SDColors.neutral50,
@@ -657,17 +786,26 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
               return false;
             },
             child: RefreshIndicator(
-              onRefresh: _loadHomePreviewData,
+              onRefresh: () async {
+                context.read<HomePageBlocM>().add(LoadCategorieDataM());
+                await _loadHomePreviewData();
+              },
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: EdgeInsets.fromLTRB(
                   SDSpacing.md,
                   SDSpacing.md,
                   SDSpacing.md,
-                  // Barre Android + quand la bottom bar de l’app est cachée, garder la même marge qu’avec la barre.
                   listBottomPadding,
                 ),
                 children: [
+                if (hasCategoryError) ...[
+                  _buildInlineErrorBanner(state.error!),
+                  SizedBox(height: SDSpacing.md),
+                ] else if (state.isLoading && categories.isEmpty) ...[
+                  const LinearProgressIndicator(minHeight: 2),
+                  SizedBox(height: SDSpacing.md),
+                ],
                 Text(
                   'Que voulez-vous faire aujourd\'hui ?',
                   style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral600),
@@ -679,14 +817,16 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
                 ),
                 SizedBox(height: SDSpacing.sm),
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
                       child: _buildUniverseCard(
                         title: 'Métiers',
                         illustrationAsset: HomeUniverseAssets.metiers,
                         icon: Icons.handyman_rounded,
-                        iconColor: SDColors.primary800,
-                        titleColor: SDColors.primary800,
+                        iconColor: SDColors.neutral500,
+                        titleColor: SDColors.neutral900,
+                        backgroundColor: SDColors.neutral100,
                         onTap: _openMetiers,
                       ),
                     ),
@@ -696,19 +836,21 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
                         title: 'Freelance',
                         illustrationAsset: HomeUniverseAssets.freelance,
                         icon: Icons.laptop_mac_rounded,
-                        iconColor: SDColors.primary800,
-                        titleColor: SDColors.primary800,
+                        iconColor: SDColors.neutral500,
+                        titleColor: SDColors.neutral900,
+                        backgroundColor: SDColors.neutral100,
                         onTap: () => _openFreelance(categories),
                       ),
                     ),
                     SizedBox(width: SDSpacing.sm),
                     Expanded(
                       child: _buildUniverseCard(
-                        title: 'Marketplace',
+                        title: 'É-marché',
                         illustrationAsset: HomeUniverseAssets.marketplace,
                         icon: Icons.shopping_basket_rounded,
-                        iconColor: SDColors.primary800,
-                        titleColor: SDColors.primary800,
+                        iconColor: SDColors.neutral500,
+                        titleColor: SDColors.neutral900,
+                        backgroundColor: SDColors.neutral100,
                         onTap: _openMarketplace,
                       ),
                     ),
@@ -778,10 +920,10 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
     );
   }
 
-  /// Cartes « univers » : ratio 1:1 (carré), zone image sur fond blanc, titre en bas.
-  static const double _universeCardRadius = 22;
+  /// Cartes « univers » style profondeur Yango :
+  /// le fond gris est un décor PLUS PETIT que l'image — l'image déborde dessus.
+  static const double _universeCardRadius = 28;
 
-  /// Illustrations sans teinte : couleurs natives du PNG.
   Widget _buildUniverseIllustration({
     required String illustrationAsset,
     required IconData icon,
@@ -807,44 +949,57 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
     required IconData icon,
     required Color iconColor,
     required Color titleColor,
+    required Color backgroundColor,
     required VoidCallback onTap,
   }) {
-    const double titleBandHeight = 40;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cardW = constraints.maxWidth;
+        // Hauteur de la scène visuelle (image + décor)
+        final stageH = cardW * 1.05;
+        // Fond gris PLUS COURT que l'image → overflow visible haut/bas
+        final stageBgH = stageH * 0.62;
 
-    return AspectRatio(
-      aspectRatio: 1,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(_universeCardRadius),
-          child: Ink(
-            decoration: BoxDecoration(
-              color: SDColors.white,
-              borderRadius: BorderRadius.circular(_universeCardRadius),
-              border: Border.all(color: SDColors.neutral200, width: 1),
-              boxShadow: [
-                BoxShadow(
-                  color: SDColors.neutral900.withOpacity(0.06),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                  spreadRadius: -2,
-                ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(_universeCardRadius),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(
-                    child: ColoredBox(
-                      color: SDColors.white,
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(4, 8, 4, 4),
-                        child: Transform.scale(
-                          scale: 1.1,
-                          alignment: Alignment.center,
+        return Material(
+          color: Colors.transparent,
+          clipBehavior: Clip.none,
+          child: InkWell(
+            onTap: onTap,
+            splashColor: titleColor.withOpacity(0.08),
+            highlightColor: titleColor.withOpacity(0.04),
+            borderRadius: BorderRadius.circular(_universeCardRadius),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: cardW,
+                  height: stageH,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    alignment: Alignment.center,
+                    children: [
+                      // 1) Décor gris — plus petit, derrière
+                      Align(
+                        alignment: Alignment.center,
+                        child: Container(
+                          width: cardW,
+                          height: stageBgH,
+                          decoration: BoxDecoration(
+                            color: backgroundColor,
+                            borderRadius:
+                                BorderRadius.circular(_universeCardRadius),
+                          ),
+                        ),
+                      ),
+
+                      // 2) Image 3D PLUS GRANDE — sort du cadre gris
+                      //    (haut + bas), sans ClipRRect
+                      Positioned(
+                        top: 0,
+                        bottom: stageH * 0.04,
+                        left: cardW * 0.02,
+                        right: cardW * 0.02,
+                        child: IgnorePointer(
                           child: _buildUniverseIllustration(
                             illustrationAsset: illustrationAsset,
                             icon: icon,
@@ -852,43 +1007,29 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
                           ),
                         ),
                       ),
-                    ),
+                    ],
                   ),
-                  Container(
-                    height: titleBandHeight,
-                    width: double.infinity,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: SDColors.white,
-                      border: Border(
-                        top: BorderSide(
-                          color: SDColors.neutral200,
-                          width: 1,
-                        ),
-                      ),
-                    ),
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text(
-                        title,
-                        textAlign: TextAlign.center,
-                        maxLines: 1,
-                        style: SDTypography.titleSmall.copyWith(
-                          color: titleColor,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 14,
-                          letterSpacing: -0.2,
-                        ),
-                      ),
-                    ),
+                ),
+
+                // 3) Titre sous la scène (après l'overflow)
+                const SizedBox(height: 6),
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: SDTypography.titleSmall.copyWith(
+                    color: titleColor,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                    letterSpacing: -0.2,
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -927,17 +1068,11 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
             squareImage: listingSquareImage,
           )
         : 205.0;
-    final safeItems = items.isNotEmpty
-        ? items
-        : [
-            _HomeMiniItem(
-              cardType: SDEntityCardType.product,
-              title: 'Chargement...',
-              subtitle: 'Veuillez patienter',
-              icon: Icons.hourglass_top_rounded,
-              listingLayout: useListingCardStyle,
-            ),
-          ];
+    // Ne jamais afficher de carte sans image (placeholders inclus).
+    final safeItems = _onlyItemsWithImages(items);
+    if (safeItems.isEmpty) {
+      return const SizedBox.shrink();
+    }
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1021,8 +1156,10 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
         priceText: item.priceText,
         badgeText: item.statusText,
         promoBadgeText: item.promoText,
+        showFavoriteHeart: item.showFavoriteHeart,
         squareImage: listingSquareImage,
         onTap: item.onCardTap,
+        onFavoriteTap: item.onFavoriteTap,
       );
     }
     return SDEntityCard(
@@ -1041,22 +1178,41 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
     );
   }
 
-  Widget _buildError(String error) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+  Widget _buildInlineErrorBanner(String message) {
+    return Container(
+      padding: SDSpacing.cardPadding,
+      decoration: BoxDecoration(
+        color: SDColors.error50,
+        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+        border: Border.all(color: SDColors.error200),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.error_outline, color: SDColors.error500, size: 48),
-          SizedBox(height: SDSpacing.sm),
-          Text(
-            'Erreur: $error',
-            style: SDTypography.bodyMedium.copyWith(color: SDColors.error500),
-            textAlign: TextAlign.center,
-          ),
-          SizedBox(height: SDSpacing.sm),
-          ElevatedButton(
-            onPressed: () => context.read<HomePageBlocM>().add(LoadCategorieDataM()),
-            child: const Text('Réessayer'),
+          Icon(Icons.wifi_off_rounded, color: SDColors.error600),
+          SizedBox(width: SDSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  message,
+                  style: SDTypography.bodyMedium.copyWith(color: SDColors.error600),
+                ),
+                SizedBox(height: SDSpacing.xs),
+                TextButton(
+                  onPressed: () =>
+                      context.read<HomePageBlocM>().add(LoadCategorieDataM()),
+                  style: TextButton.styleFrom(
+                    foregroundColor: SDColors.error600,
+                    padding: EdgeInsets.zero,
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: const Text('Réessayer'),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -1078,7 +1234,10 @@ class _HomeMiniItem {
   final String? ctaText;
   /// Carte type annonce (grande photo + texte compact), style Airbnb.
   final bool listingLayout;
+  /// Cœur favori (ex. section Métiers), à la place d'un badge texte.
+  final bool showFavoriteHeart;
   final VoidCallback? onCardTap;
+  final VoidCallback? onFavoriteTap;
 
   const _HomeMiniItem({
     required this.cardType,
@@ -1093,6 +1252,8 @@ class _HomeMiniItem {
     this.promoText,
     this.ctaText,
     this.listingLayout = false,
+    this.showFavoriteHeart = false,
     this.onCardTap,
+    this.onFavoriteTap,
   });
 }

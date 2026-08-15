@@ -28,10 +28,13 @@ class PlanningBloc extends Bloc<PlanningEvent, PlanningState> {
           _currentPrestataireId = event.prestataireId;
         }
         final response = await _apiClient
-            .get('/prestations/prestataire/${event.prestataireId}', token: _currentToken);
+            .get('/prestations/prestataire/${event.prestataireId}?limit=100',
+                token: _currentToken);
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
-          final List<dynamic> prestations = data['prestations'] ?? data;
+          final List<dynamic> prestations = data is List
+              ? data
+              : (data['prestations'] as List? ?? const []);
           emit(PlanningLoaded(prestations: prestations));
         } else {
           emit(PlanningError('Erreur lors du chargement des prestations'));

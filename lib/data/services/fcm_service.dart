@@ -34,6 +34,9 @@ class FcmService {
   String? _token;
   FcmNavigationHandler? onNavigate;
 
+  /// Deep link cold-start (notification) reçu avant que le router soit branché.
+  Map<String, dynamic>? _pendingLaunchData;
+
   bool get isReady => _ready;
   String? get token => _token;
 
@@ -101,14 +104,19 @@ class FcmService {
       _handleMessageNavigation(initial);
     }
 
-    messaging.onTokenRefresh.listen((t) async {
+    messaging.onTokenRefresh.listen((t) {
       _token = t;
-      await _registerTokenWithBackend(t);
+      // ignore: unawaited_futures
+      _registerTokenWithBackend(t);
     });
 
     _token = await messaging.getToken();
+    // Critique : ne PAS await le backend ici.
+    // Sinon main() reste bloqué jusqu'au timeout HTTP (ex. Render cold start 30s)
+    // → écran blanc avant même runApp / Lottie.
     if (_token != null) {
-      await _registerTokenWithBackend(_token!);
+      // ignore: unawaited_futures
+      _registerTokenWithBackend(_token!);
     }
 
     _ready = true;
@@ -163,7 +171,20 @@ class FcmService {
   }
 
   void _handleMessageNavigation(RemoteMessage message) {
-    onNavigate?.call(Map<String, dynamic>.from(message.data));
+    final data = Map<String, dynamic>.from(message.data);
+    if (onNavigate != null) {
+      onNavigate!(data);
+    } else {
+      _pendingLaunchData = data;
+    }
+  }
+
+  /// À consommer une seule fois depuis le splash (priorité sur Accueil).
+  String? consumePendingLaunchRoute() {
+    final data = _pendingLaunchData;
+    _pendingLaunchData = null;
+    if (data == null) return null;
+    return resolveRoute(data);
   }
 
   /// À appeler après login (token access disponible).

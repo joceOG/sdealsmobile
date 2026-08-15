@@ -5,8 +5,7 @@ import 'package:sdealsmobile/mobile/view/freelance_registration/screens/steps/av
 import 'package:sdealsmobile/mobile/view/freelance_registration/screens/steps/pricing_step.dart';
 import 'package:sdealsmobile/mobile/view/freelance_registration/screens/steps/verification_step.dart';
 import 'package:sdealsmobile/mobile/view/freelance_registration/screens/steps/portfolio_step.dart';
-import '../../../../design_system/colors.dart';
-import '../../../../design_system/typography.dart';
+import '../../../../design_system/design_system.dart';
 
 class FreelanceFormScreen extends StatefulWidget {
   final Set<String>? preSelectedCategories;
@@ -150,9 +149,9 @@ class _FreelanceFormScreenState extends State<FreelanceFormScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Inscription Freelance', style: SDTypography.titleLarge),
-        backgroundColor: SDColors.primary700,
+      backgroundColor: SDColors.white,
+      appBar: SDWhiteAppBar.appBar(
+        title: 'Inscription Freelance',
       ),
       body: Form(
         key: _formKey,

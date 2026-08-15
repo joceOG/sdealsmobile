@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../servicerequestcubit/service_request_cubit.dart';
 import '../../chatpagem/screens/chatPageScreenM.dart';
 import '../../../data/models/conversation_model.dart';
+import '../../../../data/services/api_client.dart';
+import '../../../../data/services/authCubit.dart';
 import '../../../../design_system/design_system.dart';
 
 class ServiceRequestSummaryScreen extends StatelessWidget {
@@ -474,16 +475,7 @@ class ServiceRequestSummaryScreen extends StatelessWidget {
         if (status == 'EN_ATTENTE') ...[
           SizedBox(height: SDSpacing.sm),
           OutlinedButton.icon(
-            onPressed: () {
-              // TODO: Implémenter annulation
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Annulation à implémenter',
-                      style: SDTypography.bodyMedium.copyWith(color: SDColors.white)),
-                  backgroundColor: SDColors.warning500,
-                ),
-              );
-            },
+            onPressed: () => _confirmAndCancel(context),
             icon: Icon(Icons.cancel_outlined, color: SDColors.error500),
             label: Text(
               'Annuler la commande',
@@ -500,6 +492,77 @@ class ServiceRequestSummaryScreen extends StatelessWidget {
         ],
       ],
     );
+  }
+
+  Future<void> _confirmAndCancel(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Annuler la commande'),
+        content: const Text(
+          'Voulez-vous vraiment annuler cette demande de service ?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Non'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: SDColors.error500),
+            child: const Text('Oui, annuler',
+                style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    final auth = context.read<AuthCubit>().state;
+    final authToken =
+        auth is AuthAuthenticated ? auth.token : token;
+    if (authToken.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Connexion requise pour annuler',
+            style: SDTypography.bodyMedium.copyWith(color: SDColors.white),
+          ),
+          backgroundColor: SDColors.error500,
+        ),
+      );
+      return;
+    }
+
+    try {
+      await ApiClient().updatePrestationStatus(
+        token: authToken,
+        prestationId: requestId,
+        newStatus: 'ANNULEE',
+      );
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Commande annulée',
+            style: SDTypography.bodyMedium.copyWith(color: SDColors.white),
+          ),
+          backgroundColor: SDColors.success500,
+        ),
+      );
+      Navigator.of(context).pop();
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Impossible d\'annuler : $e',
+            style: SDTypography.bodyMedium.copyWith(color: SDColors.white),
+          ),
+          backgroundColor: SDColors.error500,
+        ),
+      );
+    }
   }
 
   Map<String, dynamic> _getStatusInfo(String status) {

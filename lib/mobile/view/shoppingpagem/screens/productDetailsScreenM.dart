@@ -80,7 +80,10 @@ class _ProductDetailsState extends State<ProductDetails> {
       expandedHeight: 300.0,
       floating: false,
       pinned: true,
-      backgroundColor: SDColors.primary600,
+      backgroundColor: SDColors.white,
+      foregroundColor: SDColors.neutral900,
+      iconTheme: const IconThemeData(color: SDColors.neutral900),
+      actionsIconTheme: const IconThemeData(color: SDColors.neutral900),
       flexibleSpace: FlexibleSpaceBar(
         title: Text(
           widget.product.name,
@@ -99,10 +102,10 @@ class _ProductDetailsState extends State<ProductDetails> {
             final isFavorite =
                 state.favoriteProductIds?.contains(widget.product.id) ?? false;
             return IconButton(
-              style: SDAppBarIconStyles.onPrimary,
+              style: SDAppBarIconStyles.onLightSurface,
               icon: Icon(
                 isFavorite ? Icons.favorite : Icons.favorite_border,
-                color: isFavorite ? SDColors.error500 : SDColors.white,
+                color: isFavorite ? SDColors.error500 : SDColors.neutral900,
               ),
               onPressed: () {
                 context
@@ -119,8 +122,8 @@ class _ProductDetailsState extends State<ProductDetails> {
         ),
         // Bouton partage
         IconButton(
-          style: SDAppBarIconStyles.onPrimary,
-          icon: Icon(Icons.share, color: SDColors.white),
+          style: SDAppBarIconStyles.onLightSurface,
+          icon: Icon(Icons.share, color: SDColors.neutral900),
           onPressed: () {
             // TODO: Implémenter le partage
             AppSnackBar.info(context, 'Fonctionnalité de partage à venir');
@@ -137,8 +140,8 @@ class _ProductDetailsState extends State<ProductDetails> {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            SDColors.primary600,
-            SDColors.primary800,
+            SDColors.neutral700,
+            SDColors.neutral900,
           ],
         ),
       ),

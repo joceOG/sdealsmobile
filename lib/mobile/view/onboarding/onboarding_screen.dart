@@ -1,13 +1,31 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../design_system/design_system.dart';
+
+/// Accent onboarding — vert Soutrali
+const Color _kOnboardingAccent = SDColors.primary600;
+const Color _kOnboardingTitle = Color(0xFF0A1931);
+
+const SystemUiOverlayStyle _kOnboardingSystemUi = SystemUiOverlayStyle(
+  statusBarColor: Colors.transparent,
+  statusBarIconBrightness: Brightness.dark,
+  statusBarBrightness: Brightness.light,
+  systemNavigationBarColor: Colors.white,
+  systemNavigationBarDividerColor: Colors.transparent,
+  systemNavigationBarIconBrightness: Brightness.dark,
+  systemNavigationBarContrastEnforced: false,
+  systemStatusBarContrastEnforced: false,
+);
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({Key? key}) : super(key: key);
 
   @override
-  _OnboardingScreenState createState() => _OnboardingScreenState();
+  State<OnboardingScreen> createState() => _OnboardingScreenState();
 }
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
@@ -16,163 +34,48 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   final List<OnboardingContent> _contents = [
     OnboardingContent(
-      title: "Trouvez tout près de vous",
+      title: 'Trouvez tout\nprès de vous',
       subtitle:
-          "Cartographie intelligente. Découvrez produits et services dans votre zone en temps réel.",
-      image: "assets/onboarding/geo.png",
-      color: SDColors.primary600, // ✅ Green Soutrali
+          'Cartographie intelligente. Découvrez produits et services dans votre zone en temps réel.',
+      image: 'assets/onboarding/geo.png',
     ),
     OnboardingContent(
-      title: "300+ Métiers à votre service",
+      title: '300+ Métiers\nà votre service',
       subtitle:
-          "Plombiers, menuisiers, designers, développeurs... Trouvez l'expert qu'il vous faut.",
-      image: "assets/onboarding/pros.png",
-      color: SDColors.warning, // ✅ Orange Pro
+          'Plombiers, menuisiers, designers, développeurs... Trouvez l\'expert qu\'il vous faut.',
+      image: 'assets/onboarding/pros.png',
     ),
     OnboardingContent(
-      title: "Achetez ce que vous voulez",
+      title: 'Achetez ce\nque vous voulez',
       subtitle:
-          "Des milliers de produits. Électronique, mode, maison. Livraison rapide partout à Abidjan.",
-      image: "assets/onboarding/shop.png",
-      color: SDColors.secondary, // ✅ Purple Shop
+          'Des milliers de produits. Électronique, mode, maison. Livraison rapide partout à Abidjan.',
+      image: 'assets/onboarding/shop.png',
     ),
     OnboardingContent(
-      title: "Un compte, tout les possibles",
+      title: 'Un compte,\ntout les possibles',
       subtitle:
-          "Client, Prestataire, Freelance, Vendeur. Changez de rôle en un clic selon vos besoins.",
-      image: "assets/onboarding/roles.png",
-      color: SDColors.info, // ✅ Blue Roles
+          'Client, Prestataire, Freelance, Vendeur. Changez de rôle en un clic selon vos besoins.',
+      image: 'assets/onboarding/roles.png',
     ),
   ];
 
+  bool get _isLastPage => _currentPage == _contents.length - 1;
+
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: SDColors.white,
-      body: Stack(
-        children: [
-          // Background Animation
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 500),
-            color: SDColors.white,
-            child: PageView.builder(
-              controller: _pageController,
-              onPageChanged: (value) {
-                setState(() {
-                  _currentPage = value;
-                });
-              },
-              itemCount: _contents.length,
-              itemBuilder: (context, index) {
-                return OnboardingPage(content: _contents[index]);
-              },
-            ),
-          ),
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
 
-          // Bottom Navigation Area
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: Container(
-              padding: EdgeInsets.all(SDSpacing.lg),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.bottomCenter,
-                  end: Alignment.topCenter,
-                  colors: [
-                    SDColors.white,
-                    SDColors.white.withOpacity(0.0),
-                  ],
-                  stops: const [0.6, 1.0],
-                ),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Page Indicators
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(
-                      _contents.length,
-                      (index) => AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                        margin: const EdgeInsets.symmetric(horizontal: 4),
-                        height: 8,
-                        width: _currentPage == index ? 24 : 8,
-                        decoration: BoxDecoration(
-                          color: _currentPage == index
-                              ? _contents[_currentPage].color
-                              : SDColors.neutral300,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: SDSpacing.xl),
-
-                  // Buttons
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      // Skip Button
-                      if (_currentPage != _contents.length - 1)
-                        TextButton(
-                          onPressed: _completeOnboarding,
-                          child: Text(
-                            "Passer",
-                            style: SDTypography.bodyLarge.copyWith(
-                              color: SDColors.neutral600,
-                            ),
-                          ),
-                        )
-                      else
-                        const SizedBox(width: 60), // Spacer
-
-                      // Next / Start Button
-                      ElevatedButton(
-                        onPressed: () {
-                          if (_currentPage == _contents.length - 1) {
-                            _completeOnboarding();
-                          } else {
-                            _pageController.nextPage(
-                              duration: const Duration(milliseconds: 300),
-                              curve: Curves.easeInOut,
-                            );
-                          }
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _contents[_currentPage].color,
-                          foregroundColor: SDColors.white,
-                          padding: EdgeInsets.symmetric(
-                            horizontal: SDSpacing.xl,
-                            vertical: SDSpacing.md,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(30),
-                          ),
-                          elevation: 4,
-                        ),
-                        child: Text(
-                          _currentPage == _contents.length - 1
-                              ? "C'est parti !"
-                              : "Suivant",
-                          style: SDTypography.labelLarge.copyWith(
-                            color: SDColors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: SDSpacing.md),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+  void _goNext() {
+    if (_isLastPage) {
+      _completeOnboarding();
+    } else {
+      _pageController.nextPage(
+        duration: const Duration(milliseconds: 340),
+        curve: Curves.easeOutCubic,
+      );
+    }
   }
 
   Future<void> _completeOnboarding() async {
@@ -182,83 +85,231 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       context.go('/homepage');
     }
   }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: _kOnboardingSystemUi,
+      child: Scaffold(
+      backgroundColor: SDColors.white,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          PageView.builder(
+            controller: _pageController,
+            onPageChanged: (value) => setState(() => _currentPage = value),
+            itemCount: _contents.length,
+            itemBuilder: (context, index) {
+              return _OnboardingSlide(content: _contents[index]);
+            },
+          ),
+
+          // Passer (haut droite)
+          if (!_isLastPage)
+            Positioned(
+              top: MediaQuery.paddingOf(context).top + 8,
+              right: 8,
+              child: TextButton(
+                onPressed: _completeOnboarding,
+                child: Text(
+                  'Passer',
+                  style: SDTypography.labelLarge.copyWith(
+                    color: SDColors.neutral500,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+
+          // Indicateurs + bouton rond flèche
+          Positioned(
+            left: 24,
+            right: 24,
+            bottom: bottomInset + 20,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Row(
+                    children: List.generate(_contents.length, (index) {
+                      final active = _currentPage == index;
+                      return AnimatedContainer(
+                        duration: const Duration(milliseconds: 280),
+                        curve: Curves.easeOutCubic,
+                        margin: const EdgeInsets.only(right: 6),
+                        height: 6,
+                        width: active ? 28 : 8,
+                        decoration: BoxDecoration(
+                          color: active
+                              ? _kOnboardingAccent
+                              : SDColors.neutral200,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      );
+                    }),
+                  ),
+                ),
+                _RoundArrowButton(
+                  color: _kOnboardingAccent,
+                  onTap: _goNext,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ),
+    );
+  }
 }
 
 class OnboardingContent {
   final String title;
   final String subtitle;
   final String image;
-  final Color color;
 
-  OnboardingContent({
+  const OnboardingContent({
     required this.title,
     required this.subtitle,
     required this.image,
-    required this.color,
   });
 }
 
-class OnboardingPage extends StatelessWidget {
+class _OnboardingSlide extends StatelessWidget {
   final OnboardingContent content;
 
-  const OnboardingPage({Key? key, required this.content}) : super(key: key);
+  const _OnboardingSlide({required this.content});
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.all(SDSpacing.lg),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Expanded(
-            flex: 5,
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: content.color.withOpacity(0.2),
-                    blurRadius: 20,
-                    offset: const Offset(0, 10),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Grande image + flou / fondu bas (style capture 01)
+        Expanded(
+          flex: 58,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Image.asset(
+                content.image,
+                fit: BoxFit.cover,
+                alignment: Alignment.topCenter,
+                errorBuilder: (_, __, ___) => Container(
+                  color: SDColors.neutral100,
+                  alignment: Alignment.center,
+                  child: Icon(
+                    Icons.image_outlined,
+                    size: 64,
+                    color: SDColors.neutral300,
                   ),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(20),
-                child: Image.asset(
-                  content.image,
-                  fit: BoxFit.cover,
                 ),
               ),
-            ),
+              // Léger soft-blur sur le bas de l'image
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: 120,
+                child: ClipRect(
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+                    child: const SizedBox.expand(),
+                  ),
+                ),
+              ),
+              // Fondu blanc vers le texte
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: 180,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        SDColors.white.withOpacity(0),
+                        SDColors.white.withOpacity(0.75),
+                        SDColors.white,
+                      ],
+                      stops: const [0.0, 0.45, 1.0],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
-          SizedBox(height: SDSpacing.xxl),
-          Expanded(
-            flex: 3,
+        ),
+
+        // Texte bas, aligné à gauche (style capture 01)
+        Expanded(
+          flex: 42,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(28, 8, 28, 96),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   content.title,
-                  textAlign: TextAlign.center,
-                  style: SDTypography.headlineMedium.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: SDColors.neutral900,
-                    height: 1.2,
+                  textAlign: TextAlign.left,
+                  style: const TextStyle(
+                    fontSize: 34,
+                    height: 1.12,
+                    fontWeight: FontWeight.w800,
+                    color: _kOnboardingTitle,
+                    letterSpacing: -0.6,
                   ),
                 ),
-                SizedBox(height: SDSpacing.md),
+                const SizedBox(height: 14),
                 Text(
                   content.subtitle,
-                  textAlign: TextAlign.center,
+                  textAlign: TextAlign.left,
                   style: SDTypography.bodyLarge.copyWith(
-                    color: SDColors.neutral600,
-                    height: 1.5,
+                    color: SDColors.neutral500,
+                    height: 1.45,
+                    fontSize: 15,
                   ),
                 ),
               ],
             ),
           ),
-        ],
+        ),
+      ],
+    );
+  }
+}
+
+/// Bouton rond + flèche (capture 02)
+class _RoundArrowButton extends StatelessWidget {
+  final Color color;
+  final VoidCallback onTap;
+
+  const _RoundArrowButton({
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: color,
+      shape: const CircleBorder(),
+      elevation: 0,
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: const SizedBox(
+          width: 58,
+          height: 58,
+          child: Icon(
+            Icons.arrow_forward_rounded,
+            color: Colors.white,
+            size: 26,
+          ),
+        ),
       ),
     );
   }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../favorispageblocm/favoritePageBlocM.dart';
 import '../favorispageblocm/favoritePageEventM.dart';
@@ -429,11 +430,68 @@ class _FavoriteDetailScreenMState extends State<FavoriteDetailScreenM> {
 
   // ✏️ DIALOGUE DE MODIFICATION
   void _showEditDialog() {
-    // TODO: Implémenter le dialogue de modification
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content:
-            Text('Fonctionnalité de modification en cours de développement'),
+    if (widget.favorite.id == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Impossible de modifier ce favori')),
+      );
+      return;
+    }
+    final titreController =
+        TextEditingController(text: widget.favorite.titre);
+    final notesController =
+        TextEditingController(text: widget.favorite.notesPersonnelles ?? '');
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Modifier le favori'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: titreController,
+                decoration: const InputDecoration(
+                  labelText: 'Titre',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: notesController,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  labelText: 'Notes personnelles',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final titre = titreController.text.trim();
+              if (titre.isEmpty) return;
+              Navigator.pop(ctx);
+              context.read<FavoritePageBlocM>().add(
+                    UpdateFavoriteM(
+                      favoriteId: widget.favorite.id!,
+                      titre: titre,
+                      notesPersonnelles: notesController.text.trim(),
+                    ),
+                  );
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Favori mis à jour')),
+              );
+            },
+            child: const Text('Enregistrer'),
+          ),
+        ],
       ),
     );
   }
@@ -496,12 +554,12 @@ class _FavoriteDetailScreenMState extends State<FavoriteDetailScreenM> {
   }
 
   // 📤 PARTAGER LE FAVORI
-  void _shareFavorite() {
-    // TODO: Implémenter le partage
+  Future<void> _shareFavorite() async {
+    final text = widget.favorite.titre;
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Fonctionnalité de partage en cours de développement'),
-      ),
+      const SnackBar(content: Text('Titre copié dans le presse-papiers')),
     );
   }
 }
