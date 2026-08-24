@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
+import 'package:sdealsmobile/data/services/api_client.dart';
 
 import 'serviceProviderRegistrationPageEventM.dart';
 import 'serviceProviderRegistrationPageStateM.dart';
@@ -136,74 +137,78 @@ class ServiceProviderRegistrationBlocM extends Bloc<
     };
   }
 
-  /// POST /prestataire en multipart (champs texte + fichier [selfie] si photo choisie).
+  /// POST /prestataire en multipart (AUTH-REFRESH via ApiClient).
   Future<http.Response> _postPrestataireMultipart({
     required String apiUrl,
     required Map<String, dynamic> data,
     required String userId,
     String? token,
   }) async {
-    final uri = Uri.parse('$apiUrl/prestataire');
-    final request = http.MultipartRequest('POST', uri);
+    final api = ApiClient();
+    return api.sendAuthorizedMultipart(
+      (access) async {
+        final uri = Uri.parse('${api.apiUrl ?? apiUrl}/prestataire');
+        final request = http.MultipartRequest('POST', uri);
 
-    if (token != null && token.isNotEmpty) {
-      request.headers['Authorization'] = 'Bearer $token';
-    }
+        if (access != null && access.isNotEmpty) {
+          request.headers['Authorization'] = 'Bearer $access';
+        }
 
-    final maps = data['localisationmaps'];
-    Map<String, dynamic> locMap;
-    if (maps is Map<String, dynamic>) {
-      locMap = maps;
-    } else if (maps is Map) {
-      locMap = Map<String, dynamic>.from(maps);
-    } else {
-      locMap = {'latitude': 0.0, 'longitude': 0.0};
-    }
+        final maps = data['localisationmaps'];
+        Map<String, dynamic> locMap;
+        if (maps is Map<String, dynamic>) {
+          locMap = maps;
+        } else if (maps is Map) {
+          locMap = Map<String, dynamic>.from(maps);
+        } else {
+          locMap = {'latitude': 0.0, 'longitude': 0.0};
+        }
 
-    void field(String k, String v) => request.fields[k] = v;
+        void field(String k, String v) => request.fields[k] = v;
 
-    field('utilisateur', userId);
-    field('service', '${data['service'] ?? ''}');
-    final cat = data['category'];
-    if (cat != null && '$cat'.isNotEmpty) field('category', '$cat');
-    field('prixprestataire', '${data['prixprestataire'] ?? 0}');
-    field('localisation', '${data['localisation'] ?? 'Abidjan'}');
-    field('note', '${data['note'] ?? 0}');
-    field('verifier', (data['verifier'] == true) ? 'true' : 'false');
-    field('localisationmaps', jsonEncode(locMap));
-    field('description', '${data['description'] ?? ''}');
-    field('zoneIntervention', jsonEncode(data['zoneIntervention'] ?? []));
-    field('specialite', jsonEncode(data['specialite'] ?? []));
-    field('anneeExperience', '${data['anneeExperience'] ?? '0'}');
-    field('rayonIntervention', '${data['rayonIntervention'] ?? 10}');
-    field('tarifHoraireMin', '${data['tarifHoraireMin'] ?? 0}');
-    field('tarifHoraireMax', '${data['tarifHoraireMax'] ?? 0}');
-    field('numeroCNI', '${data['numeroCNI'] ?? ''}');
-    field('numeroRCCM', '${data['numeroRCCM'] ?? ''}');
-    field('numeroAssurance', '${data['numeroAssurance'] ?? ''}');
-    field('nbMission', '${data['nbMission'] ?? 0}');
-    field('nbAvis', '${data['nbAvis'] ?? 0}');
-    field('revenus', '${data['revenus'] ?? 0}');
-    field('clients', jsonEncode(data['clients'] ?? []));
-    field('source', '${data['source'] ?? 'sdealsmobile'}');
-    // status contrôlé côté serveur — ne pas envoyer depuis le client
+        field('utilisateur', userId);
+        field('service', '${data['service'] ?? ''}');
+        final cat = data['category'];
+        if (cat != null && '$cat'.isNotEmpty) field('category', '$cat');
+        field('prixprestataire', '${data['prixprestataire'] ?? 0}');
+        field('localisation', '${data['localisation'] ?? 'Abidjan'}');
+        field('note', '${data['note'] ?? 0}');
+        field('verifier', (data['verifier'] == true) ? 'true' : 'false');
+        field('localisationmaps', jsonEncode(locMap));
+        field('description', '${data['description'] ?? ''}');
+        field('zoneIntervention', jsonEncode(data['zoneIntervention'] ?? []));
+        field('specialite', jsonEncode(data['specialite'] ?? []));
+        field('anneeExperience', '${data['anneeExperience'] ?? '0'}');
+        field('rayonIntervention', '${data['rayonIntervention'] ?? 10}');
+        field('tarifHoraireMin', '${data['tarifHoraireMin'] ?? 0}');
+        field('tarifHoraireMax', '${data['tarifHoraireMax'] ?? 0}');
+        field('numeroCNI', '${data['numeroCNI'] ?? ''}');
+        field('numeroRCCM', '${data['numeroRCCM'] ?? ''}');
+        field('numeroAssurance', '${data['numeroAssurance'] ?? ''}');
+        field('nbMission', '${data['nbMission'] ?? 0}');
+        field('nbAvis', '${data['nbAvis'] ?? 0}');
+        field('revenus', '${data['revenus'] ?? 0}');
+        field('clients', jsonEncode(data['clients'] ?? []));
+        field('source', '${data['source'] ?? 'sdealsmobile'}');
 
-    final profilePath = data['profileImage'] as String?;
-    if (profilePath != null && profilePath.isNotEmpty) {
-      final file = File(profilePath);
-      if (await file.exists()) {
-        request.files.add(
-          await http.MultipartFile.fromPath(
-            'selfie',
-            profilePath,
-            filename: profilePath.split(RegExp(r'[/\\]')).last,
-          ),
-        );
-      }
-    }
+        final profilePath = data['profileImage'] as String?;
+        if (profilePath != null && profilePath.isNotEmpty) {
+          final file = File(profilePath);
+          if (await file.exists()) {
+            request.files.add(
+              await http.MultipartFile.fromPath(
+                'selfie',
+                profilePath,
+                filename: profilePath.split(RegExp(r'[/\\]')).last,
+              ),
+            );
+          }
+        }
 
-    final streamed = await request.send();
-    return http.Response.fromStream(streamed);
+        return request;
+      },
+      token: token,
+    );
   }
 
   // ✅ NOUVELLE MÉTHODE : Mettre à jour les rôles de l'utilisateur

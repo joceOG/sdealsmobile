@@ -9,10 +9,10 @@ import 'provider_statistics_state.dart';
 class ProviderStatisticsBloc
     extends Bloc<ProviderStatisticsEvent, ProviderStatisticsState> {
   final ApiClient _apiClient = ApiClient();
-  String? _currentToken;
+  bool _hasSession = false;
 
   void setToken(String token) {
-    _currentToken = token;
+    _hasSession = token.isNotEmpty;
   }
 
   static int _asInt(dynamic v, {int fallback = 0}) {
@@ -35,7 +35,6 @@ class ProviderStatisticsBloc
       try {
         final response = await _apiClient.get(
           '/prestations/stats?prestataireId=${event.prestataireId}',
-          token: _currentToken,
         );
 
         Map<String, dynamic> statsData = {};

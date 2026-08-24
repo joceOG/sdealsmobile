@@ -2,6 +2,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:sdealsmobile/data/services/api_client.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -299,29 +300,31 @@ class PrestataireFinalizationBloc
     String? authToken,
   ) async {
     try {
-      final request = http.MultipartRequest(
-        'POST',
-        Uri.parse('$apiUrl/upload/document'),
+      final api = ApiClient();
+      final response = await api.sendAuthorizedMultipart(
+        (access) async {
+          final request = http.MultipartRequest(
+            'POST',
+            Uri.parse('${api.apiUrl}/upload/document'),
+          );
+          if (access != null && access.isNotEmpty) {
+            request.headers['Authorization'] = 'Bearer $access';
+          }
+          request.fields['prestataireId'] = prestataireId;
+          request.fields['documentType'] = documentType;
+          request.files.add(await http.MultipartFile.fromPath(
+            'document',
+            file.path,
+            filename:
+                '${documentType}_${DateTime.now().millisecondsSinceEpoch}.jpg',
+          ));
+          return request;
+        },
+        token: authToken,
       );
 
-      if (authToken != null && authToken.isNotEmpty) {
-        request.headers['Authorization'] = 'Bearer $authToken';
-      }
-
-      request.fields['prestataireId'] = prestataireId;
-      request.fields['documentType'] = documentType;
-      request.files.add(await http.MultipartFile.fromPath(
-        'document',
-        file.path,
-        filename:
-            '${documentType}_${DateTime.now().millisecondsSinceEpoch}.jpg',
-      ));
-
-      final response = await request.send();
-      final responseBody = await response.stream.bytesToString();
-
       if (response.statusCode == 200) {
-        final data = jsonDecode(responseBody);
+        final data = jsonDecode(response.body);
         return {
           'success': true,
           'url': data['url'],
@@ -359,15 +362,10 @@ class PrestataireFinalizationBloc
         'localisationmaps': formData['location'],
       };
 
-      final headers = <String, String>{'Content-Type': 'application/json'};
-      if (authToken != null && authToken.isNotEmpty) {
-        headers['Authorization'] = 'Bearer $authToken';
-      }
-
-      final response = await http.put(
-        Uri.parse('$apiUrl/prestataire/$prestataireId/finalize'),
-        headers: headers,
-        body: jsonEncode(updateData),
+      final response = await ApiClient().put(
+        '/prestataire/$prestataireId/finalize',
+        body: updateData,
+        token: authToken,
       );
 
       if (response.statusCode == 200) {

@@ -3,21 +3,20 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:sdealsmobile/data/models/utilisateur.dart';
 import 'package:sdealsmobile/data/services/authCubit.dart';
+import 'package:sdealsmobile/data/services/api_client.dart';
+import 'package:sdealsmobile/data/services/websocket_service.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:sdealsmobile/data/services/api_client.dart';
 // ✅ Design System
 import '../../../../design_system/design_system.dart';
 import 'package:sdealsmobile/mobile/view/provider_dashboard/bloc/missions_bloc.dart';
 import 'package:sdealsmobile/mobile/view/provider_dashboard/bloc/planning_bloc.dart';
 import 'package:sdealsmobile/mobile/view/provider_dashboard/bloc/messages_bloc.dart';
 import 'package:sdealsmobile/mobile/view/provider_dashboard/bloc/notifications_bloc.dart';
-import 'package:sdealsmobile/mobile/view/provider_dashboard/bloc/soutrapay_bloc.dart';
 import 'package:sdealsmobile/mobile/view/provider_dashboard/screens/provider_missions_screen.dart';
 import 'package:sdealsmobile/mobile/view/provider_dashboard/screens/provider_planning_screen.dart';
 import 'package:sdealsmobile/mobile/view/provider_dashboard/screens/provider_messages_screen.dart';
 import 'package:sdealsmobile/mobile/view/provider_dashboard/screens/provider_notifications_screen.dart';
-import 'package:sdealsmobile/mobile/view/provider_dashboard/screens/provider_soutrapay_screen.dart';
 import 'package:sdealsmobile/mobile/view/provider_dashboard/screens/provider_profile_screen.dart';
 import 'package:sdealsmobile/mobile/view/provider_dashboard/bloc/provider_profile_bloc.dart';
 import 'package:sdealsmobile/mobile/view/provider_dashboard/screens/provider_settings_screen.dart';
@@ -114,6 +113,8 @@ class _ProviderMainScreenState extends State<ProviderMainScreen>
     if (state == AppLifecycleState.resumed && mounted) {
       // Retour app / multitâche → statut à jour sans bouton
       _initPrestataireData();
+      // STAB-05 : reprise Socket seulement si déconnecté.
+      WebSocketService().resumeIfNeeded();
     }
   }
 
@@ -1426,15 +1427,23 @@ class _ProviderMainScreenState extends State<ProviderMainScreen>
     ).then((_) => _loadUnreadNotificationsCount());
   }
 
-  // 💰 AFFICHER L'ÉCRAN SOUTRAPAY
+  // SoutraPay V1 : pas de simulation financière (Random / fake balance).
   void _showSoutraPayScreen() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => BlocProvider<SoutraPayBloc>(
-          create: (context) => SoutraPayBloc(),
-          child: const ProviderSoutraPayScreen(),
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('SoutraPay arrive bientôt'),
+        content: const Text(
+          'Les paiements, soldes et retraits seront disponibles '
+          'lorsque le service sera branché. Aucune opération fictive '
+          'n’est proposée pour le moment.',
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Compris'),
+          ),
+        ],
       ),
     );
   }

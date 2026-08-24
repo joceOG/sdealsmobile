@@ -242,42 +242,11 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
       ));
     } catch (error) {
       print("❌ Erreur chargement prestataires: $error");
-
-      // ⚠️ Fallback vers le service mock en cas d'erreur
-      try {
-        final matchingService = MockProviderMatchingService();
-        final List<AIProviderRecommendation> recommendations =
-            await matchingService.getRecommendedProviders(
-          query: '${event.serviceType} ${event.preferences?.join(' ') ?? ''}'
-              .trim(),
-          location: event.location,
-          maxResults: 5,
-        );
-
-        List<Prestataire> providers =
-            recommendations.map((r) => r.prestataire).toList();
-
-        // Créer l'explication du fallback mock
-        final explanation = ProviderMatchExplanation(
-          matchingCriteria: [event.serviceType, event.location],
-          providerScores: {},
-          providerStrengths: {},
-        );
-
-        emit(state.copyWith(
-          matchedProviders: providers,
-          matchExplanation: explanation,
-          isMatchingLoading: false,
-        ));
-
-        print("🔄 Fallback vers données mock réussi");
-      } catch (mockError) {
-        print("💥 Erreur critique: $mockError");
-        emit(state.copyWith(
-          isMatchingLoading: false,
-          matchError: error.toString(),
-        ));
-      }
+      emit(state.copyWith(
+        isMatchingLoading: false,
+        matchedProviders: const [],
+        matchError: 'Impossible de charger les prestataires. Réessayez.',
+      ));
     }
   }
 

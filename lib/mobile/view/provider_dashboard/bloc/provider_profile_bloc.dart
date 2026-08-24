@@ -8,7 +8,7 @@ import 'provider_profile_state.dart';
 class ProviderProfileBloc
     extends Bloc<ProviderProfileEvent, ProviderProfileState> {
   final ApiClient _apiClient = ApiClient();
-  String? _currentToken;
+  bool _hasSession = false;
 
   double _asDouble(dynamic value, {double fallback = 0.0}) {
     if (value is num) return value.toDouble();
@@ -20,7 +20,7 @@ class ProviderProfileBloc
   }
 
   void setToken(String token) {
-    _currentToken = token;
+    _hasSession = token.isNotEmpty;
   }
 
   ProviderProfileBloc() : super(ProviderProfileInitial()) {
@@ -31,7 +31,6 @@ class ProviderProfileBloc
         // Appel API réel
         final response = await _apiClient.get(
           '/prestataire/${event.prestataireId}',
-          token: _currentToken,
         );
 
         Map<String, dynamic> profile;
@@ -173,7 +172,6 @@ class ProviderProfileBloc
         final response = await _apiClient.put(
           '/prestataire/${event.prestataireId}',
           body: event.profileData,
-          token: _currentToken,
         );
         if (response.statusCode == 200) {
           final updatedProfile =
@@ -282,7 +280,7 @@ class ProviderProfileBloc
     // 👤 CHANGER LE MOT DE PASSE
     on<ChangePassword>((event, emit) async {
       try {
-        if (_currentToken == null || _currentToken!.isEmpty) {
+        if (!_hasSession) {
           emit(ProviderProfileError('Session expirée — reconnectez-vous'));
           return;
         }
@@ -292,7 +290,6 @@ class ProviderProfileBloc
             'currentPassword': event.currentPassword,
             'newPassword': event.newPassword,
           },
-          token: _currentToken,
         );
         if (response.statusCode == 200) {
           emit(PasswordChanged());
@@ -315,7 +312,7 @@ class ProviderProfileBloc
     // 👤 DÉSACTIVER LE COMPTE (espace Métiers)
     on<DeactivateAccount>((event, emit) async {
       try {
-        if (_currentToken == null || _currentToken!.isEmpty) {
+        if (!_hasSession) {
           emit(ProviderProfileError('Session expirée — reconnectez-vous'));
           return;
         }
@@ -325,7 +322,6 @@ class ProviderProfileBloc
         }
         final response = await _apiClient.post(
           '/prestataire/${event.prestataireId}/deactivate',
-          token: _currentToken,
         );
         if (response.statusCode == 200) {
           String message = 'Espace Métiers désactivé';
@@ -355,13 +351,12 @@ class ProviderProfileBloc
     // 👤 SUPPRIMER / DÉSACTIVER LE COMPTE UTILISATEUR
     on<DeleteAccount>((event, emit) async {
       try {
-        if (_currentToken == null || _currentToken!.isEmpty) {
+        if (!_hasSession) {
           emit(ProviderProfileError('Session expirée — reconnectez-vous'));
           return;
         }
         final response = await _apiClient.post(
           '/utilisateur/deactivate',
-          token: _currentToken,
         );
         if (response.statusCode == 200) {
           String message = 'Compte désactivé';

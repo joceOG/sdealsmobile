@@ -6,15 +6,31 @@ import 'package:bloc/bloc.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:sdealsmobile/data/models/categorie.dart';
 import 'package:sdealsmobile/data/models/service.dart';
 import 'package:sdealsmobile/data/services/api_client.dart';
 
+/// Timeout réseau Freelance — évite un Loading indéfini.
+const Duration _kFreelanceTimeout = Duration(seconds: 15);
+
+String _userFreelanceError(Object error) {
+  return 'Impossible de charger les freelances. Réessayez.';
+}
+
+String _userCategoriesError(Object error) {
+  return 'Impossible de charger les catégories. Réessayez.';
+}
+
 class FreelancePageBlocM
     extends Bloc<FreelancePageEventM, FreelancePageStateM> {
-  FreelancePageBlocM() : super(FreelancePageStateM.initial()) {
+  FreelancePageBlocM({
+    ApiClient? apiClient,
+    this.requestTimeout = _kFreelanceTimeout,
+  })  : _apiClient = apiClient ?? ApiClient(),
+        super(FreelancePageStateM.initial()) {
     on<LoadCategorieDataM>(_onLoadCategorieDataM);
     on<LoadFreelancersEvent>(_onLoadFreelancers);
     on<LoadServicesEvent>(_onLoadServices);
@@ -24,28 +40,44 @@ class FreelancePageBlocM
     on<SubmitFreelanceRegistrationEvent>(_onSubmitFreelanceRegistration);
   }
 
+  final ApiClient _apiClient;
+  final Duration requestTimeout;
+
   Future<void> _onLoadCategorieDataM(
     LoadCategorieDataM event,
     Emitter<FreelancePageStateM> emit,
   ) async {
-    emit(state.copyWith(isLoading: true));
+    emit(state.copyWith(isLoading: true, error: null));
 
-    ApiClient apiClient = ApiClient();
     try {
-      // Revenir à l'ancien nom du groupe qui fonctionne
-      var nomgroupe = "Freelance"; // Sans trait d'union
-      print("Chargement des catégories pour le groupe: $nomgroupe");
-      List<Categorie> list_categorie =
-          await apiClient.fetchCategorie(nomgroupe);
-
-      // Charger également les freelancers par défaut
-      add(LoadFreelancersEvent());
-
-      emit(state.copyWith(listItems: list_categorie, isLoading: false));
-    } catch (error) {
-      emit(state.copyWith(error: error.toString(), isLoading: false));
+      const nomgroupe = 'Freelance';
       if (kDebugMode) {
-        print("Erreur chargement catégories: $error");
+        print('Chargement des catégories pour le groupe: $nomgroupe');
+      }
+      final List<Categorie> listCategorie = await _apiClient
+          .fetchCategorie(nomgroupe)
+          .timeout(requestTimeout);
+
+      emit(state.copyWith(
+        listItems: listCategorie,
+        isLoading: false,
+        error: null,
+      ));
+
+      add(LoadFreelancersEvent());
+      add(LoadServicesEvent());
+    } on TimeoutException {
+      emit(state.copyWith(
+        isLoading: false,
+        error: 'Impossible de charger les catégories. Réessayez.',
+      ));
+    } catch (error) {
+      emit(state.copyWith(
+        isLoading: false,
+        error: _userCategoriesError(error),
+      ));
+      if (kDebugMode) {
+        print('Erreur chargement catégories: $error');
       }
     }
   }
@@ -54,108 +86,97 @@ class FreelancePageBlocM
     LoadFreelancersEvent event,
     Emitter<FreelancePageStateM> emit,
   ) async {
-    // ✅ MAINTENANT CONNECTÉ AU VRAI BACKEND !
-    try {
-      ApiClient apiClient = ApiClient();
-      print("🚀 Chargement des freelances depuis le backend...");
+    emit(state.copyWith(
+      isLoadingFreelancers: true,
+      freelancersError: null,
+    ));
 
-      final Map<String, dynamic> response = await apiClient.fetchFreelances(
-        page: 1,
-        limit: 50,
-        sortBy: 'rating',
-      );
+    try {
+      if (kDebugMode) {
+        print('Chargement des freelances depuis le backend...');
+      }
+
+      final Map<String, dynamic> response = await _apiClient
+          .fetchFreelances(
+            page: 1,
+            limit: 50,
+            sortBy: 'rating',
+          )
+          .timeout(requestTimeout);
 
       final List<Map<String, dynamic>> freelancesData =
-          (response['freelances'] as List<dynamic>)
+          (response['freelances'] as List<dynamic>? ?? const [])
               .cast<Map<String, dynamic>>();
-      final pagination = response['pagination'];
 
-      print("📦 Données brutes reçues: ${freelancesData.length} freelances");
-      if (pagination != null) {
-        print(
-            "📄 Pagination: page ${pagination['currentPage']}/${pagination['totalPages']} (${pagination['totalItems']} total)");
-      }
-
-      // Debug: Afficher le premier freelance brut
-      if (freelancesData.isNotEmpty && kDebugMode) {
-        print("🔍 Exemple de données brutes: ${freelancesData.first}");
-      }
-
-      // Convertir les données backend en FreelanceModel avec gestion d'erreur par item
       final List<FreelanceModel> freelancers = [];
-      for (var data in freelancesData) {
+      for (final data in freelancesData) {
         try {
-          final freelance = FreelanceModel.fromBackend(data);
-          freelancers.add(freelance);
+          freelancers.add(FreelanceModel.fromBackend(data));
         } catch (e) {
-          print("⚠️ Erreur conversion freelance (ID: ${data['_id']}): $e");
           if (kDebugMode) {
-            print("   Données problématiques: $data");
+            print('Erreur conversion freelance (ID: ${data['_id']}): $e');
           }
         }
       }
 
-      print(
-          "✅ Freelances chargés depuis le backend: ${freelancers.length}/${freelancesData.length}");
-
-      if (freelancers.isEmpty && freelancesData.isNotEmpty) {
-        throw Exception(
-            "Aucun freelance n'a pu être converti - problème de format des données");
-      }
-
+      // 200 + vide -> Empty. Jamais de mock en production.
       emit(state.copyWith(
         freelancers: freelancers,
         filteredFreelancers: freelancers,
+        isLoadingFreelancers: false,
+        freelancersLoaded: true,
+        freelancersError: null,
+      ));
+    } on TimeoutException {
+      emit(state.copyWith(
+        freelancers: const [],
+        filteredFreelancers: const [],
+        isLoadingFreelancers: false,
+        freelancersLoaded: true,
+        freelancersError: 'Impossible de charger les freelances. Réessayez.',
       ));
     } catch (error, stackTrace) {
-      // ⚠️ Fallback vers les données mock en cas d'erreur
       if (kDebugMode) {
-        print("❌ Erreur backend, utilisation des données mock: $error");
-        print("Stack trace: $stackTrace");
+        print('Erreur backend freelances (aucun mock): $error');
+        print(stackTrace);
       }
-
-      try {
-        final List<FreelanceModel> mockFreelancers = getMockFreelancers();
-        emit(state.copyWith(
-          freelancers: mockFreelancers,
-          filteredFreelancers: mockFreelancers,
-        ));
-        print(
-            "🔄 Fallback vers données mock réussi (${mockFreelancers.length} freelances)");
-      } catch (mockError) {
-        if (kDebugMode) {
-          print("💥 Erreur critique: $mockError");
-        }
-        emit(state.copyWith(error: error.toString()));
-      }
+      emit(state.copyWith(
+        freelancers: const [],
+        filteredFreelancers: const [],
+        isLoadingFreelancers: false,
+        freelancersLoaded: true,
+        freelancersError: _userFreelanceError(error),
+      ));
     }
   }
 
-  // ✅ Chargement des services
   Future<void> _onLoadServices(
     LoadServicesEvent event,
     Emitter<FreelancePageStateM> emit,
   ) async {
-    emit(state.copyWith(isLoadingServices: true));
+    emit(state.copyWith(isLoadingServices: true, servicesError: ''));
 
     try {
-      ApiClient apiClient = ApiClient();
-      var nomGroupe = "Freelance";
-      print("🛠️ Chargement des services pour le groupe: $nomGroupe");
-      
-      List<Service> services = await apiClient.fetchServices(nomGroupe);
-      
-      print("✅ Services chargés: ${services.length}");
+      const nomGroupe = 'Freelance';
+      final List<Service> services = await _apiClient
+          .fetchServices(nomGroupe)
+          .timeout(requestTimeout);
+
       emit(state.copyWith(
         services: services,
         isLoadingServices: false,
         servicesError: '',
       ));
-    } catch (error) {
-      print("❌ Erreur chargement services: $error");
+    } on TimeoutException {
       emit(state.copyWith(
         isLoadingServices: false,
-        servicesError: error.toString(),
+        servicesError: 'Impossible de charger les services. Réessayez.',
+      ));
+    } catch (error) {
+      if (kDebugMode) print('Erreur chargement services: $error');
+      emit(state.copyWith(
+        isLoadingServices: false,
+        servicesError: 'Impossible de charger les services. Réessayez.',
       ));
     }
   }
@@ -167,17 +188,14 @@ class FreelancePageBlocM
     final category = event.category;
 
     if (category == null || category == 'Tous') {
-      // Si aucune catégorie ou 'Tous' est sélectionnée, montrer tous les freelancers
       emit(state.copyWith(
         selectedCategory: category,
         filteredFreelancers: _applySearch(state.freelancers, state.searchQuery),
       ));
     } else {
-      // Filtrer les freelancers par catégorie
       final filtered = state.freelancers
           .where((freelancer) => freelancer.category == category)
           .toList();
-
       emit(state.copyWith(
         selectedCategory: category,
         filteredFreelancers: _applySearch(filtered, state.searchQuery),

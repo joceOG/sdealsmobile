@@ -9,11 +9,11 @@ import 'messages_state.dart';
 class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
   final ApiClient _apiClient = ApiClient();
   final WebSocketService _webSocketService = WebSocketService();
-  String? _currentToken;
+  bool _hasSession = false;
   String? _userId;
 
   void setToken(String token) {
-    _currentToken = token;
+    _hasSession = token.isNotEmpty;
   }
 
   void setUserId(String userId) {
@@ -27,7 +27,7 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
       _userId = event.prestataireId;
       try {
         final response = await _apiClient
-            .get('/messages/conversations/${event.prestataireId}', token: _currentToken);
+            .get('/messages/conversations/${event.prestataireId}');
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
           final List<dynamic> conversations = data['conversations'] ?? [];
@@ -52,7 +52,7 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
       emit(MessagesLoading());
       try {
         final response = await _apiClient.get(
-            '/messages/conversation/${event.conversationId}?userId=${event.prestataireId}', token: _currentToken);
+            '/messages/conversation/${event.conversationId}?userId=${event.prestataireId}');
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
           final List<dynamic> messages = data['messages'] ?? [];
@@ -105,7 +105,6 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
             'conversationId': event.conversationId,
             'userId': event.prestataireId,
           },
-          token: _currentToken,
         );
 
         if (response.statusCode == 200) {
@@ -167,7 +166,6 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
         final response = await _apiClient.delete(
           '/message/${event.messageId}/user',
           body: {'userId': event.prestataireId},
-          token: _currentToken,
         );
 
         if (response.statusCode == 200) {

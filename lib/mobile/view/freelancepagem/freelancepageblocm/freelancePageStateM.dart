@@ -9,18 +9,21 @@ class FreelancePageStateM extends Equatable {
   final List<Categorie>? listItems;
   final String? error;
 
-  // Nouveaux champs pour la gestion des freelancers
+  // Freelancers
+  final bool isLoadingFreelancers;
+  final bool freelancersLoaded;
+  final String? freelancersError;
   final List<FreelanceModel> freelancers;
   final List<FreelanceModel> filteredFreelancers;
   final String? selectedCategory;
   final String searchQuery;
 
-  // ✅ Champs pour la gestion des services
+  // Services
   final List<Service> services;
   final bool isLoadingServices;
   final String servicesError;
 
-  // ✅ NOUVEAU : États pour l'inscription freelance
+  // Inscription freelance
   final bool isRegistrationLoading;
   final String? registrationError;
   final String? registrationSuccess;
@@ -29,6 +32,9 @@ class FreelancePageStateM extends Equatable {
     required this.isLoading,
     required this.listItems,
     required this.error,
+    required this.isLoadingFreelancers,
+    required this.freelancersLoaded,
+    required this.freelancersError,
     required this.freelancers,
     required this.filteredFreelancers,
     required this.selectedCategory,
@@ -46,6 +52,9 @@ class FreelancePageStateM extends Equatable {
       isLoading: false,
       listItems: null,
       error: null,
+      isLoadingFreelancers: false,
+      freelancersLoaded: false,
+      freelancersError: null,
       freelancers: [],
       filteredFreelancers: [],
       selectedCategory: null,
@@ -59,11 +68,20 @@ class FreelancePageStateM extends Equatable {
     );
   }
 
+  bool get isFreelancersEmpty =>
+      freelancersLoaded &&
+      !isLoadingFreelancers &&
+      freelancersError == null &&
+      freelancers.isEmpty;
+
   @override
   List<Object?> get props => [
         isLoading,
         listItems,
         error,
+        isLoadingFreelancers,
+        freelancersLoaded,
+        freelancersError,
         freelancers,
         filteredFreelancers,
         selectedCategory,
@@ -76,36 +94,54 @@ class FreelancePageStateM extends Equatable {
         registrationSuccess,
       ];
 
+  static const Object _unset = Object();
+
   FreelancePageStateM copyWith({
     bool? isLoading,
-    List<Categorie>? listItems,
-    String? error,
+    Object? listItems = _unset,
+    Object? error = _unset,
+    bool? isLoadingFreelancers,
+    bool? freelancersLoaded,
+    Object? freelancersError = _unset,
     List<FreelanceModel>? freelancers,
     List<FreelanceModel>? filteredFreelancers,
-    String? selectedCategory,
+    Object? selectedCategory = _unset,
     String? searchQuery,
     List<Service>? services,
     bool? isLoadingServices,
     String? servicesError,
     bool? isRegistrationLoading,
-    String? registrationError,
-    String? registrationSuccess,
+    Object? registrationError = _unset,
+    Object? registrationSuccess = _unset,
   }) {
     return FreelancePageStateM(
       isLoading: isLoading ?? this.isLoading,
-      listItems: listItems ?? this.listItems,
-      error: error ?? this.error,
+      listItems: identical(listItems, _unset)
+          ? this.listItems
+          : listItems as List<Categorie>?,
+      error: identical(error, _unset) ? this.error : error as String?,
+      isLoadingFreelancers: isLoadingFreelancers ?? this.isLoadingFreelancers,
+      freelancersLoaded: freelancersLoaded ?? this.freelancersLoaded,
+      freelancersError: identical(freelancersError, _unset)
+          ? this.freelancersError
+          : freelancersError as String?,
       freelancers: freelancers ?? this.freelancers,
       filteredFreelancers: filteredFreelancers ?? this.filteredFreelancers,
-      selectedCategory: selectedCategory ?? this.selectedCategory,
+      selectedCategory: identical(selectedCategory, _unset)
+          ? this.selectedCategory
+          : selectedCategory as String?,
       searchQuery: searchQuery ?? this.searchQuery,
       services: services ?? this.services,
       isLoadingServices: isLoadingServices ?? this.isLoadingServices,
       servicesError: servicesError ?? this.servicesError,
       isRegistrationLoading:
           isRegistrationLoading ?? this.isRegistrationLoading,
-      registrationError: registrationError ?? this.registrationError,
-      registrationSuccess: registrationSuccess ?? this.registrationSuccess,
+      registrationError: identical(registrationError, _unset)
+          ? this.registrationError
+          : registrationError as String?,
+      registrationSuccess: identical(registrationSuccess, _unset)
+          ? this.registrationSuccess
+          : registrationSuccess as String?,
     );
   }
 }

@@ -10,6 +10,7 @@ import 'data/models/utilisateur.dart';
 import 'data/services/authCubit.dart';
 import 'data/services/crashlytics_service.dart';
 import 'data/services/fcm_service.dart';
+import 'data/services/token_store.dart';
 import 'data/utils/go_router_refresh_stream.dart';
 import 'mobile/view/locationpagem/locationpageblocm/locationPageBlocM.dart';
 import 'mobile/view/home.dart';
@@ -85,6 +86,9 @@ void main() async {
   await CrashlyticsService.initialize();
   // FCM local (permissions + token) — sans await réseau backend (voir FcmService).
   await FcmService.instance.initialize();
+
+  // AUTH-REFRESH : hydrater TokenStore avant AuthCubit / premières requêtes.
+  await TokenStore.hydrate();
 
   appAuthCubit = AuthCubit();
   runApp(MyApp());

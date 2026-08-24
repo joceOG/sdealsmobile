@@ -31,30 +31,16 @@ class _ConfirmationCommandeScreenState
   }
 
   void _applyPromoCode() {
-    if (_promoController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Veuillez entrer un code promo',
-              style: SDTypography.bodyMedium.copyWith(color: SDColors.white)),
-          backgroundColor: SDColors.warning500,
+    // STAB-10: pas de réduction fictive côté client.
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Les codes promo seront disponibles bientôt.',
+          style: SDTypography.bodyMedium.copyWith(color: SDColors.white),
         ),
-      );
-      return;
-    }
-
-    final authState = context.read<AuthCubit>().state;
-    if (authState is AuthAuthenticated) {
-      // TODO: Pour appliquer un code promo, il faudrait d'abord le valider côté backend
-      // Pour l'instant, on applique une réduction fictive de 10%
-      context.read<ShoppingPageBlocM>().add(
-            ApplyPromoCodeEvent(
-              userId: authState.utilisateur.idutilisateur,
-              code: _promoController.text.trim(),
-              reduction: 10.0, // Exemple: 10% ou 10 FCFA selon le type
-              typeReduction: 'POURCENTAGE',
-            ),
-          );
-    }
+        backgroundColor: SDColors.neutral700,
+      ),
+    );
   }
 
   void _confirmOrder() {

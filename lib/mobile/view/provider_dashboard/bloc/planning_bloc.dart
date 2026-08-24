@@ -8,10 +8,10 @@ import 'planning_state.dart';
 class PlanningBloc extends Bloc<PlanningEvent, PlanningState> {
   final ApiClient _apiClient = ApiClient();
   String? _currentPrestataireId;
-  String? _currentToken;
+  bool _hasSession = false;
 
   void setToken(String token) {
-    _currentToken = token;
+    _hasSession = token.isNotEmpty;
   }
 
   void setPrestataireId(String prestataireId) {
@@ -28,8 +28,7 @@ class PlanningBloc extends Bloc<PlanningEvent, PlanningState> {
           _currentPrestataireId = event.prestataireId;
         }
         final response = await _apiClient
-            .get('/prestations/prestataire/${event.prestataireId}?limit=100',
-                token: _currentToken);
+            .get('/prestations/prestataire/${event.prestataireId}?limit=100');
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
           final List<dynamic> prestations = data is List
@@ -112,7 +111,7 @@ class PlanningBloc extends Bloc<PlanningEvent, PlanningState> {
           if (event.notes != null) 'notesPrestataire': event.notes,
         };
         final response = await _apiClient
-            .put('/prestation/${event.prestationId}', body: body, token: _currentToken);
+            .put('/prestation/${event.prestationId}', body: body);
         if (response.statusCode == 200) {
           final prestation = jsonDecode(response.body);
           emit(PrestationUpdated(prestation));
@@ -137,7 +136,6 @@ class PlanningBloc extends Bloc<PlanningEvent, PlanningState> {
         final response = await _apiClient.put(
           '/prestation/${event.prestationId}',
           body: {'notesPrestataire': event.notes},
-          token: _currentToken,
         );
         if (response.statusCode == 200) {
           emit(NotesAdded(event.prestationId, event.notes));

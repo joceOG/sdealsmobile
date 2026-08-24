@@ -43,77 +43,21 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
   }
 
   void _showSoutraPayTarificationSheet(BuildContext context) {
-    showModalBottomSheet(
+    showDialog<void>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: SDColors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.7,
-        padding: const EdgeInsets.fromLTRB(_hPad, 12, _hPad, 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                height: 4,
-                width: 40,
-                decoration: BoxDecoration(
-                  color: SDColors.neutral300,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              'Tarification SoutraPay',
-              style: SDTypography.displaySmall.copyWith(
-                color: SDColors.neutral900,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Tarifs indicatifs (non branchés au backend paiement).',
-              style: SDTypography.bodyMedium
-                  .copyWith(color: SDColors.neutral600),
-            ),
-            const SizedBox(height: 20),
-            Expanded(
-              child: ListView(
-                children: [
-                  _buildTarificationRow(
-                    'Création de compte',
-                    'Gratuit',
-                    'Créez votre compte SoutraPay sans frais',
-                  ),
-                  _buildTarificationRow(
-                    'Rechargement de compte',
-                    '0 FCFA',
-                    'Aucun frais pour recharger votre compte',
-                  ),
-                  _buildTarificationRow(
-                    'Transfert entre utilisateurs',
-                    '0 FCFA',
-                    'Envoyez de l\'argent sans frais entre comptes SoutraPay',
-                  ),
-                  _buildTarificationRow(
-                    'Paiement aux marchands',
-                    '0 FCFA',
-                    'Réglez vos achats sans frais',
-                  ),
-                  _buildTarificationRow(
-                    'Retrait vers compte bancaire',
-                    '1,5%',
-                    'Des frais minimes pour les retraits vers votre banque',
-                  ),
-                ],
-              ),
-            ),
-          ],
+      builder: (ctx) => AlertDialog(
+        title: const Text('SoutraPay arrive bientôt'),
+        content: const Text(
+          'La tarification et les opérations SoutraPay seront '
+          'disponibles lorsque le paiement sera branché. '
+          'Aucun tarif ni frais n’est applicable pour le moment.',
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Compris'),
+          ),
+        ],
       ),
     );
   }

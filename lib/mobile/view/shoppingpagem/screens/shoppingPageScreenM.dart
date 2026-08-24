@@ -1488,23 +1488,7 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                   ),
                 ),
               ),
-              Container(
-                padding: EdgeInsets.all(SDSpacing.xxxs),
-                decoration: BoxDecoration(
-                  color: SDColors.primary600.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
-                ),
-                child: InkWell(
-                  onTap: () {
-                    // TODO: Masquer le banner définitivement pour cet utilisateur
-                  },
-                  child: Icon(
-                    Icons.close,
-                    color: SDColors.primary600,
-                    size: 14,
-                  ),
-                ),
-              ),
+              // STAB-10: chip SoutraPay masqué (pas de PSP réel).
             ],
           ),
         ),

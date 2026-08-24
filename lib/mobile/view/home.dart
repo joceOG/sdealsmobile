@@ -14,7 +14,6 @@ import 'chatpagem/chatpageblocm/chatPageStateM.dart';
 import 'chatpagem/screens/chatPageScreenM.dart';
 import 'homepagem/homepageblocm/homePageBlocM.dart';
 import 'freelance_registration/screens/freelance_registration_screen.dart';
-import 'seller_registration/screens/seller_registration_screen.dart';
 
 // ✅ Design System
 import '../../design_system/design_system.dart';
@@ -29,19 +28,21 @@ class Home extends StatefulWidget {
 class _HomeState extends State<Home> {
   int _currentIndex = 0;
   bool _isBottomNavVisible = true;
-  final ChatPageBlocM _chatBloc = ChatPageBlocM(userId: '');
+  late final ChatPageBlocM _chatBloc;
   final ApiClient _apiClient = ApiClient();
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final authState = context.read<AuthCubit>().state;
-      if (authState is AuthAuthenticated) {
-        _chatBloc.setUserId(authState.utilisateur.idutilisateur ?? '');
-      }
-    });
+    // Source de vérité : AuthCubit — injecter l'id dès la création (évite la race
+    // post-frame où LoadConversations partait avec userId vide).
+    final authState = context.read<AuthCubit>().state;
+    final initialId = authState is AuthAuthenticated
+        ? authState.utilisateur.idutilisateur.trim()
+        : '';
+    _chatBloc = ChatPageBlocM(
+      userId: initialId.isNotEmpty ? initialId : null,
+    );
   }
 
   @override
@@ -95,7 +96,7 @@ class _HomeState extends State<Home> {
     return BlocListener<AuthCubit, AuthState>(
       listener: (context, newAuthState) {
         final newId = newAuthState is AuthAuthenticated
-            ? (newAuthState.utilisateur.idutilisateur ?? '')
+            ? newAuthState.utilisateur.idutilisateur.trim()
             : '';
         _chatBloc.setUserId(newId);
       },
@@ -479,20 +480,15 @@ class _HomeState extends State<Home> {
       context.push('/login');
       return;
     }
-    if (already) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Vous avez déjà une boutique. L’espace de gestion arrive bientôt.',
-          ),
+    // STAB-10 : POST /vendeur exige multipart KYC (CNI, selfie, etc.) —
+    // branchement non trivial. Pas de faux succès UI.
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          already
+              ? 'Vous avez déjà une boutique. L’espace de gestion arrive bientôt.'
+              : 'L’inscription vendeur arrive bientôt.',
         ),
-      );
-      return;
-    }
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const SellerRegistrationScreen(),
       ),
     );
   }

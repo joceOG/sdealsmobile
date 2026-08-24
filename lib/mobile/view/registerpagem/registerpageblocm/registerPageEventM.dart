@@ -7,10 +7,12 @@ abstract class RegisterPageEventM extends Equatable {
   List<Object?> get props => [];
 }
 
+/// Soumission du formulaire → canonise téléphone → POST /otp/send (pas /register).
 class RegisterSubmitted extends RegisterPageEventM {
   final String fullName;
   final String email;
   final String phone;
+  final String phoneCountry;
   final String password;
   final String confirmPassword;
 
@@ -18,11 +20,52 @@ class RegisterSubmitted extends RegisterPageEventM {
     required this.fullName,
     required this.email,
     required this.phone,
+    required this.phoneCountry,
     required this.password,
     required this.confirmPassword,
   });
 
   @override
   List<Object?> get props =>
-      [fullName, email, phone, password, confirmPassword];
+      [fullName, email, phone, phoneCountry, password, confirmPassword];
+}
+
+class OtpCodeSubmitted extends RegisterPageEventM {
+  final String code;
+
+  const OtpCodeSubmitted(this.code);
+
+  @override
+  List<Object?> get props => [code];
+}
+
+class OtpResendRequested extends RegisterPageEventM {
+  const OtpResendRequested();
+}
+
+/// Retour au formulaire : invalide OTP / token locaux.
+class RegisterOtpStepCancelled extends RegisterPageEventM {
+  const RegisterOtpStepCancelled();
+}
+
+/// Téléphone modifié après OTP → invalide vérification précédente.
+class RegisterPhoneChanged extends RegisterPageEventM {
+  final String phone;
+  final String phoneCountry;
+
+  const RegisterPhoneChanged({
+    required this.phone,
+    required this.phoneCountry,
+  });
+
+  @override
+  List<Object?> get props => [phone, phoneCountry];
+}
+
+class RegisterResendTick extends RegisterPageEventM {
+  const RegisterResendTick();
+}
+
+class RegisterClearError extends RegisterPageEventM {
+  const RegisterClearError();
 }

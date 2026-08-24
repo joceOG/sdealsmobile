@@ -1,13 +1,13 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:sdealsmobile/data/services/api_client.dart';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;
   NotificationService._internal();
 
+  final ApiClient _api = ApiClient();
   final String? _apiUrl = dotenv.env['API_URL'];
   String? _fcmToken;
 
@@ -34,8 +34,6 @@ class NotificationService {
         return false;
       }
 
-      final url = Uri.parse('$_apiUrl/notification/send');
-
       final payload = {
         'userId': userId,
         'title': title,
@@ -44,18 +42,12 @@ class NotificationService {
         'fcmToken': _fcmToken,
       };
 
-      print('📱 Envoi notification vers: $url');
+      print('📱 Envoi notification via ApiClient /notification/send');
       print('📤 Payload: $payload');
 
-      final response = await http.post(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: json.encode(payload),
-      );
+      final response = await _api.post('/notification/send', body: payload);
 
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 || response.statusCode == 201) {
         print('✅ Notification envoyée avec succès');
         return true;
       } else {
@@ -209,9 +201,7 @@ class NotificationService {
         return [];
       }
 
-      final url = Uri.parse('$_apiUrl/notification/user/$userId');
-
-      final response = await http.get(url);
+      final response = await _api.get('/notification/user/$userId');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -234,9 +224,9 @@ class NotificationService {
         return false;
       }
 
-      final url = Uri.parse('$_apiUrl/notification/$notificationId/read');
-
-      final response = await http.patch(url);
+      // Backend : PUT /notification/:id/read
+      final response =
+          await _api.put('/notification/$notificationId/read');
 
       if (response.statusCode == 200) {
         print('✅ Notification marquée comme lue');

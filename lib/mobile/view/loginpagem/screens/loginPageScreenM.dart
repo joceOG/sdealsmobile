@@ -12,6 +12,7 @@ import '../loginpageblocm/loginPageBlocM.dart';
 import '../loginpageblocm/loginPageEventM.dart';
 import '../loginpageblocm/loginPageStateM.dart';
 import '../../common/utils/app_snackbar.dart';
+import '../../common/widgets/phone_country_field.dart';
 
 // ✅ Design System
 import '../../../../design_system/design_system.dart';
@@ -33,6 +34,13 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
   late final VoidCallback _fieldsListener;
   final TextEditingController identifiantController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
+  final TextEditingController _googlePhoneController = TextEditingController();
+  final TextEditingController _googleOtpController = TextEditingController();
+  PhoneCountryOption _selectedPhoneCountry = kDefaultPhoneCountries.first;
+  PhoneCountryOption _googlePhoneCountry = kDefaultPhoneCountries.first;
+
+  bool get _isEmailIdentifiant =>
+      identifiantController.text.trim().contains('@');
 
   bool get _canSubmit =>
       identifiantController.text.trim().isNotEmpty &&
@@ -67,6 +75,8 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
     _animationController.dispose();
     identifiantController.dispose();
     passwordController.dispose();
+    _googlePhoneController.dispose();
+    _googleOtpController.dispose();
     super.dispose();
   }
 
@@ -103,22 +113,192 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
                     activeRole: activeRole,
                     refreshToken: state.refreshToken,
                   );
-              // Rôles réels (Métiers / Freelance / Boutique) ≠ role user seul
               unawaited(context.read<AuthCubit>().refreshRoles());
 
-              // `go` remplace la pile (évite de rester sur /login).
-              // Si le login a été ouvert via MaterialPageRoute, on le retire aussi.
               final router = GoRouter.of(context);
               if (Navigator.of(context).canPop()) {
                 Navigator.of(context).pop();
               }
               router.go('/homepage');
-              print('🔐 Connecté en tant que $activeRole avec rôles: $roles');
             } else if (state is LoginPageFailureM) {
               AppSnackBar.error(context, state.error);
+            } else if (state is LoginGooglePhoneRequiredM &&
+                state.errorMessage != null &&
+                state.phase == GooglePhonePhase.error) {
+              AppSnackBar.error(context, state.errorMessage!);
             }
           },
-          child: SingleChildScrollView(
+          child: BlocBuilder<LoginPageBlocM, LoginPageStateM>(
+            builder: (context, state) {
+              if (state is LoginGooglePhoneRequiredM) {
+                return _buildGooglePhoneStep(context, state);
+              }
+              return _buildLoginForm(context);
+            },
+          ),
+        ),
+      );
+        },
+      ),
+    );
+  }
+
+  Widget _buildGooglePhoneStep(
+    BuildContext context,
+    LoginGooglePhoneRequiredM state,
+  ) {
+    final showOtp = state.phase == GooglePhonePhase.otpSent ||
+        state.phase == GooglePhonePhase.verifyingOtp ||
+        state.phase == GooglePhonePhase.completing ||
+        (state.phase == GooglePhonePhase.error && state.e164Phone != null);
+    final cooldown = state.resendCooldownSeconds;
+    final canResend = cooldown <= 0 && !state.isBusy;
+
+    return SingleChildScrollView(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          SDSpacing.md,
+          SDSpacing.lg,
+          SDSpacing.md,
+          SDSpacing.lg + MediaQuery.viewPaddingOf(context).bottom,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Vérifiez votre téléphone',
+              textAlign: TextAlign.center,
+              style: SDTypography.displayMedium.copyWith(
+                color: SDColors.neutral900,
+              ),
+            ),
+            SDSpacing.verticalTinyGap,
+            Text(
+              state.email != null
+                  ? 'Compte Google ${state.email}\nAjoutez un numéro pour continuer.'
+                  : 'Ajoutez un numéro pour finaliser la connexion Google.',
+              textAlign: TextAlign.center,
+              style: SDTypography.bodyLarge.copyWith(
+                color: SDColors.neutral600,
+              ),
+            ),
+            SDSpacing.verticalLargeGap,
+            if (!showOtp) ...[
+              PhoneCountryField(
+                controller: _googlePhoneController,
+                selectedCountry: _googlePhoneCountry,
+                onCountryChanged: (c) {
+                  setState(() => _googlePhoneCountry = c);
+                  context.read<LoginPageBlocM>().add(GooglePhoneChangedM(
+                        phone: _googlePhoneController.text.trim(),
+                        phoneCountry: c.isoCode.name,
+                      ));
+                },
+              ),
+              SDSpacing.verticalTinyGap,
+              Text(
+                'Pays disponibles : CI, TN, SN, BF, ML, FR',
+                style: SDTypography.bodySmall.copyWith(
+                  color: SDColors.neutral500,
+                ),
+              ),
+              SDSpacing.verticalMediumGap,
+              SDButton(
+                text: 'ENVOYER LE CODE',
+                fullWidth: true,
+                isLoading: state.phase == GooglePhonePhase.sendingOtp,
+                onPressed: state.isBusy
+                    ? null
+                    : () {
+                        context.read<LoginPageBlocM>().add(
+                              GooglePhoneSubmittedM(
+                                phone: _googlePhoneController.text.trim(),
+                                phoneCountry: _googlePhoneCountry.isoCode.name,
+                              ),
+                            );
+                      },
+              ),
+            ] else ...[
+              Text(
+                'Code envoyé au ${state.e164Phone}',
+                textAlign: TextAlign.center,
+                style: SDTypography.bodyMedium,
+              ),
+              SDSpacing.verticalMediumGap,
+              TextField(
+                controller: _googleOtpController,
+                keyboardType: TextInputType.number,
+                maxLength: 6,
+                decoration: InputDecoration(
+                  labelText: 'Code à 6 chiffres',
+                  counterText: '',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+              SDSpacing.verticalMediumGap,
+              SDButton(
+                text: state.phase == GooglePhonePhase.completing
+                    ? 'FINALISATION…'
+                    : 'VÉRIFIER ET CONTINUER',
+                fullWidth: true,
+                isLoading: state.phase == GooglePhonePhase.verifyingOtp ||
+                    state.phase == GooglePhonePhase.completing,
+                onPressed: state.isBusy
+                    ? null
+                    : () {
+                        context.read<LoginPageBlocM>().add(
+                              GoogleOtpSubmittedM(
+                                _googleOtpController.text.trim(),
+                              ),
+                            );
+                      },
+              ),
+              TextButton(
+                onPressed: canResend
+                    ? () => context
+                        .read<LoginPageBlocM>()
+                        .add(GoogleOtpResendRequestedM())
+                    : null,
+                child: Text(
+                  canResend
+                      ? 'Renvoyer le code'
+                      : 'Nouveau code dans ${cooldown}s',
+                ),
+              ),
+              TextButton(
+                onPressed: state.isBusy
+                    ? null
+                    : () {
+                        _googleOtpController.clear();
+                        context
+                            .read<LoginPageBlocM>()
+                            .add(GooglePhoneChangedM(
+                              phone: _googlePhoneController.text.trim(),
+                              phoneCountry: _googlePhoneCountry.isoCode.name,
+                            ));
+                      },
+                child: const Text('Modifier le numéro'),
+              ),
+            ],
+            TextButton(
+              onPressed: () {
+                _googlePhoneController.clear();
+                _googleOtpController.clear();
+                context.read<LoginPageBlocM>().add(GooglePhoneCancelledM());
+              },
+              child: const Text('Annuler'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoginForm(BuildContext context) {
+    return SingleChildScrollView(
             keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             child: Padding(
               padding: EdgeInsets.fromLTRB(
@@ -160,13 +340,17 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
                   ),
                   SDSpacing.verticalLargeGap,
                   
-                  // Design System Inputs
-                  SDInput(
-                    label: "Téléphone ou Email",
-                    hint: "Ex: 0102030405 ou nom@exemple.com",
+                  // STAB-07 : pays explicite pour téléphone ; email ignore le pays
+                  PhoneCountryField(
                     controller: identifiantController,
-                    prefixIcon: Icons.person_outline,
-                    keyboardType: TextInputType.emailAddress,
+                    selectedCountry: _selectedPhoneCountry,
+                    onCountryChanged: (c) {
+                      setState(() => _selectedPhoneCountry = c);
+                    },
+                    label: 'Téléphone ou Email',
+                    hint: _isEmailIdentifiant
+                        ? 'nom@exemple.com'
+                        : 'Ex: 20113786 ou +216…',
                   ),
                   SDSpacing.verticalMediumGap,
                   SDInput(
@@ -236,13 +420,18 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
                         onPressed: loading || !_canSubmit
                             ? null
                             : () {
+                                final id =
+                                    identifiantController.text.trim();
                                 context.read<LoginPageBlocM>().add(
                                       LoginSubmittedM(
-                                        identifiant:
-                                            identifiantController.text.trim(),
+                                        identifiant: id,
                                         password:
                                             passwordController.text.trim(),
                                         rememberMe: rememberMe,
+                                        phoneCountry: id.contains('@')
+                                            ? null
+                                            : _selectedPhoneCountry
+                                                .isoCode.name,
                                       ),
                                     );
                               },
@@ -321,11 +510,6 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
                 ],
               ),
             ),
-          ),
-        ),
-      );
-        },
-      ),
     );
   }
 

@@ -2,8 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:http/http.dart' as http;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter/foundation.dart';
 import '../models/utilisateur.dart';
 import 'api_client.dart';
@@ -45,18 +43,21 @@ class AuthCubit extends Cubit<AuthState> {
     ApiClient.onUnauthorized = () {
       logout();
     };
-    ApiClient.onTokenRefreshed = (newToken) {
+    ApiClient.onTokenRefreshed = (newToken, newRefresh) {
       final current = state;
-      if (current is AuthAuthenticated && current.token != newToken) {
-        emit(AuthAuthenticated(
-          token: newToken,
-          utilisateur: current.utilisateur,
-          roles: current.roles,
-          activeRole: current.activeRole,
-          roleDetails: current.roleDetails,
-          refreshToken: current.refreshToken,
-        ));
-      }
+      if (current is! AuthAuthenticated) return;
+      final refresh = (newRefresh != null && newRefresh.isNotEmpty)
+          ? newRefresh
+          : current.refreshToken;
+      if (current.token == newToken && current.refreshToken == refresh) return;
+      emit(AuthAuthenticated(
+        token: newToken,
+        utilisateur: current.utilisateur,
+        roles: current.roles,
+        activeRole: current.activeRole,
+        roleDetails: current.roleDetails,
+        refreshToken: refresh,
+      ));
     };
     _loadAuthFromStorage();
   }
@@ -71,42 +72,17 @@ class AuthCubit extends Cubit<AuthState> {
       final refreshToken = await TokenStore.getRefreshToken();
 
       if (token != null && userJson != null) {
-        final apiUrl = dotenv.env['API_URL'];
-        if (apiUrl != null) {
-          try {
-            final verifyResponse = await http.get(
-              Uri.parse('$apiUrl/utilisateur/profile'),
-              headers: {
-                'Authorization': 'Bearer $token',
-                'Content-Type': 'application/json',
-              },
-            ).timeout(const Duration(seconds: 5));
-
-            if (verifyResponse.statusCode == 401) {
-              final refreshed = await ApiClient().refreshAccessToken();
-              if (refreshed == null) {
-                await _clearAuthFromStorage();
-                emit(AuthInitial());
-                return;
-              }
-              final userData = jsonDecode(userJson);
-              final utilisateur = Utilisateur.fromJson(userData);
-              final roles = rolesJson != null
-                  ? List<String>.from(jsonDecode(rolesJson))
-                  : ['CLIENT'];
-              emit(AuthAuthenticated(
-                token: refreshed,
-                utilisateur: utilisateur,
-                roles: roles,
-                activeRole:
-                    activeRole ?? (roles.isNotEmpty ? roles.first : 'CLIENT'),
-                refreshToken: await TokenStore.getRefreshToken(),
-              ));
-              return;
-            }
-          } catch (_) {
-            // Offline : accepter le token local
-          }
+        try {
+          // Vérif session via ApiClient (AUTH-REFRESH unique).
+          await ApiClient()
+              .get('/utilisateur/profile')
+              .timeout(const Duration(seconds: 5));
+        } on UnauthorizedException {
+          await _clearAuthFromStorage();
+          emit(AuthInitial());
+          return;
+        } catch (_) {
+          // Offline / timeout : accepter le token local
         }
 
         final userData = jsonDecode(userJson);
@@ -286,20 +262,13 @@ class AuthCubit extends Cubit<AuthState> {
         await FcmService.instance.unregisterFromBackend();
       } catch (_) {}
       try {
-        final apiUrl = dotenv.env['API_URL'] ?? '';
-        await http
-            .post(
-              Uri.parse('$apiUrl/logout'),
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer ${current.token}',
-              },
-              body: jsonEncode({
-                if (current.refreshToken != null)
-                  'refreshToken': current.refreshToken,
-              }),
-            )
-            .timeout(const Duration(seconds: 10));
+        await ApiClient().post(
+          '/logout',
+          body: {
+            if (current.refreshToken != null)
+              'refreshToken': current.refreshToken,
+          },
+        ).timeout(const Duration(seconds: 10));
       } catch (_) {}
     }
     WebSocketService().disconnectForLogout();

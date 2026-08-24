@@ -675,11 +675,14 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
     super.initState();
     _chatBloc = BlocProvider.of<ChatPageBlocM>(context);
 
-    // Injecter le vrai userId depuis AuthCubit dans le BLoC
+    // Source de vérité : AuthCubit — synchroniser AVANT LoadConversations.
     final authState = context.read<AuthCubit>().state;
     if (authState is AuthAuthenticated) {
-      _currentUserId = authState.utilisateur.idutilisateur ?? '';
-      _chatBloc.setUserId(_currentUserId);
+      final id = authState.utilisateur.idutilisateur.trim();
+      if (id.isNotEmpty) {
+        _currentUserId = id;
+        _chatBloc.setUserId(id);
+      }
     }
 
     _loadInitialData();

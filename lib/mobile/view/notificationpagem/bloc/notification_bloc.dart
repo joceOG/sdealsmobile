@@ -10,7 +10,7 @@ const _kListPollInterval = Duration(seconds: 120);
 
 class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
   final ApiClient _apiClient;
-  String? _currentToken;
+  bool _hasSession = false;
   String? _currentUserId;
   Timer? _unreadTimer;
   Timer? _listTimer;
@@ -33,7 +33,7 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
   }
 
   void setToken(String token) {
-    _currentToken = token;
+    _hasSession = token.isNotEmpty;
   }
 
   void _clearPolling() {
@@ -73,10 +73,9 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     PollUnreadCountTick event,
     Emitter<NotificationState> emit,
   ) async {
-    if (_currentToken == null) return;
+    if (!_hasSession) return;
     try {
       final unreadCount = await _apiClient.getUserUnreadNotificationCount(
-        token: _currentToken!,
         userId: event.userId,
       );
       final currentState = state;
@@ -102,7 +101,7 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     PollNotificationsTick event,
     Emitter<NotificationState> emit,
   ) async {
-    if (_currentToken == null) return;
+    if (!_hasSession) return;
     if (state is! NotificationLoaded && state is! NotificationRefreshing) {
       add(PollUnreadCountTick(event.userId));
       return;
@@ -112,14 +111,12 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
         : null;
     try {
       final notifications = await _apiClient.getUserNotifications(
-        token: _currentToken!,
         userId: event.userId,
         statut: filter,
         limit: 50,
         offset: 0,
       );
       final unreadCount = await _apiClient.getUserUnreadNotificationCount(
-        token: _currentToken!,
         userId: event.userId,
       );
       emit(NotificationLoaded(
@@ -138,7 +135,7 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     try {
       emit(NotificationLoading());
 
-      if (_currentToken == null) {
+      if (!_hasSession) {
         emit(const NotificationError('Token d\'authentification manquant'));
         return;
       }
@@ -146,7 +143,6 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
       if (event.userId.isNotEmpty) _currentUserId = event.userId;
 
       final notifications = await _apiClient.getUserNotifications(
-        token: _currentToken!,
         userId: event.userId,
         statut: event.statut,
         limit: event.limit,
@@ -154,7 +150,6 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
       );
 
       final unreadCount = await _apiClient.getUserUnreadNotificationCount(
-        token: _currentToken!,
         userId: event.userId,
       );
 
@@ -174,13 +169,12 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     Emitter<NotificationState> emit,
   ) async {
     try {
-      if (_currentToken == null) {
+      if (!_hasSession) {
         emit(const NotificationError('Token d\'authentification manquant'));
         return;
       }
 
       await _apiClient.markUserNotificationAsRead(
-        token: _currentToken!,
         notificationId: event.notificationId,
       );
 
@@ -197,13 +191,12 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     Emitter<NotificationState> emit,
   ) async {
     try {
-      if (_currentToken == null) {
+      if (!_hasSession) {
         emit(const NotificationError('Token d\'authentification manquant'));
         return;
       }
 
       await _apiClient.markAllUserNotificationsAsRead(
-        token: _currentToken!,
         userId: event.userId,
       );
 
@@ -218,13 +211,12 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     Emitter<NotificationState> emit,
   ) async {
     try {
-      if (_currentToken == null) {
+      if (!_hasSession) {
         emit(const NotificationError('Token d\'authentification manquant'));
         return;
       }
 
       final success = await _apiClient.deleteNotification(
-        token: _currentToken!,
         notificationId: event.notificationId,
       );
 
@@ -272,7 +264,7 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     Emitter<NotificationState> emit,
   ) async {
     try {
-      if (_currentToken == null) {
+      if (!_hasSession) {
         emit(const NotificationError('Token d\'authentification manquant'));
         return;
       }
@@ -294,10 +286,9 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     Emitter<NotificationState> emit,
   ) async {
     try {
-      if (_currentToken == null) return;
+      if (!_hasSession) return;
 
       final unreadCount = await _apiClient.getUserUnreadNotificationCount(
-        token: _currentToken!,
         userId: event.userId,
       );
 
@@ -329,10 +320,9 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
       final currentState = state;
       if (currentState is! NotificationLoaded) return;
       if (!currentState.hasMore) return;
-      if (_currentToken == null) return;
+      if (!_hasSession) return;
 
       final moreNotifications = await _apiClient.getUserNotifications(
-        token: _currentToken!,
         userId: event.userId,
         statut: currentState.currentFilter,
         limit: 50,

@@ -7,11 +7,11 @@ import 'missions_state.dart';
 /// Missions prestataire — aligné sur planning_bloc (token + prestataireId).
 class MissionsBloc extends Bloc<MissionsEvent, MissionsState> {
   final ApiClient _apiClient = ApiClient();
-  String? _currentToken;
+  bool _hasSession = false;
   String? _currentPrestataireId;
 
   void setToken(String token) {
-    _currentToken = token;
+    _hasSession = token.isNotEmpty;
   }
 
   void setPrestataireId(String prestataireId) {
@@ -42,7 +42,6 @@ class MissionsBloc extends Bloc<MissionsEvent, MissionsState> {
       // Demandes en attente (marché) — auth requise côté backend pour PII
       final response = await _apiClient.get(
         '/prestations?statut=EN_ATTENTE',
-        token: _currentToken,
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -67,7 +66,6 @@ class MissionsBloc extends Bloc<MissionsEvent, MissionsState> {
       }
       final response = await _apiClient.get(
         '$base?statut=ACCEPTEE,EN_COURS',
-        token: _currentToken,
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -92,7 +90,6 @@ class MissionsBloc extends Bloc<MissionsEvent, MissionsState> {
       }
       final response = await _apiClient.get(
         '$base?statut=TERMINEE',
-        token: _currentToken,
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -117,7 +114,7 @@ class MissionsBloc extends Bloc<MissionsEvent, MissionsState> {
   }) async {
     emit(MissionsLoading());
     try {
-      if (_currentToken == null || _currentToken!.isEmpty) {
+      if (!_hasSession) {
         emit(MissionsError('Session expirée — reconnectez-vous'));
         return;
       }
@@ -129,7 +126,6 @@ class MissionsBloc extends Bloc<MissionsEvent, MissionsState> {
       final response = await _apiClient.patch(
         '/prestation/$missionId/statut',
         body: body,
-        token: _currentToken,
       );
       if (response.statusCode == 200) {
         emit(successState);
@@ -213,7 +209,6 @@ class MissionsBloc extends Bloc<MissionsEvent, MissionsState> {
 
       final response = await _apiClient.get(
         '/prestations?$queryString',
-        token: _currentToken,
       );
 
       if (response.statusCode == 200) {

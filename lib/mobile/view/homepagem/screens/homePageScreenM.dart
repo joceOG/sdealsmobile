@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:sdealsmobile/data/services/authCubit.dart';
+import 'package:sdealsmobile/data/services/websocket_service.dart';
 import 'package:sdealsmobile/mobile/view/common/widgets/nav_badge.dart';
 import 'package:sdealsmobile/mobile/view/freelancepagem/screens/freelancePageScreen.dart';
 import 'package:sdealsmobile/mobile/view/freelancepagem/screens/freelance_details_screen.dart';
@@ -501,6 +502,8 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
         _notificationBloc.add(
           LoadUnreadCount(authState.utilisateur.idutilisateur),
         );
+        // STAB-05 : reprise Socket seulement si déconnecté (pas de reconnect forcé).
+        WebSocketService().resumeIfNeeded();
       }
     }
   }

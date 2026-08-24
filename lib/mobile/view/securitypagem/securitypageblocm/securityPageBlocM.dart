@@ -8,7 +8,7 @@ import 'securityPageStateM.dart';
 /// `/security/user/:utilisateurId/...` + Bearer token.
 class SecurityPageBlocM extends Bloc<SecurityPageEventM, SecurityPageStateM> {
   final ApiClient _apiClient;
-  String? _token;
+  bool _hasSession = false;
   String? _userId;
 
   SecurityPageBlocM({required ApiClient apiClient})
@@ -42,7 +42,7 @@ class SecurityPageBlocM extends Bloc<SecurityPageEventM, SecurityPageStateM> {
   }
 
   void setAuth({required String token, required String userId}) {
-    _token = token;
+    _hasSession = token.isNotEmpty;
     _userId = userId;
   }
 
@@ -55,10 +55,7 @@ class SecurityPageBlocM extends Bloc<SecurityPageEventM, SecurityPageStateM> {
   }
 
   bool get _hasAuth =>
-      _token != null &&
-      _token!.isNotEmpty &&
-      _userId != null &&
-      _userId!.isNotEmpty;
+      _hasSession && _userId != null && _userId!.isNotEmpty;
 
   Future<void> _onLoadSecurityData(
     LoadSecurityDataEventM event,
@@ -73,7 +70,7 @@ class SecurityPageBlocM extends Bloc<SecurityPageEventM, SecurityPageStateM> {
       emit(SecurityPageLoadingStateM());
 
       final response =
-          await _apiClient.get(_base, token: _token);
+          await _apiClient.get(_base);
 
       if (response.statusCode == 200) {
         final data = ApiClient.decodeJson(response) as Map<String, dynamic>;
@@ -117,7 +114,6 @@ class SecurityPageBlocM extends Bloc<SecurityPageEventM, SecurityPageStateM> {
       }
       final response = await _apiClient.post(
         '$_base/2fa/enable',
-        token: _token,
       );
 
       if (response.statusCode == 200) {
@@ -150,7 +146,6 @@ class SecurityPageBlocM extends Bloc<SecurityPageEventM, SecurityPageStateM> {
       final response = await _apiClient.post(
         '$_base/2fa/disable',
         body: {'password': event.currentPassword},
-        token: _token,
       );
 
       if (response.statusCode == 200) {
@@ -188,7 +183,6 @@ class SecurityPageBlocM extends Bloc<SecurityPageEventM, SecurityPageStateM> {
       final response = await _apiClient.post(
         '$_base/2fa/verify',
         body: {'token': event.code},
-        token: _token,
       );
 
       if (response.statusCode == 200) {
@@ -225,7 +219,7 @@ class SecurityPageBlocM extends Bloc<SecurityPageEventM, SecurityPageStateM> {
     try {
       if (!_hasAuth) return;
       final response =
-          await _apiClient.get('$_base/sessions', token: _token);
+          await _apiClient.get('$_base/sessions');
 
       if (response.statusCode == 200) {
         final data = ApiClient.decodeJson(response) as Map<String, dynamic>;
@@ -255,7 +249,6 @@ class SecurityPageBlocM extends Bloc<SecurityPageEventM, SecurityPageStateM> {
       if (!_hasAuth) return;
       final response = await _apiClient.delete(
         '$_base/sessions/${event.sessionId}',
-        token: _token,
       );
 
       if (response.statusCode == 200) {
@@ -282,7 +275,6 @@ class SecurityPageBlocM extends Bloc<SecurityPageEventM, SecurityPageStateM> {
       }
       final response = await _apiClient.delete(
         '$_base/sessions',
-        token: _token,
         body: event.keepSessionId != null
             ? {'keepSessionId': event.keepSessionId}
             : null,
@@ -324,7 +316,7 @@ class SecurityPageBlocM extends Bloc<SecurityPageEventM, SecurityPageStateM> {
     try {
       if (!_hasAuth) return;
       final response =
-          await _apiClient.get('$_base/alerts', token: _token);
+          await _apiClient.get('$_base/alerts');
 
       if (response.statusCode == 200) {
         final data = ApiClient.decodeJson(response) as Map<String, dynamic>;
@@ -356,7 +348,6 @@ class SecurityPageBlocM extends Bloc<SecurityPageEventM, SecurityPageStateM> {
       if (!_hasAuth) return;
       final response = await _apiClient.patch(
         '$_base/alerts/${event.alertId}/read',
-        token: _token,
       );
 
       if (response.statusCode == 200) {
@@ -385,7 +376,6 @@ class SecurityPageBlocM extends Bloc<SecurityPageEventM, SecurityPageStateM> {
       }
       final response = await _apiClient.patch(
         '$_base/alerts/read-all',
-        token: _token,
       );
 
       if (response.statusCode == 200) {
@@ -422,7 +412,6 @@ class SecurityPageBlocM extends Bloc<SecurityPageEventM, SecurityPageStateM> {
       }
       final response = await _apiClient.delete(
         '$_base/alerts/${event.alertId}',
-        token: _token,
       );
 
       if (response.statusCode == 200) {
@@ -456,7 +445,7 @@ class SecurityPageBlocM extends Bloc<SecurityPageEventM, SecurityPageStateM> {
     try {
       if (!_hasAuth) return;
       final response =
-          await _apiClient.get('$_base/devices', token: _token);
+          await _apiClient.get('$_base/devices');
 
       if (response.statusCode == 200) {
         final data = ApiClient.decodeJson(response) as Map<String, dynamic>;
@@ -494,7 +483,6 @@ class SecurityPageBlocM extends Bloc<SecurityPageEventM, SecurityPageStateM> {
       if (!_hasAuth) return;
       final response = await _apiClient.delete(
         '$_base/devices/${event.deviceId}',
-        token: _token,
       );
 
       if (response.statusCode == 200) {
@@ -530,7 +518,6 @@ class SecurityPageBlocM extends Bloc<SecurityPageEventM, SecurityPageStateM> {
       final response = await _apiClient.put(
         '$_base/settings',
         body: {'securitySettings': event.settings},
-        token: _token,
       );
 
       if (response.statusCode == 200) {
@@ -585,7 +572,6 @@ class SecurityPageBlocM extends Bloc<SecurityPageEventM, SecurityPageStateM> {
           'currentPassword': event.currentPassword,
           'newPassword': event.newPassword,
         },
-        token: _token,
       );
 
       if (response.statusCode == 200) {
@@ -616,7 +602,7 @@ class SecurityPageBlocM extends Bloc<SecurityPageEventM, SecurityPageStateM> {
     try {
       if (!_hasAuth) return;
       final response =
-          await _apiClient.get('$_base/history', token: _token);
+          await _apiClient.get('$_base/history');
 
       if (response.statusCode == 200) {
         final data = ApiClient.decodeJson(response) as Map<String, dynamic>;
@@ -648,7 +634,6 @@ class SecurityPageBlocM extends Bloc<SecurityPageEventM, SecurityPageStateM> {
       }
       final response = await _apiClient.delete(
         '$_base/history',
-        token: _token,
       );
 
       if (response.statusCode == 200) {
@@ -683,7 +668,6 @@ class SecurityPageBlocM extends Bloc<SecurityPageEventM, SecurityPageStateM> {
       }
       final response = await _apiClient.get(
         '$_base/export',
-        token: _token,
       );
 
       if (response.statusCode == 200) {

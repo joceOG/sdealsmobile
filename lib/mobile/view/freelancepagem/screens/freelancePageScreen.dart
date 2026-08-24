@@ -75,6 +75,35 @@ class _FreelancePageScreenContentState
               );
             }
 
+            if (state.error != null && state.error!.isNotEmpty) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.error_outline,
+                          size: 48, color: SDColors.error500),
+                      const SizedBox(height: 16),
+                      Text(
+                        state.error!,
+                        textAlign: TextAlign.center,
+                        style: SDTypography.bodyMedium
+                            .copyWith(color: SDColors.neutral700),
+                      ),
+                      const SizedBox(height: 20),
+                      ElevatedButton(
+                        onPressed: () => context
+                            .read<FreelancePageBlocM>()
+                            .add(LoadCategorieDataM()),
+                        child: const Text('Réessayer'),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+
             return CustomScrollView(
               slivers: [
                 SliverToBoxAdapter(
@@ -441,6 +470,53 @@ class _FreelancePageScreenContentState
   }
 
   Widget _buildAvailableFreelancersRow(FreelancePageStateM state) {
+    if (state.isLoadingFreelancers) {
+      return SizedBox(
+        height: 80,
+        child: Center(
+          child: CircularProgressIndicator(color: SDColors.primary600),
+        ),
+      );
+    }
+
+    if (state.freelancersError != null && state.freelancersError!.isNotEmpty) {
+      return SizedBox(
+        height: 120,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                state.freelancersError!,
+                textAlign: TextAlign.center,
+                style:
+                    SDTypography.bodySmall.copyWith(color: SDColors.neutral700),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => context
+                    .read<FreelancePageBlocM>()
+                    .add(LoadFreelancersEvent()),
+                child: const Text('Réessayer'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (state.isFreelancersEmpty) {
+      return SizedBox(
+        height: 80,
+        child: Center(
+          child: Text(
+            'Aucun freelance pour le moment',
+            style: SDTypography.bodySmall.copyWith(color: SDColors.neutral500),
+          ),
+        ),
+      );
+    }
+
     final list = state.freelancers
         .where((f) =>
             f.availabilityStatus.toLowerCase().contains('disponible'))

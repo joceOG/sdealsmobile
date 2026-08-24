@@ -7,25 +7,23 @@ import 'notifications_state.dart';
 // 🎯 BLoC POUR GÉRER LES NOTIFICATIONS PRESTATAIRE
 class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
   final ApiClient _apiClient = ApiClient();
-  String? _currentToken;
+  bool _hasSession = false;
 
   NotificationsBloc() : super(NotificationsInitial()) {
     // 🔔 CHARGER LES NOTIFICATIONS DU PRESTATAIRE
     on<LoadPrestataireNotifications>((event, emit) async {
       emit(NotificationsLoading());
       try {
-        if (_currentToken == null) {
+        if (!_hasSession) {
           emit(NotificationsError('Token d\'authentification manquant'));
           return;
         }
 
         final notifications = await _apiClient.getUserNotifications(
-          token: _currentToken!,
           userId: event.prestataireId,
         );
 
         final unreadCount = await _apiClient.getUserUnreadNotificationCount(
-          token: _currentToken!,
           userId: event.prestataireId,
         );
 
@@ -45,7 +43,7 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
       emit(NotificationsLoading());
       try {
         final response = await _apiClient.get(
-            '/notification/user/${event.prestataireId}?nonLuesUniquement=true', token: _currentToken);
+            '/notification/user/${event.prestataireId}?nonLuesUniquement=true');
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
           final List<dynamic> notifications = data['notifications'] ?? [];
@@ -126,7 +124,7 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
     on<MarkNotificationAsRead>((event, emit) async {
       try {
         final response =
-            await _apiClient.put('/notification/${event.notificationId}/read', token: _currentToken);
+            await _apiClient.put('/notification/${event.notificationId}/read');
         if (response.statusCode == 200) {
           emit(NotificationMarkedAsRead(event.notificationId));
           // Recharger les notifications
@@ -144,7 +142,7 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
     on<MarkAllNotificationsAsRead>((event, emit) async {
       try {
         final response = await _apiClient
-            .put('/notification/user/${event.prestataireId}/read-all', token: _currentToken);
+            .put('/notification/user/${event.prestataireId}/read-all');
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
           emit(AllNotificationsMarkedAsRead(data['modifiedCount'] ?? 0));
@@ -162,7 +160,7 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
     on<ArchiveNotification>((event, emit) async {
       try {
         final response = await _apiClient
-            .put('/notification/${event.notificationId}/archive', token: _currentToken);
+            .put('/notification/${event.notificationId}/archive');
         if (response.statusCode == 200) {
           emit(NotificationArchived(event.notificationId));
           // Recharger les notifications
@@ -179,7 +177,7 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
     on<DeleteNotification>((event, emit) async {
       try {
         final response =
-            await _apiClient.delete('/notification/${event.notificationId}', token: _currentToken);
+            await _apiClient.delete('/notification/${event.notificationId}');
         if (response.statusCode == 200) {
           emit(NotificationDeleted(event.notificationId));
           // Recharger les notifications
@@ -312,7 +310,7 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
     on<RefreshNotifications>((event, emit) async {
       try {
         final response =
-            await _apiClient.get('/notification/user/${event.prestataireId}', token: _currentToken);
+            await _apiClient.get('/notification/user/${event.prestataireId}');
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
           final List<dynamic> notifications = data['notifications'] ?? [];
@@ -329,6 +327,6 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
   }
 
   void setToken(String token) {
-    _currentToken = token;
+    _hasSession = token.isNotEmpty;
   }
 }

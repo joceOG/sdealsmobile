@@ -2,8 +2,14 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
+/// Abstraction testable (STAB-09) — ne pas persister l'idToken.
+abstract class GoogleSignInGateway {
+  Future<String?> signInForIdToken();
+  Future<void> signOut();
+}
+
 /// Connexion Google native → idToken pour le backend.
-class GoogleAuthService {
+class GoogleAuthService implements GoogleSignInGateway {
   GoogleAuthService._();
   static final GoogleAuthService instance = GoogleAuthService._();
 
@@ -21,6 +27,7 @@ class GoogleAuthService {
   }
 
   /// Retourne l'idToken Google, ou null si annulé.
+  @override
   Future<String?> signInForIdToken() async {
     await _ensureInit();
     final google = _signIn!;
@@ -42,10 +49,27 @@ class GoogleAuthService {
       if (kDebugMode) {
         print('[GoogleAuth] $e');
       }
+      throw Exception(
+        'Configuration Google invalide. Réessayez plus tard.',
+      );
+    } catch (e) {
+      if (kDebugMode) {
+        print('[GoogleAuth] $e');
+      }
+      final s = e.toString();
+      if (s.contains('ApiException') ||
+          s.contains('PlatformException') ||
+          s.contains('DEVELOPER_ERROR') ||
+          s.contains('sign_in_failed')) {
+        throw Exception(
+          'Configuration Google invalide. Réessayez plus tard.',
+        );
+      }
       rethrow;
     }
   }
 
+  @override
   Future<void> signOut() async {
     try {
       await _ensureInit();

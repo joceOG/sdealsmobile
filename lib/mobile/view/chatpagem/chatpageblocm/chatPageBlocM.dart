@@ -15,16 +15,29 @@ import 'package:sdealsmobile/data/utils/conversation_id.dart';
 import 'dart:io';
 
 class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
-  final ApiClient _apiClient = ApiClient();
+  final ApiClient _apiClient;
   final WebSocketService _webSocketService = WebSocketService();
   final NotificationService _notificationService = NotificationService();
 
-  // ✅ ID utilisateur — mutable pour permettre la mise à jour post-création
+  /// ID utilisateur — source de vérité côté UI : [AuthCubit] via [setUserId].
   String _currentUserId;
   final _uuid = const Uuid();
 
-  ChatPageBlocM({String? userId})
-      : _currentUserId = userId ?? '',
+  /// Load demandé avant que l'id soit connu → relancer dès [setUserId].
+  bool _pendingLoadConversations = false;
+
+  /// Test-only : remplace [ApiClient.getConversations] sans réseau.
+  final Future<List<Map<String, dynamic>>> Function(String userId)?
+      _conversationsLoader;
+
+  ChatPageBlocM({
+    String? userId,
+    ApiClient? apiClient,
+    Future<List<Map<String, dynamic>>> Function(String userId)?
+        conversationsLoader,
+  })  : _apiClient = apiClient ?? ApiClient(),
+        _conversationsLoader = conversationsLoader,
+        _currentUserId = userId?.trim() ?? '',
         super(ChatPageStateM.initial()) {
     on<LoadConversations>(_onLoadConversations);
     on<SelectConversation>(_onSelectConversation);
@@ -53,12 +66,23 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
     _setupWebSocketCallbacks();
   }
 
-  // ✅ Met à jour l'ID utilisateur après création du BLoC (ex: auth asynchrone)
+  /// Met à jour l'ID utilisateur (AuthCubit). Relance un load en attente.
   void setUserId(String id) {
-    if (id.isNotEmpty) {
-      _currentUserId = id;
+    final normalized = id.trim();
+    _currentUserId = normalized;
+
+    if (normalized.isNotEmpty && _pendingLoadConversations) {
+      _pendingLoadConversations = false;
+      add(const LoadConversations());
     }
   }
+
+  /// Exposé pour tests / diagnostics.
+  @visibleForTesting
+  String get debugCurrentUserId => _currentUserId;
+
+  @visibleForTesting
+  bool get debugPendingLoadConversations => _pendingLoadConversations;
 
   // Ajouté pour la compatibilité avec le code existant
   Future<void> _onLoadCategorieDataM(
@@ -77,32 +101,40 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
 
   Future<void> _onLoadConversations(
       LoadConversations event, Emitter<ChatPageStateM> emit) async {
-    // Refuse de charger si l'ID utilisateur n'est pas encore disponible
+    // Auth pas encore synchronisée : attendre setUserId — ne jamais faux « non connecté ».
     if (_currentUserId.isEmpty) {
+      _pendingLoadConversations = true;
       emit(state.copyWith(
-        status: ChatPageStatus.error,
-        error: 'Utilisateur non connecté',
+        status: ChatPageStatus.loading,
+        error: '',
       ));
       return;
     }
 
-    emit(state.copyWith(status: ChatPageStatus.loading));
+    _pendingLoadConversations = false;
+    emit(state.copyWith(status: ChatPageStatus.loading, error: ''));
 
     try {
-      print('🔄 Chargement conversations depuis API...');
-      final conversationsData =
-          await _apiClient.getConversations(_currentUserId);
+      if (kDebugMode) {
+        print('🔄 Chargement conversations depuis API...');
+      }
+      final conversationsData = _conversationsLoader != null
+          ? await _conversationsLoader!(_currentUserId)
+          : await _apiClient.getConversations(_currentUserId);
 
       final conversations = conversationsData
           .map((data) => ConversationModel.fromBackend(data, _currentUserId))
           .toList();
 
-      print('✅ ${conversations.length} conversations chargées depuis API');
+      if (kDebugMode) {
+        print('✅ ${conversations.length} conversations chargées depuis API');
+      }
 
       emit(state.copyWith(
         status: ChatPageStatus.loaded,
         conversations: conversations,
         clearSelectedConversation: true,
+        error: '',
       ));
     } catch (error) {
       if (kDebugMode) {
