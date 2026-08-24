@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:sdealsmobile/data/models/categorie.dart';
 import 'package:sdealsmobile/data/models/service.dart';
+import 'package:sdealsmobile/data/utils/display_text.dart';
 import 'package:sdealsmobile/mobile/view/freelancepagem/freelancepageblocm/freelancePageStateM.dart';
 import 'package:sdealsmobile/mobile/view/searchpagem/screens/searchPageScreenM.dart';
 
@@ -11,6 +12,7 @@ import '../../../../design_system/widgets/sd_app_bar_icon_button.dart';
 import '../../../../design_system/spacing.dart';
 import '../../../../design_system/typography.dart';
 import '../../../../design_system/widgets/sd_entity_card.dart';
+import '../../../../design_system/widgets/sd_feedback_states.dart';
 import '../freelancepageblocm/freelancePageBlocM.dart';
 import '../freelancepageblocm/freelancePageEventM.dart';
 import '../models/freelance_model.dart';
@@ -20,6 +22,7 @@ import 'freelance_details_screen.dart';
 const int _kCategoryPreviewCount = 8;
 
 String _formatFcfaHour(double v) {
+  if (v <= 0) return 'Sur devis';
   if (v >= 1000) {
     final s = v.toStringAsFixed(0);
     final buf = StringBuffer();
@@ -30,6 +33,11 @@ String _formatFcfaHour(double v) {
     return '${buf.toString()} FCFA/h';
   }
   return '${v.toStringAsFixed(0)} FCFA/h';
+}
+
+String _ratingLabel(double rating) {
+  if (rating <= 0) return 'Pas encore noté';
+  return '${rating.toStringAsFixed(1)}/5';
 }
 
 class FreelancePageScreen extends StatelessWidget {
@@ -70,36 +78,18 @@ class _FreelancePageScreenContentState
         child: BlocBuilder<FreelancePageBlocM, FreelancePageStateM>(
           builder: (context, state) {
             if (state.isLoading) {
-              return Center(
-                child: CircularProgressIndicator(color: SDColors.primary600),
+              return const Center(
+                child: SDLoadingInline(message: 'Chargement…'),
               );
             }
 
             if (state.error != null && state.error!.isNotEmpty) {
               return Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.error_outline,
-                          size: 48, color: SDColors.error500),
-                      const SizedBox(height: 16),
-                      Text(
-                        state.error!,
-                        textAlign: TextAlign.center,
-                        style: SDTypography.bodyMedium
-                            .copyWith(color: SDColors.neutral700),
-                      ),
-                      const SizedBox(height: 20),
-                      ElevatedButton(
-                        onPressed: () => context
-                            .read<FreelancePageBlocM>()
-                            .add(LoadCategorieDataM()),
-                        child: const Text('Réessayer'),
-                      ),
-                    ],
-                  ),
+                child: SDErrorState(
+                  message: state.error!,
+                  onRetry: () => context
+                      .read<FreelancePageBlocM>()
+                      .add(LoadCategorieDataM()),
                 ),
               );
             }
@@ -403,31 +393,34 @@ class _FreelancePageScreenContentState
   Widget _buildPopularServicesRow(FreelancePageStateM state) {
     if (state.isLoadingServices) {
       return SizedBox(
-        height: 220,
+        height: 80,
         child: Center(
-          child: CircularProgressIndicator(color: SDColors.primary600),
+          child: SDLoadingInline(message: 'Chargement des services…'),
         ),
       );
     }
     if (state.servicesError.isNotEmpty) {
       return SizedBox(
-        height: 80,
+        height: 100,
         child: Center(
-          child: Text(
-            'Impossible de charger les services',
-            style: SDTypography.bodySmall.copyWith(color: SDColors.neutral500),
+          child: SDErrorState(
+            message: state.servicesError,
+            onRetry: () => context
+                .read<FreelancePageBlocM>()
+                .add(LoadServicesEvent()),
           ),
         ),
       );
     }
     final services = state.services.take(12).toList();
     if (services.isEmpty) {
-      return SizedBox(
-        height: 80,
+      return const SizedBox(
+        height: 100,
         child: Center(
-          child: Text(
-            'Aucun service pour le moment',
-            style: SDTypography.bodySmall.copyWith(color: SDColors.neutral500),
+          child: SDEmptyState(
+            title: 'Aucun service',
+            message: 'Les services populaires apparaîtront bientôt.',
+            icon: Icons.handyman_outlined,
           ),
         ),
       );
@@ -474,7 +467,7 @@ class _FreelancePageScreenContentState
       return SizedBox(
         height: 80,
         child: Center(
-          child: CircularProgressIndicator(color: SDColors.primary600),
+          child: SDLoadingInline(message: 'Chargement des freelances…'),
         ),
       );
     }
@@ -483,35 +476,24 @@ class _FreelancePageScreenContentState
       return SizedBox(
         height: 120,
         child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                state.freelancersError!,
-                textAlign: TextAlign.center,
-                style:
-                    SDTypography.bodySmall.copyWith(color: SDColors.neutral700),
-              ),
-              const SizedBox(height: 8),
-              TextButton(
-                onPressed: () => context
-                    .read<FreelancePageBlocM>()
-                    .add(LoadFreelancersEvent()),
-                child: const Text('Réessayer'),
-              ),
-            ],
+          child: SDErrorState(
+            message: state.freelancersError!,
+            onRetry: () => context
+                .read<FreelancePageBlocM>()
+                .add(LoadFreelancersEvent()),
           ),
         ),
       );
     }
 
     if (state.isFreelancersEmpty) {
-      return SizedBox(
-        height: 80,
+      return const SizedBox(
+        height: 100,
         child: Center(
-          child: Text(
-            'Aucun freelance pour le moment',
-            style: SDTypography.bodySmall.copyWith(color: SDColors.neutral500),
+          child: SDEmptyState(
+            title: 'Aucun freelance',
+            message: 'Les freelances disponibles apparaîtront bientôt.',
+            icon: Icons.people_outline,
           ),
         ),
       );
@@ -866,18 +848,16 @@ class _FreelanceAvailabilityCard extends StatelessWidget {
     final showBadge = forceAvailableBadge ||
         freelancer.availabilityStatus.toLowerCase().contains('disponible');
     final responseText = 'Répond en ${freelancer.responseTime}h';
-    final ratingText = '${freelancer.rating.toStringAsFixed(1)}/5';
-    final imageUrl = freelancer.imagePath.startsWith('http')
-        ? freelancer.imagePath
-        : null;
+    final ratingText = _ratingLabel(freelancer.rating);
+    final imageUrl = safeImageUrl(freelancer.imagePath);
     final meta = freelancer.isTopRated
         ? 'Top Rated • $responseText'
         : '${freelancer.completedJobs} projets • $responseText';
 
     return SDEntityCard(
       type: SDEntityCardType.freelance,
-      title: freelancer.name,
-      subtitle: freelancer.job,
+      title: displayOrFallback(freelancer.name, 'Freelance'),
+      subtitle: displayOrFallback(freelancer.job, 'Non renseigné'),
       fallbackIcon: Icons.laptop_mac_rounded,
       imageUrl: imageUrl,
       ratingText: ratingText,
@@ -1040,20 +1020,23 @@ class _FreelanceCategoryResultsPage extends StatelessWidget {
             separatorBuilder: (_, __) => SizedBox(height: SDSpacing.sm),
             itemBuilder: (context, i) {
               final f = list[i];
+              final avatarUrl = safeImageUrl(f.imagePath);
               return ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: CircleAvatar(
-                  backgroundImage: f.imagePath.startsWith('http')
-                      ? NetworkImage(f.imagePath)
-                      : (f.imagePath.isNotEmpty
-                          ? AssetImage(f.imagePath)
-                          : const AssetImage('assets/profile_picture.jpg'))
+                  backgroundImage: avatarUrl != null
+                      ? NetworkImage(avatarUrl)
+                      : const AssetImage('assets/profile_picture.jpg')
                           as ImageProvider,
                 ),
-                title: Text(f.name,
-                    style: SDTypography.titleSmall
-                        .copyWith(fontWeight: FontWeight.w700)),
-                subtitle: Text('${f.job} · ${f.rating.toStringAsFixed(1)} ★'),
+                title: Text(
+                  displayOrFallback(f.name, 'Freelance'),
+                  style: SDTypography.titleSmall
+                      .copyWith(fontWeight: FontWeight.w700),
+                ),
+                subtitle: Text(
+                  '${displayOrFallback(f.job, 'Non renseigné')} · ${_ratingLabel(f.rating)}',
+                ),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
                   Navigator.of(context).push(
@@ -1114,24 +1097,23 @@ class _FreelanceAllListPage extends StatelessWidget {
             separatorBuilder: (_, __) => SizedBox(height: SDSpacing.sm),
             itemBuilder: (context, i) {
               final f = list[i];
+              final avatarUrl = safeImageUrl(f.imagePath);
               return ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: CircleAvatar(
-                  backgroundImage: f.imagePath.startsWith('http')
-                      ? NetworkImage(f.imagePath)
-                      : (f.imagePath.isNotEmpty
-                          ? AssetImage(f.imagePath)
-                          : const AssetImage('assets/profile_picture.jpg'))
+                  backgroundImage: avatarUrl != null
+                      ? NetworkImage(avatarUrl)
+                      : const AssetImage('assets/profile_picture.jpg')
                           as ImageProvider,
                 ),
                 title: Text(
-                  f.name,
+                  displayOrFallback(f.name, 'Freelance'),
                   style: SDTypography.titleSmall.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
                 ),
                 subtitle: Text(
-                  '${f.job} · ${f.rating.toStringAsFixed(1)} ★ · ${_formatFcfaHour(f.hourlyRate)}',
+                  '${displayOrFallback(f.job, 'Non renseigné')} · ${_ratingLabel(f.rating)} · ${_formatFcfaHour(f.hourlyRate)}',
                   style: SDTypography.bodySmall.copyWith(
                     color: SDColors.neutral600,
                   ),

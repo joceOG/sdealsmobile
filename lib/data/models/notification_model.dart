@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:sdealsmobile/data/utils/display_text.dart';
 
 // 🔔 TYPE DE NOTIFICATION
 enum NotificationType {
@@ -70,7 +71,13 @@ class NotificationModel extends Equatable {
           ? json['expediteur']['_id']
           : json['expediteur']?.toString(),
       expediteurNom: json['expediteur'] is Map
-          ? '${json['expediteur']['nom'] ?? ''} ${json['expediteur']['prenom'] ?? ''}'.trim()
+          ? () {
+              final n = personNameFromMap(
+                Map<String, dynamic>.from(json['expediteur'] as Map),
+                fallback: '',
+              );
+              return n.isEmpty ? null : n;
+            }()
           : null,
       type: _parseType(json['type'] ?? ''),
       titre: json['titre'] ?? 'Notification',

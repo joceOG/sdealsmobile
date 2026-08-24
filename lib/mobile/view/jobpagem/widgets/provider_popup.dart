@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../data/models/prestataire.dart';
+import '../../../../data/utils/display_text.dart';
 import '../../../../data/utils/media_url.dart';
 import '../utils/navigation_helper.dart';
 import '../../../../design_system/design_system.dart';
@@ -39,30 +40,45 @@ class ProviderPopup extends StatelessWidget {
     if (provider is Prestataire) {
       final p = provider as Prestataire;
       return {
-        'fullName': p.utilisateur.fullName,
-        'serviceName': p.service.nomservice,
-        'categoryName': p.service.categorie?.nomcategorie ?? '',
-        'description': p.description,
-        'note': p.note ?? '4.5',
+        'fullName': joinPersonName(
+          prenom: p.utilisateur.prenom,
+          nom: p.utilisateur.nom,
+          fallback: 'Prestataire',
+        ),
+        'serviceName':
+            cleanDisplayPart(p.service.nomservice) ?? 'Service',
+        'categoryName':
+            cleanDisplayPart(p.service.categorie?.nomcategorie) ?? '',
+        'description': cleanDisplayPart(p.description) ?? 'Non renseigné',
+        'note': cleanDisplayPart(p.note),
         'isVerified': p.verifier,
         'photoProfil': providerPhotoUrl(
           selfie: p.selfie,
           photoProfil: p.utilisateur.photoProfil,
         ),
-        'price': '${p.prixprestataire.toStringAsFixed(0)} FCFA/h',
-        'location': p.localisation,
+        'price': formatOptionalPrice(
+              p.prixprestataire,
+              suffix: 'FCFA',
+              perUnit: '/h',
+            ) ??
+            'Sur devis',
+        'location':
+            cleanDisplayPart(p.localisation) ?? 'Adresse non renseignée',
       };
     } else if (provider is Map<String, dynamic>) {
       final utilisateur = provider['utilisateur'] as Map<String, dynamic>?;
       final service = provider['service'] as Map<String, dynamic>?;
       return {
-        'fullName': utilisateur != null 
-          ? '${utilisateur['prenom'] ?? ''} ${utilisateur['nom'] ?? ''}'.trim()
-          : 'Prestataire',
-        'serviceName': service?['nomservice'] ?? 'Service',
-        'categoryName': service?['categorie']?['nomcategorie'] ?? '',
-        'description': provider['description'] ?? 'Service professionnel de qualité.',
-        'note': provider['note']?.toString() ?? '4.5',
+        'fullName': utilisateur != null
+            ? personNameFromMap(utilisateur, fallback: 'Prestataire')
+            : 'Prestataire',
+        'serviceName':
+            cleanDisplayPart(service?['nomservice']) ?? 'Service',
+        'categoryName':
+            cleanDisplayPart(service?['categorie']?['nomcategorie']) ?? '',
+        'description':
+            cleanDisplayPart(provider['description']) ?? 'Non renseigné',
+        'note': cleanDisplayPart(provider['note']),
         'isVerified': provider['verifier'] == true,
         'photoProfil': providerPhotoUrl(
           selfie: provider['selfie']?.toString(),
@@ -70,8 +86,14 @@ class ProviderPopup extends StatelessWidget {
           utilisateurMap: utilisateur,
           prestataireMap: provider,
         ),
-        'price': '${(provider['prixprestataire'] ?? 0).toString()} FCFA/h',
-        'location': provider['localisation'] ?? 'Localisation',
+        'price': formatOptionalPrice(
+              provider['prixprestataire'],
+              suffix: 'FCFA',
+              perUnit: '/h',
+            ) ??
+            'Sur devis',
+        'location':
+            cleanDisplayPart(provider['localisation']) ?? 'Adresse non renseignée',
       };
     }
     // Fallback par défaut
@@ -79,12 +101,12 @@ class ProviderPopup extends StatelessWidget {
       'fullName': 'Prestataire',
       'serviceName': 'Service',
       'categoryName': '',
-      'description': 'Service professionnel de qualité.',
-      'note': '4.5',
+      'description': 'Non renseigné',
+      'note': null,
       'isVerified': false,
       'photoProfil': null,
-      'price': '0 FCFA/h',
-      'location': 'Localisation',
+      'price': 'Sur devis',
+      'location': 'Adresse non renseignée',
     };
   }
 
@@ -123,7 +145,9 @@ class ProviderPopup extends StatelessWidget {
                             imageUrl: normalizeMediaUrl(
                               data['photoProfil']?.toString(),
                             ),
-                            ratingText: '${data['note'] ?? 'N/A'}/5',
+                            ratingText: data['note'] != null
+                                ? '${data['note']}/5'
+                                : 'Pas encore noté',
                             metaText: data['isVerified'] == true
                                 ? '${data['location'] ?? ''} • ✓ Identité vérifiée'
                                 : (data['location']?.toString() ?? ''),

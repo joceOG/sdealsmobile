@@ -1,21 +1,19 @@
-import 'dart:io';
-import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:image_picker/image_picker.dart';
-
+import '../../../../data/services/authCubit.dart';
+import '../../../../data/utils/display_text.dart';
+import '../../../../design_system/design_system.dart';
 import '../../../data/models/conversation_model.dart';
 import '../../../data/models/message_model.dart';
+import '../../common/widgets/empty_state_widget.dart';
+import '../../searchpagem/screens/searchPageScreenM.dart';
 import '../chatpageblocm/chatPageBlocM.dart';
 import '../chatpageblocm/chatPageEventM.dart';
 import '../chatpageblocm/chatPageStateM.dart';
-import '../../common/widgets/empty_state_widget.dart';
-import '../../searchpagem/screens/searchPageScreenM.dart';
-import '../../../../data/services/authCubit.dart';
-import 'package:go_router/go_router.dart';
 import '../widgets/voice_recorder_widget.dart';
-
-// ✅ Design System
-import '../../../../design_system/design_system.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 
 /// Filtres type Figma : Tous, Travaux (prestataires), Freelance, Produits (vendeurs).
 enum _MessagesInboxFilter { tous, travaux, freelance, produits }
@@ -128,14 +126,16 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
 
   /// Photo réseau / asset si dispo, sinon avatar initiales.
   Widget _buildConversationAvatar(ConversationModel conversation) {
-    final img = conversation.participantImage.trim();
-    final hasNetwork = img.startsWith('http');
+    final img = safeImageUrl(conversation.participantImage) ??
+        (conversation.participantImage.startsWith('assets/')
+            ? conversation.participantImage
+            : '');
+    final hasNetwork = safeImageUrl(conversation.participantImage) != null;
     final hasAsset = img.startsWith('assets/') &&
         img.isNotEmpty &&
         img != 'assets/profil.png';
-    final initial = conversation.participantName.trim().isNotEmpty
-        ? conversation.participantName.trim()[0].toUpperCase()
-        : '?';
+    final name = displayOrFallback(conversation.participantName, 'Utilisateur');
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
 
     Widget initialsAvatar() {
       return CircleAvatar(
@@ -797,110 +797,19 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
     }
   }
 
-  // 🔐 Écran affiché quand l'utilisateur n'est pas connecté
+  // 🔐 Écran invité — mur d'authentification (≠ empty inbox connecté)
   Widget _buildNotAuthenticatedScreen(BuildContext context) {
-    const hPad = 20.0;
     return Scaffold(
       backgroundColor: SDColors.white,
       body: SafeArea(
-        child: ListView(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(hPad, 12, hPad, 8),
-              child: Text(
-                'Messages',
-                style: SDTypography.displayMedium.copyWith(
-                  color: SDColors.neutral900,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(hPad, 24, hPad, 32),
-              child: Column(
-                children: [
-                  Container(
-                    width: 120,
-                    height: 120,
-                    decoration: const BoxDecoration(
-                      color: SDColors.primary50,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.forum_outlined,
-                      size: 56,
-                      color: SDColors.primary600,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    'Pas encore de messages',
-                    style: SDTypography.titleMedium.copyWith(
-                      color: SDColors.neutral900,
-                      fontWeight: FontWeight.w700,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Connectez-vous pour discuter avec des prestataires, vendeurs et freelances.',
-                    style: SDTypography.bodyMedium.copyWith(
-                      color: SDColors.neutral600,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () => context.push('/login'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: SDColors.primary600,
-                        foregroundColor: SDColors.white,
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: Text(
-                        'Se connecter',
-                        style: SDTypography.labelLarge.copyWith(
-                          color: SDColors.white,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton(
-                      onPressed: () => context.push('/register'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: SDColors.primary700,
-                        side: const BorderSide(
-                          color: SDColors.primary600,
-                          width: 1.2,
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: Text(
-                        'Créer un compte',
-                        style: SDTypography.labelLarge.copyWith(
-                          color: SDColors.primary700,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+        child: GuestAuthState(
+          pageTitle: 'Messages',
+          title: 'Connectez-vous pour accéder à vos messages',
+          description:
+              'Discutez directement avec les prestataires, freelances et vendeurs.',
+          icon: Icons.forum_outlined,
+          onPrimary: () => context.push('/login'),
+          onSecondary: () => context.push('/register'),
         ),
       ),
     );
@@ -1007,8 +916,9 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
                                     : state.conversations.isEmpty
                                         ? EmptyStateWidget(
                                             imagePath: 'assets/messages_vides.png',
-                                            title: 'Aucune conversation',
-                                            message: 'Démarrez une nouvelle conversation en contactant un prestataire ou un vendeur',
+                                            title: 'Aucune conversation pour le moment',
+                                            message:
+                                                'Contactez un professionnel pour commencer à échanger.',
                                             imageSize: 180,
                                           )
                                         : filtered.isEmpty

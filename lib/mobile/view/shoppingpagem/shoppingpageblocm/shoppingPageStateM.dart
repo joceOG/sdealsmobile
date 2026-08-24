@@ -49,6 +49,9 @@ class ShoppingPageStateM extends Equatable {
   final List<Vendeur>? vendeurs; // Liste de tous les vendeurs
   final List<Vendeur>? filteredVendeurs; // Liste des vendeurs filtrés
   final List<String>? favoriteVendeurIds; // IDs des vendeurs favoris
+  /// STAB-12C — loading/erreur dédiés (pas le isLoading produits).
+  final bool isVendeursLoading;
+  final String? vendeursError;
 
   // États pour les filtres
   final String? selectedFilter; // Filtre actuellement sélectionné
@@ -82,6 +85,8 @@ class ShoppingPageStateM extends Equatable {
     this.vendeurs,
     this.filteredVendeurs,
     this.favoriteVendeurIds,
+    this.isVendeursLoading = false,
+    this.vendeursError,
     this.selectedFilter,
     this.searchQuery,
     this.selectedBrand,
@@ -109,6 +114,12 @@ class ShoppingPageStateM extends Equatable {
       filteredProducts: null,
       favoriteProductIds: [],
       productsToCompare: [],
+      showVendeurs: false,
+      vendeurs: null,
+      filteredVendeurs: null,
+      favoriteVendeurIds: [],
+      isVendeursLoading: false,
+      vendeursError: null,
       selectedFilter: '',
       searchQuery: '',
       selectedBrand: null,
@@ -136,6 +147,9 @@ class ShoppingPageStateM extends Equatable {
     List<Vendeur>? vendeurs,
     List<Vendeur>? filteredVendeurs,
     List<String>? favoriteVendeurIds,
+    bool? isVendeursLoading,
+    String? vendeursError,
+    bool clearVendeursError = false,
     String? selectedFilter,
     String? searchQuery,
     String? selectedBrand,
@@ -151,6 +165,7 @@ class ShoppingPageStateM extends Equatable {
     Cart? cart,
     bool? isCartLoading,
     String? cartError,
+    bool clearCartError = false,
     bool? isAddingToCart,
   }) {
     return ShoppingPageStateM(
@@ -166,6 +181,10 @@ class ShoppingPageStateM extends Equatable {
       vendeurs: vendeurs ?? this.vendeurs,
       filteredVendeurs: filteredVendeurs ?? this.filteredVendeurs,
       favoriteVendeurIds: favoriteVendeurIds ?? this.favoriteVendeurIds,
+      isVendeursLoading: isVendeursLoading ?? this.isVendeursLoading,
+      vendeursError: clearVendeursError
+          ? null
+          : (vendeursError ?? this.vendeursError),
       selectedFilter: selectedFilter ?? this.selectedFilter,
       searchQuery: searchQuery ?? this.searchQuery,
       selectedBrand: selectedBrand ?? this.selectedBrand,
@@ -180,7 +199,7 @@ class ShoppingPageStateM extends Equatable {
       // 🛒 NOUVEAUX PARAMÈTRES PANIER
       cart: cart ?? this.cart,
       isCartLoading: isCartLoading ?? this.isCartLoading,
-      cartError: cartError ?? this.cartError,
+      cartError: clearCartError ? null : (cartError ?? this.cartError),
       isAddingToCart: isAddingToCart ?? this.isAddingToCart,
     );
   }
@@ -199,6 +218,8 @@ class ShoppingPageStateM extends Equatable {
         vendeurs,
         filteredVendeurs,
         favoriteVendeurIds,
+        isVendeursLoading,
+        vendeursError,
         selectedFilter,
         searchQuery,
         selectedBrand,

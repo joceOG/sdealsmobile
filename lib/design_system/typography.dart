@@ -184,6 +184,16 @@ class SDTypography {
     letterSpacing: 0,
     height: 1.3,
   );
+
+  /// Helper sous un champ — 12px
+  static const helper = bodySmall;
+
+  /// Erreur sous un champ
+  static TextStyle get fieldError => bodySmall;
+
+  static const cardTitle = titleSmall;
+  static const sectionTitle = titleMedium;
+  static const pageTitle = displayMedium;
   
   // ═══════════════════════════════════════
   // HELPER METHOD

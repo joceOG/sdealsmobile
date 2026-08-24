@@ -8,7 +8,6 @@ import '../../../../design_system/design_system.dart';
 
 /// Accent onboarding — vert Soutrali
 const Color _kOnboardingAccent = SDColors.primary600;
-const Color _kOnboardingTitle = Color(0xFF0A1931);
 
 const SystemUiOverlayStyle _kOnboardingSystemUi = SystemUiOverlayStyle(
   statusBarColor: Colors.transparent,
@@ -94,7 +93,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       value: _kOnboardingSystemUi,
       child: Scaffold(
       backgroundColor: SDColors.white,
-      body: Stack(
+      body: SafeArea(
+        child: Stack(
         fit: StackFit.expand,
         children: [
           PageView.builder(
@@ -109,15 +109,26 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           // Passer (haut droite)
           if (!_isLastPage)
             Positioned(
-              top: MediaQuery.paddingOf(context).top + 8,
-              right: 8,
-              child: TextButton(
-                onPressed: _completeOnboarding,
-                child: Text(
-                  'Passer',
-                  style: SDTypography.labelLarge.copyWith(
-                    color: SDColors.neutral500,
-                    fontWeight: FontWeight.w600,
+              top: 8,
+              right: SDSpacing.sm,
+              child: Material(
+                color: SDColors.white.withOpacity(0.92),
+                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                child: InkWell(
+                  onTap: _completeOnboarding,
+                  borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: SDSpacing.md,
+                      vertical: SDSpacing.sm,
+                    ),
+                    child: Text(
+                      'Passer',
+                      style: SDTypography.labelLarge.copyWith(
+                        color: SDColors.neutral700,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -127,7 +138,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           Positioned(
             left: 24,
             right: 24,
-            bottom: bottomInset + 20,
+            bottom: bottomInset + SDSpacing.md,
             child: Row(
               children: [
                 Expanded(
@@ -158,8 +169,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
           ),
         ],
+        ),
       ),
-    ),
+      ),
     );
   }
 }
@@ -183,6 +195,11 @@ class _OnboardingSlide extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textScale = MediaQuery.textScalerOf(context);
+    final titleStyle = textScale.scale(SDTypography.displayLarge.fontSize!) > 36
+        ? SDTypography.displayMedium
+        : SDTypography.displayLarge;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -248,29 +265,37 @@ class _OnboardingSlide extends StatelessWidget {
         Expanded(
           flex: 42,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(28, 8, 28, 96),
+            padding: EdgeInsets.fromLTRB(
+              SDSpacing.lg,
+              SDSpacing.sm,
+              SDSpacing.lg,
+              SDSpacing.xxxl + SDSpacing.xl,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  content.title,
-                  textAlign: TextAlign.left,
-                  style: const TextStyle(
-                    fontSize: 34,
-                    height: 1.12,
-                    fontWeight: FontWeight.w800,
-                    color: _kOnboardingTitle,
-                    letterSpacing: -0.6,
+                Flexible(
+                  child: Text(
+                    content.title,
+                    textAlign: TextAlign.left,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: titleStyle.copyWith(
+                      color: SDColors.neutral900,
+                      height: 1.15,
+                      letterSpacing: -0.5,
+                    ),
                   ),
                 ),
-                const SizedBox(height: 14),
+                SDSpacing.verticalSmallGap,
                 Text(
                   content.subtitle,
                   textAlign: TextAlign.left,
+                  maxLines: 4,
+                  overflow: TextOverflow.ellipsis,
                   style: SDTypography.bodyLarge.copyWith(
                     color: SDColors.neutral500,
                     height: 1.45,
-                    fontSize: 15,
                   ),
                 ),
               ],

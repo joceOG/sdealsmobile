@@ -22,6 +22,8 @@ import 'package:sdealsmobile/mobile/view/orderpagem/screens/service_requests_lis
 import 'package:sdealsmobile/mobile/view/shoppingpagem/screens/shoppingPageScreenM.dart';
 import 'package:sdealsmobile/mobile/view/shoppingpagem/shoppingpageblocm/shoppingPageBlocM.dart';
 import 'package:sdealsmobile/data/services/api_client.dart';
+import 'package:sdealsmobile/data/errors/api_exception.dart';
+import 'package:sdealsmobile/data/utils/display_text.dart';
 import '../homepageblocm/homePageBlocM.dart';
 import '../homepageblocm/homePageEventM.dart';
 import '../homepageblocm/homePageStateM.dart';
@@ -182,14 +184,7 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
   }
 
   /// Normalise une URL média (Cloudinary / http / protocole-relatif).
-  String? _normalizeMediaUrl(String? raw) {
-    if (raw == null) return null;
-    final v = raw.trim();
-    if (v.isEmpty) return null;
-    if (v.startsWith('https://') || v.startsWith('http://')) return v;
-    if (v.startsWith('//')) return 'https:$v';
-    return null;
-  }
+  String? _normalizeMediaUrl(String? raw) => safeImageUrl(raw);
 
   /// Cherche une image dans les champs usuels API (utilisateur, article, freelance…).
   String? _pickImageUrl(Map<String, dynamic> source) {
@@ -266,9 +261,7 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
   List<_HomeMiniItem> _buildMetiersItems(List<Map<String, dynamic>> data) {
     return _onlyItemsWithImages(data.map((p) {
       final utilisateur = p['utilisateur'] as Map<String, dynamic>? ?? const {};
-      final prenom = utilisateur['prenom']?.toString() ?? '';
-      final nom = utilisateur['nom']?.toString() ?? '';
-      final fullName = ('$prenom $nom').trim().isEmpty ? 'Prestataire' : ('$prenom $nom').trim();
+      final fullName = personNameFromMap(utilisateur, fallback: 'Prestataire');
       final metier = _metierLabelForPrestataire(p);
       final location = _prestataireLocationLabel(p);
       final isVerified = p['verifier'] == true;
@@ -543,10 +536,7 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
       return;
     }
     final utilisateur = p['utilisateur'] as Map<String, dynamic>? ?? const {};
-    final prenom = utilisateur['prenom']?.toString() ?? '';
-    final nom = utilisateur['nom']?.toString() ?? '';
-    final fullName =
-        ('$prenom $nom').trim().isEmpty ? 'Prestataire' : ('$prenom $nom').trim();
+    final fullName = personNameFromMap(utilisateur, fallback: 'Prestataire');
     final imageUrl = _pickImageUrl(utilisateur) ?? _pickImageUrl(p);
     try {
       await _apiClient.addFavorite(
@@ -604,7 +594,9 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Impossible d’ouvrir le profil : $e')),
+        SnackBar(
+          content: Text(ApiException.userFacing(e)),
+        ),
       );
     }
   }
@@ -640,8 +632,12 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
     final price = item['prixArticle']?.toString() ?? '0';
     final vendeur = item['vendeur'];
     final vendeurId = vendeur is Map
-        ? vendeur['_id']?.toString()
+        ? (vendeur['_id']?.toString() ?? vendeur['id']?.toString())
         : vendeur?.toString();
+    final cleanVendeurId =
+        (vendeurId == null || vendeurId.isEmpty || vendeurId == 'null')
+            ? null
+            : vendeurId;
     final product = shop_model.Product(
       id: id,
       name: name,
@@ -649,8 +645,8 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
       size: '',
       price: price,
       brand: item['marque']?.toString() ?? 'Générique',
-      rating: _toDouble(item['rating']) ?? 4.5,
-      vendeurId: vendeurId,
+      rating: _toDouble(item['rating']) ?? 0.0,
+      vendeurId: cleanVendeurId,
     );
     Navigator.of(context).push(
       MaterialPageRoute(

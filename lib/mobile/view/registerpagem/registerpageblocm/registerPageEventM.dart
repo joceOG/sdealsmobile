@@ -9,7 +9,8 @@ abstract class RegisterPageEventM extends Equatable {
 
 /// Soumission du formulaire → canonise téléphone → POST /otp/send (pas /register).
 class RegisterSubmitted extends RegisterPageEventM {
-  final String fullName;
+  final String prenom;
+  final String nom;
   final String email;
   final String phone;
   final String phoneCountry;
@@ -17,7 +18,8 @@ class RegisterSubmitted extends RegisterPageEventM {
   final String confirmPassword;
 
   const RegisterSubmitted({
-    required this.fullName,
+    required this.prenom,
+    required this.nom,
     required this.email,
     required this.phone,
     required this.phoneCountry,
@@ -27,7 +29,7 @@ class RegisterSubmitted extends RegisterPageEventM {
 
   @override
   List<Object?> get props =>
-      [fullName, email, phone, phoneCountry, password, confirmPassword];
+      [prenom, nom, email, phone, phoneCountry, password, confirmPassword];
 }
 
 class OtpCodeSubmitted extends RegisterPageEventM {

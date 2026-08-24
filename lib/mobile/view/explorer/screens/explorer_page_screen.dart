@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:sdealsmobile/data/models/prestataire.dart';
 import 'package:sdealsmobile/data/models/vendeur.dart';
+import 'package:sdealsmobile/data/utils/display_text.dart';
 import 'package:sdealsmobile/mobile/view/freelancepagem/freelancepageblocm/freelancePageBlocM.dart';
 import 'package:sdealsmobile/mobile/view/freelancepagem/freelancepageblocm/freelancePageEventM.dart'
     as free_ev;
@@ -847,16 +848,17 @@ class _MetierCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Évite « null » si prenom est null (interpolation) ou si l'API renvoie le mot « null ».
-    final raw = prestataire.utilisateur.fullName.trim();
-    final shortName = raw
-        .split(RegExp(r'\s+'))
-        .where((w) => w.isNotEmpty && w.toLowerCase() != 'null')
-        .join(' ')
-        .trim();
-    final displayName = shortName.isEmpty ? 'Prestataire' : shortName;
+    // STAB-12B — jamais « null alice »
+    final displayName = joinPersonName(
+      prenom: prestataire.utilisateur.prenom,
+      nom: prestataire.utilisateur.nom,
+      fallback: 'Prestataire',
+    );
     final note = double.tryParse(prestataire.note ?? '');
-    final metier = prestataire.service.nomservice.trim();
+    final metier = displayOrFallback(
+      prestataire.service.nomservice,
+      'Non renseigné',
+    );
 
     return GestureDetector(
       onTap: () {

@@ -1,5 +1,6 @@
 import 'service.dart';
 import 'utilisateur.dart';
+import '../utils/display_text.dart';
 
 class Prestataire {
   String idprestataire;
@@ -149,26 +150,45 @@ class Prestataire {
 
   factory Prestataire.fromJson(dynamic json) {
     final map = json as Map<String, dynamic>;
+    final userRaw = map['utilisateur'];
+    final serviceRaw = map['service'];
     return Prestataire(
-      idprestataire: map['_id'] as String,
-      utilisateur: Utilisateur.fromJson(map['utilisateur']),
-      service: Service.fromJson(map['service']),
-      prixprestataire: (map['prixprestataire'] as num).toDouble(),
-      localisation: map['localisation'] as String,
+      idprestataire: map['_id']?.toString() ?? map['idprestataire']?.toString() ?? '',
+      utilisateur: userRaw is Map
+          ? Utilisateur.fromJson(Map<String, dynamic>.from(userRaw))
+          : Utilisateur(
+              idutilisateur: '',
+              nom: '',
+              prenom: null,
+              email: '',
+              password: '',
+              telephone: '',
+              role: 'PRESTATAIRE',
+            ),
+      service: serviceRaw is Map
+          ? Service.fromJson(Map<String, dynamic>.from(serviceRaw))
+          : Service(
+              idservice: '',
+              nomservice: 'Service',
+              imageservice: '',
+              prixmoyen: '0',
+            ),
+      prixprestataire: (map['prixprestataire'] as num?)?.toDouble() ?? 0.0,
+      localisation: cleanDisplayPart(map['localisation']) ?? '',
       localisationMaps: map['localisationmaps'] != null
           ? LocalisationMaps.fromJson(map['localisationmaps'])
           : null,
-      note: map['note'] as String?,
+      note: cleanDisplayPart(map['note']),
       verifier: map['verifier'] as bool? ?? false,
       cni1: map['cni1'] as String?,
       cni2: map['cni2'] as String?,
-      selfie: map['selfie'] as String?,
+      selfie: safeImageUrl(map['selfie']),
       numeroCNI: map['numeroCNI'] as String?,
       specialite: map['specialite'] != null
           ? List<String>.from(map['specialite'])
           : null,
-      anneeExperience: map['anneeExperience'] as String?,
-      description: map['description'] as String?,
+      anneeExperience: cleanDisplayPart(map['anneeExperience']),
+      description: cleanDisplayPart(map['description']),
       rayonIntervention: map['rayonIntervention'] != null
           ? (map['rayonIntervention'] as num).toDouble()
           : null,

@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:sdealsmobile/data/utils/display_text.dart';
 
 /// 📁 Modèle pour un élément de portfolio
 class PortfolioItem extends Equatable {
@@ -167,48 +168,62 @@ class FreelanceModel extends Equatable {
 
   // ✅ NOUVELLE FACTORY : Convertir depuis le backend (avec gestion robuste des nulls)
   factory FreelanceModel.fromBackend(Map<String, dynamic> json) {
-    // 🛡️ Helper pour extraire string avec fallback
-    String safeString(String key, String defaultValue) {
-      final value = json[key];
-      if (value == null) return defaultValue;
-      if (value is String) return value;
-      return value.toString();
+    String safeString(String key, {String? fallback}) {
+      final cleaned = cleanDisplayPart(json[key]);
+      if (cleaned != null) return cleaned;
+      return fallback ?? '';
     }
 
-    // 🛡️ Helper pour extraire liste de strings
     List<String> safeStringList(String key) {
       final value = json[key];
       if (value == null) return [];
       if (value is List) {
         return value
-            .map((e) => e?.toString() ?? '')
-            .where((s) => s.isNotEmpty)
+            .map((e) => cleanDisplayPart(e))
+            .whereType<String>()
             .toList();
       }
       return [];
     }
 
+    // Nom : champ name, sinon utilisateur.prenom/nom
+    String resolveName() {
+      final direct = safeString('name');
+      if (direct.isNotEmpty) return direct;
+      final u = json['utilisateur'];
+      if (u is Map) {
+        return personNameFromMap(
+          Map<String, dynamic>.from(u),
+          fallback: 'Freelance',
+        );
+      }
+      return 'Freelance';
+    }
+
+    final ratingRaw = (json['rating'] as num?)?.toDouble();
+    final hourlyRaw = (json['hourlyRate'] as num?)?.toDouble();
+
     return FreelanceModel(
-      id: safeString('_id', ''),
-      name: safeString('name', 'Freelance'),
-      job: safeString('job', 'Non spécifié'),
-      category: safeString('category', 'Autre'),
-      imagePath: safeString('imagePath', ''),
-      rating: (json['rating'] as num?)?.toDouble() ?? 0.0,
+      id: safeString('_id'),
+      name: resolveName(),
+      job: safeString('job', fallback: 'Non renseigné'),
+      category: safeString('category', fallback: 'Non renseigné'),
+      imagePath: safeImageUrl(json['imagePath']) ?? '',
+      rating: (ratingRaw != null && ratingRaw > 0) ? ratingRaw : 0.0,
       completedJobs: json['completedJobs'] as int? ?? 0,
       isTopRated: json['isTopRated'] as bool? ?? false,
       isFeatured: json['isFeatured'] as bool? ?? false,
       isNew: json['isNew'] as bool? ?? true,
       skills: safeStringList('skills'),
-      hourlyRate: (json['hourlyRate'] as num?)?.toDouble() ?? 0.0,
-      description: safeString('description', 'Aucune description disponible'),
+      hourlyRate: (hourlyRaw != null && hourlyRaw > 0) ? hourlyRaw : 0.0,
+      description: safeString('description'),
       responseTime: json['responseTime'] as int? ?? 24,
-      // Nouveaux champs avec gestion robuste des nulls
-      experienceLevel: safeString('experienceLevel', 'Débutant'),
-      availabilityStatus: safeString('availabilityStatus', 'Disponible'),
-      workingHours: safeString('workingHours', 'Temps partiel'),
-      location: safeString('location', ''),
-      phoneNumber: json['phoneNumber'] as String?,
+      experienceLevel: safeString('experienceLevel', fallback: 'Non renseigné'),
+      availabilityStatus:
+          safeString('availabilityStatus', fallback: 'Non renseigné'),
+      workingHours: safeString('workingHours', fallback: 'Non renseigné'),
+      location: safeString('location'),
+      phoneNumber: cleanDisplayPart(json['phoneNumber']),
       utilisateurId: () {
         final u = json['utilisateur'];
         if (u is Map) {
@@ -226,7 +241,6 @@ class FreelanceModel extends Equatable {
                       }
                       return null;
                     } catch (e) {
-                      print('⚠️ Erreur parsing portfolio item: $e');
                       return null;
                     }
                   })
@@ -244,7 +258,7 @@ class FreelanceModel extends Equatable {
       clientSatisfaction:
           (json['clientSatisfaction'] as num?)?.toDouble() ?? 0.0,
       preferredCategories: safeStringList('preferredCategories'),
-      accountStatus: safeString('accountStatus', 'Active'),
+      accountStatus: safeString('accountStatus', fallback: 'Active'),
     );
   }
 

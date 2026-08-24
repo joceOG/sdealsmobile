@@ -1,3 +1,5 @@
+import '../utils/display_text.dart';
+
 class Utilisateur {
   String idutilisateur;
   String nom;
@@ -15,6 +17,7 @@ class Utilisateur {
   DateTime? updatedAt;
   String role; // ✅ Champ obligatoire
   bool verifie; // ✅ Champ pour indiquer si l'utilisateur est vérifié
+  bool telephoneVerified; // STAB-12D — preuve OTP téléphone
 
   Utilisateur({
     required this.idutilisateur,
@@ -33,38 +36,44 @@ class Utilisateur {
     this.updatedAt,
     required this.role,
     this.verifie = false, // ✅ Par défaut non vérifié
+    this.telephoneVerified = false,
   });
 
-  // ✅ GETTER fullName manquant
-  String get fullName => '${prenom ?? ''} $nom'.trim();
+  /// STAB-12B — jamais « null alice » / « Alice null ».
+  String get fullName => joinPersonName(
+        prenom: prenom,
+        nom: nom,
+        fallback: '',
+      );
 
   /// Convertir JSON → Utilisateur
   factory Utilisateur.fromJson(Map<String, dynamic> json) {
     return Utilisateur(
-      idutilisateur: json['_id'] ?? json['idutilisateur'] ?? '',
-      nom: json['nom'] ?? '',
-      prenom: json['prenom'],
-      dateNaissance: json['datedenaissance'],
-      email: json['email'] ?? '',
-      password: json['password'] ?? '',
-      telephone: json['telephone'] ?? '',
-      genre: json['genre'],
-      note: json['note'],
-      photoProfil: json['photoProfil'],
+      idutilisateur: json['_id']?.toString() ?? json['idutilisateur']?.toString() ?? '',
+      nom: cleanDisplayPart(json['nom']) ?? '',
+      prenom: cleanDisplayPart(json['prenom']),
+      dateNaissance: cleanDisplayPart(json['datedenaissance']),
+      email: cleanDisplayPart(json['email']) ?? '',
+      password: json['password']?.toString() ?? '',
+      telephone: cleanDisplayPart(json['telephone']) ?? '',
+      genre: cleanDisplayPart(json['genre']),
+      note: cleanDisplayPart(json['note']),
+      photoProfil: safeImageUrl(json['photoProfil']),
       tokens: json['tokens'] != null
           ? List<String>.from(
               (json['tokens'] as List).map((t) => t is Map ? (t['token'] as String? ?? '') : t.toString()).where((token) => token.isNotEmpty),
             )
           : [],
-      token: json['token'], // ✅ pris en compte si présent dans la réponse API
+      token: json['token']?.toString(),
       createdAt: json['createdAt'] != null
-          ? DateTime.tryParse(json['createdAt'])
+          ? DateTime.tryParse(json['createdAt'].toString())
           : null,
       updatedAt: json['updatedAt'] != null
-          ? DateTime.tryParse(json['updatedAt'])
+          ? DateTime.tryParse(json['updatedAt'].toString())
           : null,
-      role: json['role'] ?? '',
-      verifie: json['verifie'] ?? false, // ✅ Par défaut non vérifié
+      role: cleanDisplayPart(json['role']) ?? '',
+      verifie: json['verifie'] == true,
+      telephoneVerified: json['telephoneVerified'] == true,
     );
   }
 
@@ -87,6 +96,7 @@ class Utilisateur {
       'updatedAt': updatedAt?.toIso8601String(),
       'role': role,
       'verifie': verifie, // ✅ Export du statut de vérification
+      'telephoneVerified': telephoneVerified,
     };
   }
 

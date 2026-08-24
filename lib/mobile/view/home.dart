@@ -14,6 +14,7 @@ import 'chatpagem/chatpageblocm/chatPageStateM.dart';
 import 'chatpagem/screens/chatPageScreenM.dart';
 import 'homepagem/homepageblocm/homePageBlocM.dart';
 import 'freelance_registration/screens/freelance_registration_screen.dart';
+import 'common/widgets/auth_form_widgets.dart';
 
 // ✅ Design System
 import '../../design_system/design_system.dart';
@@ -220,18 +221,18 @@ class _HomeState extends State<Home> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Transform.translate(
-            offset: const Offset(0, -16),
+            offset: const Offset(0, -14),
             child: Material(
               color: Colors.transparent,
-              elevation: 6,
-              shadowColor: SDColors.primary700.withOpacity(0.35),
+              elevation: 3,
+              shadowColor: SDColors.primary700.withOpacity(0.2),
               shape: const CircleBorder(),
               child: InkWell(
                 onTap: _showPublishOptions,
                 customBorder: const CircleBorder(),
                 child: Ink(
-                  width: 62,
-                  height: 62,
+                  width: 58,
+                  height: 58,
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
                       begin: Alignment.topLeft,
@@ -239,19 +240,19 @@ class _HomeState extends State<Home> {
                       colors: [SDColors.primary600, SDColors.primary800],
                     ),
                     shape: BoxShape.circle,
-                    border: Border.all(color: SDColors.white, width: 3.5),
+                    border: Border.all(color: SDColors.white, width: 2.5),
                     boxShadow: [
                       BoxShadow(
-                        color: SDColors.primary700.withOpacity(0.28),
-                        blurRadius: 14,
-                        offset: const Offset(0, 6),
+                        color: SDColors.primary700.withOpacity(0.18),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
                       ),
                     ],
                   ),
                   child: const Icon(
                     Icons.add_rounded,
                     color: SDColors.white,
-                    size: 32,
+                    size: 30,
                   ),
                 ),
               ),
@@ -260,10 +261,10 @@ class _HomeState extends State<Home> {
           Text(
             'Publier',
             style: SDTypography.labelMedium.copyWith(
-              color: SDColors.neutral900,
-              fontWeight: FontWeight.w700,
-              fontSize: 12,
-              letterSpacing: 0.2,
+              color: SDColors.neutral700,
+              fontWeight: FontWeight.w500,
+              fontSize: 11,
+              letterSpacing: 0.1,
             ),
           ),
         ],
@@ -297,7 +298,18 @@ class _HomeState extends State<Home> {
 
   void _showPublishOptions() {
     final auth = context.read<AuthCubit>().state;
-    final roles = auth is AuthAuthenticated ? auth.roles : const <String>[];
+    if (auth is! AuthAuthenticated) {
+      showGuestAuthSheet(
+        context,
+        icon: Icons.add_rounded,
+        title: 'Connectez-vous pour publier',
+        description:
+            'Créez un compte ou connectez-vous pour proposer un service, une mission ou une annonce.',
+      );
+      return;
+    }
+
+    final roles = auth.roles;
     final isProvider = roles.contains('PRESTATAIRE');
     final isFreelance = roles.contains('FREELANCE');
     final isSeller = roles.contains('VENDEUR');

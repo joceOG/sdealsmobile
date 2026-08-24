@@ -10,6 +10,7 @@ import '../jobpageblocm/jobPageBlocM.dart';
 import '../jobpageblocm/jobPageStateM.dart';
 import '../jobpageblocm/jobPageEventM.dart';
 import '../../../../data/models/prestataire.dart'; // ✅ Import nécessaire
+import '../../../../data/utils/display_text.dart';
 // ✅ Design System
 import '../../../../design_system/design_system.dart';
 
@@ -180,8 +181,10 @@ class _FullMapScreenMState extends State<FullMapScreenM> {
         // Fallback pour Map (données du backend)
         final utilisateur = provider['utilisateur'];
         if (utilisateur is Map<String, dynamic>) {
-          providerName = '${utilisateur['prenom'] ?? ''} ${utilisateur['nom'] ?? ''}'.trim();
-          if (providerName.isEmpty) providerName = 'Prestataire';
+          providerName = personNameFromMap(
+            utilisateur,
+            fallback: 'Prestataire',
+          );
         }
         
         final service = provider['service'];
@@ -206,8 +209,11 @@ class _FullMapScreenMState extends State<FullMapScreenM> {
         try {
           final prestataireData = provider as dynamic;
           if (prestataireData.utilisateur != null) {
-            providerName = '${prestataireData.utilisateur.prenom ?? ''} ${prestataireData.utilisateur.nom ?? ''}'.trim();
-            if (providerName.isEmpty) providerName = 'Prestataire';
+            providerName = joinPersonName(
+              prenom: prestataireData.utilisateur.prenom,
+              nom: prestataireData.utilisateur.nom,
+              fallback: 'Prestataire',
+            );
           }
           
           if (prestataireData.service != null) {

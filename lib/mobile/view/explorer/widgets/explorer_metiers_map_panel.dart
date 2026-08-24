@@ -5,6 +5,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:intl/intl.dart';
 
 import 'package:sdealsmobile/data/models/prestataire.dart';
+import 'package:sdealsmobile/data/utils/display_text.dart';
 import 'package:sdealsmobile/data/utils/media_url.dart';
 import 'package:sdealsmobile/design_system/design_system.dart';
 import 'package:sdealsmobile/mobile/view/common/widgets/app_image.dart';
@@ -137,7 +138,11 @@ class _ExplorerMetiersMapPanelState extends State<ExplorerMetiersMapPanel> {
   }
 
   String _name(Prestataire p) {
-    final n = '${p.utilisateur.prenom} ${p.utilisateur.nom}'.trim();
+    final n = joinPersonName(
+      prenom: p.utilisateur.prenom,
+      nom: p.utilisateur.nom,
+      fallback: 'Prestataire',
+    );
     return n.isEmpty ? 'Prestataire' : n;
   }
 
@@ -469,6 +474,8 @@ class _ExplorerMiniProviderCard extends StatelessWidget {
                           if (distance != null)
                             Text(
                               distance!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: SDTypography.labelSmall.copyWith(
                                 color: SDColors.neutral600,
                               ),

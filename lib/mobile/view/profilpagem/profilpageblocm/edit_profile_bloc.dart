@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'dart:io';
+import '../../../../data/errors/api_exception.dart';
 import '../../../../data/services/api_client.dart';
 
 // Events
@@ -117,7 +118,7 @@ class EditProfileBloc extends Bloc<EditProfileEvent, EditProfileState> {
       final userData = await _apiClient.getUserById(event.userId);
       emit(EditProfileLoaded(userData));
     } catch (e) {
-      emit(EditProfileError('Erreur lors du chargement du profil: $e'));
+      emit(EditProfileError(ApiException.userFacing(e)));
     }
   }
 
@@ -149,7 +150,7 @@ class EditProfileBloc extends Bloc<EditProfileEvent, EditProfileState> {
 
       emit(EditProfileSuccess('Profil mis à jour avec succès', updatedUser));
     } catch (e) {
-      emit(EditProfileError('Erreur lors de la mise à jour: $e'));
+      emit(EditProfileError(ApiException.userFacing(e)));
     }
   }
 

@@ -289,7 +289,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     TextFormField(
                       controller: _nomController,
                       decoration: const InputDecoration(
-                        labelText: 'Nom *',
+                        labelText: 'Nom',
+                        hintText: 'Ex. Koné',
                         prefixIcon: Icon(Icons.person, color: SDColors.neutral900),
                         border: OutlineInputBorder(),
                         focusedBorder: OutlineInputBorder(
@@ -310,6 +311,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       controller: _prenomController,
                       decoration: const InputDecoration(
                         labelText: 'Prénom',
+                        hintText: 'Ex. Aïcha',
                         prefixIcon:
                             Icon(Icons.person_outline, color: SDColors.neutral900),
                         border: OutlineInputBorder(),
@@ -348,7 +350,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     TextFormField(
                       controller: _emailController,
                       decoration: const InputDecoration(
-                        labelText: 'Email *',
+                        labelText: 'Email',
+                        hintText: 'nom@exemple.com',
                         prefixIcon: Icon(Icons.email, color: SDColors.neutral900),
                         border: OutlineInputBorder(),
                         focusedBorder: OutlineInputBorder(

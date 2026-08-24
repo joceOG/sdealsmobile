@@ -4,6 +4,8 @@ String? normalizeMediaUrl(String? raw) {
   if (raw == null) return null;
   final v = raw.trim();
   if (v.isEmpty) return null;
+  final lower = v.toLowerCase();
+  if (lower == 'null' || lower == 'undefined') return null;
   if (v.startsWith('https://') || v.startsWith('http://')) return v;
   if (v.startsWith('//')) return 'https:$v';
   return null;

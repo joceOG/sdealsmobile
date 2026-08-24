@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../data/utils/display_text.dart';
 import '../colors.dart';
 import '../spacing.dart';
 import '../typography.dart';
@@ -81,20 +82,25 @@ class SDEntityCard extends StatelessWidget {
                         color: SDColors.neutral100,
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: imageUrl != null && imageUrl!.isNotEmpty
-                          ? ClipRRect(
-                              borderRadius: BorderRadius.circular(10),
-                              child: Image.network(
-                                imageUrl!,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => Icon(
-                                  fallbackIcon,
-                                  size: isCompact ? 28 : 36,
-                                  color: ctaColor,
-                                ),
-                              ),
-                            )
-                          : Icon(fallbackIcon, size: isCompact ? 28 : 36, color: ctaColor),
+                      child: () {
+                        final safe = safeImageUrl(imageUrl);
+                        if (safe == null) {
+                          return Icon(fallbackIcon,
+                              size: isCompact ? 28 : 36, color: ctaColor);
+                        }
+                        return ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Image.network(
+                            safe,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Icon(
+                              fallbackIcon,
+                              size: isCompact ? 28 : 36,
+                              color: ctaColor,
+                            ),
+                          ),
+                        );
+                      }(),
                     ),
                     if (promoText != null && promoText!.isNotEmpty)
                       Positioned(

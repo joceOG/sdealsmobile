@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:sdealsmobile/data/utils/display_text.dart';
 import 'package:sdealsmobile/design_system/design_system.dart';
 import 'package:sdealsmobile/mobile/view/common/widgets/app_image.dart';
 
@@ -717,8 +718,11 @@ class ProviderHomeDashboard extends StatelessWidget {
         ...recentReviews.take(3).map((avis) {
           final auteur = avis['utilisateur'] ?? avis['auteur'] ?? {};
           final name = auteur is Map
-              ? '${auteur['prenom'] ?? ''} ${auteur['nom'] ?? ''}'.trim()
-              : '';
+              ? personNameFromMap(
+                  Map<String, dynamic>.from(auteur),
+                  fallback: 'Client',
+                )
+              : 'Client';
           final note = (avis['note'] is num)
               ? (avis['note'] as num).toDouble()
               : double.tryParse('${avis['note']}') ?? 0;

@@ -96,17 +96,6 @@ class _SDButtonState extends State<SDButton> {
     }
   }
   
-  double get _fontSize {
-    switch (widget.size) {
-      case SDButtonSize.large:
-        return 16;
-      case SDButtonSize.medium:
-        return 14;
-      case SDButtonSize.small:
-        return 12;
-    }
-  }
-  
   double get _iconSize {
     switch (widget.size) {
       case SDButtonSize.large:
@@ -120,21 +109,35 @@ class _SDButtonState extends State<SDButton> {
   
   @override
   Widget build(BuildContext context) {
+    final textStyle = switch (widget.size) {
+      SDButtonSize.large => SDTypography.labelLarge,
+      SDButtonSize.medium => SDTypography.labelMedium,
+      SDButtonSize.small => SDTypography.labelSmall,
+    };
+
     final content = widget.isLoading
         ? SizedBox(
-            width: 24,
-            height: 24,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              valueColor: AlwaysStoppedAnimation<Color>(
-                widget.type == SDButtonType.outlined || widget.type == SDButtonType.text
-                    ? SDColors.primary600
-                    : SDColors.white,
+            width: _buttonHeight,
+            height: _buttonHeight,
+            child: Center(
+              child: SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    widget.type == SDButtonType.outlined ||
+                            widget.type == SDButtonType.text
+                        ? SDColors.primary600
+                        : SDColors.white,
+                  ),
+                ),
               ),
             ),
           )
         : Row(
             mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               if (widget.icon != null && !widget.iconRight) ...[
                 Icon(widget.icon, size: _iconSize),
@@ -145,11 +148,8 @@ class _SDButtonState extends State<SDButton> {
                   widget.text,
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
-                  style: TextStyle(
-                    fontSize: _fontSize,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.5,
-                  ),
+                  textAlign: TextAlign.center,
+                  style: textStyle,
                 ),
               ),
               if (widget.icon != null && widget.iconRight) ...[

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:io';
@@ -6,11 +7,15 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:sdealsmobile/data/models/categorie.dart';
 import 'package:diacritic/diacritic.dart';
+import '../errors/api_exception.dart';
 import '../models/article.dart';
 import '../models/groupe.dart';
+import '../models/phone_verification_config.dart';
 import '../models/service.dart';
 import 'cache_service.dart';
 import 'token_store.dart';
+
+export '../errors/api_exception.dart';
 
 // http://180.149.197.115:3000/
 
@@ -35,12 +40,31 @@ class GooglePhoneVerificationRequiredException implements Exception {
   String toString() => message;
 }
 
+/// STAB-12E — Compte local existant avec le même email (pas de liaison silencieuse).
+class GoogleAccountLinkRequiredException implements Exception {
+  final String message;
+  final String? hint;
+  const GoogleAccountLinkRequiredException({
+    this.message =
+        'Un compte existe déjà avec cette adresse email. '
+        'Connectez-vous avec votre email et votre mot de passe.',
+    this.hint,
+  });
+  @override
+  String toString() => hint != null && hint!.isNotEmpty
+      ? '$message\n$hint'
+      : message;
+}
+
 class ApiClient {
   // URL de production
   // final String baseUrl='http://180.149.197.115:3000/api';
   // URL configurable selon la plateforme
 
   var apiUrl = dotenv.env['API_URL'];
+
+  /// STAB-12D — cache config téléphone (autorité backend).
+  static PhoneVerificationConfig? _phoneVerificationConfigCache;
 
   /// Décodage UTF-8 fiable (évite les mojibake latin1 de response.body).
   static dynamic decodeJson(http.Response response) {
@@ -49,6 +73,21 @@ class ApiClient {
 
   static String decodeBody(http.Response response) {
     return utf8.decode(response.bodyBytes);
+  }
+
+  /// STAB-12A — lève [ApiException] (message UI, fieldErrors).
+  static Never throwApiError(
+    http.Response response, {
+    String? fallbackMessage,
+  }) {
+    ApiErrorParser.throwFromResponse(
+      response,
+      fallbackMessage: fallbackMessage,
+    );
+  }
+
+  static Never throwCaughtAsApi(Object error, [StackTrace? st]) {
+    throw ApiErrorParser.fromCaught(error, st);
   }
   // Logout uniquement si le refresh a réellement échoué (voir [_sendAuthorized]).
   static void Function()? onUnauthorized;
@@ -368,12 +407,14 @@ class ApiClient {
 
       if (response.statusCode == 200) {
         return decodeJson(response);
-      } else {
-        throw Exception(
-            'Erreur lors de la mise à jour: ${response.statusCode}');
       }
-    } catch (e) {
-      throw Exception('Erreur API: $e');
+      throwApiError(response, fallbackMessage: 'Impossible de mettre à jour le profil.');
+    } on ApiException {
+      rethrow;
+    } on UnauthorizedException {
+      rethrow;
+    } catch (e, st) {
+      throwCaughtAsApi(e, st);
     }
   }
 
@@ -383,11 +424,14 @@ class ApiClient {
       final response = await get('/utilisateur/$userId');
       if (response.statusCode == 200) {
         return decodeJson(response);
-      } else {
-        throw Exception('Erreur lors du chargement: ${response.statusCode}');
       }
-    } catch (e) {
-      throw Exception('Erreur API: $e');
+      throwApiError(response, fallbackMessage: 'Impossible de charger le profil.');
+    } on ApiException {
+      rethrow;
+    } on UnauthorizedException {
+      rethrow;
+    } catch (e, st) {
+      throwCaughtAsApi(e, st);
     }
   }
 
@@ -772,13 +816,27 @@ class ApiClient {
         headers: {"Content-Type": "application/json"},
         body: jsonEncode(body),
       );
+      if (response.statusCode == 200) {
+        return _decodeOtpResponse(response);
+      }
+      // OTP : conserver messages métier (expiré / incorrect / cooldown)
       final data = _decodeOtpResponse(response);
-      if (response.statusCode == 200) return data;
-      throw Exception(_otpErrorMessage(data, response.statusCode));
+      final otpMsg = _otpErrorMessage(data, response.statusCode);
+      final parsed = ApiErrorParser.fromResponse(response);
+      throw ApiException(
+        statusCode: response.statusCode,
+        code: parsed.code,
+        message: otpMsg,
+        fieldErrors: parsed.fieldErrors,
+      );
+    } on ApiException {
+      rethrow;
     } on SocketException {
-      throw Exception('Connexion impossible. Vérifiez votre réseau.');
+      throw ApiException.network();
     } on http.ClientException {
-      throw Exception('Connexion impossible. Vérifiez votre réseau.');
+      throw ApiException.network();
+    } catch (e, st) {
+      throwCaughtAsApi(e, st);
     }
   }
 
@@ -803,13 +861,29 @@ class ApiClient {
         headers: {"Content-Type": "application/json"},
         body: jsonEncode(body),
       );
+      if (response.statusCode == 200) {
+        return _decodeOtpResponse(response);
+      }
       final data = _decodeOtpResponse(response);
-      if (response.statusCode == 200) return data;
-      throw Exception(_otpErrorMessage(data, response.statusCode));
+      final otpMsg = _otpErrorMessage(data, response.statusCode);
+      final parsed = ApiErrorParser.fromResponse(response);
+      throw ApiException(
+        statusCode: response.statusCode,
+        code: parsed.code,
+        message: otpMsg,
+        fieldErrors: {
+          ...parsed.fieldErrors,
+          if (!parsed.fieldErrors.containsKey('code')) 'code': otpMsg,
+        },
+      );
+    } on ApiException {
+      rethrow;
     } on SocketException {
-      throw Exception('Connexion impossible. Vérifiez votre réseau.');
+      throw ApiException.network();
     } on http.ClientException {
-      throw Exception('Connexion impossible. Vérifiez votre réseau.');
+      throw ApiException.network();
+    } catch (e, st) {
+      throwCaughtAsApi(e, st);
     }
   }
 
@@ -864,27 +938,30 @@ class ApiClient {
     return 'Impossible de vérifier le téléphone. Réessayez.';
   }
 
-  Future<Map<String, dynamic>> registerUser(
-      {required String fullName,
-      required String phone,
-      String? phoneCountry,
-      required String password,
-      String? email,
-      String? phoneVerificationToken,
-      String role = "Client"}) async {
+  Future<Map<String, dynamic>> registerUser({
+    required String nom,
+    String? prenom,
+    required String phone,
+    String? phoneCountry,
+    required String password,
+    String? email,
+    String? phoneVerificationToken,
+    String role = "Client",
+  }) async {
     final url = Uri.parse("$apiUrl/register");
 
-    final parts = fullName.trim().split(" ");
-    final nom = parts.isNotEmpty ? parts.first : "";
-    final prenom = parts.length > 1 ? parts.sublist(1).join(" ") : "";
-
     final body = <String, dynamic>{
-      "nom": nom,
-      "prenom": prenom,
-      "telephone": phone,
+      "nom": nom.trim(),
       "password": password,
       "role": role,
     };
+    final prenomTrim = prenom?.trim();
+    if (prenomTrim != null && prenomTrim.isNotEmpty) {
+      body["prenom"] = prenomTrim;
+    }
+    if (phone.trim().isNotEmpty) {
+      body["telephone"] = phone;
+    }
     if (phoneCountry != null && phoneCountry.isNotEmpty) {
       body["phoneCountry"] = phoneCountry;
     }
@@ -902,21 +979,16 @@ class ApiClient {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         return decodeJson(response) as Map<String, dynamic>;
-      } else {
-        String message;
-        try {
-          final error = decodeJson(response);
-          message =
-              error["error"] ?? error["message"] ?? "Erreur d'inscription";
-        } catch (_) {
-          message = "Erreur inconnue (${response.statusCode})";
-        }
-        throw Exception(message);
       }
+      throwApiError(response, fallbackMessage: "Erreur d'inscription");
+    } on ApiException {
+      rethrow;
     } on SocketException {
-      throw Exception('Connexion impossible. Vérifiez votre réseau.');
+      throw ApiException.network();
     } on http.ClientException {
-      throw Exception('Connexion impossible. Vérifiez votre réseau.');
+      throw ApiException.network();
+    } catch (e, st) {
+      throwCaughtAsApi(e, st);
     }
   }
 
@@ -927,12 +999,13 @@ class ApiClient {
     bool rememberMe = false,
   }) async {
     try {
-      // Vérification locale
       if (identifiant.trim().isEmpty || password.trim().isEmpty) {
-        throw Exception("Identifiant et mot de passe requis");
+        throw const ApiException(
+          message: 'Identifiant et mot de passe requis',
+          statusCode: 400,
+        );
       }
 
-      // Construire le body avec identifiant unique attendu par le backend
       final Map<String, String> body = {
         "identifiant": identifiant.trim(),
         "password": password.trim(),
@@ -947,32 +1020,41 @@ class ApiClient {
         body: jsonEncode(body),
       );
 
-      final data = decodeJson(response);
+      Map<String, dynamic> data;
+      try {
+        final decoded = decodeJson(response);
+        data = decoded is Map<String, dynamic>
+            ? decoded
+            : <String, dynamic>{};
+      } catch (_) {
+        throwApiError(response, fallbackMessage: 'Échec de connexion');
+      }
 
       assert(() {
-        // Ne jamais logger le body (JWT / hash) — même en debug, pas le payload brut
-        print("📥 Login status=${response.statusCode} token=${data["token"] != null}");
+        print(
+            "📥 Login status=${response.statusCode} token=${data["token"] != null}");
         return true;
       }());
 
       if (response.statusCode == 200) {
-        // Vérifier que le token est présent
         if (data["token"] == null) {
-          throw Exception("Token manquant dans la réponse");
+          throw const ApiException(
+            message: 'Connexion incomplète. Réessayez.',
+            statusCode: 200,
+          );
         }
-
-        // Sauvegarde du token si rememberMe activé
-        if (rememberMe && data["token"] != null) {
-          // Exemple: SharedPreferences
-          // final prefs = await SharedPreferences.getInstance();
-          // await prefs.setString("token", data["token"]);
-        }
-        return data; // { utilisateur: {...}, token: "xxx" }
+        return data;
       }
 
-      throw Exception(data["error"] ?? "Échec de connexion (${response.statusCode})");
-    } catch (e) {
+      throwApiError(response, fallbackMessage: 'Échec de connexion');
+    } on ApiException {
       rethrow;
+    } on SocketException {
+      throw ApiException.network();
+    } on http.ClientException {
+      throw ApiException.network();
+    } catch (e, st) {
+      throwCaughtAsApi(e, st);
     }
   }
 
@@ -992,16 +1074,26 @@ class ApiClient {
         }),
       );
 
-      final data = decodeJson(response);
+      Map<String, dynamic> data;
+      try {
+        final decoded = decodeJson(response);
+        data = decoded is Map<String, dynamic>
+            ? decoded
+            : <String, dynamic>{};
+      } catch (_) {
+        throwApiError(response, fallbackMessage: 'Connexion Google impossible');
+      }
+
       if (response.statusCode == 200) {
         if (data["token"] == null) {
-          throw Exception("Token manquant dans la réponse");
+          throw const ApiException(
+            message: 'Connexion Google incomplète. Réessayez.',
+          );
         }
-        return data as Map<String, dynamic>;
+        return data;
       }
 
       if (response.statusCode == 403 &&
-          data is Map &&
           data["code"]?.toString() == 'PHONE_VERIFICATION_REQUIRED') {
         throw GooglePhoneVerificationRequiredException(
           email: data["email"]?.toString(),
@@ -1011,18 +1103,40 @@ class ApiClient {
         );
       }
 
-      throw Exception(
-        _googleUserFacingError(
-          data is Map ? data["error"]?.toString() : null,
-          response.statusCode,
-        ),
-      );
+      if (response.statusCode == 409) {
+        final code = data["code"]?.toString();
+        if (code == 'ACCOUNT_LINK_REQUIRED') {
+          throw GoogleAccountLinkRequiredException(
+            message: data["message"]?.toString() ??
+                data["error"]?.toString() ??
+                'Un compte existe déjà avec cette adresse email. '
+                    'Connectez-vous avec votre email et votre mot de passe.',
+            hint: data["hint"]?.toString(),
+          );
+        }
+        if (code == 'GOOGLE_ID_MISMATCH') {
+          throw GoogleAccountLinkRequiredException(
+            message: data["message"]?.toString() ??
+                data["error"]?.toString() ??
+                'Ce compte Google ne correspond pas au compte Soutrali '
+                    'associé à cette adresse email.',
+          );
+        }
+      }
+
+      throwApiError(response, fallbackMessage: 'Connexion Google impossible');
     } on GooglePhoneVerificationRequiredException {
       rethrow;
+    } on GoogleAccountLinkRequiredException {
+      rethrow;
+    } on ApiException {
+      rethrow;
     } on SocketException {
-      throw Exception('Connexion impossible. Vérifiez votre réseau.');
+      throw ApiException.network();
     } on http.ClientException {
-      throw Exception('Connexion impossible. Vérifiez votre réseau.');
+      throw ApiException.network();
+    } catch (e, st) {
+      throwCaughtAsApi(e, st);
     }
   }
 
@@ -1050,23 +1164,132 @@ class ApiClient {
         headers: {"Content-Type": "application/json"},
         body: jsonEncode(body),
       );
-      final data = decodeJson(response);
+
+      Map<String, dynamic> data;
+      try {
+        final decoded = decodeJson(response);
+        data = decoded is Map<String, dynamic>
+            ? decoded
+            : <String, dynamic>{};
+      } catch (_) {
+        throwApiError(
+          response,
+          fallbackMessage: 'Finalisation Google impossible',
+        );
+      }
+
       if (response.statusCode == 200 || response.statusCode == 201) {
         if (data["token"] == null) {
-          throw Exception("Token manquant dans la réponse");
+          throw const ApiException(
+            message: 'Connexion Google incomplète. Réessayez.',
+          );
         }
-        return data as Map<String, dynamic>;
+        return data;
       }
-      throw Exception(
-        _googleUserFacingError(
-          data is Map ? data["error"]?.toString() : null,
-          response.statusCode,
-        ),
+
+      if (response.statusCode == 403 &&
+          data["code"]?.toString() == 'PHONE_VERIFICATION_REQUIRED') {
+        throw GooglePhoneVerificationRequiredException(
+          email: data["email"]?.toString(),
+          message: data["message"]?.toString() ??
+              data["error"]?.toString() ??
+              'Vérification du téléphone requise',
+        );
+      }
+
+      if (response.statusCode == 409) {
+        final code = data["code"]?.toString();
+        if (code == 'ACCOUNT_LINK_REQUIRED' || code == 'GOOGLE_ID_MISMATCH') {
+          throw GoogleAccountLinkRequiredException(
+            message: data["message"]?.toString() ??
+                data["error"]?.toString() ??
+                'Un compte existe déjà avec cette adresse email. '
+                    'Connectez-vous avec votre email et votre mot de passe.',
+            hint: data["hint"]?.toString(),
+          );
+        }
+      }
+
+      throwApiError(
+        response,
+        fallbackMessage: 'Finalisation Google impossible',
       );
+    } on GooglePhoneVerificationRequiredException {
+      rethrow;
+    } on GoogleAccountLinkRequiredException {
+      rethrow;
+    } on ApiException {
+      rethrow;
     } on SocketException {
-      throw Exception('Connexion impossible. Vérifiez votre réseau.');
+      throw ApiException.network();
     } on http.ClientException {
-      throw Exception('Connexion impossible. Vérifiez votre réseau.');
+      throw ApiException.network();
+    } catch (e, st) {
+      throwCaughtAsApi(e, st);
+    }
+  }
+
+  /// STAB-12D — politique publique (required|deferred).
+  Future<PhoneVerificationConfig> fetchPhoneVerificationConfig({
+    bool forceRefresh = false,
+  }) async {
+    if (!forceRefresh && _phoneVerificationConfigCache != null) {
+      return _phoneVerificationConfigCache!;
+    }
+    try {
+      final response = await http
+          .get(Uri.parse('$apiUrl/config/phone-verification'))
+          .timeout(const Duration(seconds: 15));
+      if (response.statusCode == 200) {
+        final decoded = decodeJson(response);
+        if (decoded is Map<String, dynamic>) {
+          _phoneVerificationConfigCache =
+              PhoneVerificationConfig.fromJson(decoded);
+          return _phoneVerificationConfigCache!;
+        }
+      }
+    } on ApiException {
+      rethrow;
+    } catch (_) {
+      // Fallback legacy : Google requis, signup selon OTP_REQUIRED côté serveur.
+    }
+    return PhoneVerificationConfig.legacy;
+  }
+
+  @visibleForTesting
+  static void debugClearPhoneVerificationConfigCache() {
+    _phoneVerificationConfigCache = null;
+  }
+
+  /// STAB-12D — vérification téléphone volontaire (compte déjà connecté).
+  Future<Map<String, dynamic>> verifyAuthenticatedUserPhone({
+    required String telephone,
+    String? phoneCountry,
+    required String phoneVerificationToken,
+  }) async {
+    try {
+      final response = await post('/utilisateur/phone/verify-complete', body: {
+        'telephone': telephone,
+        if (phoneCountry != null && phoneCountry.isNotEmpty)
+          'phoneCountry': phoneCountry,
+        'phoneVerificationToken': phoneVerificationToken,
+      });
+
+      if (response.statusCode == 200) {
+        return decodeJson(response) as Map<String, dynamic>;
+      }
+      throwApiError(
+        response,
+        fallbackMessage: 'Impossible de vérifier le téléphone. Réessayez.',
+      );
+    } on ApiException {
+      rethrow;
+    } on SocketException {
+      throw ApiException.network();
+    } on http.ClientException {
+      throw ApiException.network();
+    } catch (e, st) {
+      throwCaughtAsApi(e, st);
     }
   }
 
@@ -1286,8 +1509,9 @@ class ApiClient {
     print('Récupération des vendeurs depuis le backend');
 
     try {
-      final response =
-          await http.get(Uri.parse('${dotenv.env['API_URL']}/vendeur'));
+      final response = await http
+          .get(Uri.parse('${dotenv.env['API_URL']}/vendeur'))
+          .timeout(const Duration(seconds: 20));
 
       if (response.statusCode == 200) {
         dynamic responseData = decodeJson(response);
@@ -1310,8 +1534,9 @@ class ApiClient {
           vendeursJson = responseData['vendeurs'] ?? [];
           print('Format objet avec propriété vendeurs détecté');
         } else {
-          throw Exception(
-              'Format de réponse inattendu: ${responseData.runtimeType}');
+          throw const ApiException(
+            message: 'Réponse serveur invalide pour les boutiques.',
+          );
         }
 
         print('Vendeurs récupérés: ${vendeursJson.length}');
@@ -1322,6 +1547,8 @@ class ApiClient {
           final vendeur = vendeursJson[i];
           if (vendeur is Map<String, dynamic>) {
             result.add(vendeur);
+          } else if (vendeur is Map) {
+            result.add(Map<String, dynamic>.from(vendeur));
           } else {
             print(
                 'Erreur: Vendeur à l\'index $i n\'est pas un Map: ${vendeur.runtimeType}');
@@ -1330,13 +1557,21 @@ class ApiClient {
 
         print('Vendeurs valides après conversion: ${result.length}');
         return result;
-      } else {
-        throw Exception(
-            'Échec de récupération des vendeurs: ${response.statusCode}');
       }
-    } catch (e) {
-      print('Erreur dans fetchVendeurs: $e');
-      throw Exception('Échec de chargement des vendeurs: $e');
+      throwApiError(
+        response,
+        fallbackMessage: 'Impossible de charger les boutiques. Réessayez.',
+      );
+    } on ApiException {
+      rethrow;
+    } on TimeoutException {
+      throw ApiException.timeout();
+    } on SocketException {
+      throw ApiException.network();
+    } on http.ClientException {
+      throw ApiException.network();
+    } catch (e, st) {
+      throwCaughtAsApi(e, st);
     }
   }
 
@@ -1679,20 +1914,35 @@ class ApiClient {
     print('Récupération du freelance: $id');
 
     try {
-      final response =
-          await http.get(Uri.parse('${dotenv.env['API_URL']}/freelance/$id'));
+      final response = await http
+          .get(Uri.parse('${dotenv.env['API_URL']}/freelance/$id'))
+          .timeout(const Duration(seconds: 20));
 
       if (response.statusCode == 200) {
         Map<String, dynamic> freelanceJson = decodeJson(response);
         print('Freelance récupéré: ${freelanceJson['name']}');
         return freelanceJson;
-      } else {
-        throw Exception(
-            'Échec de récupération du freelance: ${response.statusCode}');
       }
-    } catch (e) {
-      print('Erreur dans getFreelanceById: $e');
-      throw Exception('Échec de chargement du freelance: $e');
+      if (response.statusCode == 404) {
+        throw const ApiException(
+          statusCode: 404,
+          message: 'Ce profil est introuvable.',
+        );
+      }
+      throwApiError(
+        response,
+        fallbackMessage: 'Impossible de charger ce profil. Réessayez.',
+      );
+    } on ApiException {
+      rethrow;
+    } on TimeoutException {
+      throw ApiException.timeout();
+    } on SocketException {
+      throw ApiException.network();
+    } on http.ClientException {
+      throw ApiException.network();
+    } catch (e, st) {
+      throwCaughtAsApi(e, st);
     }
   }
 
@@ -1725,6 +1975,37 @@ class ApiClient {
     } catch (e) {
       print('Erreur dans updateFreelanceRating: $e');
       throw Exception('Échec de mise à jour de la note: $e');
+    }
+  }
+
+  /// STAB-12C — méthode de classe (overrideable tests) pour ajout panier.
+  Future<Map<String, dynamic>> addToCart({
+    required String userId,
+    required String articleId,
+    required String vendeurId,
+    int quantite = 1,
+    Map<String, String>? variantes,
+  }) async {
+    try {
+      final response = await post('/cart/add', body: {
+        'userId': userId,
+        'articleId': articleId,
+        'vendeurId': vendeurId,
+        'quantite': quantite,
+        if (variantes != null) 'variantes': variantes,
+      });
+
+      if (response.statusCode == 200) {
+        return ApiClient.decodeJson(response) as Map<String, dynamic>;
+      }
+      ApiClient.throwApiError(
+        response,
+        fallbackMessage: 'Impossible d\'ajouter au panier. Réessayez.',
+      );
+    } on ApiException {
+      rethrow;
+    } catch (e, st) {
+      ApiClient.throwCaughtAsApi(e, st);
     }
   }
 }
@@ -1936,29 +2217,6 @@ extension CartApi on ApiClient {
       return ApiClient.decodeJson(response) as Map<String, dynamic>;
     }
     throw Exception('Erreur récupération panier: ${response.statusCode}');
-  }
-
-  // ✅ Ajouter un article au panier
-  Future<Map<String, dynamic>> addToCart({
-    required String userId,
-    required String articleId,
-    required String vendeurId,
-    int quantite = 1,
-    Map<String, String>? variantes,
-  }) async {
-    final response = await post('/cart/add', body: {
-      'userId': userId,
-      'articleId': articleId,
-      'vendeurId': vendeurId,
-      'quantite': quantite,
-      if (variantes != null) 'variantes': variantes,
-    });
-
-    if (response.statusCode == 200) {
-      return ApiClient.decodeJson(response) as Map<String, dynamic>;
-    }
-    throw Exception(
-        'Erreur ajout au panier: ${response.statusCode} ${response.body}');
   }
 
   // ✅ Modifier la quantité d'un article

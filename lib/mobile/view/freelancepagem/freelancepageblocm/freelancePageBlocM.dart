@@ -12,6 +12,7 @@ import 'dart:convert';
 import 'package:sdealsmobile/data/models/categorie.dart';
 import 'package:sdealsmobile/data/models/service.dart';
 import 'package:sdealsmobile/data/services/api_client.dart';
+import 'package:sdealsmobile/data/utils/display_text.dart';
 
 /// Timeout réseau Freelance — évite un Loading indéfini.
 const Duration _kFreelanceTimeout = Duration(seconds: 15);
@@ -328,13 +329,13 @@ class FreelancePageBlocM
       Map<String, dynamic> formData) {
     // Récupérer les données personnelles
     final fullName = formData['fullName'] as String? ?? '';
-    final nameParts = fullName.trim().split(' ');
-    final nom = nameParts.isNotEmpty ? nameParts.first : '';
-    final prenom = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+    final split = splitPersonNameInput(fullName);
+    final nom = split.nom;
+    final prenom = split.prenom;
 
     return {
       "nom": nom,
-      "prenom": prenom,
+      if (prenom != null && prenom.isNotEmpty) "prenom": prenom,
       "telephone": formData['phone'] ?? '',
       "email": formData['email'] ?? '',
       "password":

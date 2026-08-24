@@ -57,6 +57,27 @@ class GoogleOtpResendRequestedM extends LoginPageEventM {}
 
 class GooglePhoneCancelledM extends LoginPageEventM {}
 
+/// STAB-12D — ignorer la vérification facultative (mode deferred).
+class GooglePhoneSkippedM extends LoginPageEventM {}
+
+/// STAB-12D — démarrer vérification téléphone après session deferred.
+class StartDeferredPhoneVerifyM extends LoginPageEventM {
+  final String token;
+  final String? refreshToken;
+  final Map<String, dynamic> utilisateur;
+  final bool rememberMe;
+
+  StartDeferredPhoneVerifyM({
+    required this.token,
+    required this.utilisateur,
+    this.refreshToken,
+    this.rememberMe = true,
+  });
+
+  @override
+  List<Object?> get props => [token, refreshToken, utilisateur, rememberMe];
+}
+
 class GooglePhoneChangedM extends LoginPageEventM {
   final String phone;
   final String phoneCountry;

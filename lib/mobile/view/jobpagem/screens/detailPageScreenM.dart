@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:sdealsmobile/data/services/api_client.dart';
 import 'package:sdealsmobile/data/services/authCubit.dart';
+import 'package:sdealsmobile/data/utils/display_text.dart';
 import 'package:sdealsmobile/mobile/view/orderpagem/screens/service_request_summary_screen.dart';
 import 'package:sdealsmobile/mobile/view/jobpagem/screens/provider_profile_screen.dart';
 import 'package:sdealsmobile/mobile/view/common/widgets/app_image.dart';
@@ -286,7 +287,10 @@ class _DetailPageState extends State<DetailPage> {
       list = list.where((p) {
         final u = p['utilisateur'];
         final nom = u is Map
-            ? '${u['nom'] ?? ''} ${u['prenom'] ?? ''}'.toLowerCase()
+            ? personNameFromMap(
+                Map<String, dynamic>.from(u),
+                fallback: '',
+              ).toLowerCase()
             : '';
         final loc = (p['localisation'] ?? '').toString().toLowerCase();
         final specs = p['specialite'] is List
@@ -441,9 +445,10 @@ class _DetailPageState extends State<DetailPage> {
   String _displayName(Map<String, dynamic> p) {
     final u = p['utilisateur'];
     if (u is Map) {
-      final s =
-          '${u['prenom'] ?? ''} ${u['nom'] ?? ''}'.trim();
-      if (s.isNotEmpty) return s;
+      return personNameFromMap(
+        Map<String, dynamic>.from(u),
+        fallback: 'Prestataire',
+      );
     }
     return 'Prestataire';
   }
@@ -1525,17 +1530,27 @@ class _DetailPageState extends State<DetailPage> {
                           ),
                           hint: Text('Sélectionnez un prestataire', style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral500)),
                           items: _filteredSortedProviders.map((provider) {
-                            final prenom = provider['utilisateur']?['prenom'] ?? '';
-                            final nom = provider['utilisateur']?['nom'] ?? 'Inconnu';
-                            final price = provider['prixprestataire'] ?? 0;
-                            final note = provider['note'] ?? 'N/A';
+                            final u = provider['utilisateur'] is Map
+                                ? Map<String, dynamic>.from(
+                                    provider['utilisateur'] as Map)
+                                : null;
+                            final name = personNameFromMap(
+                              u,
+                              fallback: 'Prestataire',
+                            );
+                            final price = provider['prixprestataire'];
+                            final note = cleanDisplayPart(provider['note']);
+                            final priceLabel =
+                                formatOptionalPrice(price, suffix: 'F') ??
+                                    'Sur devis';
+                            final noteLabel = note ?? '—';
                             return DropdownMenuItem<String>(
                               value: provider['_id']?.toString(),
                               child: Row(
                                 children: [
                                   Expanded(
                                     child: Text(
-                                      '$prenom $nom',
+                                      name,
                                       style: SDTypography.bodyMedium.copyWith(fontWeight: FontWeight.w500),
                                       overflow: TextOverflow.ellipsis,
                                     ),
@@ -1543,12 +1558,12 @@ class _DetailPageState extends State<DetailPage> {
                                   Icon(Icons.star, size: 14, color: SDColors.warning500),
                                   SizedBox(width: SDSpacing.xxxs),
                                   Text(
-                                    '$note',
+                                    noteLabel,
                                     style: SDTypography.labelSmall.copyWith(color: SDColors.neutral600),
                                   ),
                                   SizedBox(width: SDSpacing.xs),
                                   Text(
-                                    '${price}F',
+                                    priceLabel,
                                     style: SDTypography.bodySmall.copyWith(
                                       fontWeight: FontWeight.bold,
                                       color: SDColors.primary700,
@@ -1971,8 +1986,10 @@ class _DetailProvidersMapState extends State<_DetailProvidersMap> {
   static String _name(Map<String, dynamic> p) {
     final u = p['utilisateur'];
     if (u is Map) {
-      final s = '${u['prenom'] ?? ''} ${u['nom'] ?? ''}'.trim();
-      if (s.isNotEmpty) return s;
+      return personNameFromMap(
+        Map<String, dynamic>.from(u),
+        fallback: 'Prestataire',
+      );
     }
     return 'Prestataire';
   }

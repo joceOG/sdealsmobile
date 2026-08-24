@@ -265,7 +265,8 @@ class _ProviderPersonalInfoStepState extends State<ProviderPersonalInfoStep> {
           SizedBox(height: SDSpacing.sm),
           SDInput(
             label: 'Mot de passe *',
-            hint: 'Au moins 6 caractères',
+            hint: 'Créez un mot de passe',
+            helperText: '6 caractères minimum',
             controller: _passwordController,
             prefixIcon: Icons.lock_outline,
             obscureText: true,

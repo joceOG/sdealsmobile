@@ -7,6 +7,7 @@ import '../bloc/planning_event.dart';
 import '../bloc/planning_state.dart';
 import '../../../../data/services/api_client.dart';
 import '../../../../data/services/authCubit.dart';
+import '../../../../data/utils/display_text.dart';
 import '../../../../design_system/design_system.dart';
 
 /// Écran Planning prestataire — layout type Figma (KPI + timeline + légende).
@@ -351,7 +352,10 @@ class ProviderPlanningScreenState extends State<ProviderPlanningScreen> {
     if (t.isNotEmpty) return t;
     final u = p['utilisateur'];
     if (u is Map) {
-      final name = '${u['prenom'] ?? ''} ${u['nom'] ?? ''}'.trim();
+      final name = personNameFromMap(
+        Map<String, dynamic>.from(u),
+        fallback: 'Client',
+      );
       if (name.isNotEmpty) return name;
     }
     return 'Mission';

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../data/models/utilisateur.dart';
+import '../../../../data/models/phone_verification_config.dart';
 import '../../../../data/services/api_client.dart';
 import '../../../../data/services/authCubit.dart';
 import '../../../../data/services/google_auth_service.dart';
@@ -13,6 +14,7 @@ import '../registerpageblocm/registerPageStateM.dart';
 
 import '../../../../design_system/design_system.dart';
 import '../../common/utils/app_snackbar.dart';
+import '../../common/widgets/auth_form_widgets.dart';
 import '../../common/widgets/phone_country_field.dart';
 
 class RegisterPageScreenM extends StatefulWidget {
@@ -22,13 +24,11 @@ class RegisterPageScreenM extends StatefulWidget {
   State<RegisterPageScreenM> createState() => _RegisterPageScreenMState();
 }
 
-class _RegisterPageScreenMState extends State<RegisterPageScreenM>
-    with SingleTickerProviderStateMixin {
+class _RegisterPageScreenMState extends State<RegisterPageScreenM> {
   bool agreeToTerms = false;
-  late AnimationController _animationController;
-  late Animation<double> _logoScale;
 
-  late final TextEditingController _fullNameController;
+  late final TextEditingController _prenomController;
+  late final TextEditingController _nomController;
   late final TextEditingController _emailController;
   late final TextEditingController _phoneController;
   late final TextEditingController _passwordController;
@@ -37,11 +37,16 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
   late final ValueNotifier<bool> _canSubmitNotifier;
   PhoneCountryOption _selectedPhoneCountry = kDefaultPhoneCountries.first;
   String? _lastCanonicalPhone;
+  PhoneVerificationConfig? _phoneConfig;
 
   @override
   void initState() {
     super.initState();
-    _fullNameController = TextEditingController();
+    ApiClient().fetchPhoneVerificationConfig().then((cfg) {
+      if (mounted) setState(() => _phoneConfig = cfg);
+    });
+    _prenomController = TextEditingController();
+    _nomController = TextEditingController();
     _emailController = TextEditingController();
     _phoneController = TextEditingController();
     _passwordController = TextEditingController();
@@ -56,7 +61,8 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
       }
     }
 
-    _fullNameController.addListener(syncCanSubmit);
+    _prenomController.addListener(syncCanSubmit);
+    _nomController.addListener(syncCanSubmit);
     _emailController.addListener(syncCanSubmit);
     _phoneController.addListener(() {
       syncCanSubmit();
@@ -64,18 +70,6 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
     });
     _passwordController.addListener(syncCanSubmit);
     _confirmPasswordController.addListener(syncCanSubmit);
-
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 900),
-    );
-    _logoScale = Tween<double>(begin: 1.0, end: 1.04).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: Curves.easeOutCubic,
-      ),
-    );
-    _animationController.forward();
   }
 
   void _notifyPhoneChanged() {
@@ -95,21 +89,32 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
 
   @override
   void dispose() {
-    _fullNameController.dispose();
+    _prenomController.dispose();
+    _nomController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     _otpController.dispose();
     _canSubmitNotifier.dispose();
-    _animationController.dispose();
     super.dispose();
   }
 
+  bool get _isDeferredSignup =>
+      _phoneConfig != null &&
+      _phoneConfig!.isDeferred &&
+      !_phoneConfig!.signupRequiresOtp;
+
   bool _computeCanSubmit() {
+    final deferredSignup = _isDeferredSignup;
+    final emailOk =
+        !deferredSignup || _emailController.text.trim().contains('@');
+    final phoneOk =
+        deferredSignup || _phoneController.text.trim().isNotEmpty;
     return agreeToTerms &&
-        _fullNameController.text.trim().isNotEmpty &&
-        _phoneController.text.trim().isNotEmpty &&
+        _nomController.text.trim().length >= 2 &&
+        emailOk &&
+        phoneOk &&
         _passwordController.text.isNotEmpty &&
         _confirmPasswordController.text.isNotEmpty &&
         _passwordController.text == _confirmPasswordController.text;
@@ -139,7 +144,8 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
   void _submit(BuildContext context) {
     context.read<RegisterPageBlocM>().add(
           RegisterSubmitted(
-            fullName: _fullNameController.text.trim(),
+            prenom: _prenomController.text.trim(),
+            nom: _nomController.text.trim(),
             email: _emailController.text.trim(),
             phone: _phoneController.text.trim(),
             phoneCountry: _selectedPhoneCountry.isoCode.name,
@@ -194,6 +200,11 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
           'Vérifiez votre téléphone via Connexion Google pour finaliser.',
         );
         context.go('/login');
+      } on GoogleAccountLinkRequiredException catch (e) {
+        if (!context.mounted) return;
+        await GoogleAuthService.instance.signOut();
+        AppSnackBar.error(context, e.toString());
+        context.go('/login');
       }
     } catch (e) {
       if (!context.mounted) return;
@@ -227,15 +238,7 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
           useGradient: false,
           backgroundColor: SDColors.white,
           centerTitle: false,
-          leading: IconButton(
-            icon: const Icon(
-              Icons.arrow_back,
-              size: 24,
-              color: SDColors.neutral900,
-            ),
-            onPressed: _handleBack,
-            tooltip: 'Retour',
-          ),
+          leading: AuthBackButton(onPressed: _handleBack),
         ),
         body: BlocConsumer<RegisterPageBlocM, RegisterPageStateM>(
           listenWhen: (prev, curr) =>
@@ -294,51 +297,54 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
   }
 
   Widget _buildFormStep(BuildContext context, RegisterPageStateM state) {
+    final phoneLabel = _isDeferredSignup
+        ? 'Numéro de téléphone (facultatif)'
+        : 'Numéro de téléphone';
+    final phoneHelper = _isDeferredSignup
+        ? 'Vous pourrez le vérifier plus tard.'
+        : null;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SDSpacing.verticalSmallGap,
-        Center(
-          child: ScaleTransition(
-            scale: _logoScale,
-            child: Image.asset('assets/logo1.png', height: 100),
-          ),
+        const AuthCompactHeader(
+          title: 'Créer un compte',
+          subtitle: 'Rejoignez Soutrali Deals',
+          logoHeight: 88,
         ),
-        SDSpacing.verticalLargeGap,
-        Text(
-          'Créer un compte',
-          textAlign: TextAlign.center,
-          style: SDTypography.displayMedium.copyWith(
-            color: SDColors.neutral900,
-          ),
-        ),
-        SDSpacing.verticalTinyGap,
-        Text(
-          'Rejoignez Soutrali Deals pour commencer',
-          textAlign: TextAlign.center,
-          style: SDTypography.bodyLarge.copyWith(
-            color: SDColors.neutral600,
-          ),
-        ),
-        SDSpacing.verticalLargeGap,
+        const AuthFieldGap(large: true),
         SDInput(
-          label: 'Nom complet',
-          hint: 'Entrez votre nom complet',
+          label: 'Prénom',
+          hint: 'Ex. Aïcha',
           prefixIcon: Icons.person_outline,
-          controller: _fullNameController,
+          controller: _prenomController,
+          errorText: _fieldError(state, const ['prenom']),
         ),
-        SDSpacing.verticalDefaultGap,
+        const AuthFieldGap(),
         SDInput(
-          label: 'Email (optionnel)',
-          hint: 'Ex: nom@exemple.com',
+          label: 'Nom',
+          hint: 'Ex. Koné',
+          prefixIcon: Icons.badge_outlined,
+          controller: _nomController,
+          errorText: _fieldError(state, const ['nom']),
+        ),
+        const AuthFieldGap(),
+        SDInput(
+          label: 'Email',
+          hint: 'nom@exemple.com',
           keyboardType: TextInputType.emailAddress,
           prefixIcon: Icons.email_outlined,
           controller: _emailController,
+          errorText: _fieldError(state, const ['email']),
         ),
-        SDSpacing.verticalDefaultGap,
+        const AuthFieldGap(),
         PhoneCountryField(
           controller: _phoneController,
           selectedCountry: _selectedPhoneCountry,
+          label: phoneLabel,
+          helperText: phoneHelper,
+          hint: '07 00 00 00 00',
+          errorText: _fieldError(state, const ['telephone', 'phone']),
           onCountryChanged: (c) {
             setState(() {
               _selectedPhoneCountry = c;
@@ -346,70 +352,43 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
             });
             _notifyPhoneChanged();
           },
-          hint: 'Ex: 20113786',
         ),
-        SDSpacing.verticalTinyGap,
-        Text(
-          'Pays disponibles : CI, TN, SN, BF, ML, FR',
-          style: SDTypography.bodySmall.copyWith(
-            color: SDColors.neutral500,
-          ),
-        ),
-        SDSpacing.verticalDefaultGap,
+        const AuthFieldGap(),
         SDInput(
           label: 'Mot de passe',
           hint: 'Créez un mot de passe',
+          helperText: '6 caractères minimum',
           obscureText: true,
           prefixIcon: Icons.lock_outline,
           controller: _passwordController,
+          errorText: _fieldError(state, const ['password']),
         ),
-        SDSpacing.verticalDefaultGap,
+        const AuthFieldGap(),
         SDInput(
-          label: 'Confirmez le mot de passe',
+          label: 'Confirmer le mot de passe',
           hint: 'Répétez le mot de passe',
           obscureText: true,
           prefixIcon: Icons.lock_reset,
           controller: _confirmPasswordController,
+          errorText: _fieldError(state, const ['confirmPassword', 'password']),
         ),
-        SDSpacing.verticalSmallGap,
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(top: 2),
-              child: Checkbox(
-                value: agreeToTerms,
-                activeColor: SDColors.primary600,
-                onChanged: (value) {
-                  setState(() {
-                    agreeToTerms = value ?? false;
-                  });
-                  final v = _computeCanSubmit();
-                  if (_canSubmitNotifier.value != v) {
-                    _canSubmitNotifier.value = v;
-                  }
-                },
-              ),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.only(top: 14),
-                child: Text(
-                  "J'accepte les termes et conditions",
-                  style: SDTypography.bodyMedium.copyWith(
-                    color: SDColors.neutral800,
-                  ),
-                ),
-              ),
-            ),
-          ],
+        const AuthFieldGap(large: true),
+        AuthTermsAcceptance(
+          value: agreeToTerms,
+          onChanged: (value) {
+            setState(() => agreeToTerms = value);
+            final v = _computeCanSubmit();
+            if (_canSubmitNotifier.value != v) {
+              _canSubmitNotifier.value = v;
+            }
+          },
         ),
-        SDSpacing.verticalMediumGap,
+        const AuthFieldGap(large: true),
         ValueListenableBuilder<bool>(
           valueListenable: _canSubmitNotifier,
           builder: (context, canSubmit, _) {
             return SDButton(
-              text: 'CONTINUER',
+              text: 'Créer mon compte',
               fullWidth: true,
               isLoading: state.isBusy,
               onPressed: state.isBusy || !canSubmit
@@ -418,28 +397,14 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
             );
           },
         ),
-        SDSpacing.verticalLargeGap,
-        Row(
-          children: [
-            Expanded(child: Divider(color: SDColors.neutral300)),
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: SDSpacing.sm),
-              child: Text(
-                'OU',
-                style: SDTypography.bodySmall.copyWith(
-                  color: SDColors.neutral500,
-                ),
-              ),
-            ),
-            Expanded(child: Divider(color: SDColors.neutral300)),
-          ],
-        ),
-        SDSpacing.verticalMediumGap,
+        const AuthFieldGap(large: true),
+        const AuthOrDivider(label: 'ou'),
+        const AuthFieldGap(),
         SDGoogleSignInButton(
           isLoading: state.isBusy,
           onPressed: state.isBusy ? null : () => _signInWithGoogle(context),
         ),
-        SDSpacing.verticalMediumGap,
+        const AuthFieldGap(),
         Wrap(
           alignment: WrapAlignment.center,
           crossAxisAlignment: WrapCrossAlignment.center,
@@ -454,7 +419,7 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
               onPressed: () => context.go('/login'),
               style: TextButton.styleFrom(
                 padding: EdgeInsets.symmetric(
-                  horizontal: SDSpacing.xs,
+                  horizontal: SDSpacing.xxs,
                   vertical: SDSpacing.xxxs,
                 ),
                 minimumSize: Size.zero,
@@ -464,6 +429,7 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
                 'Connectez-vous',
                 style: SDTypography.labelLarge.copyWith(
                   color: SDColors.primary600,
+                  fontWeight: FontWeight.w600,
                   decoration: TextDecoration.underline,
                   decorationColor: SDColors.primary600,
                 ),
@@ -471,17 +437,7 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
             ),
           ],
         ),
-        SDSpacing.verticalMediumGap,
-        Text(
-          'En vous inscrivant, vous reconnaissez avoir pris connaissance de nos documents légaux.',
-          textAlign: TextAlign.center,
-          style: SDTypography.bodySmall.copyWith(
-            color: SDColors.neutral500,
-          ),
-        ),
-        SDSpacing.verticalSmallGap,
-        const SDLegalFooterLinks(),
-        SDSpacing.verticalSmallGap,
+        SizedBox(height: SDSpacing.sm),
       ],
     );
   }
@@ -527,6 +483,7 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
             hintText: '••••••',
             counterText: '',
             prefixIcon: const Icon(Icons.sms_outlined),
+            errorText: _fieldError(state, const ['code', 'otp']),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
             ),
@@ -535,8 +492,8 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
         SDSpacing.verticalMediumGap,
         SDButton(
           text: state.phase == RegisterPhase.registering
-              ? 'CRÉATION DU COMPTE…'
-              : 'VÉRIFIER ET CRÉER MON COMPTE',
+              ? 'Création du compte…'
+              : 'Vérifier et créer mon compte',
           fullWidth: true,
           isLoading: state.phase == RegisterPhase.verifyingOtp ||
               state.phase == RegisterPhase.registering ||
@@ -579,5 +536,13 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM>
         ),
       ],
     );
+  }
+
+  String? _fieldError(RegisterPageStateM state, List<String> keys) {
+    for (final k in keys) {
+      final v = state.fieldErrors[k];
+      if (v != null && v.isNotEmpty) return v;
+    }
+    return null;
   }
 }

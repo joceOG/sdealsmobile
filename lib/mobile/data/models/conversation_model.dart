@@ -1,4 +1,5 @@
 import 'message_model.dart';
+import 'package:sdealsmobile/data/utils/display_text.dart';
 
 enum ConversationType {
   prestataire,
@@ -97,11 +98,11 @@ class ConversationModel {
         (json['messagesNonLus'] as num?)?.toInt() ??
         0;
 
-    // Nom affiché : préférer prénom + nom
-    final prenom = interlocuteur?['prenom']?.toString() ?? '';
-    final nom = interlocuteur?['nom']?.toString() ?? '';
-    final participantName =
-        '${prenom} ${nom}'.trim().isNotEmpty ? '${prenom} ${nom}'.trim() : 'Utilisateur';
+    // Nom affiché : préférer prénom + nom (STAB-12B)
+    final participantName = personNameFromMap(
+      interlocuteur,
+      fallback: 'Utilisateur',
+    );
 
     return ConversationModel(
       id: json['conversationId']?.toString() ?? json['_id']?.toString() ?? '',
@@ -110,11 +111,7 @@ class ConversationModel {
           interlocuteur?['id']?.toString() ??
           '',
       participantName: participantName,
-      participantImage: () {
-        final photo = interlocuteur?['photoProfil']?.toString().trim() ?? '';
-        if (photo.isEmpty || photo == 'null') return '';
-        return photo;
-      }(),
+      participantImage: safeImageUrl(interlocuteur?['photoProfil']) ?? '',
       lastMessage: lastMessage,
       lastUpdated: json['updatedAt'] != null
           ? DateTime.parse(json['updatedAt'].toString())

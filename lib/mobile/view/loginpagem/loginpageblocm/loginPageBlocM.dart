@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:phone_numbers_parser/phone_numbers_parser.dart';
+import 'package:sdealsmobile/data/errors/api_exception.dart';
 import 'package:sdealsmobile/data/services/api_client.dart';
 import 'package:sdealsmobile/data/services/google_auth_service.dart';
 import 'package:sdealsmobile/data/services/token_store.dart';
@@ -26,6 +27,8 @@ class LoginPageBlocM extends Bloc<LoginPageEventM, LoginPageStateM> {
     on<GoogleOtpSubmittedM>(_onGoogleOtpSubmitted);
     on<GoogleOtpResendRequestedM>(_onGoogleResend);
     on<GooglePhoneCancelledM>(_onGooglePhoneCancelled);
+    on<GooglePhoneSkippedM>(_onGooglePhoneSkipped);
+    on<StartDeferredPhoneVerifyM>(_onStartDeferredPhoneVerify);
     on<GooglePhoneChangedM>(_onGooglePhoneChanged);
     on<GoogleResendTickM>(_onResendTick);
   }
@@ -111,7 +114,10 @@ class LoginPageBlocM extends Bloc<LoginPageEventM, LoginPageStateM> {
         refreshToken: refreshToken,
       ));
     } catch (error) {
-      emit(LoginPageFailureM(error: _userFacing(error)));
+      emit(LoginPageFailureM(
+        error: _userFacing(error),
+        fieldErrors: _fieldErrors(error),
+      ));
     }
   }
 
@@ -143,9 +149,15 @@ class LoginPageBlocM extends Bloc<LoginPageEventM, LoginPageStateM> {
           email: e.email,
           rememberMe: event.rememberMe,
         ));
+      } on GoogleAccountLinkRequiredException catch (e) {
+        await _google.signOut();
+        emit(LoginPageFailureM(error: e.toString()));
       }
     } catch (error) {
-      emit(LoginPageFailureM(error: _googleFacing(error)));
+      emit(LoginPageFailureM(
+        error: _googleFacing(error),
+        fieldErrors: _fieldErrors(error),
+      ));
     } finally {
       _googleInFlight = false;
     }
@@ -179,6 +191,9 @@ class LoginPageBlocM extends Bloc<LoginPageEventM, LoginPageStateM> {
       utilisateur: utilisateur.toMap(),
       shouldUpdateAuth: true,
       refreshToken: refreshToken,
+      phoneVerificationSuggested:
+          response['phoneVerificationSuggested'] == true &&
+              !utilisateur.telephoneVerified,
     ));
   }
 
@@ -219,6 +234,7 @@ class LoginPageBlocM extends Bloc<LoginPageEventM, LoginPageStateM> {
       phoneCountry: event.phoneCountry.toUpperCase(),
       clearPhoneVerificationToken: true,
       clearError: true,
+      clearFieldErrors: true,
     ));
 
     try {
@@ -236,6 +252,7 @@ class LoginPageBlocM extends Bloc<LoginPageEventM, LoginPageStateM> {
       emit(next.copyWith(
         phase: GooglePhonePhase.error,
         errorMessage: _userFacing(e),
+        fieldErrors: _fieldErrors(e),
       ));
     }
   }
@@ -284,6 +301,7 @@ class LoginPageBlocM extends Bloc<LoginPageEventM, LoginPageStateM> {
       phase: GooglePhonePhase.sendingOtp,
       clearPhoneVerificationToken: true,
       clearError: true,
+      clearFieldErrors: true,
     ));
     try {
       await _api.sendPhoneOtp(telephone: phone, phoneCountry: country);
@@ -297,6 +315,7 @@ class LoginPageBlocM extends Bloc<LoginPageEventM, LoginPageStateM> {
       emit(next.copyWith(
         phase: GooglePhonePhase.error,
         errorMessage: _userFacing(e),
+        fieldErrors: _fieldErrors(e),
       ));
     }
   }
@@ -324,6 +343,7 @@ class LoginPageBlocM extends Bloc<LoginPageEventM, LoginPageStateM> {
     emit(cur.copyWith(
       phase: GooglePhonePhase.verifyingOtp,
       clearError: true,
+      clearFieldErrors: true,
     ));
 
     try {
@@ -350,6 +370,11 @@ class LoginPageBlocM extends Bloc<LoginPageEventM, LoginPageStateM> {
         phoneVerificationToken: token,
       ));
 
+      if (mid.isDeferredOptional) {
+        await _completeDeferredOptionalVerify(emit, mid, phone, country, token);
+        return;
+      }
+
       final response = await _api.completeGoogleSignIn(
         idToken: mid.googleIdToken,
         telephone: phone,
@@ -369,9 +394,84 @@ class LoginPageBlocM extends Bloc<LoginPageEventM, LoginPageStateM> {
       emit(next.copyWith(
         phase: GooglePhonePhase.error,
         clearPhoneVerificationToken: true,
-        errorMessage: _userFacing(e),
+        errorMessage: _deferredOtpErrorMessage(e),
+        fieldErrors: _fieldErrors(e),
       ));
     }
+  }
+
+  String _deferredOtpErrorMessage(Object error) {
+    final msg = _userFacing(error);
+    if (msg.contains('SMS') || msg.contains('sms')) return msg;
+    return msg;
+  }
+
+  void _onGooglePhoneSkipped(
+    GooglePhoneSkippedM event,
+    Emitter<LoginPageStateM> emit,
+  ) {
+    final cur = state;
+    if (cur is! LoginGooglePhoneRequiredM || !cur.isDeferredOptional) return;
+    _resendTimer?.cancel();
+    final token = cur.pendingToken ?? '';
+    final utilisateur = cur.pendingUtilisateur ?? {};
+    if (token.isEmpty) {
+      emit(LoginPageInitialM());
+      return;
+    }
+    emit(LoginPageSuccessM(
+      token: token,
+      utilisateur: utilisateur,
+      shouldUpdateAuth: true,
+      refreshToken: cur.pendingRefreshToken,
+      phoneVerificationSuggested: false,
+    ));
+  }
+
+  void _onStartDeferredPhoneVerify(
+    StartDeferredPhoneVerifyM event,
+    Emitter<LoginPageStateM> emit,
+  ) {
+    _resendTimer?.cancel();
+    emit(LoginGooglePhoneRequiredM(
+      googleIdToken: '',
+      rememberMe: event.rememberMe,
+      email: event.utilisateur['email']?.toString(),
+      isDeferredOptional: true,
+      pendingToken: event.token,
+      pendingRefreshToken: event.refreshToken,
+      pendingUtilisateur: Map<String, dynamic>.from(event.utilisateur),
+    ));
+  }
+
+  Future<void> _completeDeferredOptionalVerify(
+    Emitter<LoginPageStateM> emit,
+    LoginGooglePhoneRequiredM mid,
+    String phone,
+    String country,
+    String verificationToken,
+  ) async {
+    final result = await _api.verifyAuthenticatedUserPhone(
+      telephone: phone,
+      phoneCountry: country,
+      phoneVerificationToken: verificationToken,
+    );
+    _resendTimer?.cancel();
+    final utilisateurData =
+        result['utilisateur'] as Map<String, dynamic>? ??
+            mid.pendingUtilisateur ??
+            {};
+    final token = mid.pendingToken ?? '';
+    await _emitGoogleSession(
+      emit,
+      {
+        'token': token,
+        'refreshToken': mid.pendingRefreshToken,
+        'utilisateur': utilisateurData,
+        'phoneVerificationSuggested': false,
+      },
+      rememberMe: mid.rememberMe,
+    );
   }
 
   void _onGooglePhoneCancelled(
@@ -401,16 +501,10 @@ class LoginPageBlocM extends Bloc<LoginPageEventM, LoginPageStateM> {
     ));
   }
 
-  String _userFacing(Object error) {
-    final msg = error.toString().replaceAll('Exception: ', '');
-    if (msg.contains('Exception') ||
-        msg.contains('Socket') ||
-        msg.contains('ApiException') ||
-        msg.contains('PlatformException')) {
-      return 'Une erreur est survenue. Réessayez.';
-    }
-    return msg;
-  }
+  String _userFacing(Object error) => ApiException.userFacing(error);
+
+  Map<String, String> _fieldErrors(Object error) =>
+      error is ApiException ? error.fieldErrors : const {};
 
   String _googleFacing(Object error) {
     final msg = error.toString();

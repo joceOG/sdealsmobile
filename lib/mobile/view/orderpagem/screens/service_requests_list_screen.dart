@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:sdealsmobile/data/services/authCubit.dart';
+import 'package:sdealsmobile/data/utils/display_text.dart';
 import 'package:sdealsmobile/design_system/design_system.dart';
 import '../servicerequestcubit/service_request_cubit.dart';
 import 'service_request_summary_screen.dart';
@@ -120,10 +121,13 @@ class _OrdersBodyState extends State<_OrdersBody> {
     if (p is Map) {
       final u = p['utilisateur'] ?? p['user'];
       if (u is Map) {
-        final nom = '${u['prenom'] ?? ''} ${u['nom'] ?? ''}'.trim();
+        final nom = personNameFromMap(
+          Map<String, dynamic>.from(u),
+          fallback: 'Prestataire',
+        );
         if (nom.isNotEmpty) return nom;
       }
-      if (p['nom'] != null) return p['nom'].toString();
+      if (p['nom'] != null) return cleanDisplayPart(p['nom']);
     }
     return null;
   }

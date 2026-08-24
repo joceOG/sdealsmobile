@@ -65,8 +65,11 @@ class PhoneCountryField extends StatelessWidget {
     required this.selectedCountry,
     required this.onCountryChanged,
     this.label = 'Numéro de téléphone',
-    this.hint = 'Numéro national',
+    this.hint = '07 00 00 00 00',
+    this.helperText,
     this.enabled = true,
+    this.errorText,
+    this.compact = true,
   });
 
   final TextEditingController controller;
@@ -74,74 +77,136 @@ class PhoneCountryField extends StatelessWidget {
   final ValueChanged<PhoneCountryOption> onCountryChanged;
   final String label;
   final String hint;
+  final String? helperText;
   final bool enabled;
+  final String? errorText;
+  final bool compact;
+
+  static const double _fieldHeight = 52;
 
   @override
   Widget build(BuildContext context) {
+    final dialStyle = SDTypography.labelMedium.copyWith(
+      fontSize: compact ? 14 : 16,
+      fontWeight: FontWeight.w600,
+      color: SDColors.neutral800,
+    );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: SDTypography.labelLarge.copyWith(color: SDColors.neutral800),
+          style: SDTypography.labelLarge.copyWith(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: SDColors.neutral800,
+          ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              height: 56,
-              decoration: BoxDecoration(
-                border: Border.all(color: SDColors.neutral300),
-                borderRadius: BorderRadius.circular(12),
-                color: SDColors.white,
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<PhoneCountryOption>(
-                  value: selectedCountry,
-                  isDense: true,
-                  items: kDefaultPhoneCountries
-                      .map(
-                        (c) => DropdownMenuItem(
-                          value: c,
-                          child: Text('${c.flag} ${c.dialCode}'),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: enabled
-                      ? (v) {
-                          if (v != null) onCountryChanged(v);
-                        }
-                      : null,
+            Flexible(
+              flex: compact ? 34 : 40,
+              child: Container(
+                height: _fieldHeight,
+                decoration: BoxDecoration(
+                  border: Border.all(color: SDColors.neutral300),
+                  borderRadius:
+                      BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                  color: SDColors.white,
+                ),
+                padding: EdgeInsets.symmetric(horizontal: compact ? 6 : 8),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<PhoneCountryOption>(
+                    value: selectedCountry,
+                    isExpanded: true,
+                    isDense: true,
+                    icon: Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      size: compact ? 18 : 22,
+                      color: SDColors.neutral600,
+                    ),
+                    items: kDefaultPhoneCountries
+                        .map(
+                          (c) => DropdownMenuItem(
+                            value: c,
+                            child: Text(
+                              '${c.flag} ${c.dialCode}',
+                              style: dialStyle,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: enabled
+                        ? (v) {
+                            if (v != null) onCountryChanged(v);
+                          }
+                        : null,
+                  ),
                 ),
               ),
             ),
             const SizedBox(width: 8),
             Expanded(
+              flex: compact ? 66 : 60,
               child: TextField(
                 controller: controller,
                 enabled: enabled,
                 keyboardType: TextInputType.phone,
+                style: SDTypography.bodyLarge.copyWith(
+                  fontSize: 16,
+                  color: SDColors.neutral900,
+                ),
                 decoration: InputDecoration(
                   hintText: hint,
-                  prefixIcon: const Icon(Icons.phone_android),
+                  hintStyle: SDTypography.bodyMedium.copyWith(
+                    color: SDColors.neutral400,
+                    fontSize: 16,
+                  ),
+                  errorText: errorText,
+                  errorMaxLines: 2,
+                  errorStyle: SDTypography.fieldError,
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius:
+                        BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius:
+                        BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                    borderSide: const BorderSide(color: SDColors.neutral300),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius:
+                        BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                    borderSide: const BorderSide(
+                      color: SDColors.primary600,
+                      width: 2,
+                    ),
                   ),
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 12,
-                    vertical: 16,
+                    vertical: 14,
                   ),
+                  isDense: true,
                 ),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 4),
-        Text(
-          'Pays sélectionné : ${selectedCountry.label}',
-          style: SDTypography.bodySmall.copyWith(color: SDColors.neutral500),
-        ),
+        if (errorText == null && helperText != null && helperText!.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 6, left: 2),
+            child: Text(
+              helperText!,
+              style: SDTypography.helper.copyWith(
+                color: SDColors.neutral600,
+                fontSize: 13,
+              ),
+            ),
+          ),
       ],
     );
   }

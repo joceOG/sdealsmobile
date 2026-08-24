@@ -1,8 +1,9 @@
+import '../../../../data/services/authCubit.dart';
+import '../../../../data/utils/display_text.dart';
+import '../../../../design_system/design_system.dart';
 import 'package:characters/characters.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../../../design_system/design_system.dart';
-import '../../../../data/services/authCubit.dart';
 import 'package:go_router/go_router.dart';
 import '../../orderpagem/screens/service_requests_list_screen.dart';
 import '../profilpageblocm/profilPageBlocM.dart';
@@ -113,11 +114,14 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
         child: BlocBuilder<AuthCubit, AuthState>(
           builder: (context, authState) {
             if (authState is! AuthAuthenticated) {
-              return ListView(
-                children: [
-                  _buildPageTitle('Profil'),
-                  _buildLoginBanner(context),
-                ],
+              return GuestAuthState(
+                pageTitle: 'Profil',
+                title: 'Connectez-vous à votre profil',
+                description:
+                    'Gérez vos informations, favoris, demandes et votre activité Soutrali Deals.',
+                illustrationAsset: _guestProfilIllustration,
+                onPrimary: () => context.push('/login'),
+                onSecondary: () => context.push('/register'),
               );
             }
 
@@ -295,110 +299,21 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
     );
   }
 
-  Widget _buildLoginBanner(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(_hPad, 8, _hPad, 24),
-      child: Column(
-        children: [
-          SizedBox(
-            height: 180,
-            width: double.infinity,
-            child: Image.asset(
-              _guestProfilIllustration,
-              fit: BoxFit.contain,
-              alignment: Alignment.center,
-              filterQuality: FilterQuality.high,
-              errorBuilder: (_, __, ___) => const Center(
-                child: Icon(
-                  Icons.person_outline_rounded,
-                  size: 88,
-                  color: SDColors.neutral300,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Accédez à tous les services autour de vous',
-            style: SDTypography.titleMedium.copyWith(
-              color: SDColors.neutral900,
-              fontWeight: FontWeight.w700,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Connectez-vous pour voir les freelances, vendeurs et artisans',
-            style: SDTypography.bodyMedium.copyWith(
-              color: SDColors.neutral600,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () => context.push('/login'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: SDColors.primary600,
-                foregroundColor: SDColors.white,
-                elevation: 0,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: Text(
-                'Se connecter',
-                style: SDTypography.labelLarge.copyWith(
-                  color: SDColors.white,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton(
-              onPressed: () => context.push('/register'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: SDColors.primary700,
-                side: const BorderSide(color: SDColors.primary600, width: 1.2),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: Text(
-                'Créer un compte',
-                style: SDTypography.labelLarge.copyWith(
-                  color: SDColors.primary700,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildProfileHeader(BuildContext context) {
     final authState = context.read<AuthCubit>().state;
-    final String userName = authState is AuthAuthenticated
+    final String rawName = authState is AuthAuthenticated
         ? authState.utilisateur.fullName
-        : 'Utilisateur';
+        : '';
+    final String userName =
+        rawName.isEmpty ? 'Utilisateur' : rawName;
     final String userEmail = authState is AuthAuthenticated
         ? (authState.utilisateur.email ?? '')
         : '';
     final String? userPhoto = authState is AuthAuthenticated
-        ? authState.utilisateur.photoProfil
+        ? safeImageUrl(authState.utilisateur.photoProfil)
         : null;
 
-    final hasNetworkPhoto = userPhoto != null &&
-        userPhoto.isNotEmpty &&
-        userPhoto.startsWith('http');
+    final hasNetworkPhoto = userPhoto != null;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(_hPad, 12, _hPad, 8),

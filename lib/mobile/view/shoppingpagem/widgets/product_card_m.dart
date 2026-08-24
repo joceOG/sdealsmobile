@@ -4,12 +4,13 @@ import '../shoppingpageblocm/shoppingPageBlocM.dart';
 import '../shoppingpageblocm/shoppingPageStateM.dart' as bloc_model;
 import '../screens/productDetailsScreenM.dart';
 import 'package:sdealsmobile/data/services/authCubit.dart';
-import '../screens/panierProductScreenM.dart';
 import '../shoppingpageblocm/shoppingPageEventM.dart';
+import '../utils/cart_navigation.dart';
 import '../../common/widgets/app_image.dart';
 import '../../../../design_system/colors.dart';
 import '../../../../design_system/typography.dart';
 import '../../../../design_system/spacing.dart';
+import 'package:sdealsmobile/data/utils/display_text.dart';
 
 class ProductCardM extends StatelessWidget {
   final bloc_model.Product product;
@@ -25,6 +26,10 @@ class ProductCardM extends StatelessWidget {
       builder: (context, state) {
         final bool isFavorite =
             state.favoriteProductIds?.contains(product.id) ?? false;
+        final priceLabel = formatOptionalPrice(product.price) ?? product.price;
+        final ratingLabel = formatOptionalRating(product.rating);
+        final showBrand = product.brand.isNotEmpty &&
+            product.brand.toUpperCase() != 'NON SPÉCIFIÉ';
 
         return GestureDetector(
           onTap: () => Navigator.of(context).push(MaterialPageRoute(
@@ -86,12 +91,12 @@ class ProductCardM extends StatelessWidget {
                       ),
 
                     // Badge de la marque (seulement si disponible et valide)
-                    if (product.brand.isNotEmpty &&
-                        product.brand.toUpperCase() != 'NON SPÉCIFIÉ')
+                    if (showBrand)
                       Positioned(
                         top: 0,
                         left: 0,
                         child: Container(
+                          constraints: const BoxConstraints(maxWidth: 100),
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 4),
                           decoration: const BoxDecoration(
@@ -103,6 +108,8 @@ class ProductCardM extends StatelessWidget {
                           ),
                           child: Text(
                             product.brand,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: SDTypography.labelSmall.copyWith(
                               color: SDColors.white,
                               fontWeight: FontWeight.bold,
@@ -143,63 +150,39 @@ class ProductCardM extends StatelessWidget {
                         right: 8,
                         child: InkWell(
                           onTap: () {
-                            // Vérification de l'authentification
                             final authState = context.read<AuthCubit>().state;
-                            
+
                             if (authState is AuthAuthenticated) {
-                              final vendeurId = product.vendeurId ?? 'unknown';
-                              
-                              // Ajout de l'événement au BLoC
+                              final vendeurId = product.vendeurId;
+                              if (!isLikelyMongoObjectId(vendeurId)) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Produit incomplet : vendeur manquant.',
+                                      style: TextStyle(color: SDColors.white),
+                                    ),
+                                    backgroundColor: SDColors.warning500,
+                                  ),
+                                );
+                                return;
+                              }
+
                               context.read<ShoppingPageBlocM>().add(
                                     AddToCartEvent(
-                                      userId: authState.utilisateur.idutilisateur,
+                                      userId: authState
+                                          .utilisateur.idutilisateur,
                                       articleId: product.id,
-                                      vendeurId: vendeurId,
-                                      quantite: 1, // Ajout simple : quantité 1
+                                      vendeurId: vendeurId!,
+                                      quantite: 1,
                                     ),
                                   );
-
-                              // Feedback utilisateur visuel
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Row(
-                                    children: [
-                                      const Icon(Icons.check_circle,
-                                          color: SDColors.white, size: 20),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                            '${product.name} ajouté au panier!', style: TextStyle(color: SDColors.white)),
-                                      ),
-                                    ],
-                                  ),
-                                  backgroundColor: SDColors.success500,
-                                  duration: const Duration(seconds: 2),
-                                  action: SnackBarAction(
-                                    label: 'VOIR',
-                                    textColor: SDColors.white,
-                                    onPressed: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) =>
-                                              BlocProvider.value(
-                                            value: context
-                                                .read<ShoppingPageBlocM>(),
-                                            child: const PanierProductScreenM(),
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ),
-                              );
                             } else {
-                              // Si pas connecté
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
                                   content: Text(
-                                      'Connectez-vous pour ajouter au panier', style: TextStyle(color: SDColors.white)),
+                                      'Connectez-vous pour ajouter au panier',
+                                      style:
+                                          TextStyle(color: SDColors.white)),
                                   backgroundColor: SDColors.warning500,
                                 ),
                               );
@@ -242,16 +225,17 @@ class ProductCardM extends StatelessWidget {
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Marque
-                            Text(
-                              product.brand.toUpperCase(),
-                              style: SDTypography.labelSmall.copyWith(
-                                color: SDColors.neutral500,
-                                letterSpacing: 0.5,
+                            if (showBrand)
+                              Text(
+                                product.brand.toUpperCase(),
+                                style: SDTypography.labelSmall.copyWith(
+                                  color: SDColors.neutral500,
+                                  letterSpacing: 0.5,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
-                              maxLines: 1,
-                            ),
-                            const SizedBox(height: 4),
+                            if (showBrand) const SizedBox(height: 4),
                             // Nom
                             Text(
                               product.name,
@@ -266,39 +250,45 @@ class ProductCardM extends StatelessWidget {
                         ),
                         // Prix et Rating
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            Text(
-                              product.price,
-                              style: SDTypography.titleMedium.copyWith(
-                                color: SDColors.primary600,
-                                fontWeight: FontWeight.bold,
+                            Expanded(
+                              child: Text(
+                                priceLabel,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: SDTypography.titleMedium.copyWith(
+                                  color: SDColors.primary600,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
-                            // Rating Badge
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 4, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: SDColors.warning100,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.star,
-                                      size: 10, color: SDColors.warning500),
-                                  const SizedBox(width: 2),
-                                  Text(
-                                    product.rating.toString(),
-                                    style: SDTypography.labelSmall.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                      color: SDColors.warning500,
+                            if (ratingLabel != null) ...[
+                              const SizedBox(width: 4),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 4, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: SDColors.warning100,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.star,
+                                        size: 10, color: SDColors.warning500),
+                                    const SizedBox(width: 2),
+                                    Text(
+                                      ratingLabel,
+                                      style: SDTypography.labelSmall.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color: SDColors.warning500,
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
-                            ),
+                            ],
                           ],
                         ),
                       ],

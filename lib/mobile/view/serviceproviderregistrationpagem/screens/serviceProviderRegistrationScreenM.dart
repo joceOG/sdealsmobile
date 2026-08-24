@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sdealsmobile/data/services/authCubit.dart';
+import 'package:sdealsmobile/data/utils/display_text.dart';
 import 'package:sdealsmobile/mobile/view/serviceproviderregistrationpagem/screens/steps/provider_activity_details_step.dart';
 import 'package:sdealsmobile/mobile/view/serviceproviderregistrationpagem/screens/steps/provider_personal_info_step.dart';
 import 'package:sdealsmobile/mobile/view/serviceproviderregistrationpagem/screens/steps/provider_pricing_step.dart';
@@ -63,9 +64,11 @@ class _ServiceProviderRegistrationScreenMState
       if (authState is AuthAuthenticated) {
         setState(() {
           _formUnlocked = true;
-          formData['fullName'] =
-              '${authState.utilisateur.prenom ?? ''} ${authState.utilisateur.nom}'
-                  .trim();
+          formData['fullName'] = joinPersonName(
+            prenom: authState.utilisateur.prenom,
+            nom: authState.utilisateur.nom,
+            fallback: '',
+          );
           formData['phone'] = authState.utilisateur.telephone ?? '';
           formData['email'] = authState.utilisateur.email ?? '';
           formData['requirePassword'] = false;

@@ -6,12 +6,15 @@ import 'package:bloc/bloc.dart';
 import 'package:sdealsmobile/data/models/categorie.dart';
 import 'package:sdealsmobile/data/models/vendeur.dart';
 import 'package:sdealsmobile/data/models/cart_model.dart';
+import 'package:sdealsmobile/data/errors/api_exception.dart';
 import 'package:sdealsmobile/data/services/api_client.dart';
 
 class ShoppingPageBlocM extends Bloc<ShoppingPageEventM, ShoppingPageStateM> {
-  final ApiClient _apiClient = ApiClient();
+  final ApiClient _apiClient;
 
-  ShoppingPageBlocM() : super(ShoppingPageStateM.initial()) {
+  ShoppingPageBlocM({ApiClient? apiClient})
+      : _apiClient = apiClient ?? ApiClient(),
+        super(ShoppingPageStateM.initial()) {
     // Events originaux
     on<LoadCategorieDataM>(_onLoadCategorieDataM);
 
@@ -149,10 +152,11 @@ class ShoppingPageBlocM extends Bloc<ShoppingPageEventM, ShoppingPageStateM> {
                 image: imageUrl,
                 size: 'Quantité: ${article.quantiteArticle.toString()}',
                 price: article.prixArticle.isEmpty
-                    ? '0 FCFA'
+                    ? 'Prix non renseigné'
                     : article.prixArticle,
-                brand: 'Non spécifié', // Pas de champ marque disponible
-                rating: 0.0, // Pas de champ note disponible
+                brand: 'Non spécifié',
+                rating: 0.0,
+                vendeurId: article.vendeurId,
               ));
             } catch (e) {
               print('Erreur lors de la conversion de l\'article: $e');
@@ -421,35 +425,38 @@ class ShoppingPageBlocM extends Bloc<ShoppingPageEventM, ShoppingPageStateM> {
     LoadVendeursEvent event,
     Emitter<ShoppingPageStateM> emit,
   ) async {
-    emit(state.copyWith(isLoading: true, error: ''));
+    emit(state.copyWith(
+      isVendeursLoading: true,
+      clearVendeursError: true,
+    ));
 
     try {
       print("Chargement des vendeurs depuis l'API...");
       List<Map<String, dynamic>> vendeursData =
           await _apiClient.fetchVendeurs();
 
-      // ✅ NETTOYER LES DONNÉES AVANT PARSING (FIX UNICODE)
       List<Map<String, dynamic>> vendeursCleans = vendeursData.map((data) {
-        return data; // UTF-8 corrigé côté ApiClient.decodeJson — plus de pansement mojibake
+        return data;
       }).toList();
 
-      // Convertir les données nettoyées en modèles Vendeur
       List<Vendeur> vendeurs =
           vendeursCleans.map((data) => Vendeur.fromJson(data)).toList();
 
       print("Vendeurs chargés: ${vendeurs.length}");
 
       emit(state.copyWith(
-        isLoading: false,
+        isVendeursLoading: false,
         vendeurs: vendeurs,
-        filteredVendeurs: vendeurs, // Initialement, afficher tous les vendeurs
-        error: '',
+        filteredVendeurs: vendeurs,
+        clearVendeursError: true,
       ));
     } catch (e) {
       print("Erreur lors du chargement des vendeurs: $e");
       emit(state.copyWith(
-        isLoading: false,
-        error: "Erreur lors du chargement des vendeurs: $e",
+        isVendeursLoading: false,
+        vendeurs: state.vendeurs ?? const [],
+        filteredVendeurs: state.filteredVendeurs ?? const [],
+        vendeursError: ApiException.userFacing(e),
       ));
     }
   }
@@ -592,7 +599,7 @@ class ShoppingPageBlocM extends Bloc<ShoppingPageEventM, ShoppingPageStateM> {
     AddToCartEvent event,
     Emitter<ShoppingPageStateM> emit,
   ) async {
-    emit(state.copyWith(isAddingToCart: true, cartError: null));
+    emit(state.copyWith(isAddingToCart: true, clearCartError: true));
 
     try {
       print(
@@ -613,11 +620,12 @@ class ShoppingPageBlocM extends Bloc<ShoppingPageEventM, ShoppingPageStateM> {
       emit(state.copyWith(
         cart: cart,
         isAddingToCart: false,
+        clearCartError: true,
       ));
     } catch (error) {
       print('❌ Erreur ajout au panier: $error');
       emit(state.copyWith(
-        cartError: 'Impossible d\'ajouter l\'article: ${error.toString()}',
+        cartError: ApiException.userFacing(error),
         isAddingToCart: false,
       ));
     }

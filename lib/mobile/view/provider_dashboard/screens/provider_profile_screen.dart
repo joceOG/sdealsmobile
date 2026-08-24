@@ -4,6 +4,7 @@ import '../bloc/provider_profile_bloc.dart';
 import '../bloc/provider_profile_event.dart';
 import '../bloc/provider_profile_state.dart';
 import '../../../../data/services/authCubit.dart';
+import '../../../../data/utils/display_text.dart';
 import '../../../../design_system/design_system.dart';
 
 /// Profil = fiche éditable (pas un 2ᵉ dashboard).
@@ -203,7 +204,11 @@ class ProviderProfileScreenState extends State<ProviderProfileScreen> {
   String _authDisplayName() {
     final auth = context.read<AuthCubit>().state;
     if (auth is! AuthAuthenticated) return '';
-    return '${auth.utilisateur.prenom} ${auth.utilisateur.nom}'.trim();
+    return joinPersonName(
+      prenom: auth.utilisateur.prenom,
+      nom: auth.utilisateur.nom,
+      fallback: '',
+    );
   }
 
   String? _authPhoto() {

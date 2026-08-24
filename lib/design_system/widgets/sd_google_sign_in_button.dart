@@ -9,7 +9,7 @@ class SDGoogleSignInButton extends StatelessWidget {
   const SDGoogleSignInButton({
     super.key,
     required this.onPressed,
-    this.label = 'Continuez avec Google',
+    this.label = 'Continuer avec Google',
     this.isLoading = false,
   });
 

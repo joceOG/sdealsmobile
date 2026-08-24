@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:phone_numbers_parser/phone_numbers_parser.dart';
+import '../../../../data/errors/api_exception.dart';
 import '../../../../data/models/utilisateur.dart';
 import '../../../../data/services/api_client.dart';
 import '../../../../data/utils/phone_canonicalizer.dart';
@@ -127,6 +128,127 @@ class RegisterPageBlocM extends Bloc<RegisterPageEventM, RegisterPageStateM> {
       return;
     }
 
+    final nomTrim = event.nom.trim();
+    final prenomTrim = event.prenom.trim();
+    if (nomTrim.length < 2) {
+      emit(state.copyWith(
+        phase: RegisterPhase.error,
+        errorMessage: 'Le nom doit contenir au moins 2 caractères',
+        fieldErrors: const {'nom': 'Le nom doit contenir au moins 2 caractères'},
+      ));
+      return;
+    }
+    if (prenomTrim.isNotEmpty && prenomTrim.length < 2) {
+      emit(state.copyWith(
+        phase: RegisterPhase.error,
+        errorMessage: 'Le prénom doit contenir au moins 2 caractères',
+        fieldErrors: const {
+          'prenom': 'Le prénom doit contenir au moins 2 caractères',
+        },
+      ));
+      return;
+    }
+
+    final config = await _apiClient.fetchPhoneVerificationConfig();
+
+    // STAB-12D — mode deferred : email obligatoire, téléphone facultatif, pas d'OTP bloquant.
+    if (!config.signupRequiresOtp) {
+      final emailTrim = event.email.trim();
+      if (emailTrim.isEmpty || !emailTrim.contains('@')) {
+        emit(state.copyWith(
+          phase: RegisterPhase.error,
+          errorMessage: 'Email requis pour l\'inscription',
+        ));
+        return;
+      }
+
+      String? e164Phone;
+      final phoneRaw = event.phone.trim();
+      if (phoneRaw.isNotEmpty) {
+        try {
+          final iso = IsoCode.values.byName(event.phoneCountry.toUpperCase());
+          e164Phone = PhoneCanonicalizer.toE164(phoneRaw, isoCode: iso);
+        } on PhoneCanonicalizationException catch (e) {
+          emit(state.copyWith(
+            phase: RegisterPhase.error,
+            errorMessage: e.message,
+          ));
+          return;
+        } catch (_) {
+          emit(state.copyWith(
+            phase: RegisterPhase.error,
+            errorMessage:
+                'Numéro de téléphone invalide pour le pays sélectionné.',
+          ));
+          return;
+        }
+      }
+
+      emit(state.copyWith(
+        phase: RegisterPhase.registering,
+        clearErrorMessage: true,
+        clearFieldErrors: true,
+        pendingE164Phone: e164Phone,
+        pendingPhoneCountry: event.phoneCountry.toUpperCase(),
+        pendingPrenom: prenomTrim.isEmpty ? null : prenomTrim,
+        pendingNom: nomTrim,
+        pendingEmail: emailTrim,
+        pendingPassword: event.password,
+      ));
+      registerInFlight += 1;
+      try {
+        final newuser = await _apiClient.registerUser(
+          nom: nomTrim,
+          prenom: prenomTrim.isEmpty ? null : prenomTrim,
+          phone: e164Phone ?? '',
+          phoneCountry: event.phoneCountry.toUpperCase(),
+          password: event.password,
+          email: emailTrim,
+          role: 'Client',
+        );
+
+        if (newuser['utilisateur'] != null && newuser['token'] != null) {
+          final userData = newuser['utilisateur'] as Map<String, dynamic>;
+          final token = newuser['token'].toString();
+          final utilisateurCree = Utilisateur(
+            idutilisateur: userData['_id'] ?? '',
+            nom: userData['nom'] ?? '',
+            prenom: userData['prenom'] ?? '',
+            email: userData['email'],
+            password: '',
+            telephone: userData['telephone']?.toString() ?? '',
+            genre: userData['genre'] ?? '',
+            note: userData['note'],
+            photoProfil: userData['photoProfil'],
+            dateNaissance: userData['datedenaissance'],
+            role: userData['role'] ?? 'Client',
+            telephoneVerified: userData['telephoneVerified'] == true,
+          );
+          emit(state.copyWith(
+            phase: RegisterPhase.success,
+            utilisateur: utilisateurCree,
+            token: token,
+            clearPhoneVerificationToken: true,
+            clearPending: true,
+          ));
+        } else {
+          emit(state.copyWith(
+            phase: RegisterPhase.error,
+            errorMessage: 'Inscription incomplète. Réessayez.',
+          ));
+        }
+      } catch (e) {
+        emit(state.copyWith(
+          phase: RegisterPhase.error,
+          errorMessage: _userFacing(e),
+          fieldErrors: _fieldErrors(e),
+        ));
+      } finally {
+        registerInFlight = 0;
+      }
+      return;
+    }
+
     late final String e164Phone;
     try {
       final iso = IsoCode.values.byName(event.phoneCountry.toUpperCase());
@@ -158,10 +280,12 @@ class RegisterPageBlocM extends Bloc<RegisterPageEventM, RegisterPageStateM> {
     emit(state.copyWith(
       phase: RegisterPhase.sendingOtp,
       clearErrorMessage: true,
+      clearFieldErrors: true,
       clearPhoneVerificationToken: true,
       pendingE164Phone: e164Phone,
       pendingPhoneCountry: event.phoneCountry.toUpperCase(),
-      pendingFullName: event.fullName.trim(),
+      pendingPrenom: prenomTrim.isEmpty ? null : prenomTrim,
+      pendingNom: nomTrim,
       pendingEmail: event.email.trim(),
       pendingPassword: event.password,
     ));
@@ -178,6 +302,7 @@ class RegisterPageBlocM extends Bloc<RegisterPageEventM, RegisterPageStateM> {
       emit(state.copyWith(
         phase: RegisterPhase.error,
         errorMessage: _userFacing(e),
+        fieldErrors: _fieldErrors(e),
         clearPending: true,
         clearPhoneVerificationToken: true,
         clearOtpSentAt: true,
@@ -201,6 +326,7 @@ class RegisterPageBlocM extends Bloc<RegisterPageEventM, RegisterPageStateM> {
     emit(state.copyWith(
       phase: RegisterPhase.sendingOtp,
       clearErrorMessage: true,
+      clearFieldErrors: true,
       clearPhoneVerificationToken: true,
     ));
 
@@ -216,6 +342,7 @@ class RegisterPageBlocM extends Bloc<RegisterPageEventM, RegisterPageStateM> {
       emit(state.copyWith(
         phase: RegisterPhase.error,
         errorMessage: _userFacing(e),
+        fieldErrors: _fieldErrors(e),
       ));
     } finally {
       sendInFlight = 0;
@@ -230,11 +357,12 @@ class RegisterPageBlocM extends Bloc<RegisterPageEventM, RegisterPageStateM> {
     if (state.phase == RegisterPhase.success) return;
     final phone = state.pendingE164Phone;
     final country = state.pendingPhoneCountry;
-    final fullName = state.pendingFullName;
+    final nom = state.pendingNom;
+    final prenom = state.pendingPrenom;
     final password = state.pendingPassword;
     if (phone == null ||
         country == null ||
-        fullName == null ||
+        nom == null ||
         password == null) {
       return;
     }
@@ -251,6 +379,7 @@ class RegisterPageBlocM extends Bloc<RegisterPageEventM, RegisterPageStateM> {
     emit(state.copyWith(
       phase: RegisterPhase.verifyingOtp,
       clearErrorMessage: true,
+      clearFieldErrors: true,
     ));
 
     verifyInFlight += 1;
@@ -291,6 +420,7 @@ class RegisterPageBlocM extends Bloc<RegisterPageEventM, RegisterPageStateM> {
       emit(state.copyWith(
         phase: RegisterPhase.error,
         errorMessage: _userFacing(e),
+        fieldErrors: _fieldErrors(e),
       ));
       return;
     } finally {
@@ -309,7 +439,8 @@ class RegisterPageBlocM extends Bloc<RegisterPageEventM, RegisterPageStateM> {
 
     final phone = state.pendingE164Phone!;
     final country = state.pendingPhoneCountry!;
-    final fullName = state.pendingFullName!;
+    final nom = state.pendingNom!;
+    final prenom = state.pendingPrenom;
     final password = state.pendingPassword!;
     final email = state.pendingEmail;
 
@@ -317,7 +448,8 @@ class RegisterPageBlocM extends Bloc<RegisterPageEventM, RegisterPageStateM> {
     registerInFlight += 1;
     try {
       final newuser = await _apiClient.registerUser(
-        fullName: fullName,
+        nom: nom,
+        prenom: prenom,
         phone: phone,
         phoneCountry: country,
         password: password,
@@ -365,21 +497,15 @@ class RegisterPageBlocM extends Bloc<RegisterPageEventM, RegisterPageStateM> {
       emit(state.copyWith(
         phase: RegisterPhase.error,
         errorMessage: _userFacing(e),
+        fieldErrors: _fieldErrors(e),
       ));
     } finally {
       registerInFlight = 0;
     }
   }
 
-  String _userFacing(Object e) {
-    final msg = e.toString().replaceAll('Exception: ', '');
-    if (msg.contains('Exception') ||
-        msg.contains('Socket') ||
-        msg.contains('bcrypt') ||
-        msg.contains('JWT') ||
-        msg.contains('Stack')) {
-      return 'Une erreur est survenue. Réessayez.';
-    }
-    return msg;
-  }
+  String _userFacing(Object e) => ApiException.userFacing(e);
+
+  Map<String, String> _fieldErrors(Object e) =>
+      e is ApiException ? e.fieldErrors : const {};
 }

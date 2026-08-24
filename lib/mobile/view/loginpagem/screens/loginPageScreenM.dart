@@ -12,6 +12,7 @@ import '../loginpageblocm/loginPageBlocM.dart';
 import '../loginpageblocm/loginPageEventM.dart';
 import '../loginpageblocm/loginPageStateM.dart';
 import '../../common/utils/app_snackbar.dart';
+import '../../common/widgets/auth_form_widgets.dart';
 import '../../common/widgets/phone_country_field.dart';
 
 // ✅ Design System
@@ -25,26 +26,25 @@ class LoginPageScreenM extends StatefulWidget {
   State<LoginPageScreenM> createState() => _LoginPageScreenMState();
 }
 
-class _LoginPageScreenMState extends State<LoginPageScreenM>
-    with SingleTickerProviderStateMixin {
-  bool rememberMe = false;
-  bool isPasswordVisible = false;
-  late AnimationController _animationController;
-  late Animation<double> _logoScale;
+class _LoginPageScreenMState extends State<LoginPageScreenM> {
+  AuthLoginMode _loginMode = AuthLoginMode.phone;
   late final VoidCallback _fieldsListener;
-  final TextEditingController identifiantController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
   final TextEditingController _googlePhoneController = TextEditingController();
   final TextEditingController _googleOtpController = TextEditingController();
   PhoneCountryOption _selectedPhoneCountry = kDefaultPhoneCountries.first;
   PhoneCountryOption _googlePhoneCountry = kDefaultPhoneCountries.first;
 
-  bool get _isEmailIdentifiant =>
-      identifiantController.text.trim().contains('@');
-
-  bool get _canSubmit =>
-      identifiantController.text.trim().isNotEmpty &&
-      passwordController.text.trim().isNotEmpty;
+  bool get _canSubmit {
+    if (_loginMode == AuthLoginMode.email) {
+      return _emailController.text.trim().contains('@') &&
+          passwordController.text.trim().isNotEmpty;
+    }
+    return _phoneController.text.trim().isNotEmpty &&
+        passwordController.text.trim().isNotEmpty;
+  }
 
   @override
   void initState() {
@@ -52,28 +52,18 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
     _fieldsListener = () {
       if (mounted) setState(() {});
     };
-    identifiantController.addListener(_fieldsListener);
+    _phoneController.addListener(_fieldsListener);
+    _emailController.addListener(_fieldsListener);
     passwordController.addListener(_fieldsListener);
-
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 900),
-    );
-    _logoScale = Tween<double>(begin: 1.0, end: 1.04).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: Curves.easeOutCubic,
-      ),
-    );
-    _animationController.forward();
   }
 
   @override
   void dispose() {
-    identifiantController.removeListener(_fieldsListener);
+    _phoneController.removeListener(_fieldsListener);
+    _emailController.removeListener(_fieldsListener);
     passwordController.removeListener(_fieldsListener);
-    _animationController.dispose();
-    identifiantController.dispose();
+    _phoneController.dispose();
+    _emailController.dispose();
     passwordController.dispose();
     _googlePhoneController.dispose();
     _googleOtpController.dispose();
@@ -90,36 +80,23 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
         return Scaffold(
         backgroundColor: SDColors.white,
         appBar: SDAppBar(
-          title: '', // Empty title for minimal look
+          title: '',
           useGradient: false,
           backgroundColor: SDColors.white,
           centerTitle: false,
-          leading: SDCircleCloseButton(
+          showBackButton: false,
+          leading: AuthBackButton(
             onPressed: () => Navigator.of(context).maybePop(),
           ),
         ),
         body: BlocListener<LoginPageBlocM, LoginPageStateM>(
           listener: (context, state) {
             if (state is LoginPageSuccessM) {
-              final utilisateur = Utilisateur.fromMap(state.utilisateur);
-              final userRole = utilisateur.role.toUpperCase();
-              final roles = [userRole];
-              final activeRole = userRole;
-
-              context.read<AuthCubit>().setAuthenticated(
-                    token: state.token,
-                    utilisateur: utilisateur,
-                    roles: roles,
-                    activeRole: activeRole,
-                    refreshToken: state.refreshToken,
-                  );
-              unawaited(context.read<AuthCubit>().refreshRoles());
-
-              final router = GoRouter.of(context);
-              if (Navigator.of(context).canPop()) {
-                Navigator.of(context).pop();
+              if (state.phoneVerificationSuggested) {
+                _promptOptionalPhoneVerification(context, state);
+                return;
               }
-              router.go('/homepage');
+              _finishLogin(context, state);
             } else if (state is LoginPageFailureM) {
               AppSnackBar.error(context, state.error);
             } else if (state is LoginGooglePhoneRequiredM &&
@@ -133,7 +110,7 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
               if (state is LoginGooglePhoneRequiredM) {
                 return _buildGooglePhoneStep(context, state);
               }
-              return _buildLoginForm(context);
+              return _buildLoginForm(context, state);
             },
           ),
         ),
@@ -141,6 +118,79 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
         },
       ),
     );
+  }
+
+  void _finishLogin(BuildContext context, LoginPageSuccessM state) {
+    final utilisateur = Utilisateur.fromMap(state.utilisateur);
+    final userRole = utilisateur.role.toUpperCase();
+    final roles = [userRole];
+    final activeRole = userRole;
+
+    context.read<AuthCubit>().setAuthenticated(
+          token: state.token,
+          utilisateur: utilisateur,
+          roles: roles,
+          activeRole: activeRole,
+          refreshToken: state.refreshToken,
+        );
+    unawaited(context.read<AuthCubit>().refreshRoles());
+
+    final router = GoRouter.of(context);
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    }
+    router.go('/homepage');
+  }
+
+  Future<void> _promptOptionalPhoneVerification(
+    BuildContext context,
+    LoginPageSuccessM state,
+  ) async {
+    final verify = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Vérifier votre téléphone ?'),
+        content: const Text(
+          'Vous pouvez vérifier votre numéro maintenant ou le faire plus tard depuis votre profil.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Plus tard'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Vérifier mon téléphone'),
+          ),
+        ],
+      ),
+    );
+    if (!context.mounted) return;
+    if (verify == true) {
+      context.read<LoginPageBlocM>().add(
+            StartDeferredPhoneVerifyM(
+              token: state.token,
+              refreshToken: state.refreshToken,
+              utilisateur: state.utilisateur,
+            ),
+          );
+    } else {
+      _finishLogin(context, state);
+    }
+  }
+
+  String? _loginFieldError(LoginPageStateM state, List<String> keys) {
+    final map = state is LoginPageFailureM
+        ? state.fieldErrors
+        : state is LoginGooglePhoneRequiredM
+            ? state.fieldErrors
+            : const <String, String>{};
+    for (final k in keys) {
+      final v = map[k];
+      if (v != null && v.isNotEmpty) return v;
+    }
+    return null;
   }
 
   Widget _buildGooglePhoneStep(
@@ -175,9 +225,11 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
             ),
             SDSpacing.verticalTinyGap,
             Text(
-              state.email != null
-                  ? 'Compte Google ${state.email}\nAjoutez un numéro pour continuer.'
-                  : 'Ajoutez un numéro pour finaliser la connexion Google.',
+              state.isDeferredOptional
+                  ? 'Renforcez la sécurité de votre compte en vérifiant votre numéro.'
+                  : (state.email != null
+                      ? 'Compte Google ${state.email}\nAjoutez un numéro pour continuer.'
+                      : 'Ajoutez un numéro pour finaliser la connexion Google.'),
               textAlign: TextAlign.center,
               style: SDTypography.bodyLarge.copyWith(
                 color: SDColors.neutral600,
@@ -188,6 +240,7 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
               PhoneCountryField(
                 controller: _googlePhoneController,
                 selectedCountry: _googlePhoneCountry,
+                errorText: _loginFieldError(state, const ['telephone', 'phone']),
                 onCountryChanged: (c) {
                   setState(() => _googlePhoneCountry = c);
                   context.read<LoginPageBlocM>().add(GooglePhoneChangedM(
@@ -196,16 +249,9 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
                       ));
                 },
               ),
-              SDSpacing.verticalTinyGap,
-              Text(
-                'Pays disponibles : CI, TN, SN, BF, ML, FR',
-                style: SDTypography.bodySmall.copyWith(
-                  color: SDColors.neutral500,
-                ),
-              ),
-              SDSpacing.verticalMediumGap,
+              const AuthFieldGap(),
               SDButton(
-                text: 'ENVOYER LE CODE',
+                text: 'Envoyer le code',
                 fullWidth: true,
                 isLoading: state.phase == GooglePhonePhase.sendingOtp,
                 onPressed: state.isBusy
@@ -225,7 +271,7 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
                 textAlign: TextAlign.center,
                 style: SDTypography.bodyMedium,
               ),
-              SDSpacing.verticalMediumGap,
+              const AuthFieldGap(),
               TextField(
                 controller: _googleOtpController,
                 keyboardType: TextInputType.number,
@@ -233,16 +279,17 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
                 decoration: InputDecoration(
                   labelText: 'Code à 6 chiffres',
                   counterText: '',
+                  errorText: _loginFieldError(state, const ['code', 'otp']),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
               ),
-              SDSpacing.verticalMediumGap,
+              const AuthFieldGap(),
               SDButton(
                 text: state.phase == GooglePhonePhase.completing
-                    ? 'FINALISATION…'
-                    : 'VÉRIFIER ET CONTINUER',
+                    ? 'Finalisation…'
+                    : 'Vérifier et continuer',
                 fullWidth: true,
                 isLoading: state.phase == GooglePhonePhase.verifyingOtp ||
                     state.phase == GooglePhonePhase.completing,
@@ -284,12 +331,22 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
               ),
             ],
             TextButton(
-              onPressed: () {
-                _googlePhoneController.clear();
-                _googleOtpController.clear();
-                context.read<LoginPageBlocM>().add(GooglePhoneCancelledM());
-              },
-              child: const Text('Annuler'),
+              onPressed: state.isBusy
+                  ? null
+                  : () {
+                      _googlePhoneController.clear();
+                      _googleOtpController.clear();
+                      if (state.isDeferredOptional) {
+                        context
+                            .read<LoginPageBlocM>()
+                            .add(GooglePhoneSkippedM());
+                      } else {
+                        context
+                            .read<LoginPageBlocM>()
+                            .add(GooglePhoneCancelledM());
+                      }
+                    },
+              child: Text(state.isDeferredOptional ? 'Plus tard' : 'Annuler'),
             ),
           ],
         ),
@@ -297,226 +354,164 @@ class _LoginPageScreenMState extends State<LoginPageScreenM>
     );
   }
 
-  Widget _buildLoginForm(BuildContext context) {
+  Widget _buildLoginForm(BuildContext context, LoginPageStateM state) {
+    final loading = state is LoginPageLoadingM;
+
     return SingleChildScrollView(
-            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(
-                SDSpacing.md,
-                0,
-                SDSpacing.md,
-                SDSpacing.lg +
-                    MediaQuery.viewPaddingOf(context).bottom +
-                    MediaQuery.viewInsetsOf(context).bottom,
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          SDSpacing.md,
+          SDSpacing.xxs,
+          SDSpacing.md,
+          SDSpacing.md +
+              MediaQuery.viewPaddingOf(context).bottom +
+              MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const AuthCompactHeader(
+              title: 'Bienvenue !',
+              subtitle: 'Connectez-vous pour continuer',
+              logoHeight: 96,
+            ),
+            const AuthFieldGap(large: true),
+            SDGoogleSignInButton(
+              isLoading: loading,
+              onPressed: loading
+                  ? null
+                  : () => context
+                      .read<LoginPageBlocM>()
+                      .add(GoogleLoginSubmittedM()),
+            ),
+            const AuthFieldGap(large: true),
+            const AuthOrDivider(),
+            const AuthFieldGap(large: true),
+            AuthLoginModeToggle(
+              mode: _loginMode,
+              onChanged: (mode) => setState(() => _loginMode = mode),
+            ),
+            const AuthFieldGap(),
+            if (_loginMode == AuthLoginMode.phone)
+              PhoneCountryField(
+                controller: _phoneController,
+                selectedCountry: _selectedPhoneCountry,
+                onCountryChanged: (c) {
+                  setState(() => _selectedPhoneCountry = c);
+                },
+                label: 'Téléphone',
+                hint: '07 00 00 00 00',
+                errorText: _loginFieldError(
+                  state,
+                  const ['telephone', 'phone', 'identifiant'],
+                ),
+              )
+            else
+              SDInput(
+                label: 'Email',
+                hint: 'nom@exemple.com',
+                keyboardType: TextInputType.emailAddress,
+                prefixIcon: Icons.email_outlined,
+                controller: _emailController,
+                errorText: _loginFieldError(state, const ['email', 'identifiant']),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  SDSpacing.verticalMediumGap,
-                  Center(
-                    child: ScaleTransition(
-                      scale: _logoScale,
-                      child: Image.asset(
-                        'assets/logo1.png',
-                        height: 120,
-                      ),
-                    ),
+            const AuthFieldGap(),
+            SDInput(
+              label: 'Mot de passe',
+              hint: 'Entrez votre mot de passe',
+              helperText: '6 caractères minimum',
+              controller: passwordController,
+              obscureText: true,
+              prefixIcon: Icons.lock_outline,
+              errorText: _loginFieldError(state, const ['password']),
+            ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: _showForgotPasswordDialog,
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: Text(
+                  'Mot de passe oublié ?',
+                  style: SDTypography.bodyMedium.copyWith(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: SDColors.primary700,
                   ),
-                  SDSpacing.verticalLargeGap,
-                  Text(
-                    "Bienvenue !",
-                    textAlign: TextAlign.center,
-                    style: SDTypography.displayMedium.copyWith(
-                      color: SDColors.neutral900,
-                    ),
-                  ),
-                  SDSpacing.verticalTinyGap,
-                  Text(
-                    "Connectez-vous pour continuer",
-                    textAlign: TextAlign.center,
-                    style: SDTypography.bodyLarge.copyWith(
-                      color: SDColors.neutral600,
-                    ),
-                  ),
-                  SDSpacing.verticalLargeGap,
-                  
-                  // STAB-07 : pays explicite pour téléphone ; email ignore le pays
-                  PhoneCountryField(
-                    controller: identifiantController,
-                    selectedCountry: _selectedPhoneCountry,
-                    onCountryChanged: (c) {
-                      setState(() => _selectedPhoneCountry = c);
-                    },
-                    label: 'Téléphone ou Email',
-                    hint: _isEmailIdentifiant
-                        ? 'nom@exemple.com'
-                        : 'Ex: 20113786 ou +216…',
-                  ),
-                  SDSpacing.verticalMediumGap,
-                  SDInput(
-                    label: "Mot de passe",
-                    hint: "Entrez votre mot de passe",
-                    controller: passwordController,
-                    obscureText: true,
-                    prefixIcon: Icons.lock_outline,
-                  ),
-                  
-                  SDSpacing.verticalSmallGap,
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Checkbox(
-                            value: rememberMe,
-                            activeColor: SDColors.primary600,
-                            onChanged: (value) {
-                              setState(() {
-                                rememberMe = value ?? false;
-                              });
-                            },
-                          ),
-                          Expanded(
-                            child: Text(
-                              "Se souvenir de moi",
-                              style: SDTypography.bodyMedium,
-                            ),
-                          ),
-                        ],
-                      ),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton(
-                          onPressed: _showForgotPasswordDialog,
-                          style: TextButton.styleFrom(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: SDSpacing.xs,
-                              vertical: SDSpacing.xxxs,
-                            ),
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
-                          child: Text(
-                            "Mot de passe oublié ?",
-                            style: SDTypography.labelMedium.copyWith(
-                              color: SDColors.primary700,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  
-                  SDSpacing.verticalMediumGap,
-                  
-                  BlocBuilder<LoginPageBlocM, LoginPageStateM>(
-                    builder: (context, state) {
-                      final loading = state is LoginPageLoadingM;
-                      return SDButton(
-                        text: "SE CONNECTER",
-                        fullWidth: true,
-                        isLoading: loading,
-                        onPressed: loading || !_canSubmit
-                            ? null
-                            : () {
-                                final id =
-                                    identifiantController.text.trim();
-                                context.read<LoginPageBlocM>().add(
-                                      LoginSubmittedM(
-                                        identifiant: id,
-                                        password:
-                                            passwordController.text.trim(),
-                                        rememberMe: rememberMe,
-                                        phoneCountry: id.contains('@')
-                                            ? null
-                                            : _selectedPhoneCountry
-                                                .isoCode.name,
-                                      ),
-                                    );
-                              },
-                      );
-                    },
-                  ),
-                  
-                  SDSpacing.verticalLargeGap,
-                  Row(
-                    children: [
-                      Expanded(child: Divider(color: SDColors.neutral300)),
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: SDSpacing.sm),
-                        child: Text(
-                          "OU",
-                          style: SDTypography.bodySmall.copyWith(
-                            color: SDColors.neutral500,
-                          ),
-                        ),
-                      ),
-                      Expanded(child: Divider(color: SDColors.neutral300)),
-                    ],
-                  ),
-                  SDSpacing.verticalMediumGap,
-                  SDGoogleSignInButton(
-                    onPressed: () {
-                      context
-                          .read<LoginPageBlocM>()
-                          .add(GoogleLoginSubmittedM());
-                    },
-                  ),
-                  SDSpacing.verticalMediumGap,
-                  Wrap(
-                    alignment: WrapAlignment.center,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      Text(
-                        'Vous n\'avez pas de compte ?',
-                        style: SDTypography.bodyMedium.copyWith(
-                          color: SDColors.neutral800,
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          WidgetsBinding.instance.addPostFrameCallback((_) {
-                            context.push("/register");
-                          });
-                        },
-                        style: TextButton.styleFrom(
-                          padding: EdgeInsets.symmetric(horizontal: SDSpacing.xs, vertical: SDSpacing.xxxs),
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        child: Text(
-                          'S\'inscrire',
-                          style: SDTypography.labelLarge.copyWith(
-                            color: SDColors.primary600,
-                            decoration: TextDecoration.underline,
-                            decorationColor: SDColors.primary600,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  SDSpacing.verticalMediumGap,
-                  Text(
-                    'En utilisant l’application, vous pouvez consulter nos documents légaux ci-dessous.',
-                    textAlign: TextAlign.center,
-                    style: SDTypography.bodySmall.copyWith(
-                      color: SDColors.neutral500,
-                    ),
-                  ),
-                  SDSpacing.verticalSmallGap,
-                  const SDLegalFooterLinks(),
-                  SDSpacing.verticalSmallGap,
-                ],
+                ),
               ),
             ),
+            const AuthFieldGap(large: true),
+            SDButton(
+              text: 'Se connecter',
+              fullWidth: true,
+              isLoading: loading,
+              onPressed: loading || !_canSubmit ? null : () => _submitLogin(context),
+            ),
+            const AuthFieldGap(large: true),
+            Wrap(
+              alignment: WrapAlignment.center,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Text(
+                  'Pas encore de compte ?',
+                  style: SDTypography.bodyMedium.copyWith(
+                    color: SDColors.neutral800,
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => context.push('/register'),
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: SDSpacing.xxs,
+                      vertical: SDSpacing.xxxs,
+                    ),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: Text(
+                    'Créer un compte',
+                    style: SDTypography.labelLarge.copyWith(
+                      color: SDColors.primary600,
+                      fontWeight: FontWeight.w600,
+                      decoration: TextDecoration.underline,
+                      decorationColor: SDColors.primary600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: SDSpacing.sm),
+          ],
+        ),
+      ),
     );
+  }
+
+  void _submitLogin(BuildContext context) {
+    final id = _loginMode == AuthLoginMode.email
+        ? _emailController.text.trim()
+        : _phoneController.text.trim();
+    context.read<LoginPageBlocM>().add(
+          LoginSubmittedM(
+            identifiant: id,
+            password: passwordController.text.trim(),
+            rememberMe: true,
+            phoneCountry: _loginMode == AuthLoginMode.email
+                ? null
+                : _selectedPhoneCountry.isoCode.name,
+          ),
+        );
   }
 
   Future<void> _showForgotPasswordDialog() async {
     final emailField = TextEditingController(
-      text: identifiantController.text.trim().contains('@')
-          ? identifiantController.text.trim()
+      text: _loginMode == AuthLoginMode.email
+          ? _emailController.text.trim()
           : '',
     );
     final submitted = await showDialog<bool>(

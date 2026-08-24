@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:sdealsmobile/data/services/api_client.dart';
+import 'package:sdealsmobile/data/utils/display_text.dart';
 import 'provider_profile_event.dart';
 import 'provider_profile_state.dart';
 
@@ -45,9 +46,10 @@ class ProviderProfileBloc
               ? utilisateurRaw
               : <String, dynamic>{};
 
-          final fullName =
-              '${utilisateur['prenom'] ?? ''} ${utilisateur['nom'] ?? ''}'
-                  .trim();
+          final fullName = personNameFromMap(
+            utilisateur,
+            fallback: 'Prestataire',
+          );
 
           services = _extractServices(data);
           final locationLabel = _extractLocation(data);

@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 import 'package:sdealsmobile/data/models/categorie.dart';
 import 'package:sdealsmobile/data/models/prestataire.dart';
 import 'package:sdealsmobile/data/services/authCubit.dart';
+import 'package:sdealsmobile/data/utils/display_text.dart';
 import 'package:sdealsmobile/data/utils/media_url.dart';
 import 'package:sdealsmobile/design_system/design_system.dart';
 import 'package:sdealsmobile/mobile/view/jobpagem/jobpageblocm/jobPageBlocM.dart';
@@ -281,7 +282,11 @@ class _JobPageViewState extends State<_JobPageView> {
   }
 
   String _providerName(Prestataire p) {
-    final n = '${p.utilisateur.prenom} ${p.utilisateur.nom}'.trim();
+    final n = joinPersonName(
+      prenom: p.utilisateur.prenom,
+      nom: p.utilisateur.nom,
+      fallback: 'Prestataire',
+    );
     return n.isEmpty ? 'Prestataire' : n;
   }
 
@@ -1610,10 +1615,14 @@ class _ProviderCompareCard extends StatelessWidget {
                             const Icon(Icons.star_rounded,
                                 size: 14, color: Color(0xFFFBBF24)),
                             const SizedBox(width: 2),
-                            Text(
-                              rating,
-                              style: SDTypography.labelSmall
-                                  .copyWith(color: SDColors.neutral600),
+                            Flexible(
+                              child: Text(
+                                rating,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: SDTypography.labelSmall
+                                    .copyWith(color: SDColors.neutral600),
+                              ),
                             ),
                             if (distance != null) ...[
                               Text(' · ',
@@ -1622,10 +1631,14 @@ class _ProviderCompareCard extends StatelessWidget {
                               const Icon(Icons.place_outlined,
                                   size: 12, color: SDColors.neutral900),
                               const SizedBox(width: 2),
-                              Text(
-                                distance!,
-                                style: SDTypography.labelSmall
-                                    .copyWith(color: SDColors.neutral600),
+                              Flexible(
+                                child: Text(
+                                  distance!,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: SDTypography.labelSmall
+                                      .copyWith(color: SDColors.neutral600),
+                                ),
                               ),
                             ],
                           ],

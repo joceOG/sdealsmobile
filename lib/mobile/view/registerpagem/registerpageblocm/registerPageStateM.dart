@@ -16,6 +16,8 @@ enum RegisterPhase {
 class RegisterPageStateM extends Equatable {
   final RegisterPhase phase;
   final String? errorMessage;
+  /// STAB-12A : erreurs par champ (telephone, email, password, code…).
+  final Map<String, String> fieldErrors;
   final Utilisateur? utilisateur;
   /// JWT session après inscription réussie — PAS le phoneVerificationToken.
   final String? token;
@@ -23,7 +25,8 @@ class RegisterPageStateM extends Equatable {
   final String? phoneVerificationToken;
   final String? pendingE164Phone;
   final String? pendingPhoneCountry;
-  final String? pendingFullName;
+  final String? pendingPrenom;
+  final String? pendingNom;
   final String? pendingEmail;
   final String? pendingPassword;
   /// Secondes restantes avant resend (UI). Sécurité réelle = backend.
@@ -33,12 +36,14 @@ class RegisterPageStateM extends Equatable {
   const RegisterPageStateM({
     this.phase = RegisterPhase.initial,
     this.errorMessage,
+    this.fieldErrors = const {},
     this.utilisateur,
     this.token,
     this.phoneVerificationToken,
     this.pendingE164Phone,
     this.pendingPhoneCountry,
-    this.pendingFullName,
+    this.pendingPrenom,
+    this.pendingNom,
     this.pendingEmail,
     this.pendingPassword,
     this.resendCooldownSeconds = 0,
@@ -67,13 +72,16 @@ class RegisterPageStateM extends Equatable {
     RegisterPhase? phase,
     String? errorMessage,
     bool clearErrorMessage = false,
+    Map<String, String>? fieldErrors,
+    bool clearFieldErrors = false,
     Utilisateur? utilisateur,
     String? token,
     String? phoneVerificationToken,
     bool clearPhoneVerificationToken = false,
     String? pendingE164Phone,
     String? pendingPhoneCountry,
-    String? pendingFullName,
+    String? pendingPrenom,
+    String? pendingNom,
     String? pendingEmail,
     String? pendingPassword,
     bool clearPending = false,
@@ -86,6 +94,9 @@ class RegisterPageStateM extends Equatable {
       errorMessage: clearErrorMessage
           ? null
           : (errorMessage ?? this.errorMessage),
+      fieldErrors: clearFieldErrors
+          ? const {}
+          : (fieldErrors ?? this.fieldErrors),
       utilisateur: utilisateur ?? this.utilisateur,
       token: token ?? this.token,
       phoneVerificationToken: clearPhoneVerificationToken
@@ -96,8 +107,9 @@ class RegisterPageStateM extends Equatable {
       pendingPhoneCountry: clearPending
           ? null
           : (pendingPhoneCountry ?? this.pendingPhoneCountry),
-      pendingFullName:
-          clearPending ? null : (pendingFullName ?? this.pendingFullName),
+      pendingPrenom:
+          clearPending ? null : (pendingPrenom ?? this.pendingPrenom),
+      pendingNom: clearPending ? null : (pendingNom ?? this.pendingNom),
       pendingEmail: clearPending ? null : (pendingEmail ?? this.pendingEmail),
       pendingPassword:
           clearPending ? null : (pendingPassword ?? this.pendingPassword),
@@ -111,12 +123,14 @@ class RegisterPageStateM extends Equatable {
   List<Object?> get props => [
         phase,
         errorMessage,
+        fieldErrors,
         utilisateur,
         token,
         phoneVerificationToken,
         pendingE164Phone,
         pendingPhoneCountry,
-        pendingFullName,
+        pendingPrenom,
+        pendingNom,
         pendingEmail,
         pendingPassword,
         resendCooldownSeconds,

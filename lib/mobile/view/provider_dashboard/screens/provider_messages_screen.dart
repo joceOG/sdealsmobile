@@ -1,15 +1,16 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:intl/intl.dart';
+import '../../../../data/services/authCubit.dart';
+import '../../../../data/utils/conversation_id.dart';
+import '../../../../data/utils/display_text.dart';
+import '../../../../design_system/design_system.dart';
+import '../../../data/models/conversation_model.dart';
+import '../../chatpagem/chatpageblocm/chatPageBlocM.dart';
+import '../../chatpagem/screens/chatPageScreenM.dart';
 import '../bloc/messages_bloc.dart';
 import '../bloc/messages_event.dart';
 import '../bloc/messages_state.dart';
-import '../../../../data/services/authCubit.dart';
-import '../../chatpagem/screens/chatPageScreenM.dart';
-import '../../chatpagem/chatpageblocm/chatPageBlocM.dart';
-import '../../../data/models/conversation_model.dart';
-import '../../../../data/utils/conversation_id.dart';
-import '../../../../design_system/design_system.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
 
 /// Écran Messagerie prestataire — layout type Figma (chips + liste).
 class ProviderMessagesScreen extends StatefulWidget {
@@ -226,8 +227,7 @@ class ProviderMessagesScreenState extends State<ProviderMessagesScreen> {
       final q = _searchQuery.toLowerCase();
       list = list.where((c) {
         final other = _otherParticipant(c);
-        final name =
-            '${other?['prenom'] ?? ''} ${other?['nom'] ?? ''}'.toLowerCase();
+        final name = personNameFromMap(other, fallback: '').toLowerCase();
         final mission = _missionTitle(c).toLowerCase();
         final content =
             '${_lastMessage(c)?['contenu'] ?? ''}'.toLowerCase();
@@ -279,15 +279,12 @@ class ProviderMessagesScreenState extends State<ProviderMessagesScreen> {
 
   String _displayName(Map<String, dynamic>? p) {
     if (p == null) return 'Client';
-    final full = '${p['prenom'] ?? ''} ${p['nom'] ?? ''}'.trim();
-    if (full.isEmpty) return 'Client';
-    // Style Figma : "Koffi A."
-    final prenom = '${p['prenom'] ?? ''}'.trim();
-    final nom = '${p['nom'] ?? ''}'.trim();
-    if (prenom.isNotEmpty && nom.isNotEmpty) {
+    final prenom = cleanDisplayPart(p['prenom']);
+    final nom = cleanDisplayPart(p['nom']);
+    if (prenom != null && nom != null && nom.isNotEmpty) {
       return '$prenom ${nom[0].toUpperCase()}.';
     }
-    return full;
+    return joinPersonName(prenom: prenom, nom: nom, fallback: 'Client');
   }
 
   String _missionTitle(Map<String, dynamic> c) {
@@ -632,10 +629,9 @@ class ProviderMessagesScreenState extends State<ProviderMessagesScreen> {
       return;
     }
 
-    final participantName =
-        '${other?['prenom'] ?? ''} ${other?['nom'] ?? ''}'.trim();
+    final participantName = personNameFromMap(other, fallback: 'Client');
     final participantImage =
-        other?['photoProfil']?.toString() ?? 'assets/images/default_user.png';
+        safeImageUrl(other?['photoProfil']) ?? 'assets/images/default_user.png';
 
     Navigator.of(context).push(
       MaterialPageRoute(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:sdealsmobile/data/errors/api_exception.dart';
 import 'package:sdealsmobile/data/services/api_client.dart';
 import 'package:sdealsmobile/mobile/view/common/widgets/app_image.dart';
 import 'package:sdealsmobile/mobile/view/freelancepagem/models/freelance_model.dart';
@@ -99,7 +100,7 @@ class _FreelanceServiceOfferDetailScreenState
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Impossible d’ouvrir le profil : $e')),
+        SnackBar(content: Text(ApiException.userFacing(e))),
       );
     }
   }

@@ -4,6 +4,8 @@ class Article {
   String prixArticle;
   int quantiteArticle;
   String photoArticle;
+  /// STAB-12C — requis pour POST /cart/add
+  String? vendeurId;
 
   Article({
     this.id,
@@ -11,22 +13,45 @@ class Article {
     required this.prixArticle,
     required this.quantiteArticle,
     required this.photoArticle,
+    this.vendeurId,
   });
 
+  static String? _vendeurIdFrom(dynamic raw) {
+    if (raw == null) return null;
+    if (raw is String) {
+      final s = raw.trim();
+      return s.isEmpty || s == 'null' ? null : s;
+    }
+    if (raw is Map) {
+      final id = raw['_id'] ?? raw['id'];
+      final s = id?.toString().trim();
+      if (s == null || s.isEmpty || s == 'null') return null;
+      return s;
+    }
+    final s = raw.toString().trim();
+    return s.isEmpty || s == 'null' ? null : s;
+  }
+
   factory Article.fromJson(dynamic json) {
-    final prix = json['prixArticle'];
+    final map = json is Map<String, dynamic>
+        ? json
+        : Map<String, dynamic>.from(json as Map);
+    final prix = map['prixArticle'];
     final prixText = prix == null ? '' : prix.toString();
-    final quantite = json['quantiteArticle'];
+    final quantite = map['quantiteArticle'];
     final rawId =
-        json['_id'] ?? json['id'] ?? json['idarticle'] ?? json['idArticle'];
+        map['_id'] ?? map['id'] ?? map['idarticle'] ?? map['idArticle'];
+    final photo = map['photoArticle']?.toString() ?? '';
+    final nom = map['nomArticle']?.toString() ?? '';
     return Article(
       id: rawId?.toString(),
-      nomArticle: json['nomArticle'] as String,
+      nomArticle: nom,
       prixArticle: prixText,
       quantiteArticle: quantite is int
           ? quantite
-          : int.tryParse(quantite.toString()) ?? 0,
-      photoArticle: json['photoArticle'] as String,
+          : int.tryParse(quantite?.toString() ?? '') ?? 0,
+      photoArticle: photo == 'null' ? '' : photo,
+      vendeurId: _vendeurIdFrom(map['vendeur']),
     );
   }
 
@@ -37,6 +62,7 @@ class Article {
       'prixArticle': prixArticle,
       'quantiteArticle': quantiteArticle,
       'photoArticle': photoArticle,
+      if (vendeurId != null) 'vendeurId': vendeurId,
     };
   }
 }

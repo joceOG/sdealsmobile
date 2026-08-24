@@ -4,6 +4,7 @@ import '../avispageblocm/avisPageBlocM.dart';
 import '../avispageblocm/avisPageEventM.dart';
 import '../avispageblocm/avisPageStateM.dart';
 import 'package:sdealsmobile/data/models/avis.dart';
+import 'package:sdealsmobile/data/utils/display_text.dart';
 import '../../../../design_system/design_system.dart';
 
 class AvisDetailScreenM extends StatefulWidget {
@@ -170,7 +171,11 @@ class _AvisDetailScreenMState extends State<AvisDetailScreenM> {
                 Text(
                   widget.avis.anonyme
                       ? 'Anonyme'
-                      : '${widget.avis.auteur.nom} ${widget.avis.auteur.prenom}',
+                      : joinPersonName(
+                          prenom: widget.avis.auteur.prenom,
+                          nom: widget.avis.auteur.nom,
+                          fallback: 'Utilisateur',
+                        ),
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,

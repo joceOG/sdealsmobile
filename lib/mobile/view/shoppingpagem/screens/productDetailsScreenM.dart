@@ -7,7 +7,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:sdealsmobile/data/services/authCubit.dart';
 import '../shoppingpageblocm/shoppingPageBlocM.dart';
 import '../shoppingpageblocm/shoppingPageEventM.dart';
-import 'panierProductScreenM.dart';
+import '../utils/cart_navigation.dart';
 // ✅ Design System
 import '../../../../design_system/design_system.dart';
 
@@ -447,7 +447,47 @@ class _ProductDetailsState extends State<ProductDetails> {
         // Bouton principal : Ajouter au panier
         SizedBox(
           width: double.infinity,
-          child: BlocBuilder<ShoppingPageBlocM, bloc_model.ShoppingPageStateM>(
+          child: BlocConsumer<ShoppingPageBlocM, bloc_model.ShoppingPageStateM>(
+            listenWhen: (prev, curr) =>
+                prev.isAddingToCart &&
+                !curr.isAddingToCart &&
+                (curr.cartError != prev.cartError ||
+                    curr.cart != prev.cart),
+            listener: (context, state) {
+              if ((state.cartError ?? '').isNotEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(state.cartError!),
+                    backgroundColor: SDColors.error500,
+                  ),
+                );
+                return;
+              }
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Row(
+                    children: [
+                      Icon(Icons.check_circle, color: SDColors.white),
+                      SizedBox(width: SDSpacing.xs),
+                      Expanded(
+                        child: Text(
+                          '${widget.product.name} ajouté au panier!',
+                          style: SDTypography.bodyMedium
+                              .copyWith(color: SDColors.white),
+                        ),
+                      ),
+                    ],
+                  ),
+                  backgroundColor: SDColors.success500,
+                  duration: const Duration(seconds: 2),
+                  action: SnackBarAction(
+                    label: 'Voir',
+                    textColor: SDColors.white,
+                    onPressed: () => openShoppingCart(context),
+                  ),
+                ),
+              );
+            },
             builder: (context, state) {
               final isAdding = state.isAddingToCart;
               return ElevatedButton.icon(
@@ -456,58 +496,35 @@ class _ProductDetailsState extends State<ProductDetails> {
                     : () {
                         final authState = context.read<AuthCubit>().state;
                         if (authState is AuthAuthenticated) {
-                          final vendeurId = widget.product.vendeurId ?? 'unknown';
+                          final vendeurId = widget.product.vendeurId;
+                          if (!isLikelyMongoObjectId(vendeurId)) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Produit incomplet : vendeur manquant. Impossible d\'ajouter au panier.',
+                                ),
+                                backgroundColor: SDColors.warning500,
+                              ),
+                            );
+                            return;
+                          }
 
                           context.read<ShoppingPageBlocM>().add(
                                 AddToCartEvent(
-                                  userId: authState.utilisateur.idutilisateur,
+                                  userId:
+                                      authState.utilisateur.idutilisateur,
                                   articleId: widget.product.id,
-                                  vendeurId: vendeurId,
+                                  vendeurId: vendeurId!,
                                   quantite: _quantity,
                                 ),
                               );
-
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Row(
-                                children: [
-                                  Icon(Icons.check_circle,
-                                      color: SDColors.white),
-                                  SizedBox(width: SDSpacing.xs),
-                                  Expanded(
-                                    child: Text(
-                                        '${widget.product.name} ajouté au panier!',
-                                        style: SDTypography.bodyMedium.copyWith(color: SDColors.white)),
-                                  ),
-                                ],
-                              ),
-                              backgroundColor: SDColors.success500,
-                              duration: Duration(seconds: 2),
-                              action: SnackBarAction(
-                                label: 'Voir',
-                                textColor: SDColors.white,
-                                onPressed: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          BlocProvider.value(
-                                        value:
-                                            context.read<ShoppingPageBlocM>(),
-                                        child: const PanierProductScreenM(),
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
-                          );
                         } else {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(
                                   'Veuillez vous connecter pour ajouter au panier',
-                                  style: SDTypography.bodyMedium.copyWith(color: SDColors.white)),
+                                  style: SDTypography.bodyMedium
+                                      .copyWith(color: SDColors.white)),
                               backgroundColor: SDColors.warning500,
                             ),
                           );

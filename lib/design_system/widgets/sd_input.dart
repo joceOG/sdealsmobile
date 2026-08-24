@@ -56,6 +56,12 @@ class SDInput extends StatefulWidget {
   
   /// Focus node
   final FocusNode? focusNode;
+
+  /// Erreur serveur / validation (STAB-12A) — affichée sous le champ.
+  final String? errorText;
+
+  /// Texte d'aide sous le champ (STAB-13).
+  final String? helperText;
   
   const SDInput({
     super.key,
@@ -73,6 +79,8 @@ class SDInput extends StatefulWidget {
     this.enabled = true,
     this.initialValue,
     this.focusNode,
+    this.errorText,
+    this.helperText,
   });
   
   @override
@@ -196,10 +204,17 @@ class _SDInputState extends State<SDInput> {
         // ERROR STYLE
         // ═══════════════════════════════════════
         
-        errorStyle: SDTypography.bodySmall.copyWith(
+        errorStyle: SDTypography.fieldError.copyWith(
           color: SDColors.error500,
         ),
         errorMaxLines: 2,
+        errorText: widget.errorText,
+        helperText: widget.errorText == null ? widget.helperText : null,
+        helperStyle: SDTypography.helper.copyWith(
+          color: SDColors.neutral600,
+          fontSize: 13,
+        ),
+        helperMaxLines: 2,
       ),
     );
   }

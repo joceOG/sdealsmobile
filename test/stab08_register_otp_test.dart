@@ -1,6 +1,7 @@
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:phone_numbers_parser/phone_numbers_parser.dart';
+import 'package:sdealsmobile/data/models/phone_verification_config.dart';
 import 'package:sdealsmobile/data/services/api_client.dart';
 import 'package:sdealsmobile/data/utils/phone_canonicalizer.dart';
 import 'package:sdealsmobile/mobile/view/registerpagem/registerpageblocm/registerPageBlocM.dart';
@@ -31,6 +32,16 @@ class _FakeApiClient extends ApiClient {
   String? lastVerifyPhone;
   String? lastRegisterPhone;
   String? lastRegisterToken;
+
+  @override
+  Future<PhoneVerificationConfig> fetchPhoneVerificationConfig({
+    bool forceRefresh = false,
+  }) async =>
+      const PhoneVerificationConfig(
+        mode: 'required',
+        signupRequiresOtp: true,
+        googleRequiresPhone: true,
+      );
 
   @override
   Future<Map<String, dynamic>> sendPhoneOtp({
@@ -67,7 +78,8 @@ class _FakeApiClient extends ApiClient {
 
   @override
   Future<Map<String, dynamic>> registerUser({
-    required String fullName,
+    required String nom,
+    String? prenom,
     required String phone,
     String? phoneCountry,
     required String password,
@@ -84,8 +96,8 @@ class _FakeApiClient extends ApiClient {
           'token': 'session-jwt',
           'utilisateur': {
             '_id': 'u1',
-            'nom': 'Test',
-            'prenom': 'User',
+            'nom': nom,
+            'prenom': prenom ?? '',
             'telephone': phone,
             'role': 'Client',
           },
@@ -98,7 +110,8 @@ RegisterSubmitted _form({
   String country = 'TN',
 }) {
   return RegisterSubmitted(
-    fullName: 'Jean Dupont',
+    prenom: 'Jean',
+    nom: 'Dupont',
     email: '',
     phone: phone,
     phoneCountry: country,

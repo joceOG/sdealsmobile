@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:sdealsmobile/data/services/api_client.dart';
+import 'package:sdealsmobile/data/utils/display_text.dart';
 
 import 'serviceProviderRegistrationPageEventM.dart';
 import 'serviceProviderRegistrationPageStateM.dart';
@@ -114,9 +115,9 @@ class ServiceProviderRegistrationBlocM extends Bloc<
   Map<String, dynamic> _prepareUserData(Map<String, dynamic> formData) {
     // Séparer le nom complet en nom et prénom
     final fullName = formData['fullName'] as String? ?? '';
-    final nameParts = fullName.trim().split(' ');
-    final nom = nameParts.isNotEmpty ? nameParts.first : '';
-    final prenom = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+    final split = splitPersonNameInput(fullName);
+    final nom = split.nom;
+    final prenom = split.prenom;
 
     final phone = formData['phone'] ?? '';
     // Mot de passe choisi par l'utilisateur — jamais dérivé du téléphone
@@ -128,7 +129,7 @@ class ServiceProviderRegistrationBlocM extends Bloc<
 
     return {
       "nom": nom,
-      "prenom": prenom,
+      if (prenom != null && prenom.isNotEmpty) "prenom": prenom,
       "telephone": phone,
       "email": formData['email'] ?? '',
       "password": password,

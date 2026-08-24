@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:sdealsmobile/data/services/api_client.dart';
 import 'package:sdealsmobile/data/services/authCubit.dart';
+import 'package:sdealsmobile/data/utils/display_text.dart';
 import '../../../../design_system/design_system.dart';
 
 /// Écran Missions prestataire — layout type Figma (aperçu + chips + cartes).
@@ -272,7 +273,10 @@ class ProviderMissionsScreenState extends State<ProviderMissionsScreen> {
       list = list.where((m) {
         final client = m['utilisateur'] ?? {};
         final name =
-            '${client['nom'] ?? ''} ${client['prenom'] ?? ''}'.toLowerCase();
+            personNameFromMap(
+              Map<String, dynamic>.from(client),
+              fallback: '',
+            ).toLowerCase();
         final adresse = '${m['adresse'] ?? ''} ${m['ville'] ?? ''}'.toLowerCase();
         final notes = '${m['notesClient'] ?? ''} ${m['titre'] ?? ''}'.toLowerCase();
         return name.contains(q) || adresse.contains(q) || notes.contains(q);
@@ -763,7 +767,10 @@ class _MissionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final client = mission['utilisateur'] ?? {};
     final clientName =
-        '${client['prenom'] ?? ''} ${client['nom'] ?? ''}'.trim();
+        personNameFromMap(
+          Map<String, dynamic>.from(client),
+          fallback: 'Client',
+        );
     final title = (mission['titre'] ??
             mission['service']?['nomservice'] ??
             mission['notesClient'] ??

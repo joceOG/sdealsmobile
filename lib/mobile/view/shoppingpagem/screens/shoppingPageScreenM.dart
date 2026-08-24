@@ -11,6 +11,7 @@ import 'productDetailsScreenM.dart';
 import 'package:sdealsmobile/mobile/view/searchpagem/screens/searchPageScreenM.dart';
 import 'panierProductScreenM.dart';
 import 'package:sdealsmobile/data/models/vendeur.dart';
+import '../utils/cart_navigation.dart';
 import '../widgets/filter_bottom_sheet.dart';
 import '../../common/widgets/app_image.dart';
 import '../../common/widgets/skeleton_loader.dart';
@@ -20,6 +21,8 @@ import '../../../../design_system/colors.dart';
 import '../../../../design_system/typography.dart';
 import '../../../../design_system/spacing.dart';
 import '../../../../design_system/widgets/sd_app_bar_icon_button.dart';
+import '../../../../design_system/widgets/sd_feedback_states.dart';
+import 'package:sdealsmobile/data/utils/display_text.dart';
 
 // Utilisation du modèle Product du BLoC
 typedef Product = bloc_model.Product;
@@ -179,17 +182,7 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
               clipBehavior: Clip.none,
               children: [
                 IconButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => BlocProvider.value(
-                          value: context.read<ShoppingPageBlocM>(),
-                          child: const PanierProductScreenM(),
-                        ),
-                      ),
-                    );
-                  },
+                  onPressed: () => openShoppingCart(context),
                   icon: const Icon(Icons.shopping_cart_outlined),
                   color: SDColors.neutral900,
                   tooltip: 'Panier',
@@ -528,9 +521,10 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
         ? all.sublist(0, all.length > 6 ? 6 : all.length)
         : all;
     if (list.isEmpty) {
-      return Text(
-        'Aucune promo à afficher.',
-        style: SDTypography.bodySmall.copyWith(color: SDColors.neutral500),
+      return SDEmptyState(
+        title: 'Aucune promo',
+        message: 'Les offres du moment apparaîtront ici.',
+        icon: Icons.local_offer_outlined,
       );
     }
     return SizedBox(
@@ -540,13 +534,7 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
         itemCount: list.length,
         separatorBuilder: (_, __) => SizedBox(width: SDSpacing.sm),
         itemBuilder: (context, i) {
-          final p = list[i];
-          final pct = 15 + (p.id.hashCode.abs() % 16);
-          return _CompactShopProductCard(
-            product: p,
-            discountPercent: pct,
-            strikePrice: p.price,
-          );
+          return _CompactShopProductCard(product: list[i]);
         },
       ),
     );
@@ -566,11 +554,19 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
           title: 'Boutiques recommandées',
         ),
         SizedBox(height: SDSpacing.sm),
-        if (shops.isEmpty)
-          Text(
-            'Boutiques en cours de chargement…',
-            style:
-                SDTypography.bodySmall.copyWith(color: SDColors.neutral500),
+        if (state.isVendeursLoading && shops.isEmpty)
+          const SDLoadingInline(message: 'Chargement des boutiques…')
+        else if ((state.vendeursError ?? '').isNotEmpty && shops.isEmpty)
+          SDErrorState(
+            message: state.vendeursError!,
+            onRetry: () =>
+                context.read<ShoppingPageBlocM>().add(LoadVendeursEvent()),
+          )
+        else if (shops.isEmpty)
+          const SDEmptyState(
+            title: 'Aucune boutique',
+            message: 'Les boutiques recommandées apparaîtront bientôt.',
+            icon: Icons.storefront_outlined,
           )
         else
           ...shops.take(4).map((v) => _ShopRecommendTile(vendeur: v)),
@@ -1143,64 +1139,33 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                               // 🛒 Bouton ajouter au panier CONNECTÉ AU BLOC
                               InkWell(
                                 onTap: () {
-                                  // Récupérer l'utilisateur connecté
                                   final authState =
                                       context.read<AuthCubit>().state;
                                   if (authState is AuthAuthenticated) {
-                                    // TODO: Récupérer le vendeurId depuis l'article
-                                    // Pour l'instant, on utilise un vendeurId fictif
-                                    final vendeurId =
-                                        product.vendeurId ?? 'unknown';
+                                    final vendeurId = product.vendeurId;
+                                    if (!isLikelyMongoObjectId(vendeurId)) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Produit incomplet : vendeur manquant. Impossible d\'ajouter au panier.',
+                                          ),
+                                          backgroundColor: Colors.orange,
+                                        ),
+                                      );
+                                      return;
+                                    }
 
-                                    // Dispatch l'événement au BLoC
                                     context.read<ShoppingPageBlocM>().add(
                                           AddToCartEvent(
                                             userId: authState
                                                 .utilisateur.idutilisateur,
                                             articleId: product.id,
-                                            vendeurId: vendeurId,
+                                            vendeurId: vendeurId!,
                                             quantite: 1,
                                           ),
                                         );
-
-                                    // Animation + Feedback
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Row(
-                                          children: [
-                                            const Icon(Icons.check_circle,
-                                                color: Colors.white),
-                                            const SizedBox(width: 8),
-                                            Expanded(
-                                              child: Text(
-                                                  '${product.name} ajouté au panier!'),
-                                            ),
-                                          ],
-                                        ),
-                                        backgroundColor: Colors.green,
-                                        duration: const Duration(seconds: 2),
-                                        action: SnackBarAction(
-                                          label: 'Voir',
-                                          textColor: Colors.white,
-                                          onPressed: () {
-                                            Navigator.push(
-                                              context,
-                                              MaterialPageRoute(
-                                                builder: (context) =>
-                                                    BlocProvider.value(
-                                                  value: context.read<
-                                                      ShoppingPageBlocM>(),
-                                                  child:
-                                                      const PanierProductScreenM(),
-                                                ),
-                                              ),
-                                            );
-                                          },
-                                        ),
-                                      ),
-                                    );
                                   } else {
-                                    // Rediriger vers la connexion
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
                                         content: Text(
@@ -1299,19 +1264,7 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                             builder: (context, state) {
                               final cartCount = state.cart?.totalItems ?? 0;
                               return InkWell(
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          BlocProvider.value(
-                                        value:
-                                            context.read<ShoppingPageBlocM>(),
-                                        child: const PanierProductScreenM(),
-                                      ),
-                                    ),
-                                  );
-                                },
+                                onTap: () => openShoppingCart(context),
                                 child: Container(
                                   padding: EdgeInsets.all(SDSpacing.xxs),
                                   decoration: BoxDecoration(
@@ -1590,15 +1543,7 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                   builder: (context, state) {
                     final cartCount = state.cart?.totalItems ?? 0;
                     return InkWell(
-                      onTap: () {
-                        Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (context) => BlocProvider.value(
-                                      value: context.read<ShoppingPageBlocM>(),
-                                      child: const PanierProductScreenM(),
-                                    )));
-                      },
+                      onTap: () => openShoppingCart(context),
                       borderRadius: BorderRadius.circular(20),
                       child: Container(
                         padding: EdgeInsets.symmetric(
@@ -2114,7 +2059,12 @@ class _CompactShopProductCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final oldPrice = strikePrice;
-    final showDeal = discountPercent != null && oldPrice != null;
+    final showDeal = discountPercent != null &&
+        discountPercent! > 0 &&
+        oldPrice != null &&
+        oldPrice.isNotEmpty;
+    final ratingLabel = formatOptionalRating(product.rating);
+    final priceLabel = formatOptionalPrice(product.price) ?? product.price;
 
     return GestureDetector(
       onTap: () => Navigator.of(context).push(
@@ -2172,11 +2122,12 @@ class _CompactShopProductCard extends StatelessWidget {
                             ),
                     ),
                   ),
-                  if (discountPercent != null)
+                  if (showDeal)
                     Positioned(
                       top: 6,
                       right: 6,
                       child: Container(
+                        constraints: const BoxConstraints(maxWidth: 44),
                         padding: const EdgeInsets.symmetric(
                             horizontal: 6, vertical: 3),
                         decoration: BoxDecoration(
@@ -2185,6 +2136,8 @@ class _CompactShopProductCard extends StatelessWidget {
                         ),
                         child: Text(
                           '-$discountPercent%',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: SDTypography.labelSmall.copyWith(
                             color: SDColors.white,
                             fontWeight: FontWeight.w800,
@@ -2214,22 +2167,31 @@ class _CompactShopProductCard extends StatelessWidget {
                   SizedBox(height: SDSpacing.xxxs),
                   Row(
                     children: [
-                      ...List.generate(
-                        5,
-                        (i) => Icon(
-                          i < product.rating.floor()
-                              ? Icons.star_rounded
-                              : Icons.star_outline_rounded,
-                          size: 14,
-                          color: SDColors.warning500,
+                      if (ratingLabel != null)
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.star_rounded,
+                              size: 14,
+                              color: SDColors.warning500,
+                            ),
+                            Text(
+                              ratingLabel,
+                              style: SDTypography.labelSmall.copyWith(
+                                color: SDColors.neutral600,
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
                     ],
                   ),
                   SizedBox(height: SDSpacing.xxxs),
                   if (showDeal) ...[
                     Text(
-                      product.price,
+                      priceLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: SDTypography.labelMedium.copyWith(
                         color: SDColors.neutral900,
                         fontWeight: FontWeight.w800,
@@ -2237,6 +2199,8 @@ class _CompactShopProductCard extends StatelessWidget {
                     ),
                     Text(
                       oldPrice,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: SDTypography.labelSmall.copyWith(
                         color: SDColors.neutral400,
                         decoration: TextDecoration.lineThrough,
@@ -2244,7 +2208,9 @@ class _CompactShopProductCard extends StatelessWidget {
                     ),
                   ] else
                     Text(
-                      product.price,
+                      priceLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: SDTypography.labelMedium.copyWith(
                         color: SDColors.primary600,
                         fontWeight: FontWeight.w700,
