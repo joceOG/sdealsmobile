@@ -178,6 +178,9 @@ class _SDButtonState extends State<SDButton> {
               widget.fullWidth ? double.infinity : 120,
               _buttonHeight,
             ),
+            // Garantit une zone tactile ≥ 48dp même quand le bouton
+            // est visuellement compact (SDButtonSize.small = 40dp).
+            tapTargetSize: MaterialTapTargetSize.padded,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
             ),
@@ -227,6 +230,7 @@ class _SDButtonState extends State<SDButton> {
               widget.fullWidth ? double.infinity : 120,
               _buttonHeight,
             ),
+            tapTargetSize: MaterialTapTargetSize.padded,
             side: const BorderSide(color: SDColors.primary600, width: 2),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),

@@ -19,6 +19,9 @@ class SDWhiteAppBar {
     PreferredSizeWidget? bottom,
     Color? backgroundColor,
     double? toolbarHeight,
+    /// Style personnalisé pour le titre. Par défaut `displayMedium` (28sp).
+    /// Utiliser `SDTypography.titleLarge` pour les titres longs.
+    TextStyle? titleStyle,
   }) {
     assert(
       title != null || titleWidget != null,
@@ -30,7 +33,7 @@ class SDWhiteAppBar {
           title!,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: SDTypography.displayMedium.copyWith(
+          style: (titleStyle ?? SDTypography.displayMedium).copyWith(
             color: SDColors.neutral900,
             fontWeight: FontWeight.w700,
           ),

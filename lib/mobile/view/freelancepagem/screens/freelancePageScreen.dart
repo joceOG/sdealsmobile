@@ -1,10 +1,11 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:sdealsmobile/data/models/categorie.dart';
-import 'package:sdealsmobile/data/models/service.dart';
+import 'package:sdealsmobile/data/services/api_client.dart';
 import 'package:sdealsmobile/data/utils/display_text.dart';
+import 'package:sdealsmobile/data/utils/media_url.dart';
 import 'package:sdealsmobile/mobile/view/freelancepagem/freelancepageblocm/freelancePageStateM.dart';
+import 'package:sdealsmobile/mobile/view/common/widgets/app_image.dart';
 import 'package:sdealsmobile/mobile/view/searchpagem/screens/searchPageScreenM.dart';
 
 import '../../../../design_system/colors.dart';
@@ -22,7 +23,7 @@ import 'freelance_details_screen.dart';
 const int _kCategoryPreviewCount = 8;
 
 String _formatFcfaHour(double v) {
-  if (v <= 0) return 'Sur devis';
+  if (v <= 0) return '';
   if (v >= 1000) {
     final s = v.toStringAsFixed(0);
     final buf = StringBuffer();
@@ -35,24 +36,40 @@ String _formatFcfaHour(double v) {
   return '${v.toStringAsFixed(0)} FCFA/h';
 }
 
-String _ratingLabel(double rating) {
-  if (rating <= 0) return 'Pas encore noté';
-  return '${rating.toStringAsFixed(1)}/5';
+/// Null si pas de note réelle (jamais « 0.0 » inventé).
+String? _ratingLabelOrNull(double rating) {
+  if (rating <= 0) return null;
+  return rating.toStringAsFixed(1);
+}
+
+String _freelanceListSubtitle(FreelanceModel f) {
+  final parts = <String>[
+    displayOrFallback(f.job, f.category),
+    if (_ratingLabelOrNull(f.rating) != null) _ratingLabelOrNull(f.rating)!,
+    if (f.hourlyRate > 0) _formatFcfaHour(f.hourlyRate),
+  ];
+  return parts.where((e) => e.trim().isNotEmpty).join(' · ');
 }
 
 class FreelancePageScreen extends StatelessWidget {
   final List<dynamic> categories;
+  /// Injection optionnelle (tests / stubs).
+  final ApiClient? apiClient;
 
-  const FreelancePageScreen({Key? key, this.categories = const []})
-      : super(key: key);
+  const FreelancePageScreen({
+    Key? key,
+    this.categories = const [],
+    this.apiClient,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    // STAB-13B Phase 2 — hub talent-first : catégories + freelances uniquement.
+    // LoadServicesEvent retiré (Services populaires hors V1).
     return BlocProvider(
-      create: (_) => FreelancePageBlocM()
+      create: (_) => FreelancePageBlocM(apiClient: apiClient)
         ..add(LoadCategorieDataM())
-        ..add(LoadFreelancersEvent())
-        ..add(LoadServicesEvent()),
+        ..add(LoadFreelancersEvent()),
       child: const _FreelancePageScreenContent(),
     );
   }
@@ -108,33 +125,28 @@ class _FreelancePageScreenContentState
                         SizedBox(height: SDSpacing.lg),
                         _buildCategoryGrid(context, state),
                         SizedBox(height: SDSpacing.md),
-                        Center(child: _buildSeeAllCategoriesButton(context, state)),
+                        Center(
+                            child:
+                                _buildSeeAllCategoriesButton(context, state)),
                         SizedBox(height: SDSpacing.xl),
                         _buildSectionHeaderRow(
-                          leadingIcon: Icons.build,
-                          title: 'Services populaires',
-                          actionLabel: 'Tout',
-                          onAction: () => _openSearchFreelance(context),
-                        ),
-                        SizedBox(height: SDSpacing.sm),
-                        _buildPopularServicesRow(state),
-                        SizedBox(height: SDSpacing.xl),
-                        _buildSectionHeaderRow(
-                          leadingIcon: Icons.people,
-                          title: 'Freelances disponibles',
+                          leadingIcon: Icons.people_outline,
+                          title: 'Freelances recommandés',
                           actionLabel: 'Voir tout',
                           onAction: () => _openAllFreelancers(context),
                           titleMaxLines: 2,
                         ),
                         SizedBox(height: SDSpacing.sm),
-                        _buildAvailableFreelancersRow(state),
-                        SizedBox(height: SDSpacing.xl),
-                        _buildSectionTitleOnly(
-                          leadingIcon: Icons.flash_on,
-                          title: 'Offres rapides',
-                        ),
-                        SizedBox(height: SDSpacing.sm),
-                        _buildQuickOffers(context),
+                        _buildRecommendedFreelancers(state),
+                        if (_popularSkills(state).isNotEmpty) ...[
+                          SizedBox(height: SDSpacing.xl),
+                          _buildSectionTitleOnly(
+                            leadingIcon: Icons.tag,
+                            title: 'Compétences populaires',
+                          ),
+                          SizedBox(height: SDSpacing.sm),
+                          _buildPopularSkillsChips(context, state),
+                        ],
                         SizedBox(height: SDSpacing.xxl),
                       ],
                     ),
@@ -217,7 +229,7 @@ class _FreelancePageScreenContentState
               onTap: openSearch,
               behavior: HitTestBehavior.opaque,
               child: Text(
-                'Quel service freelance cherchez-vous ?',
+                'Quelle compétence recherchez-vous ?',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: SDTypography.bodyMedium.copyWith(
@@ -271,7 +283,8 @@ class _FreelancePageScreenContentState
         crossAxisCount: 4,
         mainAxisSpacing: 10,
         crossAxisSpacing: 10,
-        childAspectRatio: 0.78,
+        // Ratio plus bas = cellules plus hautes (évite overflow labels 2 lignes @320).
+        childAspectRatio: 0.68,
       ),
       itemCount: preview.length,
       itemBuilder: (context, index) {
@@ -331,7 +344,6 @@ class _FreelancePageScreenContentState
     );
   }
 
-  /// Même pattern que `JobPageScreenM` (Catégories / Services populaires / Artisans proches).
   Widget _buildSectionHeaderRow({
     required IconData leadingIcon,
     required String title,
@@ -390,82 +402,53 @@ class _FreelancePageScreenContentState
     );
   }
 
-  Widget _buildPopularServicesRow(FreelancePageStateM state) {
-    if (state.isLoadingServices) {
-      return SizedBox(
-        height: 80,
-        child: Center(
-          child: SDLoadingInline(message: 'Chargement des services…'),
-        ),
-      );
+  /// Skills agrégées depuis les freelances réels (pas de fake catalogue).
+  List<String> _popularSkills(FreelancePageStateM state) {
+    final counts = <String, int>{};
+    for (final f in state.freelancers) {
+      for (final s in f.skills) {
+        final t = s.trim();
+        if (t.isEmpty) continue;
+        counts[t] = (counts[t] ?? 0) + 1;
+      }
     }
-    if (state.servicesError.isNotEmpty) {
-      return SizedBox(
-        height: 100,
-        child: Center(
-          child: SDErrorState(
-            message: state.servicesError,
-            onRetry: () => context
-                .read<FreelancePageBlocM>()
-                .add(LoadServicesEvent()),
-          ),
-        ),
-      );
-    }
-    final services = state.services.take(12).toList();
-    if (services.isEmpty) {
-      return const SizedBox(
-        height: 100,
-        child: Center(
-          child: SDEmptyState(
-            title: 'Aucun service',
-            message: 'Les services populaires apparaîtront bientôt.',
-            icon: Icons.handyman_outlined,
-          ),
-        ),
-      );
-    }
+    final sorted = counts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    return sorted.take(10).map((e) => e.key).toList();
+  }
 
-    return SizedBox(
-      height: 228,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: services.length,
-        separatorBuilder: (_, __) => SizedBox(width: SDSpacing.sm),
-        itemBuilder: (context, index) {
-          final service = services[index];
-          final hint = _serviceRatingHint(state, service);
-          return _PopularServiceCard(
-            service: service,
-            rating: hint.$1,
-            reviewLabel: hint.$2,
-            onTap: () => _openSearchFreelance(context),
-          );
-        },
-      ),
+  Widget _buildPopularSkillsChips(
+      BuildContext context, FreelancePageStateM state) {
+    final skills = _popularSkills(state);
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: skills
+          .map(
+            (s) => ActionChip(
+              label: Text(
+                s,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: SDTypography.labelSmall.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: SDColors.neutral800,
+                ),
+              ),
+              backgroundColor: SDColors.neutral50,
+              side: BorderSide(color: SDColors.neutral200),
+              onPressed: () => _openSearchFreelance(context, query: s),
+              visualDensity: VisualDensity.compact,
+            ),
+          )
+          .toList(),
     );
   }
 
-  /// (rating affichée, libellé avis). Si pas de données fiables, note null → UI adaptée.
-  (double?, String?) _serviceRatingHint(
-      FreelancePageStateM state, Service service) {
-    final catName = service.categorie?.nomcategorie;
-    if (catName == null || catName.isEmpty) return (null, null);
-    final matches = state.freelancers
-        .where((f) =>
-            f.category.toLowerCase().trim() == catName.toLowerCase().trim())
-        .toList();
-    if (matches.isEmpty) return (null, null);
-    final avg =
-        matches.fold<double>(0, (s, f) => s + f.rating) / matches.length;
-    final jobs = matches.fold<int>(0, (s, f) => s + f.completedJobs);
-    return (avg, '$jobs mission${jobs > 1 ? 's' : ''}');
-  }
-
-  Widget _buildAvailableFreelancersRow(FreelancePageStateM state) {
+  Widget _buildRecommendedFreelancers(FreelancePageStateM state) {
     if (state.isLoadingFreelancers) {
-      return SizedBox(
-        height: 80,
+      return Padding(
+        padding: EdgeInsets.symmetric(vertical: SDSpacing.md),
         child: Center(
           child: SDLoadingInline(message: 'Chargement des freelances…'),
         ),
@@ -473,105 +456,43 @@ class _FreelancePageScreenContentState
     }
 
     if (state.freelancersError != null && state.freelancersError!.isNotEmpty) {
-      return SizedBox(
-        height: 120,
-        child: Center(
-          child: SDErrorState(
-            message: state.freelancersError!,
-            onRetry: () => context
-                .read<FreelancePageBlocM>()
-                .add(LoadFreelancersEvent()),
-          ),
-        ),
+      return SDErrorState(
+        message: state.freelancersError!,
+        onRetry: () =>
+            context.read<FreelancePageBlocM>().add(LoadFreelancersEvent()),
       );
     }
 
-    if (state.isFreelancersEmpty) {
-      return const SizedBox(
-        height: 100,
-        child: Center(
-          child: SDEmptyState(
-            title: 'Aucun freelance',
-            message: 'Les freelances disponibles apparaîtront bientôt.',
-            icon: Icons.people_outline,
-          ),
-        ),
+    if (state.isFreelancersEmpty || state.freelancers.isEmpty) {
+      // Pas de SizedBox(height: 100) — évite BOTTOM OVERFLOWED.
+      return SDEmptyState(
+        title: 'Aucun freelance disponible',
+        message: 'De nouveaux talents apparaîtront bientôt.',
+        icon: Icons.people_outline,
       );
     }
 
-    final list = state.freelancers
-        .where((f) =>
-            f.availabilityStatus.toLowerCase().contains('disponible'))
-        .toList();
-    if (list.isEmpty) {
-      final fallback = state.freelancers.take(8).toList();
-      if (fallback.isEmpty) {
-        return SizedBox(
-          height: 80,
-          child: Center(
-            child: Text(
-              'Aucun freelance pour le moment',
-              style:
-                  SDTypography.bodySmall.copyWith(color: SDColors.neutral500),
-            ),
-          ),
-        );
-      }
-      return SizedBox(
-        height: 200,
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          itemCount: fallback.length,
-          separatorBuilder: (_, __) => SizedBox(width: SDSpacing.sm),
-          itemBuilder: (context, i) => _FreelanceAvailabilityCard(
-            freelancer: fallback[i],
-            forceAvailableBadge: false,
-          ),
-        ),
-      );
-    }
-
+    final list = state.freelancers.take(8).toList();
+    // Hauteur ≥ ~236 pour que SDEntityCard ne passe pas en mode compact
+    // (CTA « Voir le profil » masqué si maxHeight/textScale < 210).
     return SizedBox(
-      height: 200,
+      height: 248,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: list.length,
         separatorBuilder: (_, __) => SizedBox(width: SDSpacing.sm),
-        itemBuilder: (context, i) => _FreelanceAvailabilityCard(
-          freelancer: list[i],
-          forceAvailableBadge: true,
-        ),
+        itemBuilder: (context, i) => _FreelanceTalentCard(freelancer: list[i]),
       ),
     );
   }
 
-  Widget _buildQuickOffers(BuildContext context) {
-    const offers = <Map<String, dynamic>>[
-      {'label': 'CV en 1h', 'icon': Icons.description_outlined},
-      {'label': 'Logo Pro', 'icon': Icons.rocket_launch_outlined},
-      {'label': 'Site urgent', 'icon': Icons.bolt_outlined},
-    ];
-
-    return Row(
-      children: [
-        for (var i = 0; i < offers.length; i++) ...[
-          if (i > 0) SizedBox(width: SDSpacing.sm),
-          Expanded(
-            child: _QuickOfferTile(
-              label: offers[i]['label'] as String,
-              icon: offers[i]['icon'] as IconData,
-              onTap: () => _openSearchFreelance(context),
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
-  void _openSearchFreelance(BuildContext context) {
+  void _openSearchFreelance(BuildContext context, {String? query}) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => const SearchPageScreenM(initialIndex: 2),
+        builder: (_) => SearchPageScreenM(
+          initialIndex: 2,
+          initialQuery: query,
+        ),
       ),
     );
   }
@@ -582,7 +503,7 @@ class _FreelancePageScreenContentState
       MaterialPageRoute<void>(
         builder: (_) => BlocProvider.value(
           value: bloc,
-          child: const _FreelanceAllListPage(title: 'Freelances disponibles'),
+          child: const _FreelanceAllListPage(title: 'Freelances recommandés'),
         ),
       ),
     );
@@ -635,236 +556,103 @@ class _CategoryCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final img = categorie.imagecategorie;
-    final hasNetworkImage =
-        img.isNotEmpty && (img.startsWith('http://') || img.startsWith('https://'));
-
+    // imagecategorie = backend / dashboard admin. Icône DS seulement si URL absente.
+    final img = normalizeMediaUrl(categorie.imagecategorie);
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(14),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            height: 52,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: SDColors.primary50.withOpacity(0.85),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: SDColors.primary100),
-            ),
-            child: Center(
-              child: hasNetworkImage
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: CachedNetworkImage(
-                        imageUrl: img,
-                        width: 36,
-                        height: 36,
-                        fit: BoxFit.cover,
-                        errorWidget: (_, __, ___) => Icon(
-                          _iconForName(categorie.nomcategorie),
-                          color: SDColors.primary600,
-                          size: 28,
-                        ),
-                      ),
-                    )
-                  : Icon(
-                      _iconForName(categorie.nomcategorie),
-                      color: SDColors.primary600,
-                      size: 28,
-                    ),
-            ),
-          ),
-          SizedBox(height: SDSpacing.xxxs),
-          Text(
-            categorie.nomcategorie,
-            maxLines: 2,
-            textAlign: TextAlign.center,
-            overflow: TextOverflow.ellipsis,
-            style: SDTypography.labelSmall.copyWith(
-              color: SDColors.neutral800,
-              fontWeight: FontWeight.w600,
-              fontSize: 11,
-              height: 1.15,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// --- Popular service card (horizontal) ---
-
-class _PopularServiceCard extends StatelessWidget {
-  final Service service;
-  final double? rating;
-  final String? reviewLabel;
-  final VoidCallback onTap;
-
-  const _PopularServiceCard({
-    required this.service,
-    required this.rating,
-    required this.reviewLabel,
-    required this.onTap,
-  });
-
-  String _priceLine() {
-    final p = service.prixmoyen.trim();
-    if (p.isEmpty) return 'Sur devis';
-    return 'À partir de $p FCFA';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 168,
-        decoration: BoxDecoration(
-          color: SDColors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: SDColors.neutral200),
-          boxShadow: [
-            BoxShadow(
-              color: SDColors.neutral900.withOpacity(0.04),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ClipRRect(
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(15)),
-              child: SizedBox(
-                height: 96,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final iconH =
+              (constraints.maxHeight * 0.52).clamp(34.0, 52.0).toDouble();
+          final iconSize = (iconH * 0.5).clamp(18.0, 28.0).toDouble();
+          return Column(
+            children: [
+              Container(
+                height: iconH,
                 width: double.infinity,
-                child: service.imageservice.isNotEmpty
-                    ? CachedNetworkImage(
-                        imageUrl: service.imageservice,
-                        fit: BoxFit.cover,
-                        placeholder: (_, __) => Container(
-                          color: SDColors.neutral100,
-                        ),
-                        errorWidget: (_, __, ___) => Container(
-                          color: SDColors.primary50,
-                          child: Icon(Icons.image_outlined,
-                              color: SDColors.primary400, size: 40),
+                decoration: BoxDecoration(
+                  color: SDColors.primary50.withOpacity(0.85),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: SDColors.primary100),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: img != null
+                    ? SizedBox(
+                        width: double.infinity,
+                        height: iconH,
+                        child: AppImage(
+                          imageUrl: img,
+                          height: iconH,
+                          fit: BoxFit.cover,
+                          borderRadius: 14,
                         ),
                       )
-                    : Container(
-                        color: SDColors.primary50,
-                        child: Icon(Icons.handyman_outlined,
-                            color: SDColors.primary500, size: 40),
-                        alignment: Alignment.center,
+                    : Center(
+                        child: Icon(
+                          _iconForName(categorie.nomcategorie),
+                          color: SDColors.primary600,
+                          size: iconSize,
+                        ),
                       ),
               ),
-            ),
-            Padding(
-              padding: EdgeInsets.fromLTRB(
-                SDSpacing.xs,
-                SDSpacing.xs,
-                SDSpacing.xs,
-                SDSpacing.xxs,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    service.nomservice,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: SDTypography.labelLarge.copyWith(
-                      color: SDColors.neutral900,
-                      fontWeight: FontWeight.w700,
-                      height: 1.2,
-                    ),
+              SizedBox(height: SDSpacing.xxxs),
+              Expanded(
+                child: Text(
+                  categorie.nomcategorie,
+                  maxLines: 2,
+                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                  style: SDTypography.labelSmall.copyWith(
+                    color: SDColors.neutral800,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 11,
+                    height: 1.15,
                   ),
-                  SizedBox(height: SDSpacing.xxxs),
-                  Text(
-                    _priceLine(),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: SDTypography.labelSmall.copyWith(
-                      color: SDColors.primary700,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  if (rating != null) ...[
-                    SizedBox(height: SDSpacing.xxxs),
-                    Row(
-                      children: [
-                        Icon(Icons.star_rounded,
-                            size: 16, color: SDColors.warning600),
-                        Text(
-                          rating!.toStringAsFixed(1),
-                          style: SDTypography.labelSmall.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: SDColors.neutral800,
-                          ),
-                        ),
-                        if (reviewLabel != null) ...[
-                          Expanded(
-                            child: Text(
-                              ' · $reviewLabel',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: SDTypography.labelSmall.copyWith(
-                                color: SDColors.neutral500,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ],
-                ],
+                ),
               ),
-            ),
-          ],
-        ),
+            ],
+          );
+        },
       ),
     );
   }
 }
 
-// --- Freelance availability card ---
 
-class _FreelanceAvailabilityCard extends StatelessWidget {
+// --- Talent card (profil freelance honnête) ---
+
+class _FreelanceTalentCard extends StatelessWidget {
   final FreelanceModel freelancer;
-  final bool forceAvailableBadge;
 
-  const _FreelanceAvailabilityCard({
-    required this.freelancer,
-    required this.forceAvailableBadge,
-  });
+  const _FreelanceTalentCard({required this.freelancer});
 
   @override
   Widget build(BuildContext context) {
-    final showBadge = forceAvailableBadge ||
-        freelancer.availabilityStatus.toLowerCase().contains('disponible');
-    final responseText = 'Répond en ${freelancer.responseTime}h';
-    final ratingText = _ratingLabel(freelancer.rating);
     final imageUrl = safeImageUrl(freelancer.imagePath);
-    final meta = freelancer.isTopRated
-        ? 'Top Rated • $responseText'
-        : '${freelancer.completedJobs} projets • $responseText';
+    final hasRating = freelancer.rating > 0;
+    final hasRate = freelancer.hourlyRate > 0;
+    final skills = freelancer.skills
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .take(2)
+        .join(' · ');
+    final avail = freelancer.availabilityStatus.trim();
+    // Uniquement si le backend a une dispo réelle (pas le fallback « Non renseigné »).
+    final showAvail =
+        avail.toLowerCase() == 'disponible' || avail.toLowerCase() == 'available';
 
     return SDEntityCard(
       type: SDEntityCardType.freelance,
       title: displayOrFallback(freelancer.name, 'Freelance'),
-      subtitle: displayOrFallback(freelancer.job, 'Non renseigné'),
+      subtitle: displayOrFallback(freelancer.job, freelancer.category),
       fallbackIcon: Icons.laptop_mac_rounded,
       imageUrl: imageUrl,
-      ratingText: ratingText,
-      metaText: meta,
-      statusText: showBadge ? 'Disponible' : freelancer.availabilityStatus,
-      priceText: _formatFcfaHour(freelancer.hourlyRate),
-      ctaLabel: 'Contacter',
+      ratingText: hasRating ? freelancer.rating.toStringAsFixed(1) : null,
+      metaText: skills.isNotEmpty ? skills : null,
+      statusText: showAvail ? 'Disponible' : null,
+      priceText: hasRate ? _formatFcfaHour(freelancer.hourlyRate) : null,
+      ctaLabel: 'Voir le profil',
       onTap: () {
         Navigator.of(context).push(
           MaterialPageRoute(
@@ -872,58 +660,6 @@ class _FreelanceAvailabilityCard extends StatelessWidget {
           ),
         );
       },
-    );
-  }
-}
-
-class _QuickOfferTile extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final VoidCallback onTap;
-
-  const _QuickOfferTile({
-    required this.label,
-    required this.icon,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: SDColors.neutral50,
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          padding: EdgeInsets.symmetric(
-            vertical: SDSpacing.md,
-            horizontal: SDSpacing.xs,
-          ),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: SDColors.neutral200),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, color: SDColors.primary600, size: 26),
-              SizedBox(height: SDSpacing.xxs),
-              Text(
-                label,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: SDTypography.labelSmall.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: SDColors.neutral800,
-                  fontSize: 11,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }
@@ -1035,7 +771,7 @@ class _FreelanceCategoryResultsPage extends StatelessWidget {
                       .copyWith(fontWeight: FontWeight.w700),
                 ),
                 subtitle: Text(
-                  '${displayOrFallback(f.job, 'Non renseigné')} · ${_ratingLabel(f.rating)}',
+                  _freelanceListSubtitle(f),
                 ),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
@@ -1113,7 +849,7 @@ class _FreelanceAllListPage extends StatelessWidget {
                   ),
                 ),
                 subtitle: Text(
-                  '${displayOrFallback(f.job, 'Non renseigné')} · ${_ratingLabel(f.rating)} · ${_formatFcfaHour(f.hourlyRate)}',
+                  _freelanceListSubtitle(f),
                   style: SDTypography.bodySmall.copyWith(
                     color: SDColors.neutral600,
                   ),

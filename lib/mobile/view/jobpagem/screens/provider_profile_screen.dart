@@ -8,6 +8,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../../../data/models/prestataire.dart';
 import '../../../../data/services/api_client.dart';
 import '../../../../data/services/authCubit.dart';
+import '../../../../data/utils/media_url.dart';
 import '../screens/fullMapScreenM.dart';
 import '../../common/widgets/app_image.dart';
 import '../widgets/service_request_sheet.dart';
@@ -122,16 +123,10 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
   String? _heroPhotoUrl() {
     final p = _provider;
     if (p == null) return null;
-    final selfie = p.selfie?.trim() ?? '';
-    if (selfie.isNotEmpty && selfie.toLowerCase().startsWith('http')) {
-      return selfie;
-    }
-    final prof = p.utilisateur.photoProfil?.trim() ?? '';
-
-    if (prof.isNotEmpty && prof.toLowerCase().startsWith('http')) {
-      return prof;
-    }
-    return null;
+    return providerPhotoUrl(
+      selfie: p.selfie,
+      photoProfil: p.utilisateur.photoProfil,
+    );
   }
 
   double? _parsedProviderNote() {
@@ -220,7 +215,7 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
               SDSpacing.sm,
               SDSpacing.sm,
               SDSpacing.sm,
-              SDSpacing.xxl,
+              SDResponsive.scrollPaddingBelowCta(context, ctaHeight: SDCtaBarHeight.single),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -271,7 +266,7 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
         photoUrl.isNotEmpty && photoUrl.toLowerCase().startsWith('http');
     final mq = MediaQuery.of(context);
     final topInset = mq.padding.top;
-    final heroHeight = 280.0 + topInset;
+    final heroHeight = SDResponsive.heroHeight(context) + topInset;
 
     return SizedBox(
       height: heroHeight,
@@ -1016,7 +1011,7 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
                     size: 48, color: SDColors.neutral400),
                 SizedBox(height: SDSpacing.sm),
                 Text(
-                  'Aucun avis détaillé pour le moment',
+                  'Aucun avis pour le moment',
                   textAlign: TextAlign.center,
                   style: SDTypography.titleSmall.copyWith(
                     color: SDColors.neutral800,
@@ -1025,8 +1020,7 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
                 ),
                 SizedBox(height: SDSpacing.xs),
                 Text(
-                  'Les retours clients détaillés s’afficheront ici lorsque '
-                  'cette fonctionnalité sera branchée sur l’API.',
+                  'Les avis apparaîtront ici après les prestations réalisées.',
                   textAlign: TextAlign.center,
                   style: SDTypography.bodySmall
                       .copyWith(color: SDColors.neutral600, height: 1.4),
@@ -1063,9 +1057,7 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
                     size: 56, color: SDColors.neutral400),
                 SizedBox(height: SDSpacing.md),
                 Text(
-                  'Aucune réalisation publiée pour l’instant. Le portfolio '
-                  'pourra être enrichi depuis l’espace prestataire lorsque '
-                  'des photos seront disponibles côté serveur.',
+                  'Aucune réalisation publiée pour le moment',
                   textAlign: TextAlign.center,
                   style: SDTypography.bodyMedium
                       .copyWith(color: SDColors.neutral600, height: 1.45),
@@ -1117,69 +1109,94 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
   }
 
   Widget _buildBottomActions() {
-    return SafeArea(
-      child: Container(
-        padding: EdgeInsets.all(SDSpacing.sm),
-        decoration: BoxDecoration(
-          color: SDColors.white,
-          boxShadow: [
-            BoxShadow(
-              color: SDColors.neutral900.withOpacity(0.08),
-              blurRadius: 12,
-              offset: const Offset(0, -4),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: _onContactProvider,
-                icon: Icon(Icons.phone_outlined, color: SDColors.primary700),
-                label: Text(
-                  'Appeler',
-                  style: SDTypography.labelMedium.copyWith(
-                    color: SDColors.primary700,
-                    fontWeight: FontWeight.w600,
+    return Builder(
+      builder: (context) {
+        // SDResponsive.systemBottomInset choisit max(padding, viewPadding)
+        // pour être fiable sur EMUI/Huawei qui ne remontent pas correctement
+        // MediaQuery.padding.bottom (navigation 3 boutons).
+        final double sysBottom = SDResponsive.systemBottomInset(context);
+        return Container(
+          padding: EdgeInsets.fromLTRB(
+            SDSpacing.sm,
+            SDSpacing.sm,
+            SDSpacing.sm,
+            SDSpacing.sm + sysBottom,
+          ),
+          decoration: BoxDecoration(
+            color: SDColors.white,
+            boxShadow: [
+              BoxShadow(
+                color: SDColors.neutral900.withOpacity(0.08),
+                blurRadius: 12,
+                offset: const Offset(0, -4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _onContactProvider,
+                  icon: Icon(Icons.phone_outlined, color: SDColors.primary700),
+                  label: Text(
+                    'Appeler',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: SDTypography.labelMedium.copyWith(
+                      color: SDColors.primary700,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: SDColors.primary700,
-                  side: BorderSide(color: SDColors.primary700, width: 1.5),
-                  padding: EdgeInsets.symmetric(vertical: SDSpacing.sm),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: SDColors.primary700,
+                    side: BorderSide(color: SDColors.primary700, width: 1.5),
+                    minimumSize: const Size(0, 48),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: SDSpacing.xs,
+                      vertical: SDSpacing.xs,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
                 ),
               ),
-            ),
-            SizedBox(width: SDSpacing.sm),
-            Expanded(
-              flex: 2,
-              child: ElevatedButton.icon(
-                onPressed: _onRequestService,
-                icon: Icon(Icons.send_rounded, color: SDColors.white),
-                label: Text(
-                  'Demander un service',
-                  style: SDTypography.labelMedium.copyWith(
-                    color: SDColors.white,
-                    fontWeight: FontWeight.bold,
+              SizedBox(width: SDSpacing.sm),
+              Expanded(
+                flex: 2,
+                child: ElevatedButton.icon(
+                  onPressed: _onRequestService,
+                  icon: Icon(Icons.send_rounded, color: SDColors.white),
+                  label: Text(
+                    'Demander un service',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: SDTypography.labelMedium.copyWith(
+                      color: SDColors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: SDColors.primary700,
-                  foregroundColor: SDColors.white,
-                  padding: EdgeInsets.symmetric(vertical: SDSpacing.sm),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: SDColors.primary700,
+                    foregroundColor: SDColors.white,
+                    minimumSize: const Size(0, 48),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: SDSpacing.xs,
+                      vertical: SDSpacing.xs,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 2,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
-                  elevation: 2,
                 ),
               ),
-            ),
-          ],
-        ),
-      ),
+            ],
+          ),
+        );
+      },
     );
   }
 

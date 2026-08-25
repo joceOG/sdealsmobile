@@ -8,6 +8,8 @@ import 'package:intl/intl.dart';
 import 'package:sdealsmobile/data/services/api_client.dart';
 import 'package:sdealsmobile/data/services/authCubit.dart';
 import 'package:sdealsmobile/data/utils/display_text.dart';
+import 'package:sdealsmobile/data/utils/media_url.dart';
+import 'package:sdealsmobile/data/utils/string_list_normalizer.dart';
 import 'package:sdealsmobile/mobile/view/orderpagem/screens/service_request_summary_screen.dart';
 import 'package:sdealsmobile/mobile/view/jobpagem/screens/provider_profile_screen.dart';
 import 'package:sdealsmobile/mobile/view/common/widgets/app_image.dart';
@@ -418,10 +420,8 @@ class _DetailPageState extends State<DetailPage> {
   }
 
   String _metierLine(Map<String, dynamic> p) {
-    final spec = p['specialite'];
-    if (spec is List && spec.isNotEmpty) {
-      return spec.first.toString();
-    }
+    final specs = normalizeStringList(p['specialite']);
+    if (specs.isNotEmpty) return specs.first;
     final svc = p['service'];
     if (svc is Map) {
       return (svc['nomservice'] ?? widget.title).toString();
@@ -430,16 +430,11 @@ class _DetailPageState extends State<DetailPage> {
   }
 
   String? _photoUrl(Map<String, dynamic> p) {
-    final selfie = p['selfie']?.toString().trim() ?? '';
     final u = p['utilisateur'];
-    final profil = u is Map
-        ? (u['photoProfil']?.toString().trim() ?? '')
-        : '';
-    final raw = (selfie.isNotEmpty && selfie.toLowerCase().startsWith('http'))
-        ? selfie
-        : profil;
-    if (raw.isEmpty || !raw.toLowerCase().startsWith('http')) return null;
-    return raw;
+    return providerPhotoUrl(
+      utilisateurMap: u is Map ? Map<String, dynamic>.from(u) : null,
+      prestataireMap: p,
+    );
   }
 
   String _displayName(Map<String, dynamic> p) {
@@ -456,13 +451,7 @@ class _DetailPageState extends State<DetailPage> {
   List<String> _aggregatedSpecialites() {
     final set = <String>{};
     for (final p in _providers) {
-      final s = p['specialite'];
-      if (s is List) {
-        for (final e in s) {
-          final t = e.toString().trim();
-          if (t.isNotEmpty) set.add(t);
-        }
-      }
+      set.addAll(normalizeStringList(p['specialite']));
     }
     final out = set.toList()..sort();
     if (out.length > 14) return out.sublist(0, 14);
@@ -1376,9 +1365,14 @@ class _DetailPageState extends State<DetailPage> {
   }
 
   Widget _buildStickyCta(BuildContext context) {
-    return SafeArea(
+    // Politique safe-bottom unifiée (SDResponsive.systemBottomInset) —
+    // SafeArea seul est inopérant sur EMUI (insets remontés via gestureInsets).
+    final double sysBottom = SDResponsive.systemBottomInset(context);
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+          SDSpacing.sm, SDSpacing.xs, SDSpacing.sm, SDSpacing.sm + sysBottom),
       child: Padding(
-        padding: EdgeInsets.fromLTRB(SDSpacing.sm, SDSpacing.xs, SDSpacing.sm, SDSpacing.sm),
+        padding: EdgeInsets.zero,
         child: SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(

@@ -371,11 +371,13 @@ class _ServiceProviderRegistrationScreenMState
   }
 
   Widget _buildWizard() {
+    final bottomPad = SDResponsive.scrollPaddingBelowCta(context, ctaHeight: SDCtaBarHeight.withBack);
     return Scaffold(
       backgroundColor: SDColors.white,
       appBar: SDWhiteAppBar.appBar(
-        centerTitle: true,
-        title: 'Créer mon profil prestataire',
+        centerTitle: false,
+        title: 'Créer mon profil',
+        titleStyle: SDTypography.titleLarge,
       ),
       body: Column(
         children: [
@@ -388,7 +390,8 @@ class _ServiceProviderRegistrationScreenMState
           ),
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              padding: EdgeInsets.fromLTRB(20, 4, 20, bottomPad),
               physics: const BouncingScrollPhysics(),
               child: _buildStepBody(),
             ),
@@ -485,6 +488,9 @@ class _StepProgress extends StatelessWidget {
   final int currentStep;
   final List<String> labels;
 
+  /// Libellés courts pour petits écrans (< 360 dp).
+  static const List<String> _shortLabels = ['Infos', 'Activité', 'Tarifs'];
+
   const _StepProgress({
     required this.currentStep,
     required this.labels,
@@ -492,10 +498,11 @@ class _StepProgress extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final effectiveLabels = SDResponsive.isCompact(context) ? _shortLabels : labels;
     return Column(
       children: [
         Row(
-          children: List.generate(labels.length * 2 - 1, (i) {
+          children: List.generate(effectiveLabels.length * 2 - 1, (i) {
             if (i.isOdd) {
               final after = i ~/ 2;
               final done = currentStep > after;
@@ -535,11 +542,11 @@ class _StepProgress extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Row(
-          children: List.generate(labels.length, (i) {
+          children: List.generate(effectiveLabels.length, (i) {
             final active = currentStep == i;
             return Expanded(
               child: Text(
-                labels[i],
+                effectiveLabels[i],
                 textAlign: TextAlign.center,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,

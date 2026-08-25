@@ -25,7 +25,7 @@ class Product {
     this.id = '',
     this.brand = 'Générique',
     this.isFavorite = false,
-    this.rating = 4.5,
+    this.rating = 0.0,
     this.vendeurId,
   });
 }

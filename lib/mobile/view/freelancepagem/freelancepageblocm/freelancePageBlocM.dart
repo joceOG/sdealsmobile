@@ -65,8 +65,9 @@ class FreelancePageBlocM
         error: null,
       ));
 
+      // STAB-13B Phase 2 : freelances uniquement (Services populaires hors hub V1).
+      // LoadServicesEvent reste disponible mais n'est plus déclenché ici.
       add(LoadFreelancersEvent());
-      add(LoadServicesEvent());
     } on TimeoutException {
       emit(state.copyWith(
         isLoading: false,

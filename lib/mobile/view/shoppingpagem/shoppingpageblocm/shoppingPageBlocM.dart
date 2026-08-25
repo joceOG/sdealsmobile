@@ -113,13 +113,10 @@ class ShoppingPageBlocM extends Bloc<ShoppingPageEventM, ShoppingPageStateM> {
     emit(state.copyWith(isLoading: true));
 
     try {
-      // Utiliser l'API client pour charger les articles réels
-      ApiClient apiClient = ApiClient();
-
-      // Tenter de récupérer les articles depuis l'API
+      // STAB-13C : toujours l’ApiClient injecté (tests / stubs).
       try {
         print("Tentative de chargement des articles depuis l'API...");
-        final articles = await apiClient.fetchArticle();
+        final articles = await _apiClient.fetchArticle();
 
         if (articles.isNotEmpty) {
           print("Articles récupérés avec succès: ${articles.length}");
@@ -134,12 +131,12 @@ class ShoppingPageBlocM extends Bloc<ShoppingPageEventM, ShoppingPageStateM> {
                   'Article: ${article.nomArticle}, prix: ${article.prixArticle}, image: ${article.photoArticle}');
 
               // S'assurer que les valeurs sont valides ou fournir des valeurs par défaut
-              String imageUrl = article.photoArticle;
-              // Si l'URL de l'image n'est pas valide ou vide, utiliser une image par défaut
+              String imageUrl = article.photoArticle.trim();
+              // Pas d’asset inventé : placeholder UI si URL absente/invalide.
               if (imageUrl.isEmpty ||
-                  (!imageUrl.startsWith('http') &&
-                      !imageUrl.startsWith('https'))) {
-                imageUrl = 'assets/products/default.png';
+                  (!imageUrl.startsWith('http://') &&
+                      !imageUrl.startsWith('https://'))) {
+                imageUrl = '';
               }
 
               products.add(Product(
@@ -154,7 +151,7 @@ class ShoppingPageBlocM extends Bloc<ShoppingPageEventM, ShoppingPageStateM> {
                 price: article.prixArticle.isEmpty
                     ? 'Prix non renseigné'
                     : article.prixArticle,
-                brand: 'Non spécifié',
+                brand: '',
                 rating: 0.0,
                 vendeurId: article.vendeurId,
               ));

@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -23,6 +22,7 @@ import '../../../../design_system/spacing.dart';
 import '../../../../design_system/widgets/sd_app_bar_icon_button.dart';
 import '../../../../design_system/widgets/sd_feedback_states.dart';
 import 'package:sdealsmobile/data/utils/display_text.dart';
+import 'package:sdealsmobile/data/utils/media_url.dart';
 
 // Utilisation du modèle Product du BLoC
 typedef Product = bloc_model.Product;
@@ -30,30 +30,139 @@ typedef Product = bloc_model.Product;
 /// Aperçu catégories sur le hub (comme Freelance).
 const int _kShopCategoryPreviewCount = 8;
 
+/// Icônes É-marché — mapping strict (spécifique → générique). Sans image réseau.
 IconData _shopCategoryIcon(String rawName) {
-  final name = rawName.toLowerCase();
-  if (name.contains('auto') || name.contains('moto')) {
-    return Icons.directions_car;
+  final name = rawName
+      .toLowerCase()
+      .replaceAll('é', 'e')
+      .replaceAll('è', 'e')
+      .replaceAll('ê', 'e')
+      .replaceAll('à', 'a')
+      .replaceAll('ù', 'u')
+      .replaceAll('ô', 'o')
+      .replaceAll('î', 'i')
+      .replaceAll('ç', 'c');
+
+  if (name.contains('telephone') ||
+      name.contains('smartphone') ||
+      name.contains('phone')) {
+    return Icons.smartphone_outlined;
   }
-  if (name.contains('immobilier') || name.contains('maison')) {
-    return Icons.house;
+  if (name.contains('ordinateur') ||
+      name.contains('laptop') ||
+      name.contains('informatique')) {
+    return Icons.laptop_mac_outlined;
   }
-  if (name.contains('électronique') || name.contains('electronique')) {
-    return Icons.devices;
+  if (name.contains('tv') ||
+      name.contains('television') ||
+      name.contains('ecran') ||
+      name.contains('electronique') ||
+      name.contains('high-tech') ||
+      name.contains('hightech') ||
+      name.contains('tech')) {
+    return Icons.devices_other_outlined;
   }
-  if (name.contains('tech')) return Icons.electrical_services;
+  if (name.contains('beaute') ||
+      name.contains('cosmetique') ||
+      name.contains('maquillage') ||
+      name.contains('parfum')) {
+    return Icons.spa_outlined;
+  }
+  if (name.contains('sante') ||
+      name.contains('pharmacie') ||
+      name.contains('medic')) {
+    return Icons.medical_services_outlined;
+  }
+  if (name.contains('chaussure') || name.contains('sneaker')) {
+    return Icons.checkroom_outlined;
+  }
   if (name.contains('mode') ||
-      name.contains('vêtement') ||
-      name.contains('vetement')) {
-    return Icons.style;
+      name.contains('vetement') ||
+      name.contains('fashion') ||
+      name.contains('habillement') ||
+      name.contains('accessoire')) {
+    return Icons.checkroom_outlined;
   }
-  if (name.contains('meuble')) return Icons.chair;
-  if (name.contains('sport')) return Icons.sports_soccer;
-  if (name.contains('jeu')) return Icons.videogame_asset;
-  if (name.contains('santé') || name.contains('sante')) {
-    return Icons.health_and_safety;
+  if (name.contains('bijou') || name.contains('montre')) {
+    return Icons.watch_outlined;
   }
-  return Icons.category_outlined;
+  if (name.contains('bebe') ||
+      name.contains('enfant') ||
+      name.contains('jouet') ||
+      name.contains('puericulture')) {
+    return Icons.child_care_outlined;
+  }
+  if (name.contains('sport') ||
+      name.contains('fitness') ||
+      name.contains('gym')) {
+    return Icons.fitness_center_outlined;
+  }
+  if (name.contains('jeu') ||
+      name.contains('gaming') ||
+      name.contains('console')) {
+    return Icons.sports_esports_outlined;
+  }
+  if (name.contains('livre') ||
+      name.contains('papeterie') ||
+      name.contains('education')) {
+    return Icons.menu_book_outlined;
+  }
+  if (name.contains('aliment') ||
+      name.contains('epicerie') ||
+      name.contains('boisson') ||
+      name.contains('food') ||
+      name.contains('agro')) {
+    return Icons.restaurant_outlined;
+  }
+  if (name.contains('electromenager')) {
+    return Icons.kitchen_outlined;
+  }
+  if (name.contains('maison') ||
+      name.contains('cuisine') ||
+      name.contains('deco') ||
+      name.contains('meuble') ||
+      name.contains('jardin')) {
+    return Icons.chair_outlined;
+  }
+  if (name.contains('immobilier') ||
+      name.contains('appartement') ||
+      name.contains('terrain')) {
+    return Icons.home_work_outlined;
+  }
+  if (name.contains('auto') ||
+      name.contains('moto') ||
+      name.contains('vehicule') ||
+      name.contains('voiture')) {
+    return Icons.directions_car_outlined;
+  }
+  if (name.contains('bricolage') ||
+      name.contains('outil') ||
+      name.contains('quincaillerie')) {
+    return Icons.handyman_outlined;
+  }
+  if (name.contains('animal') || name.contains('animau') || name.contains('pet')) {
+    return Icons.pets_outlined;
+  }
+  if (name.contains('voyage') || name.contains('bagage') || name.contains('valise')) {
+    return Icons.luggage_outlined;
+  }
+  if (name.contains('bureau') || name.contains('entreprise')) {
+    return Icons.business_center_outlined;
+  }
+  return Icons.shopping_bag_outlined;
+}
+
+/// Prix hub : "3 000 FCFA" (espace fine).
+String _formatShopPrice(String raw) {
+  final digits = raw.replaceAll(RegExp(r'[^\d]'), '');
+  if (digits.isEmpty) return raw.trim().isEmpty ? 'Prix non renseigné' : raw;
+  final value = int.tryParse(digits);
+  if (value == null || value <= 0) return 'Prix non renseigné';
+  final formatted = value.toString().replaceAllMapped(
+    RegExp(r'(\d)(?=(\d{3})+$)'),
+    (m) => '${m.group(1)}\u202F',
+  );
+  return '$formatted FCFA';
 }
 
 class ShoppingPageScreenM extends StatefulWidget {
@@ -165,7 +274,7 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
       children: [
         Expanded(
           child: Text(
-            'Marketplace',
+            'É-marché',
             textAlign: TextAlign.start,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -297,7 +406,7 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
               onTap: openSearch,
               behavior: HitTestBehavior.opaque,
               child: Text(
-                'Que voulez-vous acheter ?',
+                'Que recherchez-vous ?',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: SDTypography.bodyMedium.copyWith(
@@ -324,59 +433,7 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
     );
   }
 
-  Widget _buildPromoBanner(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.all(SDSpacing.md),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF5F0E8),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: SDColors.neutral200),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '-20% sur l\'électronique',
-                  style: SDTypography.titleSmall.copyWith(
-                    color: SDColors.neutral900,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                SizedBox(height: SDSpacing.sm),
-                FilledButton(
-                  onPressed: () => _openSearchShop(context),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: SDColors.primary600,
-                    foregroundColor: SDColors.white,
-                    padding: EdgeInsets.symmetric(
-                      horizontal: SDSpacing.md,
-                      vertical: SDSpacing.xs,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: Text(
-                    'Voir l\'offre',
-                    style: SDTypography.labelMedium.copyWith(
-                      color: SDColors.white,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          SizedBox(width: SDSpacing.sm),
-          Icon(Icons.kitchen_outlined,
-              size: 52, color: SDColors.primary600.withOpacity(0.35)),
-        ],
-      ),
-    );
-  }
+  // STAB-13C : bannière -20% hardcodée retirée (pas de promo certifiée).
 
   Widget _buildCategoryPreviewGrid(
       BuildContext context, bloc_model.ShoppingPageStateM state) {
@@ -408,7 +465,7 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
         crossAxisCount: 4,
         mainAxisSpacing: 10,
         crossAxisSpacing: 10,
-        childAspectRatio: 0.78,
+        childAspectRatio: 0.68,
       ),
       itemCount: preview.length,
       itemBuilder: (context, index) {
@@ -481,7 +538,7 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
     final list = _displayProducts(state).take(10).toList();
     if (state.isLoading == true && list.isEmpty) {
       return SizedBox(
-        height: 210,
+        height: 248,
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
           itemCount: 4,
@@ -489,7 +546,7 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
           padding: EdgeInsets.zero,
           itemBuilder: (_, __) => SkeletonWidget.rounded(
             width: 148,
-            height: 200,
+            height: 240,
             borderRadius: 16,
           ),
         ),
@@ -502,7 +559,7 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
       );
     }
     return SizedBox(
-      height: 210,
+      height: 268,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: list.length,
@@ -514,89 +571,37 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
     );
   }
 
-  Widget _buildDealsRow(
+  /// STAB-13C : Boutiques uniquement si données présentes (pas d’empty géant).
+  Widget _buildShopsSection(
       BuildContext context, bloc_model.ShoppingPageStateM state) {
-    final all = _displayProducts(state);
-    final list = all.length > 1
-        ? all.sublist(0, all.length > 6 ? 6 : all.length)
-        : all;
-    if (list.isEmpty) {
-      return SDEmptyState(
-        title: 'Aucune promo',
-        message: 'Les offres du moment apparaîtront ici.',
-        icon: Icons.local_offer_outlined,
+    final shops = state.filteredVendeurs ?? state.vendeurs ?? [];
+
+    if (state.isVendeursLoading && shops.isEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionTitleOnly(
+            leadingIcon: Icons.storefront_outlined,
+            title: 'Boutiques',
+          ),
+          SizedBox(height: SDSpacing.sm),
+          const SDLoadingInline(message: 'Chargement des boutiques…'),
+        ],
       );
     }
-    return SizedBox(
-      height: 228,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: list.length,
-        separatorBuilder: (_, __) => SizedBox(width: SDSpacing.sm),
-        itemBuilder: (context, i) {
-          return _CompactShopProductCard(product: list[i]);
-        },
-      ),
-    );
-  }
 
-  Widget _buildNearYouAndShops(
-      BuildContext context, bloc_model.ShoppingPageStateM state) {
-    final products = _displayProducts(state);
-    final near = products.take(5).toList();
-    final shops = state.filteredVendeurs ?? state.vendeurs ?? [];
+    // Vide ou erreur sans données → section absente sur la Home.
+    if (shops.isEmpty) return const SizedBox.shrink();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildSectionTitleOnly(
           leadingIcon: Icons.storefront_outlined,
-          title: 'Boutiques recommandées',
+          title: 'Boutiques',
         ),
         SizedBox(height: SDSpacing.sm),
-        if (state.isVendeursLoading && shops.isEmpty)
-          const SDLoadingInline(message: 'Chargement des boutiques…')
-        else if ((state.vendeursError ?? '').isNotEmpty && shops.isEmpty)
-          SDErrorState(
-            message: state.vendeursError!,
-            onRetry: () =>
-                context.read<ShoppingPageBlocM>().add(LoadVendeursEvent()),
-          )
-        else if (shops.isEmpty)
-          const SDEmptyState(
-            title: 'Aucune boutique',
-            message: 'Les boutiques recommandées apparaîtront bientôt.',
-            icon: Icons.storefront_outlined,
-          )
-        else
-          ...shops.take(4).map((v) => _ShopRecommendTile(vendeur: v)),
-        SizedBox(height: SDSpacing.xl),
-        _buildSectionTitleOnly(
-          leadingIcon: Icons.near_me_outlined,
-          title: 'Près de vous',
-        ),
-        SizedBox(height: SDSpacing.sm),
-        SizedBox(
-          height: 118,
-          child: near.isEmpty
-              ? Text(
-                  'Produits à proximité bientôt disponibles.',
-                  style: SDTypography.bodySmall
-                      .copyWith(color: SDColors.neutral500),
-                )
-              : ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: near.length,
-                  separatorBuilder: (_, __) => SizedBox(width: SDSpacing.xs),
-                  itemBuilder: (context, i) {
-                    final km = (0.5 + (i + 1) * 0.35).toStringAsFixed(1);
-                    return _NearYouTile(
-                      product: near[i],
-                      distanceKm: km,
-                    );
-                  },
-                ),
-        ),
+        ...shops.take(4).map((v) => _ShopRecommendTile(vendeur: v)),
       ],
     );
   }
@@ -662,18 +667,12 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                         _buildMarketplaceHeader(context),
                         SizedBox(height: SDSpacing.md),
                         _buildSearchField(context),
-                        SizedBox(height: SDSpacing.lg),
-                        _buildPromoBanner(context),
                         SizedBox(height: SDSpacing.xl),
-                        _buildSectionHeaderRow(
-                          leadingIcon: Icons.local_mall_outlined,
-                          title: 'Produits populaires',
-                          actionLabel: 'Tout voir',
-                          onAction: () => _openSearchShop(context),
+                        _buildSectionTitleOnly(
+                          leadingIcon: Icons.grid_view_rounded,
+                          title: 'Catégories',
                         ),
                         SizedBox(height: SDSpacing.sm),
-                        _buildPopularProductsRow(context, state),
-                        SizedBox(height: SDSpacing.xl),
                         _buildCategoryPreviewGrid(context, state),
                         SizedBox(height: SDSpacing.md),
                         Center(
@@ -681,15 +680,15 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                         ),
                         SizedBox(height: SDSpacing.xl),
                         _buildSectionHeaderRow(
-                          leadingIcon: Icons.local_offer_outlined,
-                          title: 'Bon plan',
+                          leadingIcon: Icons.local_mall_outlined,
+                          title: 'Produits à découvrir',
                           actionLabel: 'Tout voir',
                           onAction: () => _openSearchShop(context),
                         ),
                         SizedBox(height: SDSpacing.sm),
-                        _buildDealsRow(context, state),
+                        _buildPopularProductsRow(context, state),
                         SizedBox(height: SDSpacing.xl),
-                        _buildNearYouAndShops(context, state),
+                        _buildShopsSection(context, state),
                         SizedBox(height: SDSpacing.xxl),
                       ],
                     ),
@@ -2044,27 +2043,20 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
   }
 }
 
-/// Carte produit horizontale (Marketplace Figma).
+/// Carte produit hub É-marché (STAB-13C) — données réelles uniquement.
 class _CompactShopProductCard extends StatelessWidget {
   final Product product;
-  final int? discountPercent;
-  final String? strikePrice;
 
-  const _CompactShopProductCard({
-    required this.product,
-    this.discountPercent,
-    this.strikePrice,
-  });
+  const _CompactShopProductCard({required this.product});
 
   @override
   Widget build(BuildContext context) {
-    final oldPrice = strikePrice;
-    final showDeal = discountPercent != null &&
-        discountPercent! > 0 &&
-        oldPrice != null &&
-        oldPrice.isNotEmpty;
+    // Note uniquement si > 0 (pas de mapping promo/rating backend dans ce patch ;
+    // le BLoC laisse rating à 0 tant que le contrat métier n’est pas certifié).
     final ratingLabel = formatOptionalRating(product.rating);
-    final priceLabel = formatOptionalPrice(product.price) ?? product.price;
+    final priceLabel = _formatShopPrice(product.price);
+    final imageUrl = normalizeMediaUrl(product.image);
+    final title = displayOrFallback(product.name, 'Produit');
 
     return GestureDetector(
       onTap: () => Navigator.of(context).push(
@@ -2092,70 +2084,37 @@ class _CompactShopProductCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Expanded(
-              child: Stack(
-                children: [
-                  Container(
-                    margin: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: SDColors.neutral50,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: product.image.startsWith('http')
-                          ? AppImage(
-                              imageUrl: product.image,
-                              width: double.infinity,
-                              height: double.infinity,
-                              fit: BoxFit.contain,
-                              placeholderAsset: 'assets/products/default.png',
-                            )
-                          : Image.asset(
-                              product.image.isNotEmpty
-                                  ? product.image
-                                  : 'assets/products/default.png',
-                              fit: BoxFit.contain,
-                              errorBuilder: (_, __, ___) => const Center(
-                                child: Icon(Icons.image_not_supported, size: 32),
-                              ),
-                            ),
-                    ),
-                  ),
-                  if (showDeal)
-                    Positioned(
-                      top: 6,
-                      right: 6,
-                      child: Container(
-                        constraints: const BoxConstraints(maxWidth: 44),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: SDColors.error500,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          '-$discountPercent%',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: SDTypography.labelSmall.copyWith(
-                            color: SDColors.white,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 10,
-                          ),
+            AspectRatio(
+              aspectRatio: 1,
+              child: Container(
+                margin: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+                decoration: BoxDecoration(
+                  color: SDColors.neutral50,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: imageUrl != null
+                    ? AppImage(
+                        imageUrl: imageUrl,
+                        fit: BoxFit.contain,
+                        borderRadius: 12,
+                      )
+                    : const Center(
+                        child: Icon(
+                          Icons.image_outlined,
+                          size: 36,
+                          color: SDColors.neutral400,
                         ),
                       ),
-                    ),
-                ],
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    product.name,
+                    title,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: SDTypography.labelSmall.copyWith(
@@ -2165,127 +2124,35 @@ class _CompactShopProductCard extends StatelessWidget {
                     ),
                   ),
                   SizedBox(height: SDSpacing.xxxs),
-                  Row(
-                    children: [
-                      if (ratingLabel != null)
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.star_rounded,
-                              size: 14,
-                              color: SDColors.warning500,
-                            ),
-                            Text(
-                              ratingLabel,
-                              style: SDTypography.labelSmall.copyWith(
-                                color: SDColors.neutral600,
-                              ),
-                            ),
-                          ],
-                        ),
-                    ],
+                  Text(
+                    priceLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: SDTypography.labelMedium.copyWith(
+                      color: SDColors.primary600,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
-                  SizedBox(height: SDSpacing.xxxs),
-                  if (showDeal) ...[
-                    Text(
-                      priceLabel,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: SDTypography.labelMedium.copyWith(
-                        color: SDColors.neutral900,
-                        fontWeight: FontWeight.w800,
-                      ),
+                  if (ratingLabel != null) ...[
+                    SizedBox(height: SDSpacing.xxxs),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.star_rounded,
+                          size: 14,
+                          color: SDColors.warning500,
+                        ),
+                        const SizedBox(width: 2),
+                        Text(
+                          ratingLabel,
+                          style: SDTypography.labelSmall.copyWith(
+                            color: SDColors.neutral600,
+                          ),
+                        ),
+                      ],
                     ),
-                    Text(
-                      oldPrice,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: SDTypography.labelSmall.copyWith(
-                        color: SDColors.neutral400,
-                        decoration: TextDecoration.lineThrough,
-                      ),
-                    ),
-                  ] else
-                    Text(
-                      priceLabel,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: SDTypography.labelMedium.copyWith(
-                        color: SDColors.primary600,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
+                  ],
                 ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _NearYouTile extends StatelessWidget {
-  final Product product;
-  final String distanceKm;
-
-  const _NearYouTile({
-    required this.product,
-    required this.distanceKm,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => BlocProvider.value(
-            value: context.read<ShoppingPageBlocM>(),
-            child: ProductDetails(product: product),
-          ),
-        ),
-      ),
-      child: SizedBox(
-        width: 72,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Container(
-              height: 64,
-              width: 64,
-              decoration: BoxDecoration(
-                color: SDColors.neutral50,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: SDColors.neutral200),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: product.image.startsWith('http')
-                    ? AppImage(
-                        imageUrl: product.image,
-                        width: 64,
-                        height: 64,
-                        fit: BoxFit.cover,
-                        placeholderAsset: 'assets/products/default.png',
-                      )
-                    : Image.asset(
-                        product.image.isNotEmpty
-                            ? product.image
-                            : 'assets/products/default.png',
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) =>
-                            const Icon(Icons.image_not_supported, size: 24),
-                      ),
-              ),
-            ),
-            SizedBox(height: SDSpacing.xxxs),
-            Text(
-              '$distanceKm km',
-              style: SDTypography.labelSmall.copyWith(
-                color: SDColors.primary600,
-                fontWeight: FontWeight.w700,
-                fontSize: 10,
               ),
             ),
           ],
@@ -2302,6 +2169,10 @@ class _ShopRecommendTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ratingLabel = formatOptionalRating(vendeur.rating);
+    final logo = safeImageUrl(vendeur.shopLogo);
+    final name = displayOrFallback(vendeur.shopName, 'Boutique');
+
     return Padding(
       padding: EdgeInsets.only(bottom: SDSpacing.xs),
       child: InkWell(
@@ -2318,16 +2189,16 @@ class _ShopRecommendTile extends StatelessWidget {
               child: SizedBox(
                 width: 40,
                 height: 40,
-                child: vendeur.shopLogo != null && vendeur.shopLogo!.isNotEmpty
+                child: logo != null
                     ? AppImage(
-                        imageUrl: vendeur.shopLogo!,
+                        imageUrl: logo,
                         width: 40,
                         height: 40,
                         fit: BoxFit.cover,
                       )
                     : ColoredBox(
                         color: SDColors.primary50,
-                        child: Icon(Icons.storefront,
+                        child: Icon(Icons.storefront_outlined,
                             color: SDColors.primary600, size: 22),
                       ),
               ),
@@ -2338,7 +2209,7 @@ class _ShopRecommendTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    vendeur.shopName,
+                    name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: SDTypography.labelSmall.copyWith(
@@ -2346,19 +2217,20 @@ class _ShopRecommendTile extends StatelessWidget {
                       color: SDColors.neutral900,
                     ),
                   ),
-                  Row(
-                    children: [
-                      Icon(Icons.star_rounded,
-                          size: 12, color: SDColors.warning500),
-                      Text(
-                        vendeur.rating.toStringAsFixed(1),
-                        style: SDTypography.labelSmall.copyWith(
-                          color: SDColors.neutral600,
-                          fontSize: 10,
+                  if (ratingLabel != null)
+                    Row(
+                      children: [
+                        Icon(Icons.star_rounded,
+                            size: 12, color: SDColors.warning500),
+                        Text(
+                          ratingLabel,
+                          style: SDTypography.labelSmall.copyWith(
+                            color: SDColors.neutral600,
+                            fontSize: 10,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
                 ],
               ),
             ),
@@ -2380,61 +2252,51 @@ class _ShopCategoryCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final img = categorie.imagecategorie;
-    final hasNetworkImage = img.isNotEmpty &&
-        (img.startsWith('http://') || img.startsWith('https://'));
-
+    // STAB-13C : icônes pro uniquement (pas imagecategorie produit/incohérente).
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(14),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            height: 52,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: SDColors.primary50.withOpacity(0.85),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: SDColors.primary100),
-            ),
-            child: Center(
-              child: hasNetworkImage
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: CachedNetworkImage(
-                        imageUrl: img,
-                        width: 36,
-                        height: 36,
-                        fit: BoxFit.cover,
-                        errorWidget: (_, __, ___) => Icon(
-                          _shopCategoryIcon(categorie.nomcategorie),
-                          color: SDColors.primary600,
-                          size: 28,
-                        ),
-                      ),
-                    )
-                  : Icon(
-                      _shopCategoryIcon(categorie.nomcategorie),
-                      color: SDColors.primary600,
-                      size: 28,
-                    ),
-            ),
-          ),
-          SizedBox(height: SDSpacing.xxxs),
-          Text(
-            categorie.nomcategorie,
-            maxLines: 2,
-            textAlign: TextAlign.center,
-            overflow: TextOverflow.ellipsis,
-            style: SDTypography.labelSmall.copyWith(
-              color: SDColors.neutral800,
-              fontWeight: FontWeight.w600,
-              fontSize: 11,
-              height: 1.15,
-            ),
-          ),
-        ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final iconH =
+              (constraints.maxHeight * 0.52).clamp(34.0, 52.0).toDouble();
+          final iconSize = (iconH * 0.55).clamp(20.0, 30.0).toDouble();
+          return Column(
+            children: [
+              Container(
+                height: iconH,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: SDColors.primary50.withOpacity(0.85),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: SDColors.primary100),
+                ),
+                child: Center(
+                  child: Icon(
+                    _shopCategoryIcon(categorie.nomcategorie),
+                    color: SDColors.primary600,
+                    size: iconSize,
+                  ),
+                ),
+              ),
+              SizedBox(height: SDSpacing.xxxs),
+              Expanded(
+                child: Text(
+                  categorie.nomcategorie,
+                  maxLines: 2,
+                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                  style: SDTypography.labelSmall.copyWith(
+                    color: SDColors.neutral800,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 11,
+                    height: 1.15,
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

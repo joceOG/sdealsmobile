@@ -14,17 +14,20 @@ class Categorie {
   });
 
   factory Categorie.fromJson(dynamic json) {
-    // json peut être Map<String, dynamic>
-    final map = json as Map<String, dynamic>;
+    // Hive / cache renvoie souvent Map<dynamic, dynamic>, pas Map<String, dynamic>.
+    final map = Map<String, dynamic>.from(json as Map);
     final g = map['groupe'];
     return Categorie(
       idcategorie: map['_id'] as String? ?? map['idcategorie'] as String? ?? '',
       nomcategorie: map['nomcategorie'] as String? ?? '',
       imagecategorie: map['imagecategorie'] as String? ?? '',
-      // Gère populate ou simple ObjectId string
-      groupe: g is Map<String, dynamic>
-          ? Groupe.fromJson(g)
-          : Groupe(idgroupe: g as String? ?? '', nomgroupe: ''), // placeholder si pas populate
+      // Gère populate (Map) ou simple ObjectId string
+      groupe: g is Map
+          ? Groupe.fromJson(Map<String, dynamic>.from(g))
+          : Groupe(
+              idgroupe: g?.toString() ?? '',
+              nomgroupe: '',
+            ),
     );
   }
 

@@ -8,6 +8,7 @@ export 'colors.dart';
 export 'typography.dart';
 export 'spacing.dart';
 export 'animations.dart';
+export 'responsive.dart';
 
 // ═══════════════════════════════════════
 // WIDGETS (Components)

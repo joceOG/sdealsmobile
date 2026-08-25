@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../colors.dart';
+import '../responsive.dart';
 import '../spacing.dart';
 import '../typography.dart';
 import 'sd_button.dart';
@@ -183,7 +184,7 @@ class GuestAuthState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _buildVisual(),
+          _buildVisual(context),
           const SizedBox(height: SDSpacing.md),
           Text(
             title,
@@ -223,34 +224,41 @@ class GuestAuthState extends StatelessWidget {
     );
   }
 
-  Widget _buildVisual() {
+  Widget _buildVisual(BuildContext context) {
+    // Illustration / icône adaptive : plafonnée à 25 % du viewport.
+    final effectiveIllustrationH =
+        SDResponsive.illustrationHeight(context, preferred: illustrationHeight);
+    // Cercle icône : max 22 % du viewport (reste lisible à 320×568).
+    final circleSize =
+        (MediaQuery.sizeOf(context).height * 0.22).clamp(80.0, 112.0);
+
     if (illustrationAsset != null) {
       return SizedBox(
-        height: illustrationHeight,
+        height: effectiveIllustrationH,
         width: double.infinity,
         child: Image.asset(
           illustrationAsset!,
           fit: BoxFit.contain,
           alignment: Alignment.center,
           filterQuality: FilterQuality.high,
-          errorBuilder: (_, __, ___) => _buildIconVisual(),
+          errorBuilder: (_, __, ___) => _buildIconVisual(circleSize),
         ),
       );
     }
-    return _buildIconVisual();
+    return _buildIconVisual(circleSize);
   }
 
-  Widget _buildIconVisual() {
+  Widget _buildIconVisual(double size) {
     return Container(
-      width: 112,
-      height: 112,
+      width: size,
+      height: size,
       decoration: const BoxDecoration(
         color: SDColors.primary50,
         shape: BoxShape.circle,
       ),
       child: Icon(
         icon ?? Icons.lock_outline_rounded,
-        size: 52,
+        size: size * 0.46,
         color: SDColors.primary600,
       ),
     );

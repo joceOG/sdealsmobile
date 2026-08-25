@@ -173,8 +173,9 @@ class SDSpacing {
   /// Icon button size - 48px (44px minimum + 4px padding)
   static const double iconButtonSize = 48.0;
   
-  /// Minimum touch target - 44px (WCAG requirement)
-  static const double minTouchTarget = 44.0;
+  /// Minimum touch target - 48px (Android Material guideline).
+  /// WCAG minimum est 44px ; préférer 48px sur Android.
+  static const double minTouchTarget = 48.0;
   
   /// Border radius small - 8px
   static const double borderRadiusSmall = 8.0;

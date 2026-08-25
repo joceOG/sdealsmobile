@@ -318,6 +318,9 @@ class _JobPageViewState extends State<_JobPageView> {
   String? _distanceLabel(Prestataire p, Map<String, double> distances) {
     final d = distances[p.idprestataire];
     if (d == null) return null;
+    // Éviter "0,0 km" : afficher "À proximité" sous 100 m.
+    if (d < 0.1) return 'À proximité';
+    if (d < 1.0) return '< 1 km';
     return '${d.toStringAsFixed(1).replaceAll('.', ',')} km';
   }
 
@@ -1108,7 +1111,15 @@ class _JobPageViewState extends State<_JobPageView> {
                               ),
                             ),
                           ),
-                          ...providers.take(12).map((p) {
+                          ...providers
+                              .where((p) =>
+                                  providerPhotoUrl(
+                                    selfie: p.selfie,
+                                    photoProfil: p.utilisateur.photoProfil,
+                                  ) !=
+                                  null)
+                              .take(12)
+                              .map((p) {
                             final selected =
                                 p.idprestataire == _selectedProviderId;
                             final d = state.providerDistances[p.idprestataire];

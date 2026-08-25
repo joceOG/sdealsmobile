@@ -65,8 +65,11 @@ String displayOrFallback(dynamic value, String fallback) {
 
 /// URL image affichable, ou `null` → placeholder (jamais charger « null »).
 String? safeImageUrl(dynamic value) {
+  if (value is bool) return null;
   final cleaned = cleanDisplayPart(value);
   if (cleaned == null) return null;
+  final lower = cleaned.toLowerCase();
+  if (lower == 'true' || lower == 'false') return null;
   if (cleaned.startsWith('https://') || cleaned.startsWith('http://')) {
     return cleaned;
   }

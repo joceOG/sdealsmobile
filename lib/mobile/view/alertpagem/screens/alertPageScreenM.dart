@@ -38,14 +38,8 @@ class _AlertPageScreenMState extends State<AlertPageScreenM> {
       body: SafeArea(
         child: BlocConsumer<AlertPageBlocM, AlertPageStateM>(
           listener: (context, state) {
-            if (state is AlertPageErrorM) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(state.message),
-                  backgroundColor: SDColors.error500,
-                ),
-              );
-            }
+            // Les erreurs de chargement sont affichées inline — pas de SnackBar
+            // pour éviter l'état contradictoire Empty + Error simultanés.
             if (state is AlertMarkedAsReadM ||
                 state is AlertDeletedM ||
                 state is AlertArchivedM ||
@@ -75,41 +69,7 @@ class _AlertPageScreenMState extends State<AlertPageScreenM> {
                 ),
                 const SizedBox(height: 8),
                 Expanded(
-                  child: state is AlertPageLoadingM ||
-                          state is AlertPageInitialM
-                      ? const Center(child: CircularProgressIndicator())
-                      : RefreshIndicator(
-                          color: SDColors.primary600,
-                          onRefresh: () async {
-                            context
-                                .read<AlertPageBlocM>()
-                                .add(const LoadAlertsDataM(limit: 50));
-                          },
-                          child: filtered.isEmpty
-                              ? ListView(
-                                  physics:
-                                      const AlwaysScrollableScrollPhysics(),
-                                  children: [
-                                    SizedBox(
-                                      height:
-                                          MediaQuery.sizeOf(context).height *
-                                              0.45,
-                                      child: _emptyState(),
-                                    ),
-                                  ],
-                                )
-                              : ListView.separated(
-                                  physics:
-                                      const AlwaysScrollableScrollPhysics(),
-                                  padding: const EdgeInsets.fromLTRB(
-                                      _hPad, 8, _hPad, 24),
-                                  itemCount: filtered.length,
-                                  separatorBuilder: (_, __) =>
-                                      const SizedBox(height: 10),
-                                  itemBuilder: (context, i) =>
-                                      _buildAlertCard(filtered[i]),
-                                ),
-                        ),
+                  child: _buildBody(context, state, filtered),
                 ),
               ],
             );
@@ -379,6 +339,61 @@ class _AlertPageScreenMState extends State<AlertPageScreenM> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildBody(
+    BuildContext context,
+    AlertPageStateM state,
+    List<Alert> filtered,
+  ) {
+    // Loading / Initial
+    if (state is AlertPageLoadingM || state is AlertPageInitialM) {
+      return const Center(
+        child: CircularProgressIndicator(color: SDColors.primary600),
+      );
+    }
+
+    // Error — état exclusif : aucun empty state par-dessus
+    if (state is AlertPageErrorM) {
+      return SDErrorState(
+        message: 'Impossible de charger les notifications.',
+        onRetry: () => context
+            .read<AlertPageBlocM>()
+            .add(const LoadAlertsDataM(limit: 50)),
+      );
+    }
+
+    // Empty
+    if (filtered.isEmpty) {
+      return RefreshIndicator(
+        color: SDColors.primary600,
+        onRefresh: () async =>
+            context.read<AlertPageBlocM>().add(const LoadAlertsDataM(limit: 50)),
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            SizedBox(
+              height: MediaQuery.sizeOf(context).height * 0.45,
+              child: _emptyState(),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Loaded
+    return RefreshIndicator(
+      color: SDColors.primary600,
+      onRefresh: () async =>
+          context.read<AlertPageBlocM>().add(const LoadAlertsDataM(limit: 50)),
+      child: ListView.separated(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(_hPad, 8, _hPad, 24),
+        itemCount: filtered.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 10),
+        itemBuilder: (context, i) => _buildAlertCard(filtered[i]),
       ),
     );
   }

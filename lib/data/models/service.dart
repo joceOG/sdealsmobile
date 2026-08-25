@@ -15,16 +15,17 @@ class Service {
     this.categorie,
   });
 
-  /// Construire depuis JSON / Map
-  factory Service.fromJson(Map<String, dynamic> json) {
+  /// Construire depuis JSON / Map (Hive peut renvoyer Map<dynamic, dynamic>).
+  factory Service.fromJson(dynamic json) {
+    final map = Map<String, dynamic>.from(json as Map);
+    final catRaw = map['categorie'];
     return Service(
-      idservice: json['_id'] as String? ?? json['idservice'] as String? ?? '',
-      nomservice: json['nomservice'] as String? ?? '',
-      imageservice: json['imageservice'] as String? ?? '',
-      prixmoyen: json['prixmoyen'] as String? ?? json['prixservice']?.toString() ?? '0',
-      categorie: json['categorie'] != null
-          ? Categorie.fromJson(json['categorie'] as Map<String, dynamic>)
-          : null,
+      idservice: map['_id'] as String? ?? map['idservice'] as String? ?? '',
+      nomservice: map['nomservice'] as String? ?? '',
+      imageservice: map['imageservice'] as String? ?? '',
+      prixmoyen:
+          map['prixmoyen'] as String? ?? map['prixservice']?.toString() ?? '0',
+      categorie: catRaw != null ? Categorie.fromJson(catRaw) : null,
     );
   }
 

@@ -23,6 +23,8 @@ import 'mobile/view/registerpagem/screens/registerPageScreenM.dart';
 import 'mobile/view/serviceproviderregistrationpagem/screens/serviceProviderRegistrationScreenM.dart';
 import 'mobile/view/serviceproviderregistrationpagem/serviceproviderregistrationoageblocm/serviceProviderRegistrationPageBlocM.dart';
 import 'mobile/view/serviceproviderwelcomepagem/screens/serviceProviderWelcomeScreenM.dart';
+import 'mobile/view/freelance_registration/screens/freelance_welcome_screen.dart';
+import 'mobile/view/seller_registration/screens/emarket_welcome_screen.dart';
 import 'mobile/view/shoppingpagem/screens/vendorDetailsScreenM.dart';
 import 'mobile/view/splashcreenm/screens/splashScreenM.dart';
 import 'mobile/view/splashcreenm/splashscreenblocm/splashscreenBlocM.dart';
@@ -154,6 +156,14 @@ class MyApp extends StatelessWidget {
           final categories = state.extra as List<dynamic>; // cast to your type
           return ServiceProviderWelcomeScreenM(categories: categories);
         },
+      ),
+      GoRoute(
+        path: '/freelanceWelcome',
+        builder: (context, state) => const FreelanceWelcomeScreen(),
+      ),
+      GoRoute(
+        path: '/emarketWelcome',
+        builder: (context, state) => const EmarketWelcomeScreen(),
       ),
       GoRoute(
         path: '/serviceProviderRegistration',

@@ -703,64 +703,97 @@ class FreelanceDetailsScreen extends StatelessWidget {
   }
 
   /// Boutons d'action
+  /// Barre CTA fixe — même architecture safe-bottom que provider_profile_screen.
   Widget _buildActionButtons(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.shade300,
-            blurRadius: 10,
-            offset: const Offset(0, -2),
+    final bool hasPhone =
+        freelance.phoneNumber != null && freelance.phoneNumber!.isNotEmpty;
+    return Builder(
+      builder: (context) {
+        final double sysBottom = SDResponsive.systemBottomInset(context);
+        return Container(
+          padding: EdgeInsets.fromLTRB(
+            SDSpacing.sm,
+            SDSpacing.sm,
+            SDSpacing.sm,
+            SDSpacing.sm + sysBottom,
           ),
-        ],
-      ),
-      child: Row(
-        children: [
-          // Bouton Téléphone
-          if (freelance.phoneNumber != null &&
-              freelance.phoneNumber!.isNotEmpty)
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: () => _makePhoneCall(freelance.phoneNumber!),
-                icon: const Icon(Icons.phone),
-                label: const Text('Appeler'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.green,
-                  side: const BorderSide(color: Colors.green),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+          decoration: BoxDecoration(
+            color: SDColors.white,
+            boxShadow: [
+              BoxShadow(
+                color: SDColors.neutral900.withOpacity(0.08),
+                blurRadius: 12,
+                offset: const Offset(0, -4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              if (hasPhone) ...[
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _makePhoneCall(freelance.phoneNumber!),
+                    icon: Icon(Icons.phone_outlined, color: SDColors.primary700),
+                    label: Text(
+                      'Appeler',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: SDTypography.labelMedium.copyWith(
+                        color: SDColors.primary700,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: SDColors.primary700,
+                      side: BorderSide(color: SDColors.primary700, width: 1.5),
+                      minimumSize: const Size(0, 48),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: SDSpacing.xs,
+                        vertical: SDSpacing.xs,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
+                ),
+                SizedBox(width: SDSpacing.sm),
+              ],
+              Expanded(
+                flex: hasPhone ? 2 : 1,
+                child: ElevatedButton.icon(
+                  onPressed: () => _contactFreelancer(context),
+                  icon: Icon(Icons.send_rounded, color: SDColors.white),
+                  label: Text(
+                    'Contacter',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: SDTypography.labelMedium.copyWith(
+                      color: SDColors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: SDColors.primary700,
+                    foregroundColor: SDColors.white,
+                    minimumSize: const Size(0, 48),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: SDSpacing.xs,
+                      vertical: SDSpacing.xs,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 2,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
                 ),
               ),
-            ),
-          if (freelance.phoneNumber != null &&
-              freelance.phoneNumber!.isNotEmpty)
-            const SizedBox(width: 12),
-
-          // Bouton Contacter
-          Expanded(
-            child: ElevatedButton.icon(
-              onPressed: () => _contactFreelancer(context),
-              icon: const Icon(Icons.message, color: Colors.white),
-              label: const Text(
-                'Contacter',
-                style:
-                    TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 

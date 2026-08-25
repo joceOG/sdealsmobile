@@ -27,9 +27,11 @@ class SDCircleCloseButton extends StatelessWidget {
           child: InkWell(
             onTap: onPressed,
             customBorder: const CircleBorder(),
+            // Zone interactive 48×48 dp (Android Material guideline).
+            // Le cercle visuel reste proportionnel à cette taille.
             child: const SizedBox(
-              width: 40,
-              height: 40,
+              width: 48,
+              height: 48,
               child: Icon(
                 Icons.close,
                 size: 22,

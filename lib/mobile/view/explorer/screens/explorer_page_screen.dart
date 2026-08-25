@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:sdealsmobile/data/models/prestataire.dart';
 import 'package:sdealsmobile/data/models/vendeur.dart';
 import 'package:sdealsmobile/data/utils/display_text.dart';
+import 'package:sdealsmobile/data/utils/media_url.dart';
 import 'package:sdealsmobile/mobile/view/freelancepagem/freelancepageblocm/freelancePageBlocM.dart';
 import 'package:sdealsmobile/mobile/view/freelancepagem/freelancepageblocm/freelancePageEventM.dart'
     as free_ev;
@@ -540,8 +541,16 @@ class _ExplorerBodyState extends State<_ExplorerBody> {
   Widget _buildMetiersSection(BuildContext context) {
     return BlocBuilder<JobPageBlocM, JobPageStateM>(
       builder: (context, state) {
+        // UX : n’afficher que les prestataires avec photo publique réelle.
         final list = state.matchedProviders
-            .where((p) => _hasDisplayableImage(p.selfie))
+            .where((p) {
+              final url = providerPhotoUrl(
+                selfie: p.selfie,
+                photoProfil: p.utilisateur.photoProfil,
+              );
+              return url != null && url.isNotEmpty;
+            })
+            .take(12)
             .toList();
         if (state.isMatchingLoading && list.isEmpty) {
           return _sectionGap(
@@ -859,6 +868,10 @@ class _MetierCard extends StatelessWidget {
       prestataire.service.nomservice,
       'Non renseigné',
     );
+    final photoUrl = providerPhotoUrl(
+      selfie: prestataire.selfie,
+      photoProfil: prestataire.utilisateur.photoProfil,
+    );
 
     return GestureDetector(
       onTap: () {
@@ -896,10 +909,9 @@ class _MetierCard extends StatelessWidget {
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(14),
-                  child: prestataire.selfie != null &&
-                          prestataire.selfie!.startsWith('http')
+                  child: photoUrl != null
                       ? AppImage(
-                          imageUrl: prestataire.selfie!,
+                          imageUrl: photoUrl,
                           fit: BoxFit.cover,
                           placeholderAsset: 'assets/profile_picture.jpg',
                         )

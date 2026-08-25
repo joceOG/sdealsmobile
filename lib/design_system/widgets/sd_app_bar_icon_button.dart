@@ -4,13 +4,15 @@ import '../colors.dart';
 /// Styles d’[IconButton] pour les barres d’outils (AppBar, etc.).
 abstract final class SDAppBarIconStyles {
   /// Fond clair (AppBar blanche / surface claire).
+  /// Zone de tap : 48×48 dp (Android Material guideline).
+  /// Visuel icône : 22 dp, disque 40 dp rendu par padding interne.
   static ButtonStyle onLightSurface = IconButton.styleFrom(
     foregroundColor: SDColors.neutral900,
     backgroundColor: SDColors.neutral100,
     padding: const EdgeInsets.all(8),
-    minimumSize: const Size(40, 40),
-    maximumSize: const Size(40, 40),
-    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    minimumSize: const Size(48, 48),
+    maximumSize: const Size(48, 48),
+    // tapTargetSize par défaut (padded) → zone interactive ≥ 48×48 dp.
     iconSize: 22,
     shape: const CircleBorder(
       side: BorderSide(color: SDColors.neutral200, width: 1),
@@ -22,9 +24,8 @@ abstract final class SDAppBarIconStyles {
     foregroundColor: SDColors.white,
     backgroundColor: SDColors.white.withOpacity(0.18),
     padding: const EdgeInsets.all(8),
-    minimumSize: const Size(40, 40),
-    maximumSize: const Size(40, 40),
-    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    minimumSize: const Size(48, 48),
+    maximumSize: const Size(48, 48),
     iconSize: 22,
     shape: CircleBorder(
       side: BorderSide(color: SDColors.white.withOpacity(0.35), width: 1),

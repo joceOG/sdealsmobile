@@ -83,15 +83,9 @@ class _LanguageSettingsScreenState extends State<LanguageSettingsScreen> {
             Expanded(
               child: BlocConsumer<PreferencesPageBlocM, PreferencesPageStateM>(
                 listener: (context, state) {
-                  if (state is PreferencesPageErrorM) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(state.message),
-                        backgroundColor: SDColors.error500,
-                      ),
-                    );
-                  } else if (state is LanguageUpdatedM ||
-                      state is CurrencyUpdatedM) {
+                  // Erreurs → affichées inline uniquement (pas de SnackBar).
+                  // Succès seulement.
+                  if (state is LanguageUpdatedM || state is CurrencyUpdatedM) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content: Text('Préférences mises à jour'),
@@ -120,8 +114,9 @@ class _LanguageSettingsScreenState extends State<LanguageSettingsScreen> {
                     );
                   }
                   if (state is PreferencesPageErrorM) {
+                    // Masquer les messages techniques bruts — toujours message humain.
                     return _centeredMessage(
-                      state.message,
+                      'Impossible de charger ces paramètres.',
                       retry: () => context.read<PreferencesPageBlocM>().add(
                             LoadPreferencesM(utilisateurId: _userId!),
                           ),

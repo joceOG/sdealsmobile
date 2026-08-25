@@ -151,6 +151,7 @@ class _ProvidersListScreenState extends State<ProvidersListScreen> {
     return Padding(
       padding: EdgeInsets.only(bottom: SDSpacing.sm, left: SDSpacing.sm, right: SDSpacing.sm),
       child: SDEntityCard(
+        width: null,
         type: SDEntityCardType.provider,
         title: fullName,
         subtitle: serviceName,

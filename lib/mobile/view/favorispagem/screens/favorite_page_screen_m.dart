@@ -157,13 +157,20 @@ class _FavoritePageScreenMState extends State<FavoritePageScreenM> {
                                     SizedBox(
                                       height:
                                           MediaQuery.sizeOf(context).height *
-                                              0.45,
-                                      child: const EmptyStateWidget(
+                                              0.55,
+                                      child: EmptyStateWidget(
                                         imagePath: 'assets/favoris_vides.png',
                                         title: 'Aucun favori',
                                         message:
                                             'Explorez Métiers, Freelance ou Marketplace et enregistrez vos coups de cœur.',
-                                        imageSize: 160,
+                                        imageSize: 140,
+                                        action: SDButton(
+                                          text: 'Explorer les professionnels',
+                                          type: SDButtonType.outlined,
+                                          icon: Icons.search_rounded,
+                                          onPressed: () =>
+                                              Navigator.of(context).maybePop(),
+                                        ),
                                       ),
                                     ),
                                   ],

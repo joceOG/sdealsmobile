@@ -448,17 +448,17 @@ class ApiClient {
         List<Categorie> allCategories = [];
         for (var json in categoriesJson) {
            try {
-             if (json['groupe'] is Map<String, dynamic>) {
-               var groupeJson = json['groupe'];
-               var jsonCopy = Map<String, dynamic>.from(json);
-               jsonCopy['groupe'] = {
-                 '_id': groupeJson['_id'] as String,
-                 'nomgroupe': groupeJson['nomgroupe'] as String
+             // Normalise Hive Map<dynamic,dynamic> → Map<String,dynamic>
+             final map = Map<String, dynamic>.from(json as Map);
+             final groupeRaw = map['groupe'];
+             if (groupeRaw is Map) {
+               final groupeJson = Map<String, dynamic>.from(groupeRaw);
+               map['groupe'] = {
+                 '_id': groupeJson['_id']?.toString() ?? '',
+                 'nomgroupe': groupeJson['nomgroupe']?.toString() ?? '',
                };
-               allCategories.add(Categorie.fromJson(jsonCopy));
-             } else {
-               allCategories.add(Categorie.fromJson(json));
              }
+             allCategories.add(Categorie.fromJson(map));
            } catch (e) {
              print('Erreur parsing catégorie cache: $e');
            }
@@ -486,19 +486,16 @@ class ApiClient {
         List<Categorie> allCategories = [];
         for (var json in categoriesJson) {
           try {
-            // Si 'groupe' est un objet (populate), récupérer l'id et le nom
-            if (json['groupe'] is Map<String, dynamic>) {
-              var groupeJson = json['groupe'];
-              var jsonCopy = Map<String, dynamic>.from(json);
-              jsonCopy['groupe'] = {
-                '_id': groupeJson['_id'] as String,
-                'nomgroupe': groupeJson['nomgroupe'] as String
+            final map = Map<String, dynamic>.from(json as Map);
+            final groupeRaw = map['groupe'];
+            if (groupeRaw is Map) {
+              final groupeJson = Map<String, dynamic>.from(groupeRaw);
+              map['groupe'] = {
+                '_id': groupeJson['_id']?.toString() ?? '',
+                'nomgroupe': groupeJson['nomgroupe']?.toString() ?? '',
               };
-              allCategories.add(Categorie.fromJson(jsonCopy));
-            } else {
-              // Cas où 'groupe' est déjà un ID ou nom
-              allCategories.add(Categorie.fromJson(json));
             }
+            allCategories.add(Categorie.fromJson(map));
           } catch (e) {
             print('Erreur parsing catégorie: $e pour ${json.toString()}');
           }
@@ -653,14 +650,9 @@ class ApiClient {
         // Traiter chaque catégorie
         for (var json in allCategoriesJson) {
           try {
-            // Si groupe est un objet avec _id (cas populate)
-            if (json['groupe'] is Map<String, dynamic>) {
-              var jsonCopy = Map<String, dynamic>.from(json);
-              jsonCopy['groupe'] = json['groupe']['_id'] as String;
-              allCategories.add(Categorie.fromJson(jsonCopy));
-            } else {
-              allCategories.add(Categorie.fromJson(json));
-            }
+            allCategories.add(
+              Categorie.fromJson(Map<String, dynamic>.from(json as Map)),
+            );
           } catch (e) {
             print('Erreur parsing catégorie: $e pour ${json.toString()}');
           }

@@ -24,6 +24,8 @@ import 'package:sdealsmobile/mobile/view/shoppingpagem/shoppingpageblocm/shoppin
 import 'package:sdealsmobile/data/services/api_client.dart';
 import 'package:sdealsmobile/data/errors/api_exception.dart';
 import 'package:sdealsmobile/data/utils/display_text.dart';
+import 'package:sdealsmobile/data/utils/media_url.dart';
+import 'package:sdealsmobile/data/utils/string_list_normalizer.dart';
 import '../homepageblocm/homePageBlocM.dart';
 import '../homepageblocm/homePageEventM.dart';
 import '../homepageblocm/homePageStateM.dart';
@@ -168,18 +170,10 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
   /// Libellé lieu prestataire (texte réel uniquement — pas de faux "Abidjan").
   String? _prestataireLocationLabel(Map<String, dynamic> p) {
     final loc = p['localisation']?.toString().trim();
-    if (loc != null && loc.isNotEmpty) return loc;
+    if (loc != null && loc.isNotEmpty && !loc.startsWith('[')) return loc;
 
-    final zones = p['zoneIntervention'];
-    if (zones is List && zones.isNotEmpty) {
-      final labels = zones
-          .map((e) => e.toString().trim())
-          .where((s) => s.isNotEmpty)
-          .take(2)
-          .toList();
-      if (labels.isNotEmpty) return labels.join(', ');
-    }
-    // localisationmaps = lat/lng seulement → pas de nom d'adresse fiable
+    final zones = normalizeStringList(p['zoneIntervention']);
+    if (zones.isNotEmpty) return zones.take(2).join(', ');
     return null;
   }
 
@@ -246,11 +240,10 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
     final categorie = service['categorie'] as Map<String, dynamic>?;
     final nomCat = categorie?['nomcategorie']?.toString().trim();
     if (nomCat != null && nomCat.isNotEmpty) return nomCat;
-    final spec = p['specialite'];
-    if (spec is List && spec.isNotEmpty) {
-      return spec.take(2).map((e) => e.toString()).where((s) => s.isNotEmpty).join(', ');
+    final spec = normalizeStringList(p['specialite']);
+    if (spec.isNotEmpty) {
+      return spec.take(2).join(', ');
     }
-    if (spec is String && spec.trim().isNotEmpty) return spec.trim();
     final desc = p['description']?.toString().trim();
     if (desc != null && desc.isNotEmpty) {
       return desc.length > 72 ? '${desc.substring(0, 69)}…' : desc;
@@ -259,14 +252,20 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
   }
 
   List<_HomeMiniItem> _buildMetiersItems(List<Map<String, dynamic>> data) {
-    return _onlyItemsWithImages(data.map((p) {
+    // UX : masquer les prestataires sans photo publique affichable.
+    return data
+        .map((p) {
       final utilisateur = p['utilisateur'] as Map<String, dynamic>? ?? const {};
       final fullName = personNameFromMap(utilisateur, fallback: 'Prestataire');
       final metier = _metierLabelForPrestataire(p);
       final location = _prestataireLocationLabel(p);
       final isVerified = p['verifier'] == true;
       final expYears = _toInt(p['anneeExperience']);
-      final imageUrl = _pickImageUrl(utilisateur) ?? _pickImageUrl(p);
+      final imageUrl = providerPhotoUrl(
+        utilisateurMap: utilisateur,
+        prestataireMap: p,
+      );
+      if (imageUrl == null || imageUrl.isEmpty) return null;
       final rating = _ratingWithReviews(p['note'], p['nbAvis']);
       final metaParts = <String>[
         if (location != null) location,
@@ -289,7 +288,10 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
         onCardTap: () => _openProviderFromHome(p),
         onFavoriteTap: () => _addProviderFavorite(p),
       );
-    })).take(5).toList();
+    })
+        .whereType<_HomeMiniItem>()
+        .take(5)
+        .toList();
   }
 
   List<_HomeMiniItem> _buildFreelanceServiceOfferItems(List<Map<String, dynamic>> data) {
@@ -865,6 +867,7 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
                   useBlockContainer: false,
                   useListingCardStyle: true,
                   listingSquareImage: true,
+                  requireImage: true,
                 ),
                 SizedBox(height: SDSpacing.sm),
                 if (_freelanceServiceItems.isNotEmpty) ...[
@@ -1044,6 +1047,9 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
     bool listingSquareImage = false,
     /// Bannière 16:9 plus étroite que les offres freelance (ex. promos marketplace).
     bool listingBannerCompact = false,
+    /// Si false (Métiers), affiche les cartes même sans photo publique (fallback icône).
+    /// Nécessaire car STAB-11b redacte le selfie KYC en liste publique.
+    bool requireImage = true,
   }) {
     assert(
       !listingBannerCompact || (!listingSquareImage && useListingCardStyle),
@@ -1067,8 +1073,8 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
             squareImage: listingSquareImage,
           )
         : 205.0;
-    // Ne jamais afficher de carte sans image (placeholders inclus).
-    final safeItems = _onlyItemsWithImages(items);
+    final safeItems =
+        requireImage ? _onlyItemsWithImages(items) : List<_HomeMiniItem>.from(items);
     if (safeItems.isEmpty) {
       return const SizedBox.shrink();
     }
@@ -1178,39 +1184,47 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
   }
 
   Widget _buildInlineErrorBanner(String message) {
+    // Compact offline banner (~100-120dp max) — message court + Réessayer en ligne.
+    final shortMsg = message.toLowerCase().contains('connexion') ||
+            message.toLowerCase().contains('réseau') ||
+            message.toLowerCase().contains('network')
+        ? 'Pas de connexion. Vérifiez votre réseau.'
+        : message;
     return Container(
-      padding: SDSpacing.cardPadding,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         color: SDColors.error50,
         borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
         border: Border.all(color: SDColors.error200),
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.wifi_off_rounded, color: SDColors.error600),
-          SizedBox(width: SDSpacing.sm),
+          Icon(Icons.wifi_off_rounded, color: SDColors.error600, size: 20),
+          SizedBox(width: SDSpacing.xs),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  message,
-                  style: SDTypography.bodyMedium.copyWith(color: SDColors.error600),
-                ),
-                SizedBox(height: SDSpacing.xs),
-                TextButton(
-                  onPressed: () =>
-                      context.read<HomePageBlocM>().add(LoadCategorieDataM()),
-                  style: TextButton.styleFrom(
-                    foregroundColor: SDColors.error600,
-                    padding: EdgeInsets.zero,
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  child: const Text('Réessayer'),
-                ),
-              ],
+            child: Text(
+              shortMsg,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: SDTypography.bodySmall.copyWith(color: SDColors.error600),
+            ),
+          ),
+          SizedBox(width: SDSpacing.xs),
+          TextButton(
+            onPressed: () =>
+                context.read<HomePageBlocM>().add(LoadCategorieDataM()),
+            style: TextButton.styleFrom(
+              foregroundColor: SDColors.error600,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text(
+              'Réessayer',
+              style: SDTypography.labelSmall.copyWith(
+                color: SDColors.error600,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],

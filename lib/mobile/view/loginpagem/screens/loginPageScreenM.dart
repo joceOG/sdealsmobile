@@ -146,25 +146,12 @@ class _LoginPageScreenMState extends State<LoginPageScreenM> {
     BuildContext context,
     LoginPageSuccessM state,
   ) async {
-    final verify = await showDialog<bool>(
+    final verify = await showModalBottomSheet<bool>(
       context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Vérifier votre téléphone ?'),
-        content: const Text(
-          'Vous pouvez vérifier votre numéro maintenant ou le faire plus tard depuis votre profil.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Plus tard'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Vérifier mon téléphone'),
-          ),
-        ],
-      ),
+      isDismissible: false,
+      enableDrag: false,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _PhoneVerificationSheet(ctx),
     );
     if (!context.mounted) return;
     if (verify == true) {
@@ -557,5 +544,102 @@ class _LoginPageScreenMState extends State<LoginPageScreenM> {
       if (!mounted) return;
       AppSnackBar.error(context, 'Impossible d\'envoyer la demande : $e');
     }
+  }
+}
+
+// ─── Bottom sheet vérification téléphone ──────────────────────────────────────
+
+class _PhoneVerificationSheet extends StatelessWidget {
+  const _PhoneVerificationSheet(BuildContext context);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: SDColors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: EdgeInsets.fromLTRB(
+        24,
+        20,
+        24,
+        24 + MediaQuery.paddingOf(context).bottom,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Poignée
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: SDColors.neutral200,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          // Icône
+          Center(
+            child: Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: SDColors.primary50,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Icon(
+                Icons.phone_android_rounded,
+                color: SDColors.primary600,
+                size: 28,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Titre
+          Text(
+            'Vérifier votre numéro',
+            textAlign: TextAlign.center,
+            style: SDTypography.titleLarge.copyWith(
+              color: SDColors.neutral900,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          // Corps
+          Text(
+            'Ajoutez une couche de sécurité et facilitez vos échanges avec les prestataires. Vous pourrez aussi le faire plus tard depuis votre profil.',
+            textAlign: TextAlign.center,
+            style: SDTypography.bodyMedium.copyWith(
+              color: SDColors.neutral600,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 28),
+          // CTA primaire
+          SDButton(
+            text: 'Vérifier maintenant',
+            fullWidth: true,
+            onPressed: () => Navigator.of(context).pop(true),
+          ),
+          const SizedBox(height: 12),
+          // Action secondaire sobre
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            style: TextButton.styleFrom(
+              foregroundColor: SDColors.neutral600,
+            ),
+            child: Text(
+              'Plus tard',
+              style: SDTypography.labelLarge.copyWith(
+                color: SDColors.neutral600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

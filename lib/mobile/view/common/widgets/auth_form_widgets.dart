@@ -63,12 +63,11 @@ class AuthBackButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return IconButton(
-      icon: const Icon(Icons.arrow_back, size: 22, color: SDColors.neutral900),
+      icon: const Icon(Icons.arrow_back, size: 24, color: SDColors.neutral900),
       onPressed: onPressed,
       tooltip: 'Retour',
-      visualDensity: VisualDensity.compact,
-      padding: const EdgeInsets.all(8),
-      constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+      padding: const EdgeInsets.all(12),
+      constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
     );
   }
 }
@@ -268,6 +267,11 @@ class AuthFieldGap extends StatelessWidget {
 }
 
 /// STAB-13 — Sheet auth invité (Publier, actions protégées).
+///
+/// Utilise [SDResponsive.systemBottomInset] pour le padding inférieur :
+/// fiable sur EMUI/Huawei qui ne remontent pas correctement SafeArea.
+/// Le sheet est scrollable sur petits écrans (< 360dp) pour garantir
+/// que les deux CTA (Se connecter / Créer un compte) restent accessibles.
 Future<void> showGuestAuthSheet(
   BuildContext context, {
   required String title,
@@ -278,43 +282,59 @@ Future<void> showGuestAuthSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (sheetContext) => Container(
-      decoration: const BoxDecoration(
-        color: SDColors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(0, 10, 0, 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40,
-                height: 5,
-                decoration: BoxDecoration(
-                  color: SDColors.neutral300,
-                  borderRadius: BorderRadius.circular(6),
+    builder: (sheetContext) => Builder(
+      builder: (innerCtx) {
+        final double sysBottom = SDResponsive.systemBottomInset(innerCtx);
+        // Limite la hauteur max du sheet à 90 % du viewport pour laisser le
+        // fond visible et forcer le scroll sur petits écrans.
+        final double maxH = MediaQuery.sizeOf(innerCtx).height * 0.90;
+        return ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: maxH),
+          child: Container(
+            decoration: const BoxDecoration(
+              color: SDColors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Drag handle
+                Padding(
+                  padding: const EdgeInsets.only(top: 10, bottom: 4),
+                  child: Container(
+                    width: 40,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: SDColors.neutral300,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                  ),
                 ),
-              ),
-              GuestAuthState(
-                title: title,
-                description: description,
-                icon: icon,
-                centerVertically: false,
-                onPrimary: () {
-                  Navigator.pop(sheetContext);
-                  context.push('/login');
-                },
-                onSecondary: () {
-                  Navigator.pop(sheetContext);
-                  context.push('/register');
-                },
-              ),
-            ],
+                // Contenu scrollable — protège les CTA sur petits écrans
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.fromLTRB(0, 6, 0, sysBottom + 8),
+                    child: GuestAuthState(
+                      title: title,
+                      description: description,
+                      icon: icon,
+                      centerVertically: false,
+                      onPrimary: () {
+                        Navigator.pop(sheetContext);
+                        context.push('/login');
+                      },
+                      onSecondary: () {
+                        Navigator.pop(sheetContext);
+                        context.push('/register');
+                      },
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     ),
   );
 }

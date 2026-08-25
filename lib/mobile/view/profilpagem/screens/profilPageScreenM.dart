@@ -44,22 +44,10 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
   }
 
   void _showSoutraPayTarificationSheet(BuildContext context) {
-    showDialog<void>(
+    showModalBottomSheet<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('SoutraPay arrive bientôt'),
-        content: const Text(
-          'La tarification et les opérations SoutraPay seront '
-          'disponibles lorsque le paiement sera branché. '
-          'Aucun tarif ni frais n’est applicable pour le moment.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Compris'),
-          ),
-        ],
-      ),
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _SoutraPayBottomSheet(ctx),
     );
   }
 
@@ -484,5 +472,83 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
     } catch (e) {
       context.push('/providermain');
     }
+  }
+}
+
+// ─── Bottom sheet SoutraPay ───────────────────────────────────────────────────
+
+class _SoutraPayBottomSheet extends StatelessWidget {
+  const _SoutraPayBottomSheet(BuildContext context);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: SDColors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: EdgeInsets.fromLTRB(
+        24,
+        20,
+        24,
+        24 + MediaQuery.paddingOf(context).bottom,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: SDColors.neutral200,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Center(
+            child: Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: SDColors.primary50,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Icon(
+                Icons.payments_rounded,
+                color: SDColors.primary600,
+                size: 28,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'SoutraPay arrive bientôt',
+            textAlign: TextAlign.center,
+            style: SDTypography.titleLarge.copyWith(
+              color: SDColors.neutral900,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Les paiements SoutraPay ne sont pas encore disponibles dans cette version.',
+            textAlign: TextAlign.center,
+            style: SDTypography.bodyMedium.copyWith(
+              color: SDColors.neutral600,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 28),
+          SDButton(
+            text: 'D\'accord',
+            fullWidth: true,
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ],
+      ),
+    );
   }
 }

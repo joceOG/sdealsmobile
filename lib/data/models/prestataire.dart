@@ -1,6 +1,8 @@
 import 'service.dart';
 import 'utilisateur.dart';
 import '../utils/display_text.dart';
+import '../utils/media_url.dart';
+import '../utils/string_list_normalizer.dart';
 
 class Prestataire {
   String idprestataire;
@@ -77,14 +79,11 @@ class Prestataire {
       return s.isEmpty ? null : s;
     }
 
-    List<String>? toStringListOrNull(dynamic value) {
-      if (value == null) return null;
-      if (value is List) {
-        final out = value.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
-        return out.isEmpty ? null : out;
-      }
-      return null;
-    }
+    List<String>? toStringListOrNull(dynamic value) =>
+        normalizeStringListOrNull(value);
+
+    /// STAB-11b : champs KYC peuvent être bool (présence) en liste publique.
+    String? kycUrlOrNull(dynamic value) => kycFieldAsPublicUrl(value);
 
     try {
       final id = json['_id'] as String? ?? json['idprestataire'] as String? ?? '';
@@ -110,37 +109,28 @@ class Prestataire {
                 nomservice: 'Service inconnu',
                 imageservice: '',
                 prixmoyen: '0'),
-        // ✅ CORRIGÉ : Mapping correct du backend
         prixprestataire: toDoubleOrNull(json['prixprestataire']) ?? 0.0,
-        // ✅ CORRIGÉ : Mapping correct du backend
         localisation: json['localisation']?.toString() ?? '',
         localisationMaps: json['localisationmaps'] != null
             ? LocalisationMaps.fromJson(json['localisationmaps'])
             : null,
-        // ✅ CORRIGÉ : Mapping correct du backend
         note: toStringOrNull(json['note']),
-        // ✅ CORRIGÉ : Mapping correct du backend
         verifier: json['verifier'] as bool? ?? false,
-        cni1: json['cni1'] as String?,
-        cni2: json['cni2'] as String?,
-        selfie: json['selfie'] as String?,
-        numeroCNI: json['numeroCNI'] as String?,
-        // ✅ CORRIGÉ : Mapping correct du backend
+        cni1: kycUrlOrNull(json['cni1']),
+        cni2: kycUrlOrNull(json['cni2']),
+        selfie: kycUrlOrNull(json['selfie']),
+        numeroCNI: toStringOrNull(json['numeroCNI']),
         specialite: toStringListOrNull(json['specialite']),
         anneeExperience: toStringOrNull(json['anneeExperience']),
         description: toStringOrNull(json['description']),
         rayonIntervention: toDoubleOrNull(json['rayonIntervention']),
-        zoneIntervention: json['zoneIntervention'] != null
-            ? List<String>.from(json['zoneIntervention'])
-            : null,
+        zoneIntervention: toStringListOrNull(json['zoneIntervention']),
         tarifHoraireMin: toDoubleOrNull(json['tarifHoraireMin']),
         tarifHoraireMax: toDoubleOrNull(json['tarifHoraireMax']),
-        diplomeCertificat: json['diplomeCertificat'] != null
-            ? List<String>.from(json['diplomeCertificat'])
-            : null,
-        attestationAssurance: json['attestationAssurance'] as String?,
-        numeroAssurance: json['numeroAssurance'] as String?,
-        numeroRCCM: json['numeroRCCM'] as String?,
+        diplomeCertificat: toStringListOrNull(json['diplomeCertificat']),
+        attestationAssurance: kycUrlOrNull(json['attestationAssurance']),
+        numeroAssurance: toStringOrNull(json['numeroAssurance']),
+        numeroRCCM: toStringOrNull(json['numeroRCCM']),
       );
     } catch (e) {
       print('Erreur conversion prestataire backend: $e');
@@ -180,31 +170,25 @@ class Prestataire {
           : null,
       note: cleanDisplayPart(map['note']),
       verifier: map['verifier'] as bool? ?? false,
-      cni1: map['cni1'] as String?,
-      cni2: map['cni2'] as String?,
-      selfie: safeImageUrl(map['selfie']),
+      cni1: kycFieldAsPublicUrl(map['cni1']),
+      cni2: kycFieldAsPublicUrl(map['cni2']),
+      selfie: kycFieldAsPublicUrl(map['selfie']),
       numeroCNI: map['numeroCNI'] as String?,
-      specialite: map['specialite'] != null
-          ? List<String>.from(map['specialite'])
-          : null,
+      specialite: normalizeStringListOrNull(map['specialite']),
       anneeExperience: cleanDisplayPart(map['anneeExperience']),
       description: cleanDisplayPart(map['description']),
       rayonIntervention: map['rayonIntervention'] != null
           ? (map['rayonIntervention'] as num).toDouble()
           : null,
-      zoneIntervention: map['zoneIntervention'] != null
-          ? List<String>.from(map['zoneIntervention'])
-          : null,
+      zoneIntervention: normalizeStringListOrNull(map['zoneIntervention']),
       tarifHoraireMin: map['tarifHoraireMin'] != null
           ? (map['tarifHoraireMin'] as num).toDouble()
           : null,
       tarifHoraireMax: map['tarifHoraireMax'] != null
           ? (map['tarifHoraireMax'] as num).toDouble()
           : null,
-      diplomeCertificat: map['diplomeCertificat'] != null
-          ? List<String>.from(map['diplomeCertificat'])
-          : null,
-      attestationAssurance: map['attestationAssurance'] as String?,
+      diplomeCertificat: normalizeStringListOrNull(map['diplomeCertificat']),
+      attestationAssurance: kycFieldAsPublicUrl(map['attestationAssurance']),
       numeroAssurance: map['numeroAssurance'] as String?,
       numeroRCCM: map['numeroRCCM'] as String?,
     );

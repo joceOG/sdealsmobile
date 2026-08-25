@@ -1216,10 +1216,13 @@ class _ProviderMainScreenState extends State<ProviderMainScreen>
         color: SDColors.white,
         border: Border(top: BorderSide(color: SDColors.neutral200)),
       ),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: SDSpacing.xs, vertical: 6),
+      child: Builder(
+        builder: (context) {
+          // Politique safe-bottom unifiée — SafeArea inopérant sur EMUI.
+          final double sysBottom = SDResponsive.systemBottomInset(context);
+          return Padding(
+            padding: EdgeInsets.fromLTRB(
+                SDSpacing.xs, 6, SDSpacing.xs, 6 + sysBottom),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
@@ -1234,7 +1237,8 @@ class _ProviderMainScreenState extends State<ProviderMainScreen>
                   Icons.person_rounded, 'Profil'),
             ],
           ),
-        ),
+          );
+        },
       ),
     );
   }

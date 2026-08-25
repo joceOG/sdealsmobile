@@ -13,7 +13,8 @@ import 'chatpagem/chatpageblocm/chatPageBlocM.dart';
 import 'chatpagem/chatpageblocm/chatPageStateM.dart';
 import 'chatpagem/screens/chatPageScreenM.dart';
 import 'homepagem/homepageblocm/homePageBlocM.dart';
-import 'freelance_registration/screens/freelance_registration_screen.dart';
+import 'freelance_registration/screens/freelance_welcome_screen.dart';
+import 'seller_registration/screens/emarket_welcome_screen.dart';
 import 'common/widgets/auth_form_widgets.dart';
 
 // ✅ Design System
@@ -133,42 +134,50 @@ class _HomeState extends State<Home> {
           ),
         ],
       ),
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: 78,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildNavItem(
-                index: 0,
-                label: 'Accueil',
-                icon: Icons.home_outlined,
-                activeIcon: Icons.home,
+      child: Builder(
+        builder: (context) {
+          // Politique unifiée : SDResponsive.systemBottomInset couvre padding,
+          // viewPadding, FlutterView et systemGestureInsets (cas EMUI mesuré :
+          // la barre 3-boutons n'apparaît QUE dans gestureInsets = 38.7 dp).
+          final double bottomSafe = SDResponsive.systemBottomInset(context);
+          return Padding(
+            padding: EdgeInsets.only(bottom: bottomSafe),
+            child: SizedBox(
+              height: 78,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildNavItem(
+                    index: 0,
+                    label: 'Accueil',
+                    icon: Icons.home_outlined,
+                    activeIcon: Icons.home,
+                  ),
+                  _buildNavItem(
+                    index: 1,
+                    label: 'Explorer',
+                    icon: Icons.search_outlined,
+                    activeIcon: Icons.search,
+                  ),
+                  _buildPublishButton(),
+                  _buildNavItem(
+                    index: 2,
+                    label: 'Messagerie',
+                    icon: Icons.chat_bubble_outline,
+                    activeIcon: Icons.chat_bubble,
+                    withChatBadge: true,
+                  ),
+                  _buildNavItem(
+                    index: 3,
+                    label: 'Profil',
+                    icon: Icons.person_outline,
+                    activeIcon: Icons.person,
+                  ),
+                ],
               ),
-              _buildNavItem(
-                index: 1,
-                label: 'Explorer',
-                icon: Icons.search_outlined,
-                activeIcon: Icons.search,
-              ),
-              _buildPublishButton(),
-              _buildNavItem(
-                index: 2,
-                label: 'Messagerie',
-                icon: Icons.chat_bubble_outline,
-                activeIcon: Icons.chat_bubble,
-                withChatBadge: true,
-              ),
-              _buildNavItem(
-                index: 3,
-                label: 'Profil',
-                icon: Icons.person_outline,
-                activeIcon: Icons.person,
-              ),
-            ],
-          ),
-        ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -481,7 +490,7 @@ class _HomeState extends State<Home> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => const FreelanceRegistrationScreen(),
+        builder: (_) => const FreelanceWelcomeScreen(),
       ),
     );
   }
@@ -492,15 +501,20 @@ class _HomeState extends State<Home> {
       context.push('/login');
       return;
     }
-    // STAB-10 : POST /vendeur exige multipart KYC (CNI, selfie, etc.) —
-    // branchement non trivial. Pas de faux succès UI.
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          already
-              ? 'Vous avez déjà une boutique. L’espace de gestion arrive bientôt.'
-              : 'L’inscription vendeur arrive bientôt.',
+    if (already) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Vous avez déjà une boutique. L’espace de gestion arrive bientôt.',
+          ),
         ),
+      );
+      return;
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const EmarketWelcomeScreen(),
       ),
     );
   }

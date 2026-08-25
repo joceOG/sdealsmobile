@@ -32,8 +32,8 @@ class SDListingPreviewCard extends StatelessWidget {
   static double totalHeightForWidth(double width, {bool squareImage = false}) {
     final imageHeight =
         squareImage ? width : width / _aspectWidthOverHeight;
-    // Titre + (sous-titre métier / accroche) + prix + ligne note·lieu
-    return imageHeight + 108;
+    // Titre (2 lignes max) + sous-titre + prix + note·lieu + espacement
+    return imageHeight + 126;
   }
 
   const SDListingPreviewCard({
@@ -224,12 +224,12 @@ class SDListingPreviewCard extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      maxLines: 1,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: SDTypography.labelLarge.copyWith(
                         color: SDColors.neutral900,
                         fontWeight: FontWeight.w600,
-                        fontSize: 15,
+                        fontSize: 14,
                         height: 1.2,
                         letterSpacing: -0.2,
                       ),

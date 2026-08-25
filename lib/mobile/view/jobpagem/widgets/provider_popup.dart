@@ -138,6 +138,7 @@ class ProviderPopup extends StatelessWidget {
                       children: [
                         Expanded(
                           child: SDEntityCard(
+                            width: null,
                             type: SDEntityCardType.provider,
                             title: data['fullName']?.toString() ?? 'Prestataire',
                             subtitle: data['serviceName']?.toString() ?? 'Service',

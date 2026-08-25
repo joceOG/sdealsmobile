@@ -5,6 +5,11 @@ import '../alertpageblocm/alertPageEventM.dart';
 import '../alertpageblocm/alertPageStateM.dart';
 import '../../../../design_system/design_system.dart';
 
+/// Préférences de notification — redesign DS STAB-13.
+///
+/// Sections : Canaux · Types d'alertes · Priorités.
+/// Chaque ligne = icône + label + description courte + contrôle aligné à droite.
+/// Titre complet, jamais tronqué. Sauvegarde automatique désactivée → bouton en AppBar.
 class AlertSettingsScreenM extends StatefulWidget {
   const AlertSettingsScreenM({super.key});
 
@@ -19,126 +24,43 @@ class _AlertSettingsScreenMState extends State<AlertSettingsScreenM> {
   List<String> _typesEnabled = [];
   List<String> _prioritesEnabled = [];
 
-  final List<String> _allTypes = [
-    'COMMANDE',
-    'PRESTATION',
-    'PAIEMENT',
-    'VERIFICATION',
-    'MESSAGE',
-    'SYSTEME',
-    'PROMOTION',
-    'RAPPEL'
+  final _allTypes = const [
+    _TypeItem('COMMANDE', 'Commandes', 'Suivi de vos commandes et livraisons',
+        Icons.shopping_bag_outlined),
+    _TypeItem('PRESTATION', 'Prestations', 'Demandes et statuts de prestation',
+        Icons.handyman_outlined),
+    _TypeItem('PAIEMENT', 'Paiements', 'Confirmations et rappels de paiement',
+        Icons.payments_outlined),
+    _TypeItem('VERIFICATION', 'Vérifications',
+        'Codes OTP et confirmations de sécurité', Icons.verified_outlined),
+    _TypeItem('MESSAGE', 'Messages', 'Nouveaux messages de prestataires',
+        Icons.chat_bubble_outline),
+    _TypeItem('PROMOTION', 'Promotions', 'Offres et réductions disponibles',
+        Icons.local_offer_outlined),
+    _TypeItem('RAPPEL', 'Rappels', 'Rappels de rendez-vous et d\'échéances',
+        Icons.alarm_outlined),
+    _TypeItem('SYSTEME', 'Système', 'Mises à jour et informations techniques',
+        Icons.settings_outlined),
   ];
 
-  final List<String> _allPriorites = ['BASSE', 'NORMALE', 'HAUTE', 'CRITIQUE'];
+  final _allPriorites = const [
+    _PrioriteItem('BASSE', 'Basse', 'Informations non urgentes',
+        Icons.arrow_downward_rounded, SDColors.neutral500),
+    _PrioriteItem('NORMALE', 'Normale', 'Alertes courantes',
+        Icons.remove_rounded, SDColors.info600),
+    _PrioriteItem('HAUTE', 'Haute', 'Alertes importantes à traiter rapidement',
+        Icons.arrow_upward_rounded, SDColors.warning600),
+    _PrioriteItem('CRITIQUE', 'Critique', 'Alertes urgentes nécessitant action',
+        Icons.priority_high_rounded, SDColors.error600),
+  ];
 
   @override
   void initState() {
     super.initState();
-    // Charger les préférences actuelles
     context.read<AlertPageBlocM>().add(const LoadAlertPreferencesM());
   }
 
-  String _getTypeLabel(String type) {
-    switch (type) {
-      case 'COMMANDE':
-        return 'Commande';
-      case 'PRESTATION':
-        return 'Prestation';
-      case 'PAIEMENT':
-        return 'Paiement';
-      case 'VERIFICATION':
-        return 'Vérification';
-      case 'MESSAGE':
-        return 'Message';
-      case 'SYSTEME':
-        return 'Système';
-      case 'PROMOTION':
-        return 'Promotion';
-      case 'RAPPEL':
-        return 'Rappel';
-      default:
-        return type;
-    }
-  }
-
-  String _getPrioriteLabel(String priorite) {
-    switch (priorite) {
-      case 'BASSE':
-        return 'Basse';
-      case 'NORMALE':
-        return 'Normale';
-      case 'HAUTE':
-        return 'Haute';
-      case 'CRITIQUE':
-        return 'Critique';
-      default:
-        return priorite;
-    }
-  }
-
-  Color _getTypeColor(String type) {
-    switch (type) {
-      case 'COMMANDE':
-        return Colors.blue;
-      case 'PRESTATION':
-        return Colors.green;
-      case 'PAIEMENT':
-        return Colors.orange;
-      case 'VERIFICATION':
-        return Colors.purple;
-      case 'MESSAGE':
-        return Colors.teal;
-      case 'SYSTEME':
-        return Colors.grey;
-      case 'PROMOTION':
-        return Colors.pink;
-      case 'RAPPEL':
-        return Colors.amber;
-      default:
-        return Colors.grey;
-    }
-  }
-
-  Color _getPrioriteColor(String priorite) {
-    switch (priorite) {
-      case 'BASSE':
-        return Colors.green;
-      case 'NORMALE':
-        return Colors.blue;
-      case 'HAUTE':
-        return Colors.orange;
-      case 'CRITIQUE':
-        return Colors.red;
-      default:
-        return Colors.grey;
-    }
-  }
-
-  IconData _getTypeIcon(String type) {
-    switch (type) {
-      case 'COMMANDE':
-        return Icons.shopping_cart;
-      case 'PRESTATION':
-        return Icons.work;
-      case 'PAIEMENT':
-        return Icons.payment;
-      case 'VERIFICATION':
-        return Icons.verified;
-      case 'MESSAGE':
-        return Icons.message;
-      case 'SYSTEME':
-        return Icons.settings;
-      case 'PROMOTION':
-        return Icons.local_offer;
-      case 'RAPPEL':
-        return Icons.schedule;
-      default:
-        return Icons.notifications;
-    }
-  }
-
-  void _savePreferences() {
+  void _save() {
     context.read<AlertPageBlocM>().add(UpdateAlertPreferencesM(
           emailEnabled: _emailEnabled,
           pushEnabled: _pushEnabled,
@@ -148,29 +70,19 @@ class _AlertSettingsScreenMState extends State<AlertSettingsScreenM> {
         ));
   }
 
-  void _resetToDefaults() {
-    setState(() {
-      _emailEnabled = true;
-      _pushEnabled = true;
-      _smsEnabled = false;
-      _typesEnabled = List.from(_allTypes);
-      _prioritesEnabled = List.from(_allPriorites);
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: SDColors.white,
+      backgroundColor: SDColors.neutral50,
       appBar: SDWhiteAppBar.appBar(
-        title: 'Paramètres des Alertes',
+        title: 'Préférences de notification',
         actions: [
           TextButton(
-            onPressed: _savePreferences,
+            onPressed: _save,
             child: Text(
-              'Sauvegarder',
-              style: SDTypography.bodyMedium.copyWith(
-                color: SDColors.neutral900,
+              'Enregistrer',
+              style: SDTypography.labelLarge.copyWith(
+                color: SDColors.primary600,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -189,280 +101,150 @@ class _AlertSettingsScreenMState extends State<AlertSettingsScreenM> {
             });
           } else if (state is AlertPreferencesUpdatedM) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                  content: Text('Préférences sauvegardées avec succès')),
+              SnackBar(
+                content: const Text('Préférences enregistrées'),
+                backgroundColor: SDColors.success600,
+                behavior: SnackBarBehavior.floating,
+              ),
             );
           } else if (state is AlertPageErrorM) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Erreur: ${state.message}')),
+              SnackBar(
+                content: const Text(
+                    'Impossible d\'enregistrer les préférences. Réessayez.'),
+                backgroundColor: SDColors.error600,
+                behavior: SnackBarBehavior.floating,
+              ),
             );
           }
         },
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 🔔 CANAUX DE NOTIFICATION
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Canaux de Notification',
-                        style: TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 16),
-                      SwitchListTile(
-                        title: const Text('Email'),
-                        subtitle: const Text('Recevoir les alertes par email'),
-                        value: _emailEnabled,
-                        onChanged: (value) {
-                          setState(() {
-                            _emailEnabled = value;
-                          });
-                        },
-                        secondary: const Icon(Icons.email),
-                      ),
-                      SwitchListTile(
-                        title: const Text('Notifications Push'),
-                        subtitle: const Text('Recevoir les notifications push'),
-                        value: _pushEnabled,
-                        onChanged: (value) {
-                          setState(() {
-                            _pushEnabled = value;
-                          });
-                        },
-                        secondary: const Icon(Icons.phone_android),
-                      ),
-                      SwitchListTile(
-                        title: const Text('SMS'),
-                        subtitle: const Text('Recevoir les alertes par SMS'),
-                        value: _smsEnabled,
-                        onChanged: (value) {
-                          setState(() {
-                            _smsEnabled = value;
-                          });
-                        },
-                        secondary: const Icon(Icons.sms),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // 🏷️ TYPES D'ALERTES
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Types d\'Alertes',
-                        style: TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Sélectionnez les types d\'alertes que vous souhaitez recevoir',
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                      const SizedBox(height: 16),
-                      ..._allTypes.map((type) {
-                        final isEnabled = _typesEnabled.contains(type);
-                        return CheckboxListTile(
-                          title: Row(
-                            children: [
-                              Icon(
-                                _getTypeIcon(type),
-                                color: _getTypeColor(type),
-                                size: 20,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(_getTypeLabel(type)),
-                            ],
-                          ),
-                          value: isEnabled,
-                          onChanged: (value) {
-                            setState(() {
-                              if (value == true) {
-                                _typesEnabled.add(type);
-                              } else {
-                                _typesEnabled.remove(type);
-                              }
-                            });
-                          },
-                          controlAffinity: ListTileControlAffinity.trailing,
-                        );
-                      }).toList(),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // 🎯 PRIORITÉS
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Priorités',
-                        style: TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Sélectionnez les priorités d\'alertes que vous souhaitez recevoir',
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                      const SizedBox(height: 16),
-                      ..._allPriorites.map((priorite) {
-                        final isEnabled = _prioritesEnabled.contains(priorite);
-                        return CheckboxListTile(
-                          title: Row(
-                            children: [
-                              Icon(
-                                Icons.circle,
-                                color: _getPrioriteColor(priorite),
-                                size: 16,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(_getPrioriteLabel(priorite)),
-                            ],
-                          ),
-                          value: isEnabled,
-                          onChanged: (value) {
-                            setState(() {
-                              if (value == true) {
-                                _prioritesEnabled.add(priorite);
-                              } else {
-                                _prioritesEnabled.remove(priorite);
-                              }
-                            });
-                          },
-                          controlAffinity: ListTileControlAffinity.trailing,
-                        );
-                      }).toList(),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // 📊 RÉSUMÉ DES PRÉFÉRENCES
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Résumé des Préférences',
-                        style: TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 16),
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[100],
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.grey[300]!),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Canaux activés: ${_getActiveChannels()}',
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.w500),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Types activés: ${_typesEnabled.length}/${_allTypes.length}',
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.w500),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Priorités activées: ${_prioritesEnabled.length}/${_allPriorites.length}',
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.w500),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // 🎯 ACTIONS
-              Row(
+              // ── Canaux ──────────────────────────────────────────────────
+              _sectionTitle('Canaux'),
+              const SizedBox(height: 8),
+              _dsCard(
                 children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _resetToDefaults,
-                      icon: const Icon(Icons.restore),
-                      label: const Text('Réinitialiser'),
-                    ),
+                  _switchRow(
+                    icon: Icons.email_outlined,
+                    label: 'Email',
+                    description: 'Alertes envoyées à votre adresse email',
+                    value: _emailEnabled,
+                    onChanged: (v) => setState(() => _emailEnabled = v),
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: _savePreferences,
-                      icon: const Icon(Icons.save),
-                      label: const Text('Sauvegarder'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue[600],
-                        foregroundColor: Colors.white,
-                      ),
-                    ),
+                  _divider(),
+                  _switchRow(
+                    icon: Icons.phone_android_outlined,
+                    label: 'Notifications push',
+                    description: 'Alertes sur votre appareil en temps réel',
+                    value: _pushEnabled,
+                    onChanged: (v) => setState(() => _pushEnabled = v),
+                  ),
+                  _divider(),
+                  _switchRow(
+                    icon: Icons.sms_outlined,
+                    label: 'SMS',
+                    description: 'Alertes par message texte',
+                    value: _smsEnabled,
+                    onChanged: (v) => setState(() => _smsEnabled = v),
                   ),
                 ],
               ),
-              const SizedBox(height: 32),
 
-              // ℹ️ INFORMATIONS
-              Card(
-                color: Colors.blue[50],
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+              const SizedBox(height: 24),
+
+              // ── Types d'alertes ─────────────────────────────────────────
+              _sectionTitle('Types d\'alertes'),
+              const SizedBox(height: 4),
+              Text(
+                'Choisissez les catégories que vous souhaitez recevoir.',
+                style:
+                    SDTypography.bodySmall.copyWith(color: SDColors.neutral500),
+              ),
+              const SizedBox(height: 8),
+              _dsCard(
+                children: List.generate(_allTypes.length, (i) {
+                  final t = _allTypes[i];
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Row(
-                        children: [
-                          Icon(Icons.info, color: Colors.blue[600]),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Informations',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.blue[600],
-                            ),
-                          ),
-                        ],
+                      _checkRow(
+                        icon: t.icon,
+                        iconColor: SDColors.primary600,
+                        label: t.label,
+                        description: t.description,
+                        checked: _typesEnabled.contains(t.key),
+                        onChanged: (v) => setState(() {
+                          if (v) {
+                            _typesEnabled.add(t.key);
+                          } else {
+                            _typesEnabled.remove(t.key);
+                          }
+                        }),
                       ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        '• Les paramètres sont sauvegardés automatiquement\n'
-                        '• Vous pouvez modifier vos préférences à tout moment\n'
-                        '• Les alertes critiques sont toujours envoyées\n'
-                        '• Les notifications push nécessitent l\'autorisation de l\'appareil',
-                        style: TextStyle(fontSize: 12),
-                      ),
+                      if (i < _allTypes.length - 1) _divider(),
                     ],
+                  );
+                }),
+              ),
+
+              const SizedBox(height: 24),
+
+              // ── Priorités ───────────────────────────────────────────────
+              _sectionTitle('Priorités'),
+              const SizedBox(height: 4),
+              Text(
+                'Filtrez les alertes selon leur niveau d\'importance.',
+                style:
+                    SDTypography.bodySmall.copyWith(color: SDColors.neutral500),
+              ),
+              const SizedBox(height: 8),
+              _dsCard(
+                children: List.generate(_allPriorites.length, (i) {
+                  final p = _allPriorites[i];
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _checkRow(
+                        icon: p.icon,
+                        iconColor: p.color,
+                        label: p.label,
+                        description: p.description,
+                        checked: _prioritesEnabled.contains(p.key),
+                        onChanged: (v) => setState(() {
+                          if (v) {
+                            _prioritesEnabled.add(p.key);
+                          } else {
+                            _prioritesEnabled.remove(p.key);
+                          }
+                        }),
+                      ),
+                      if (i < _allPriorites.length - 1) _divider(),
+                    ],
+                  );
+                }),
+              ),
+
+              const SizedBox(height: 16),
+
+              // Réinitialiser
+              Center(
+                child: TextButton.icon(
+                  onPressed: () => setState(() {
+                    _emailEnabled = true;
+                    _pushEnabled = true;
+                    _smsEnabled = false;
+                    _typesEnabled = _allTypes.map((t) => t.key).toList();
+                    _prioritesEnabled =
+                        _allPriorites.map((p) => p.key).toList();
+                  }),
+                  icon: const Icon(Icons.restore_rounded, size: 18),
+                  label: const Text('Réinitialiser les préférences'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: SDColors.neutral600,
                   ),
                 ),
               ),
@@ -473,11 +255,156 @@ class _AlertSettingsScreenMState extends State<AlertSettingsScreenM> {
     );
   }
 
-  String _getActiveChannels() {
-    final channels = <String>[];
-    if (_emailEnabled) channels.add('Email');
-    if (_pushEnabled) channels.add('Push');
-    if (_smsEnabled) channels.add('SMS');
-    return channels.isEmpty ? 'Aucun' : channels.join(', ');
+  // ── Helpers visuels ────────────────────────────────────────────────────────
+
+  Widget _sectionTitle(String title) {
+    return Text(
+      title,
+      style: SDTypography.titleMedium.copyWith(
+        color: SDColors.neutral900,
+        fontWeight: FontWeight.w700,
+      ),
+    );
   }
+
+  Widget _dsCard({required List<Widget> children}) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: SDColors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: SDColors.neutral200),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: children,
+      ),
+    );
+  }
+
+  Widget _divider() => const Divider(
+        height: 1,
+        indent: 56,
+        color: SDColors.neutral100,
+      );
+
+  Widget _switchRow({
+    required IconData icon,
+    required String label,
+    required String description,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: SDColors.neutral100,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, size: 20, color: SDColors.neutral700),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style: SDTypography.bodyLarge
+                        .copyWith(fontWeight: FontWeight.w600)),
+                Text(
+                  description,
+                  style: SDTypography.bodySmall
+                      .copyWith(color: SDColors.neutral500),
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: value,
+            onChanged: onChanged,
+            activeColor: SDColors.primary600,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _checkRow({
+    required IconData icon,
+    required Color iconColor,
+    required String label,
+    required String description,
+    required bool checked,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return InkWell(
+      onTap: () => onChanged(!checked),
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: iconColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, size: 20, color: iconColor),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label,
+                      style: SDTypography.bodyLarge
+                          .copyWith(fontWeight: FontWeight.w600)),
+                  Text(
+                    description,
+                    style: SDTypography.bodySmall
+                        .copyWith(color: SDColors.neutral500),
+                  ),
+                ],
+              ),
+            ),
+            Checkbox(
+              value: checked,
+              onChanged: (v) => onChanged(v ?? false),
+              activeColor: SDColors.primary600,
+              side: const BorderSide(color: SDColors.neutral400),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(4)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Data classes ─────────────────────────────────────────────────────────────
+
+class _TypeItem {
+  const _TypeItem(this.key, this.label, this.description, this.icon);
+  final String key;
+  final String label;
+  final String description;
+  final IconData icon;
+}
+
+class _PrioriteItem {
+  const _PrioriteItem(
+      this.key, this.label, this.description, this.icon, this.color);
+  final String key;
+  final String label;
+  final String description;
+  final IconData icon;
+  final Color color;
 }

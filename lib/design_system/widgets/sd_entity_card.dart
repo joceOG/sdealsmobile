@@ -21,6 +21,13 @@ class SDEntityCard extends StatelessWidget {
   final String? ctaLabel;
   final VoidCallback? onTap;
 
+  /// Largeur explicite. Si [null], la carte prend toute la largeur disponible
+  /// contrainte par son parent (Expanded, Flexible, ListView…).
+  ///
+  /// Par défaut [168] pour les listes horizontales scroll (backward-compat).
+  /// Passer [null] pour les listes verticales ou les popups avec [Expanded].
+  final double? width;
+
   const SDEntityCard({
     super.key,
     required this.type,
@@ -35,6 +42,7 @@ class SDEntityCard extends StatelessWidget {
     this.promoText,
     this.ctaLabel,
     this.onTap,
+    this.width = 168,
   });
 
   Color _ctaColor() {
@@ -51,9 +59,7 @@ class SDEntityCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ctaColor = _ctaColor();
-    return SizedBox(
-      width: 168,
-      child: SDCard(
+    final card = SDCard(
         onTap: onTap,
         elevation: 1.5,
         borderRadius: SDSpacing.borderRadiusLarge,
@@ -63,7 +69,12 @@ class SDEntityCard extends StatelessWidget {
         showHoverEffect: false,
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final isCompact = constraints.maxHeight < 210;
+            // Normalise la hauteur disponible par rapport au textScale.
+            // À textScale 1.3, le texte occupe plus d'espace vertical ;
+            // on compare la hauteur «équivalente textScale 1.0» au seuil.
+            final ts = MediaQuery.textScalerOf(context).scale(1.0);
+            final adjustedHeight = constraints.maxHeight / ts;
+            final isCompact = adjustedHeight < 210;
             final imageHeight = isCompact ? 68.0 : 102.0;
             final sectionGap = isCompact ? 4.0 : 8.0;
             final showStatus = !isCompact && statusText != null && statusText!.isNotEmpty;
@@ -127,12 +138,13 @@ class SDEntityCard extends StatelessWidget {
                 SizedBox(height: sectionGap),
                 Text(
                   title,
-                  maxLines: 1,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: SDTypography.labelLarge.copyWith(
                     color: SDColors.neutral900,
                     fontWeight: FontWeight.w700,
                     fontSize: isCompact ? 13 : 14,
+                    height: 1.25,
                   ),
                 ),
                 Text(
@@ -197,7 +209,8 @@ class SDEntityCard extends StatelessWidget {
             );
           },
         ),
-      ),
-    );
+      );
+    if (width != null) return SizedBox(width: width, child: card);
+    return card;
   }
 }
