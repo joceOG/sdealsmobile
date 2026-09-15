@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:sdealsmobile/mobile/view/common/utils/app_snackbar.dart';
 import '../../common/widgets/empty_state_widget.dart';
 import '../../common/widgets/app_image.dart';
@@ -567,7 +568,7 @@ class _ProductDetailsState extends State<ProductDetails> {
               fullWidth: true,
               onPressed: () {
                 Navigator.of(ctx).pop();
-                Navigator.of(context).pushNamed('/login');
+                context.push('/login');
               },
             ),
             const SizedBox(height: 12),
@@ -577,7 +578,7 @@ class _ProductDetailsState extends State<ProductDetails> {
               fullWidth: true,
               onPressed: () {
                 Navigator.of(ctx).pop();
-                Navigator.of(context).pushNamed('/register');
+                context.push('/register');
               },
             ),
             const SizedBox(height: 8),

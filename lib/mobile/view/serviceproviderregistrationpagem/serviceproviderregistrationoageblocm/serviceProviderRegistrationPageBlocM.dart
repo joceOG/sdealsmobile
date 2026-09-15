@@ -22,7 +22,6 @@ class ServiceProviderRegistrationBlocM extends Bloc<
     Emitter<ServiceProviderRegistrationStateM> emit,
   ) async {
     emit(ServiceProviderRegistrationLoading());
-    print("🚀 Démarrage inscription prestataire: ${event.formData.toString()}");
 
     try {
       final apiUrl = dotenv.env['API_URL'];
@@ -34,10 +33,8 @@ class ServiceProviderRegistrationBlocM extends Bloc<
       String userId;
       if ((event.formData['existingUserId'] as String?)?.isNotEmpty == true) {
         userId = event.formData['existingUserId'];
-        print("✅ Utilisateur existant détecté: $userId (pas de réinscription)");
       } else {
         final userData = _prepareUserData(event.formData);
-        print("📤 Création utilisateur: $userData");
 
         final userResponse = await http.post(
           Uri.parse("$apiUrl/register"),
@@ -48,29 +45,24 @@ class ServiceProviderRegistrationBlocM extends Bloc<
         if (userResponse.statusCode != 200 && userResponse.statusCode != 201) {
           final errorData = jsonDecode(userResponse.body);
           throw Exception(
-              "Erreur création utilisateur: ${errorData['error'] ?? userResponse.body}");
+              "Erreur création utilisateur: ${errorData['error'] ?? 'échec inscription'}");
         }
 
         final userResult = jsonDecode(userResponse.body);
-        print("🔍 Réponse API utilisateur: $userResult");
 
         // Vérifier la structure de la réponse
         if (userResult['utilisateur'] != null) {
           userId = userResult['utilisateur']['_id'];
-          print("✅ Utilisateur créé avec ID: $userId");
         } else if (userResult['_id'] != null) {
           // Si la structure est différente
           userId = userResult['_id'];
-          print("✅ Utilisateur créé avec ID (structure alternative): $userId");
         } else {
-          print("❌ Structure de réponse inattendue: $userResult");
           throw Exception("Structure de réponse utilisateur inattendue");
         }
       }
 
       // ✅ ÉTAPE 2: multipart/form-data (aligné dashboard) pour envoyer selfie / photo profil
       final prestataireData = _preparePrestataireData(event.formData, userId);
-      print("📤 Création prestataire: $prestataireData");
 
       final prestataireResponse = await _postPrestataireMultipart(
         apiUrl: apiUrl!,
@@ -81,8 +73,6 @@ class ServiceProviderRegistrationBlocM extends Bloc<
 
       if (prestataireResponse.statusCode == 201 ||
           prestataireResponse.statusCode == 200) {
-        print("✅ Prestataire créé avec succès!");
-
         // ✅ NOUVEAU : Mettre à jour les rôles de l'utilisateur connecté
         await _updateUserRoles(userId);
 
@@ -96,16 +86,14 @@ class ServiceProviderRegistrationBlocM extends Bloc<
         } catch (_) {
           errorData = null;
         }
-        print("❌ Erreur création prestataire: ${prestataireResponse.body}");
         final msg = errorData is Map && errorData['error'] != null
             ? errorData['error'].toString()
-            : prestataireResponse.body;
+            : 'échec création profil';
         emit(ServiceProviderRegistrationFailure(
           error: "Erreur création prestataire: $msg",
         ));
       }
     } catch (e) {
-      print("💥 Erreur inscription: $e");
       emit(ServiceProviderRegistrationFailure(
           error: "Erreur d'inscription: $e"));
     }
@@ -214,13 +202,7 @@ class ServiceProviderRegistrationBlocM extends Bloc<
 
   // ✅ NOUVELLE MÉTHODE : Mettre à jour les rôles de l'utilisateur
   Future<void> _updateUserRoles(String userId) async {
-    try {
-      // Note: La mise à jour des rôles sera gérée dans l'écran après l'inscription
-      // car le BLoC n'a pas accès au context
-      print("✅ Rôle PRESTATAIRE à ajouter pour l'utilisateur: $userId");
-    } catch (e) {
-      print("❌ Erreur lors de la mise à jour des rôles: $e");
-    }
+    // La mise à jour des rôles est gérée dans l'écran après l'inscription.
   }
 
   // ✅ PRÉPARATION DES DONNÉES PRESTATAIRE

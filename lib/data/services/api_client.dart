@@ -1428,69 +1428,73 @@ class ApiClient {
     }
   }
 
-  // ✅ NOUVELLE MÉTHODE : Récupérer tous les prestataires
-  Future<List<Map<String, dynamic>>> fetchPrestataires({bool forceRefresh = false}) async {
-    print('🚀 Récupération des prestataires depuis le backend');
-    print('🌐 URL complète: ${dotenv.env['API_URL']}/prestataire');
-    const cacheKey = 'all_prestataires';
+  // ✅ Récupérer les prestataires (pagination bornée)
+  Future<List<Map<String, dynamic>>> fetchPrestataires({
+    bool forceRefresh = false,
+    int page = 1,
+    int limit = 20,
+  }) async {
+    final safePage = page < 1 ? 1 : page;
+    final safeLimit = limit.clamp(1, 50);
+    if (kDebugMode) {
+      debugPrint('fetchPrestataires page=$safePage limit=$safeLimit');
+    }
+    final cacheKey = 'prestataires_p${safePage}_l$safeLimit';
 
-    // 1️⃣ Cache (sauf si refresh forcé)
     if (!forceRefresh) {
       try {
         final cachedData = await CacheService().getCachedData(cacheKey);
         if (cachedData != null) {
-          print('📦 Prestataires récupérés du cache');
           return (cachedData as List).cast<Map<String, dynamic>>();
         }
-      } catch (e) {
-        print('Erreur cache prestataires: $e');
-      }
+      } catch (_) {}
     }
 
-    // 2️⃣ API
-
-    // ✅ SUPPRIMÉ : Test de connectivité inutile qui causait le problème
-
     try {
-      final response = await http
-          .get(Uri.parse('${dotenv.env['API_URL']}/prestataire'), headers: {
-        'Content-Type': 'application/json'
+      final uri = Uri.parse('${dotenv.env['API_URL']}/prestataire').replace(
+        queryParameters: {
+          'page': safePage.toString(),
+          'limit': safeLimit.toString(),
+        },
+      );
+      final response = await http.get(uri, headers: {
+        'Content-Type': 'application/json',
       }).timeout(const Duration(seconds: 25));
 
-      print('📡 Status Code: ${response.statusCode}');
-      print('📋 Response Headers: ${response.headers}');
-      print('📝 Response Body Length: ${response.body.length}');
-
       if (response.statusCode == 200) {
-        List<dynamic> prestatairesJson = decodeJson(response);
-        print('✅ Prestataires récupérés: ${prestatairesJson.length}');
-
-        // Retourner la liste de Map pour que le BLoC puisse la convertir
-        List<Map<String, dynamic>> result = prestatairesJson.cast<Map<String, dynamic>>();
-        await CacheService().cacheData(
-          cacheKey,
-          result,
-          ttl: const Duration(minutes: 2),
-        );
-        return result;
-      } else {
-        print('❌ Erreur HTTP ${response.statusCode}: ${response.body}');
-        throw Exception(
-            'Échec de récupération des prestataires: ${response.statusCode}');
-      }
-    } catch (e) {
-      print('🔥 Erreur dans fetchPrestataires: $e');
-      // Si refresh forcé échoue, tenter quand même le cache
-      if (forceRefresh) {
+        final decoded = decodeJson(response);
+        List<dynamic> prestatairesJson;
+        if (decoded is List) {
+          prestatairesJson = decoded;
+        } else if (decoded is Map && decoded['data'] is List) {
+          prestatairesJson = decoded['data'] as List;
+        } else if (decoded is Map && decoded['prestataires'] is List) {
+          prestatairesJson = decoded['prestataires'] as List;
+        } else {
+          prestatairesJson = const [];
+        }
+        final list = prestatairesJson
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
         try {
-          final cachedData = await CacheService().getCachedData(cacheKey);
-          if (cachedData != null) {
-            print('📦 Fallback cache prestataires (après échec refresh)');
-            return (cachedData as List).cast<Map<String, dynamic>>();
-          }
+          await CacheService().cacheData(cacheKey, list);
         } catch (_) {}
+        return list;
       }
-      throw Exception('Impossible de charger les prestataires');
+      throw ApiException(
+        message: 'Impossible de charger les prestataires.',
+        statusCode: response.statusCode,
+      );
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      try {
+        final cachedData = await CacheService().getCachedData(cacheKey);
+        if (cachedData != null) {
+          return (cachedData as List).cast<Map<String, dynamic>>();
+        }
+      } catch (_) {}
+      throwCaughtAsApi(e);
     }
   }
 
@@ -2772,7 +2776,7 @@ extension MessagerieApi on ApiClient {
       token: accessToken,
     );
     if (response.statusCode != 200) {
-      throw Exception('FCM register ${response.statusCode}: ${response.body}');
+      throw Exception('FCM register ${response.statusCode}');
     }
   }
 
@@ -2787,7 +2791,7 @@ extension MessagerieApi on ApiClient {
       body: {'token': token},
     );
     if (response.statusCode != 200) {
-      throw Exception('FCM unregister ${response.statusCode}: ${response.body}');
+      throw Exception('FCM unregister ${response.statusCode}');
     }
   }
 

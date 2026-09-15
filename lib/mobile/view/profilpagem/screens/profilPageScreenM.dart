@@ -187,17 +187,6 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
                     );
                   },
                 ),
-                _buildSectionLabel('Paiements'),
-                MenuItem(
-                  icon: Icons.account_balance_wallet_outlined,
-                  title: 'Portefeuille',
-                  onTap: () => Navigator.pushNamed(context, '/wallet'),
-                ),
-                MenuItem(
-                  icon: Icons.payments_outlined,
-                  title: 'Tarification',
-                  onTap: () => _showSoutraPayTarificationSheet(context),
-                ),
                 _buildPrestataireModeSection(),
                 _buildSectionLabel('Compte'),
                 MenuItem(

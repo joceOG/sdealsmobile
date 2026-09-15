@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:sdealsmobile/data/models/vendeur.dart';
+import 'package:url_launcher/url_launcher.dart';
 // ✅ Design System
 import '../../../../design_system/design_system.dart';
 
@@ -639,25 +640,50 @@ class VendorDetailsScreenM extends StatelessWidget {
     );
   }
 
+  Future<void> _contactVendor(BuildContext context) async {
+    final tel = vendeur.utilisateur?.telephone?.trim() ?? '';
+    if (tel.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Aucun numéro de téléphone disponible pour ce vendeur.',
+            style: SDTypography.bodyMedium,
+          ),
+        ),
+      );
+      return;
+    }
+    final uri = Uri(scheme: 'tel', path: tel);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    } else if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Impossible d’ouvrir l’appel.',
+            style: SDTypography.bodyMedium,
+          ),
+        ),
+      );
+    }
+  }
+
   Widget _buildActionButtons(BuildContext context) {
+    final hasPhone =
+        (vendeur.utilisateur?.telephone?.trim() ?? '').isNotEmpty;
     return Row(
       children: [
         Expanded(
           child: ElevatedButton.icon(
-            onPressed: () {
-              // TODO: Contacter le vendeur
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                    content: Text('Fonctionnalité de contact à venir',
-                        style: SDTypography.bodyMedium)),
-              );
-            },
+            onPressed: hasPhone ? () => _contactVendor(context) : null,
             icon: Icon(Icons.phone, color: SDColors.white),
-            label: Text('Contacter',
+            label: Text(
+                hasPhone ? 'Contacter' : 'Pas de téléphone',
                 style: SDTypography.labelMedium.copyWith(color: SDColors.white)),
             style: ElevatedButton.styleFrom(
               backgroundColor: SDColors.success500,
               foregroundColor: SDColors.white,
+              disabledBackgroundColor: SDColors.neutral300,
               padding: EdgeInsets.symmetric(vertical: SDSpacing.sm),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),

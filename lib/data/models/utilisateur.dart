@@ -49,7 +49,8 @@ class Utilisateur {
   /// Convertir JSON → Utilisateur
   factory Utilisateur.fromJson(Map<String, dynamic> json) {
     return Utilisateur(
-      idutilisateur: json['_id']?.toString() ?? json['idutilisateur']?.toString() ?? '',
+      idutilisateur:
+          json['_id']?.toString() ?? json['idutilisateur']?.toString() ?? '',
       nom: cleanDisplayPart(json['nom']) ?? '',
       prenom: cleanDisplayPart(json['prenom']),
       dateNaissance: cleanDisplayPart(json['datedenaissance']),
@@ -61,7 +62,10 @@ class Utilisateur {
       photoProfil: safeImageUrl(json['photoProfil']),
       tokens: json['tokens'] != null
           ? List<String>.from(
-              (json['tokens'] as List).map((t) => t is Map ? (t['token'] as String? ?? '') : t.toString()).where((token) => token.isNotEmpty),
+              (json['tokens'] as List)
+                  .map((t) =>
+                      t is Map ? (t['token'] as String? ?? '') : t.toString())
+                  .where((token) => token.isNotEmpty),
             )
           : [],
       token: json['token']?.toString(),
@@ -77,7 +81,8 @@ class Utilisateur {
     );
   }
 
-  /// Convertir Utilisateur → JSON
+  /// JSON pour persistance locale / affichage.
+  /// Jamais de mot de passe, JWT, refresh ni tokens FCM.
   Map<String, dynamic> toJson() {
     return {
       '_id': idutilisateur,
@@ -85,19 +90,29 @@ class Utilisateur {
       'prenom': prenom,
       'datedenaissance': dateNaissance,
       'email': email,
-      'password': password,
       'telephone': telephone,
       'genre': genre,
       'note': note,
       'photoProfil': photoProfil,
-      'tokens': tokens != null ? tokens!.map((t) => {'token': t}).toList() : [],
-      'token': token, // ✅ exporté aussi
       'createdAt': createdAt?.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
       'role': role,
-      'verifie': verifie, // ✅ Export du statut de vérification
+      'verifie': verifie,
       'telephoneVerified': telephoneVerified,
     };
+  }
+
+  /// Nettoie un JSON legacy (prefs) avant restauration.
+  static Map<String, dynamic> sanitizePersistedJson(Map<String, dynamic> raw) {
+    final out = Map<String, dynamic>.from(raw);
+    out.remove('password');
+    out.remove('token');
+    out.remove('tokens');
+    out.remove('refreshToken');
+    out.remove('refresh_token');
+    out.remove('fcmToken');
+    out.remove('fcmTokens');
+    return out;
   }
 
   Map<String, dynamic> toMap() => toJson();

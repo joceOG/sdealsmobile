@@ -13,6 +13,7 @@ import '../../securitypagem/screens/securityPageScreenM.dart';
 import '../../securitypagem/securitypageblocm/securityPageBlocM.dart';
 import 'language_settings_screen.dart';
 import 'profile_menu_item.dart';
+import 'delete_account_screen.dart';
 
 /// Hub Paramètres — regroupe langue, préférences, sécu, notifs prefs.
 class ProfileSettingsHubScreen extends StatelessWidget {
@@ -123,6 +124,17 @@ class ProfileSettingsHubScreen extends StatelessWidget {
                               ..add(const LoadAlertPreferencesM()),
                             child: const AlertSettingsScreenM(),
                           ),
+                        ),
+                      );
+                    },
+                  ),
+                  MenuItem(
+                    icon: Icons.delete_forever_outlined,
+                    title: 'Supprimer mon compte',
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const DeleteAccountScreen(),
                         ),
                       );
                     },

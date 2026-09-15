@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -69,19 +70,48 @@ void main() async {
   );
 
   await Hive.initFlutter();
-  try {
-    await dotenv.load(fileName: ".env");
-  } catch (_) {
-    try {
-      await dotenv.load(fileName: ".env.example");
-    } catch (_) {}
-  }
   const apiUrlDefine = String.fromEnvironment('API_URL');
   const mapsKeyDefine = String.fromEnvironment('GOOGLE_MAPS_API_KEY');
-  if (apiUrlDefine.isNotEmpty) dotenv.env['API_URL'] = apiUrlDefine;
+  const legalBaseDefine = String.fromEnvironment('LEGAL_BASE_URL');
+
+  // Release fail-closed : API_URL via --dart-define uniquement (pas d'.env embarqué).
+  if (apiUrlDefine.isNotEmpty) {
+    dotenv.env['API_URL'] = apiUrlDefine;
+  } else if (kReleaseMode) {
+    throw StateError(
+      'API_URL manquant en release. Build avec '
+      '--dart-define=API_URL=https://…/api',
+    );
+  } else {
+    try {
+      await dotenv.load(fileName: '.env');
+    } catch (_) {
+      try {
+        await dotenv.load(fileName: '.env.example');
+      } catch (_) {}
+    }
+  }
   if (mapsKeyDefine.isNotEmpty) {
     dotenv.env['GOOGLE_MAPS_API_KEY'] = mapsKeyDefine;
   }
+  if (legalBaseDefine.isNotEmpty) {
+    dotenv.env['LEGAL_BASE_URL'] = legalBaseDefine;
+  }
+
+  final resolvedApi = (dotenv.env['API_URL'] ?? '').trim();
+  if (resolvedApi.isEmpty) {
+    throw StateError('API_URL non configuré');
+  }
+  if (kReleaseMode && !resolvedApi.startsWith('https://')) {
+    throw StateError('API_URL release doit être HTTPS');
+  }
+  if (kReleaseMode &&
+      (resolvedApi.contains('localhost') ||
+          resolvedApi.contains('127.0.0.1') ||
+          resolvedApi.contains('192.168.'))) {
+    throw StateError('API_URL release refuse localhost / LAN');
+  }
+
   await initializeDateFormatting('fr_FR', null);
 
   // Firebase + Crashlytics (no-op si non configuré)

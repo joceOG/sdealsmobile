@@ -1,30 +1,32 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sdealsmobile/mobile/view/profilpagem/screens/delete_account_screen.dart';
+import 'package:sdealsmobile/data/utils/legal_urls.dart';
 
-import 'package:sdealsmobile/main.dart';
-
+/// Smoke Soutrali Deals (remplace le template compteur).
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget( MyApp());
+  testWidgets('smoke — marque + écran suppression compte', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: Center(child: Text('Soutrali Deals')),
+        ),
+      ),
+    );
+    expect(find.text('Soutrali Deals'), findsOneWidget);
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
-
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
+    await tester.pumpWidget(const MaterialApp(home: DeleteAccountScreen()));
     await tester.pump();
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    expect(find.text('Supprimer mon compte'), findsWidgets);
+    expect(find.textContaining('n’est pas une simple déconnexion'),
+        findsOneWidget);
+    expect(find.text('Confirmer la suppression'), findsOneWidget);
+    expect(find.text('Annuler'), findsOneWidget);
+  });
+
+  test('URL suppression compte stable', () {
+    expect(LegalUrls.suppressionCompte, contains('/suppression-compte'));
+    expect(LegalUrls.confidentialite, contains('/confidentialite'));
   });
 }

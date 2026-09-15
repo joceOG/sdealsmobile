@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../data/models/prestataire.dart';
 import '../../../../data/utils/display_text.dart';
 import '../../../../data/utils/media_url.dart';
@@ -20,7 +21,9 @@ class ProviderPopup extends StatelessWidget {
     if (provider is Prestataire) {
       return (provider as Prestataire).idprestataire;
     } else if (provider is Map<String, dynamic>) {
-      return provider['_id']?.toString() ?? provider['idprestataire']?.toString() ?? '';
+      return provider['_id']?.toString() ??
+          provider['idprestataire']?.toString() ??
+          '';
     }
     return '';
   }
@@ -45,8 +48,7 @@ class ProviderPopup extends StatelessWidget {
           nom: p.utilisateur.nom,
           fallback: 'Prestataire',
         ),
-        'serviceName':
-            cleanDisplayPart(p.service.nomservice) ?? 'Service',
+        'serviceName': cleanDisplayPart(p.service.nomservice) ?? 'Service',
         'categoryName':
             cleanDisplayPart(p.service.categorie?.nomcategorie) ?? '',
         'description': cleanDisplayPart(p.description) ?? 'Non renseigné',
@@ -64,6 +66,7 @@ class ProviderPopup extends StatelessWidget {
             'Sur devis',
         'location':
             cleanDisplayPart(p.localisation) ?? 'Adresse non renseignée',
+        'telephone': cleanDisplayPart(p.utilisateur.telephone) ?? '',
       };
     } else if (provider is Map<String, dynamic>) {
       final utilisateur = provider['utilisateur'] as Map<String, dynamic>?;
@@ -72,8 +75,7 @@ class ProviderPopup extends StatelessWidget {
         'fullName': utilisateur != null
             ? personNameFromMap(utilisateur, fallback: 'Prestataire')
             : 'Prestataire',
-        'serviceName':
-            cleanDisplayPart(service?['nomservice']) ?? 'Service',
+        'serviceName': cleanDisplayPart(service?['nomservice']) ?? 'Service',
         'categoryName':
             cleanDisplayPart(service?['categorie']?['nomcategorie']) ?? '',
         'description':
@@ -92,8 +94,9 @@ class ProviderPopup extends StatelessWidget {
               perUnit: '/h',
             ) ??
             'Sur devis',
-        'location':
-            cleanDisplayPart(provider['localisation']) ?? 'Adresse non renseignée',
+        'location': cleanDisplayPart(provider['localisation']) ??
+            'Adresse non renseignée',
+        'telephone': cleanDisplayPart(utilisateur?['telephone']) ?? '',
       };
     }
     // Fallback par défaut
@@ -107,13 +110,36 @@ class ProviderPopup extends StatelessWidget {
       'photoProfil': null,
       'price': 'Sur devis',
       'location': 'Adresse non renseignée',
+      'telephone': '',
     };
+  }
+
+  Future<void> _contact(BuildContext context, String? rawTel) async {
+    final tel = (rawTel ?? '').trim();
+    if (tel.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Aucun numéro de téléphone disponible pour ce professionnel.',
+          ),
+        ),
+      );
+      return;
+    }
+    final uri = Uri(scheme: 'tel', path: tel);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    } else if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Impossible d’ouvrir l’appel.')),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final data = _getProviderData();
-    
+
     return Material(
       color: Colors.transparent,
       child: GestureDetector(
@@ -140,8 +166,10 @@ class ProviderPopup extends StatelessWidget {
                           child: SDEntityCard(
                             width: null,
                             type: SDEntityCardType.provider,
-                            title: data['fullName']?.toString() ?? 'Prestataire',
-                            subtitle: data['serviceName']?.toString() ?? 'Service',
+                            title:
+                                data['fullName']?.toString() ?? 'Prestataire',
+                            subtitle:
+                                data['serviceName']?.toString() ?? 'Service',
                             fallbackIcon: Icons.handyman_rounded,
                             imageUrl: normalizeMediaUrl(
                               data['photoProfil']?.toString(),
@@ -187,18 +215,18 @@ class ProviderPopup extends StatelessWidget {
                     const SizedBox(height: 6),
                     Text(
                       data['description']?.toString() ?? '',
-                      style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral600),
+                      style: SDTypography.bodyMedium
+                          .copyWith(color: SDColors.neutral600),
                     ),
                     const SizedBox(height: 10),
                     Row(
                       children: [
                         Expanded(
                           child: ElevatedButton.icon(
-                            onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Fonction de contact à implémenter')),
-                              );
-                            },
+                            onPressed: () => _contact(
+                              context,
+                              data['telephone']?.toString(),
+                            ),
                             icon: const Icon(Icons.phone, size: 18),
                             label: const Text('Contacter'),
                             style: ElevatedButton.styleFrom(
@@ -240,10 +268,4 @@ class ProviderPopup extends StatelessWidget {
       ),
     );
   }
-
 }
-
-
-
-
-

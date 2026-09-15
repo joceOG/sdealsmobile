@@ -358,7 +358,7 @@ class ProviderProfileBloc
           return;
         }
         final response = await _apiClient.post(
-          '/utilisateur/deactivate',
+          '/utilisateur/request-account-deletion',
         );
         if (response.statusCode == 200) {
           String message = 'Compte désactivé';

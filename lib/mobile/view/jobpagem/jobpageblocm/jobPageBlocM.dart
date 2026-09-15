@@ -3,6 +3,7 @@ import 'package:sdealsmobile/mobile/view/jobpagem/jobpageblocm/jobPageEventM.dar
 import 'package:sdealsmobile/mobile/view/jobpagem/jobpageblocm/jobPageStateM.dart';
 
 import 'package:bloc/bloc.dart';
+import 'package:flutter/foundation.dart';
 
 import 'package:sdealsmobile/data/models/categorie.dart';
 import 'package:sdealsmobile/data/services/api_client.dart';
@@ -25,6 +26,7 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
     on<LoadNearbyProvidersM>(_onLoadNearbyProvidersM);
     on<LoadProvidersByCategoryM>(_onLoadProvidersByCategoryM);
     on<LoadUrgentProvidersM>(_onLoadUrgentProvidersM);
+    on<LoadMoreProvidersM>(_onLoadMoreProvidersM);
     on<UpdateExplorerFiltersM>((event, emit) {
       emit(state.copyWith(
         filterVerifiedOnly: event.filterVerifiedOnly,
@@ -32,6 +34,30 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
         clearMinRating: event.clearMinRating,
       ));
     });
+  }
+
+  static const int _pageLimit = 20;
+
+  List<Prestataire> _mapPrestataires(List<Map<String, dynamic>> data) {
+    final out = <Prestataire>[];
+    for (final row in data) {
+      try {
+        out.add(Prestataire.fromBackend(row));
+      } catch (_) {
+        // ignore invalid rows
+      }
+    }
+    return out;
+  }
+
+  List<Prestataire> _mergeUnique(
+      List<Prestataire> current, List<Prestataire> incoming) {
+    final seen = {for (final p in current) p.idprestataire};
+    final merged = List<Prestataire>.from(current);
+    for (final p in incoming) {
+      if (seen.add(p.idprestataire)) merged.add(p);
+    }
+    return merged;
   }
 
   Future<void> _onLoadCategorieDataJobM(
@@ -114,22 +140,11 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
     try {
       // 🚀 Charger les prestataires depuis le backend
       ApiClient apiClient = ApiClient();
-      print("🚀 Chargement des prestataires depuis le backend...");
+      final List<Map<String, dynamic>> prestatairesData = await apiClient
+          .fetchPrestataires(forceRefresh: true, page: 1, limit: _pageLimit);
 
-      final List<Map<String, dynamic>> prestatairesData =
-          await apiClient.fetchPrestataires(forceRefresh: true);
-
-      // Convertir vers le modèle Prestataire (tolérant aux enregistrements partiels)
-      List<Prestataire> providers = [];
-      for (final data in prestatairesData) {
-        try {
-          providers.add(Prestataire.fromBackend(data));
-        } catch (e) {
-          print('⚠️ Prestataire ignoré (mapping invalide): $e');
-        }
-      }
-
-      print("✅ Prestataires chargés depuis le backend: ${providers.length}");
+      List<Prestataire> providers = _mapPrestataires(prestatairesData);
+      final hasMore = prestatairesData.length >= _pageLimit;
 
       // 🔍 Filtrer par type de service si spécifié
       if (event.serviceType.isNotEmpty) {
@@ -143,9 +158,6 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
                         .contains(event.serviceType.toLowerCase())) ??
                     false))
             .toList();
-
-        print(
-            "🎯 Prestataires filtrés pour '${event.serviceType}': ${providers.length}");
       }
 
       // 📍 Filtrer par localisation si spécifié
@@ -155,8 +167,6 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
                 .toLowerCase()
                 .contains(event.location.toLowerCase()))
             .toList();
-
-        print("📍 Prestataires dans '${event.location}': ${providers.length}");
       }
 
       // 🏆 Trier par note (vérifiés en premier, puis par expérience)
@@ -169,11 +179,6 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
         int expB = int.tryParse(b.anneeExperience ?? '0') ?? 0;
         return expB.compareTo(expA);
       });
-
-      // 🎯 Montrer plus de prestataires pour éviter de masquer les nouveaux profils
-      if (providers.length > 20) {
-        providers = providers.take(20).toList();
-      }
 
       // ✅ Créer l'explication du matching
       final matchCriteria = [event.serviceType, event.location];
@@ -239,9 +244,11 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
         matchedProviders: providers,
         matchExplanation: explanation,
         isMatchingLoading: false,
+        providersPage: 1,
+        providersHasMore: hasMore,
       ));
     } catch (error) {
-      print("❌ Erreur chargement prestataires: $error");
+      if (kDebugMode) debugPrint('matching providers load failed');
       emit(state.copyWith(
         isMatchingLoading: false,
         matchedProviders: const [],
@@ -261,42 +268,17 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
       searchRadius: event.radius,
       selectedCategory: event.category ?? '',
       selectedService: event.service ?? '',
+      providersPage: 1,
+      providersHasMore: true,
+      isLoadingMore: false,
     ));
 
     try {
       ApiClient apiClient = ApiClient();
-      print("📍 🚀 DÉBUT - Chargement des prestataires à proximité...");
-      print("📍 Position: ${event.latitude}, ${event.longitude}");
-      print("📍 Rayon: ${event.radius} km");
-      print("🌐 API URL: ${apiClient.apiUrl}");
-
-      // Charger tous les prestataires
-      print("📡 Appel API fetchPrestataires()...");
-      final List<Map<String, dynamic>> prestatairesData =
-          await apiClient.fetchPrestataires(forceRefresh: true);
-      
-      print("✅ API Response: ${prestatairesData.length} prestataires reçus");
-      if (prestatairesData.isNotEmpty) {
-        print("📋 Premier prestataire sample: ${prestatairesData[0].keys}");
-        print("📋 Premier prestataire data: ${prestatairesData[0]}");
-      }
-
-      print("🔄 Conversion vers modèle Prestataire...");
-      List<Prestataire> allProviders = [];
-      for (int i = 0; i < prestatairesData.length; i++) {
-        try {
-          print("🔄 Conversion prestataire $i...");
-          final provider = Prestataire.fromBackend(prestatairesData[i]);
-          allProviders.add(provider);
-          print("✅ Prestataire $i converti: ${provider.utilisateur.nom} ${provider.utilisateur.prenom}");
-        } catch (e) {
-          print("⚠️ Erreur conversion prestataire $i: $e");
-          print("⚠️ Données problématiques: ${prestatairesData[i]}");
-          // Continue avec les autres
-        }
-      }
-      
-      print("✅ ${allProviders.length} prestataires convertis avec succès");
+      final List<Map<String, dynamic>> prestatairesData = await apiClient
+          .fetchPrestataires(forceRefresh: true, page: 1, limit: _pageLimit);
+      List<Prestataire> allProviders = _mapPrestataires(prestatairesData);
+      final hasMore = prestatairesData.length >= _pageLimit;
 
       // Filtrer par catégorie si spécifiée
       if (event.category != null && event.category!.isNotEmpty) {
@@ -318,12 +300,6 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
             .toList();
       }
 
-      print("🔍 Filtrage par distance...");
-      print("📍 Position utilisateur: ${event.latitude}, ${event.longitude}");
-      print("📍 Rayon de recherche: ${event.radius} km");
-      print("📍 Prestataires avant filtrage: ${allProviders.length}");
-      
-      // ✅ Filtrage par distance + distances persistées
       final filtered = await _filterByDistance(
         allProviders,
         event.latitude,
@@ -333,9 +309,6 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
       List<Prestataire> nearbyProviders = filtered.providers;
       final distances = filtered.distances;
 
-      print("📍 Prestataires après filtrage distance: ${nearbyProviders.length}");
-
-      // Trier par distance puis vérifié
       nearbyProviders.sort((a, b) {
         final da = distances[a.idprestataire] ?? 9999;
         final db = distances[b.idprestataire] ?? 9999;
@@ -345,21 +318,82 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
         if (!a.verifier && b.verifier) return 1;
         return 0;
       });
-      
-      print("✅ Prestataires finaux après tri: ${nearbyProviders.length}");
-
-      print("✅ Prestataires à proximité trouvés: ${nearbyProviders.length}");
 
       emit(state.copyWith(
         nearbyProviders: nearbyProviders,
         providerDistances: distances,
         isNearbyLoading: false,
+        providersPage: 1,
+        providersHasMore: hasMore,
+        isLoadingMore: false,
       ));
     } catch (error) {
-      print("❌ Erreur chargement prestataires à proximité: $error");
+      if (kDebugMode) debugPrint('nearby providers load failed');
       emit(state.copyWith(
         isNearbyLoading: false,
         nearbyError: error.toString(),
+      ));
+    }
+  }
+
+  Future<void> _onLoadMoreProvidersM(
+      LoadMoreProvidersM event, Emitter<JobPageStateM> emit) async {
+    if (state.isLoadingMore ||
+        !state.providersHasMore ||
+        state.isNearbyLoading) {
+      return;
+    }
+    emit(state.copyWith(isLoadingMore: true, nearbyError: ''));
+    try {
+      final nextPage = state.providersPage + 1;
+      final apiClient = ApiClient();
+      final batch = await apiClient.fetchPrestataires(
+        page: nextPage,
+        limit: _pageLimit,
+      );
+      var providers = _mapPrestataires(batch);
+
+      if (state.selectedCategory.isNotEmpty) {
+        providers = providers
+            .where((p) =>
+                p.service.categorie?.nomcategorie
+                    .toLowerCase()
+                    .contains(state.selectedCategory.toLowerCase()) ??
+                false)
+            .toList();
+      }
+      if (state.selectedService.isNotEmpty) {
+        providers = providers
+            .where((p) => p.service.nomservice
+                .toLowerCase()
+                .contains(state.selectedService.toLowerCase()))
+            .toList();
+      }
+
+      var distances = Map<String, double>.from(state.providerDistances);
+      if (state.userLatitude != null && state.userLongitude != null) {
+        final filtered = await _filterByDistance(
+          providers,
+          state.userLatitude!,
+          state.userLongitude!,
+          state.searchRadius,
+        );
+        providers = filtered.providers;
+        distances = {...distances, ...filtered.distances};
+      }
+
+      final merged = _mergeUnique(state.nearbyProviders, providers);
+      emit(state.copyWith(
+        nearbyProviders: merged,
+        providerDistances: distances,
+        providersPage: nextPage,
+        providersHasMore: batch.length >= _pageLimit,
+        isLoadingMore: false,
+      ));
+    } catch (_) {
+      emit(state.copyWith(
+        isLoadingMore: false,
+        nearbyError: 'Chargement supplémentaire impossible. Réessayez.',
       ));
     }
   }
@@ -377,15 +411,15 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
       ApiClient apiClient = ApiClient();
       print("🏷️ Chargement prestataires pour catégorie: ${event.category}");
 
-      final List<Map<String, dynamic>> prestatairesData =
-          await apiClient.fetchPrestataires(forceRefresh: true);
+      final List<Map<String, dynamic>> prestatairesData = await apiClient
+          .fetchPrestataires(forceRefresh: true, page: 1, limit: _pageLimit);
 
       List<Prestataire> providers = [];
       for (final data in prestatairesData) {
         try {
           providers.add(Prestataire.fromBackend(data));
         } catch (e) {
-          print('⚠️ Prestataire ignoré (mapping invalide): $e');
+          if (kDebugMode) debugPrint('prestataire mapping skipped');
         }
       }
 
@@ -413,8 +447,10 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
 
       // Trier par note (conversion sécurisée)
       providers.sort((a, b) {
-        final noteA = double.tryParse('${a.note ?? ''}'.replaceAll(',', '.')) ?? 0.0;
-        final noteB = double.tryParse('${b.note ?? ''}'.replaceAll(',', '.')) ?? 0.0;
+        final noteA =
+            double.tryParse('${a.note ?? ''}'.replaceAll(',', '.')) ?? 0.0;
+        final noteB =
+            double.tryParse('${b.note ?? ''}'.replaceAll(',', '.')) ?? 0.0;
         if (noteB > noteA) return 1;
         if (noteB < noteA) return -1;
         return 0;
@@ -449,15 +485,15 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
       ApiClient apiClient = ApiClient();
       print("🚨 Chargement prestataires d'urgence...");
 
-      final List<Map<String, dynamic>> prestatairesData =
-          await apiClient.fetchPrestataires(forceRefresh: true);
+      final List<Map<String, dynamic>> prestatairesData = await apiClient
+          .fetchPrestataires(forceRefresh: true, page: 1, limit: _pageLimit);
 
       List<Prestataire> providers = [];
       for (final data in prestatairesData) {
         try {
           providers.add(Prestataire.fromBackend(data));
         } catch (e) {
-          print('⚠️ Prestataire ignoré (mapping invalide): $e');
+          if (kDebugMode) debugPrint('prestataire mapping skipped');
         }
       }
 
@@ -483,8 +519,10 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
       providers.sort((a, b) {
         if (a.verifier && !b.verifier) return -1;
         if (!a.verifier && b.verifier) return 1;
-        final noteA = double.tryParse('${a.note ?? ''}'.replaceAll(',', '.')) ?? 0.0;
-        final noteB = double.tryParse('${b.note ?? ''}'.replaceAll(',', '.')) ?? 0.0;
+        final noteA =
+            double.tryParse('${a.note ?? ''}'.replaceAll(',', '.')) ?? 0.0;
+        final noteB =
+            double.tryParse('${b.note ?? ''}'.replaceAll(',', '.')) ?? 0.0;
         if (noteB > noteA) return 1;
         if (noteB < noteA) return -1;
         return 0;

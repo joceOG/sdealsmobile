@@ -95,6 +95,11 @@ class LoadUrgentProvidersM extends JobPageEventM {
   List<Object> get props => [latitude ?? 0, longitude ?? 0, radius];
 }
 
+/// Pagination progressive des prestataires (page suivante).
+class LoadMoreProvidersM extends JobPageEventM {
+  const LoadMoreProvidersM();
+}
+
 /// Filtres locaux Liste|Carte (vérifié / note) — sans rechargement API.
 class UpdateExplorerFiltersM extends JobPageEventM {
   final bool? filterVerifiedOnly;

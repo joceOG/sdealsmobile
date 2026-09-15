@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:http/http.dart' as http;
@@ -112,7 +113,9 @@ class PrestataireFinalizationBloc
     emit(PrestataireFinalizationLoading());
 
     try {
-      print("🚀 Soumission finalisation: ${event.formData}");
+      if (kDebugMode) {
+        debugPrint('finalization submit keys=${event.formData.keys.toList()}');
+      }
 
       // 1. Vérifier les documents obligatoires
       final requiredDocs = _validateRequiredDocuments(event.formData);

@@ -37,7 +37,8 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
     (
       q: 'Comment fonctionnent les paiements ?',
       a:
-          'Soutrali Deals s’appuie sur les moyens locaux (Mobile Money, cartes) via SoutraPay. Consultez Portefeuille et Tarification dans Profil pour le détail.',
+          'Les paiements in-app (SoutraPay / Mobile Money) ne sont pas encore disponibles dans cette version. '
+          'Contactez le professionnel directement (appel) pour convenir du mode de paiement.',
     ),
     (
       q: 'Puis-je vendre des produits ?',

@@ -23,6 +23,7 @@ class JobPageStateM extends Equatable {
   final String matchError;
 
   final List<Prestataire> nearbyProviders;
+
   /// idprestataire → distance km (calcul Haversine)
   final Map<String, double> providerDistances;
   final bool isNearbyLoading;
@@ -34,6 +35,9 @@ class JobPageStateM extends Equatable {
   final String selectedService;
   final bool filterVerifiedOnly;
   final double? filterMinRating;
+  final int providersPage;
+  final bool providersHasMore;
+  final bool isLoadingMore;
 
   const JobPageStateM({
     required this.isLoading,
@@ -60,6 +64,9 @@ class JobPageStateM extends Equatable {
     required this.selectedService,
     this.filterVerifiedOnly = false,
     this.filterMinRating,
+    this.providersPage = 1,
+    this.providersHasMore = true,
+    this.isLoadingMore = false,
   });
 
   factory JobPageStateM.initial() {
@@ -88,6 +95,9 @@ class JobPageStateM extends Equatable {
       selectedService: '',
       filterVerifiedOnly: false,
       filterMinRating: null,
+      providersPage: 1,
+      providersHasMore: true,
+      isLoadingMore: false,
     );
   }
 
@@ -131,6 +141,9 @@ class JobPageStateM extends Equatable {
     bool? filterVerifiedOnly,
     double? filterMinRating,
     bool clearMinRating = false,
+    int? providersPage,
+    bool? providersHasMore,
+    bool? isLoadingMore,
   }) {
     return JobPageStateM(
       isLoading: isLoading ?? this.isLoading,
@@ -158,6 +171,9 @@ class JobPageStateM extends Equatable {
       filterVerifiedOnly: filterVerifiedOnly ?? this.filterVerifiedOnly,
       filterMinRating:
           clearMinRating ? null : (filterMinRating ?? this.filterMinRating),
+      providersPage: providersPage ?? this.providersPage,
+      providersHasMore: providersHasMore ?? this.providersHasMore,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
     );
   }
 
@@ -187,5 +203,8 @@ class JobPageStateM extends Equatable {
         selectedService,
         filterVerifiedOnly,
         filterMinRating,
+        providersPage,
+        providersHasMore,
+        isLoadingMore,
       ];
 }

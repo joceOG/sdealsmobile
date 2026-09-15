@@ -1177,6 +1177,37 @@ class _JobPageViewState extends State<_JobPageView> {
                               },
                             );
                           }),
+                          if (state.providersHasMore)
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                              child: OutlinedButton(
+                                onPressed: state.isLoadingMore
+                                    ? null
+                                    : () => context
+                                        .read<JobPageBlocM>()
+                                        .add(const LoadMoreProvidersM()),
+                                child: state.isLoadingMore
+                                    ? const SizedBox(
+                                        height: 18,
+                                        width: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Text('Charger plus de professionnels'),
+                              ),
+                            ),
+                          if (!state.providersHasMore && providers.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 16),
+                              child: Text(
+                                'Fin de la liste',
+                                textAlign: TextAlign.center,
+                                style: SDTypography.bodySmall.copyWith(
+                                  color: SDColors.neutral500,
+                                ),
+                              ),
+                            ),
                           const SizedBox(height: 16),
                         ],
                       ),

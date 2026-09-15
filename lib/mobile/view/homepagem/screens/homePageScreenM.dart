@@ -86,7 +86,11 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
 
   Future<void> _loadHomePreviewData() async {
     try {
-      final prestatairesFuture = _apiClient.fetchPrestataires(forceRefresh: true);
+      final prestatairesFuture = _apiClient.fetchPrestataires(
+        forceRefresh: true,
+        page: 1,
+        limit: 20,
+      );
       final freelancesFuture = _apiClient.fetchFreelances(limit: 6);
       final articlesFuture = _apiClient.fetchArticle();
       final results = await Future.wait<dynamic>([

@@ -251,8 +251,6 @@ class FreelancePageBlocM
       registrationSuccess: null,
     ));
 
-    print("🚀 Démarrage inscription freelance: ${event.formData.toString()}");
-
     try {
       final apiUrl = dotenv.env['API_URL'];
       if (apiUrl == null) {
@@ -263,10 +261,8 @@ class FreelancePageBlocM
       String userId;
       if ((event.formData['existingUserId'] as String?)?.isNotEmpty == true) {
         userId = event.formData['existingUserId'];
-        print("✅ Utilisateur existant détecté: $userId (pas de réinscription)");
       } else {
         final userData = _prepareUserDataForFreelance(event.formData);
-        print("📤 Création utilisateur pour freelance: $userData");
 
         final userResponse = await http.post(
           Uri.parse("$apiUrl/register"),
@@ -277,17 +273,15 @@ class FreelancePageBlocM
         if (userResponse.statusCode != 200 && userResponse.statusCode != 201) {
           final errorData = jsonDecode(userResponse.body);
           throw Exception(
-              "Erreur création utilisateur: ${errorData['error'] ?? userResponse.body}");
+              "Erreur création utilisateur: ${errorData['error'] ?? 'échec inscription'}");
         }
 
         final userResult = jsonDecode(userResponse.body);
         userId = userResult['utilisateur']['_id'];
-        print("✅ Utilisateur créé avec ID: $userId");
       }
 
       // ✅ ÉTAPE 2: Créer le freelance avec le nouveau modèle
       final freelanceData = _prepareFreelanceData(event.formData, userId);
-      print("📤 Création freelance: $freelanceData");
 
       final freelanceResponse = await http.post(
         Uri.parse("$apiUrl/freelance"),
@@ -297,27 +291,23 @@ class FreelancePageBlocM
 
       if (freelanceResponse.statusCode == 201 ||
           freelanceResponse.statusCode == 200) {
-        print("✅ Freelance créé avec succès!");
-
         // Recharger la liste des freelances pour inclure le nouveau
         add(LoadFreelancersEvent());
 
         emit(state.copyWith(
           isRegistrationLoading: false,
           registrationSuccess:
-              "🎉 Inscription freelance réussie ! Bienvenue dans l'équipe Soutrali !",
+              "Inscription freelance réussie. Bienvenue sur Soutrali Deals.",
         ));
       } else {
         final errorData = jsonDecode(freelanceResponse.body);
-        print("❌ Erreur création freelance: ${freelanceResponse.body}");
         emit(state.copyWith(
           isRegistrationLoading: false,
           registrationError:
-              "Erreur création freelance: ${errorData['error'] ?? freelanceResponse.body}",
+              "Erreur création freelance: ${errorData['error'] ?? 'échec'}",
         ));
       }
     } catch (e) {
-      print("💥 Erreur inscription freelance: $e");
       emit(state.copyWith(
         isRegistrationLoading: false,
         registrationError: "Erreur d'inscription: $e",
@@ -334,15 +324,20 @@ class FreelancePageBlocM
     final nom = split.nom;
     final prenom = split.prenom;
 
+    final password = (formData['password'] as String?)?.trim() ?? '';
+    if (password.length < 6) {
+      throw Exception(
+          'Mot de passe requis (6 caractères minimum) pour créer le compte');
+    }
+
     return {
       "nom": nom,
       if (prenom != null && prenom.isNotEmpty) "prenom": prenom,
       "telephone": formData['phone'] ?? '',
       "email": formData['email'] ?? '',
-      "password":
-          formData['password'] ?? 'freelance123', // Mot de passe par défaut
+      "password": password,
       "genre": formData['gender'] ?? 'Homme',
-      "role": "freelance", // ✅ Ajouter le rôle freelance
+      "role": "freelance",
     };
   }
 

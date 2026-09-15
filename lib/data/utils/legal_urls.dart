@@ -4,8 +4,14 @@ import 'package:url_launcher/url_launcher.dart';
 
 /// Base URL du site web (pages légales hébergées).
 String legalBaseUrl() {
-  final fromEnv = dotenv.env['LEGAL_BASE_URL']?.trim();
-  if (fromEnv != null && fromEnv.isNotEmpty) return fromEnv.replaceAll(RegExp(r'/+$'), '');
+  try {
+    final fromEnv = dotenv.env['LEGAL_BASE_URL']?.trim();
+    if (fromEnv != null && fromEnv.isNotEmpty) {
+      return fromEnv.replaceAll(RegExp(r'/+$'), '');
+    }
+  } catch (_) {
+    // dotenv non initialisé (tests / cold path)
+  }
   return 'https://soutralideals-web-app.onrender.com';
 }
 
@@ -14,6 +20,7 @@ class LegalUrls {
   static String get confidentialite => '${legalBaseUrl()}/confidentialite';
   static String get cookies => '${legalBaseUrl()}/cookies';
   static String get mentions => '${legalBaseUrl()}/mentions-legales';
+  static String get suppressionCompte => '${legalBaseUrl()}/suppression-compte';
 }
 
 Future<void> openLegalUrl(BuildContext context, String url) async {

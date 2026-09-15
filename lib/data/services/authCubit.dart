@@ -85,8 +85,16 @@ class AuthCubit extends Cubit<AuthState> {
           // Offline / timeout : accepter le token local
         }
 
-        final userData = jsonDecode(userJson);
+        final rawUser = Map<String, dynamic>.from(jsonDecode(userJson) as Map);
+        final hadSecrets = rawUser.containsKey('password') ||
+            rawUser.containsKey('token') ||
+            rawUser.containsKey('tokens');
+        final userData = Utilisateur.sanitizePersistedJson(rawUser);
         final utilisateur = Utilisateur.fromJson(userData);
+        if (hadSecrets) {
+          // Migration : réécrire sans secrets, session conservée.
+          await prefs.setString('auth_user', jsonEncode(utilisateur.toJson()));
+        }
         final roles = rolesJson != null
             ? List<String>.from(jsonDecode(rolesJson))
             : ['CLIENT'];

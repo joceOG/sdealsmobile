@@ -121,7 +121,7 @@ class FcmService {
 
     _ready = true;
     if (kDebugMode) {
-      print('[FCM] prêt — token: ${_token?.substring(0, 12)}…');
+      print('[FCM] prêt — tokenLen=${_token?.length ?? 0}');
     }
     return true;
   }

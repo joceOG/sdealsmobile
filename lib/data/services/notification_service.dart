@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:sdealsmobile/data/services/api_client.dart';
 
@@ -11,17 +12,16 @@ class NotificationService {
   final String? _apiUrl = dotenv.env['API_URL'];
   String? _fcmToken;
 
-  // Getters
   String? get fcmToken => _fcmToken;
   bool get isTokenSet => _fcmToken != null;
 
-  // 🔑 CONFIGURER LE TOKEN FCM
   void setFCMToken(String token) {
     _fcmToken = token;
-    print('🔑 Token FCM configuré: ${token.substring(0, 20)}...');
+    if (kDebugMode) {
+      debugPrint('FCM token set (len=${token.length})');
+    }
   }
 
-  // 📱 ENVOYER NOTIFICATION PUSH
   Future<bool> sendPushNotification({
     required String userId,
     required String title,
@@ -30,7 +30,7 @@ class NotificationService {
   }) async {
     try {
       if (_apiUrl == null) {
-        print('❌ URL API non configurée');
+        if (kDebugMode) debugPrint('API_URL missing for notification send');
         return false;
       }
 
@@ -42,26 +42,25 @@ class NotificationService {
         'fcmToken': _fcmToken,
       };
 
-      print('📱 Envoi notification via ApiClient /notification/send');
-      print('📤 Payload: $payload');
+      if (kDebugMode) {
+        debugPrint('notification send status pending route=/notification/send');
+      }
 
       final response = await _api.post('/notification/send', body: payload);
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        print('✅ Notification envoyée avec succès');
         return true;
-      } else {
-        print('❌ Erreur envoi notification: ${response.statusCode}');
-        print('📄 Réponse: ${response.body}');
-        return false;
       }
+      if (kDebugMode) {
+        debugPrint('notification send failed status=${response.statusCode}');
+      }
+      return false;
     } catch (e) {
-      print('❌ Erreur envoi notification: $e');
+      if (kDebugMode) debugPrint('notification send error=${e.runtimeType}');
       return false;
     }
   }
 
-  // 🔔 NOTIFICATION COMMANDE
   Future<bool> notifyOrderStatusChange({
     required String userId,
     required String orderId,
@@ -84,7 +83,6 @@ class NotificationService {
     );
   }
 
-  // 💬 NOTIFICATION MESSAGE
   Future<bool> notifyNewMessage({
     required String userId,
     required String senderName,
@@ -108,7 +106,6 @@ class NotificationService {
     );
   }
 
-  // 💰 NOTIFICATION PAIEMENT
   Future<bool> notifyPaymentReceived({
     required String userId,
     required double amount,
@@ -131,7 +128,6 @@ class NotificationService {
     );
   }
 
-  // 🚚 NOTIFICATION LIVRAISON
   Future<bool> notifyDeliveryUpdate({
     required String userId,
     required String orderId,
@@ -154,7 +150,6 @@ class NotificationService {
     );
   }
 
-  // 📊 NOTIFICATION STATISTIQUES
   Future<bool> notifyStats({
     required String userId,
     required String title,
@@ -173,7 +168,6 @@ class NotificationService {
     );
   }
 
-  // 🔄 NOTIFICATION GÉNÉRIQUE
   Future<bool> notifyGeneric({
     required String userId,
     required String title,
@@ -193,55 +187,35 @@ class NotificationService {
     );
   }
 
-  // 📋 RÉCUPÉRER LES NOTIFICATIONS DE L'UTILISATEUR
   Future<List<Map<String, dynamic>>> getUserNotifications(String userId) async {
     try {
-      if (_apiUrl == null) {
-        print('❌ URL API non configurée');
-        return [];
-      }
+      if (_apiUrl == null) return [];
 
       final response = await _api.get('/notification/user/$userId');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         return List<Map<String, dynamic>>.from(data['notifications'] ?? []);
-      } else {
-        print('❌ Erreur récupération notifications: ${response.statusCode}');
-        return [];
       }
-    } catch (e) {
-      print('❌ Erreur récupération notifications: $e');
+      return [];
+    } catch (_) {
       return [];
     }
   }
 
-  // ✅ MARQUER NOTIFICATION COMME LUE
   Future<bool> markNotificationAsRead(String notificationId) async {
     try {
-      if (_apiUrl == null) {
-        print('❌ URL API non configurée');
-        return false;
-      }
+      if (_apiUrl == null) return false;
 
-      // Backend : PUT /notification/:id/read
       final response =
           await _api.put('/notification/$notificationId/read');
 
-      if (response.statusCode == 200) {
-        print('✅ Notification marquée comme lue');
-        return true;
-      } else {
-        print('❌ Erreur marquage notification: ${response.statusCode}');
-        return false;
-      }
-    } catch (e) {
-      print('❌ Erreur marquage notification: $e');
+      return response.statusCode == 200;
+    } catch (_) {
       return false;
     }
   }
 
-  // 🧹 NETTOYAGE
   void dispose() {
     _fcmToken = null;
   }
