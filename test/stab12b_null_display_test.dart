@@ -86,7 +86,7 @@ void main() {
       expect(formatOptionalPrice(0), isNull);
       expect(formatOptionalRating(null), isNull);
       expect(formatOptionalRating(0), isNull);
-      expect(formatOptionalPrice(1500), contains('1500'));
+      expect(formatOptionalPrice(1500), '1\u00A0500 FCFA');
       expect(formatOptionalRating(4.5), '4.5');
     });
   });

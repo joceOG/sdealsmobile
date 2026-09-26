@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../data/services/fcm_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../design_system/design_system.dart';
 
@@ -81,7 +82,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('onboarding_completed', true);
     if (mounted) {
-      context.go('/homepage');
+      final held = FcmService.instance.consumePendingDestination();
+      if (held != null) {
+        context.go(held);
+      } else {
+        context.go('/homepage');
+      }
     }
   }
 
@@ -92,85 +98,87 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: _kOnboardingSystemUi,
       child: Scaffold(
-      backgroundColor: SDColors.white,
-      body: SafeArea(
-        child: Stack(
-        fit: StackFit.expand,
-        children: [
-          PageView.builder(
-            controller: _pageController,
-            onPageChanged: (value) => setState(() => _currentPage = value),
-            itemCount: _contents.length,
-            itemBuilder: (context, index) {
-              return _OnboardingSlide(content: _contents[index]);
-            },
-          ),
+        backgroundColor: SDColors.white,
+        body: SafeArea(
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              PageView.builder(
+                controller: _pageController,
+                onPageChanged: (value) => setState(() => _currentPage = value),
+                itemCount: _contents.length,
+                itemBuilder: (context, index) {
+                  return _OnboardingSlide(content: _contents[index]);
+                },
+              ),
 
-          // Passer (haut droite)
-          if (!_isLastPage)
-            Positioned(
-              top: 8,
-              right: SDSpacing.sm,
-              child: Material(
-                color: SDColors.white.withOpacity(0.92),
-                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-                child: InkWell(
-                  onTap: _completeOnboarding,
-                  borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: SDSpacing.md,
-                      vertical: SDSpacing.sm,
-                    ),
-                    child: Text(
-                      'Passer',
-                      style: SDTypography.labelLarge.copyWith(
-                        color: SDColors.neutral700,
-                        fontWeight: FontWeight.w600,
+              // Passer (haut droite)
+              if (!_isLastPage)
+                Positioned(
+                  top: 8,
+                  right: SDSpacing.sm,
+                  child: Material(
+                    color: SDColors.white.withOpacity(0.92),
+                    borderRadius:
+                        BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                    child: InkWell(
+                      onTap: _completeOnboarding,
+                      borderRadius:
+                          BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: SDSpacing.md,
+                          vertical: SDSpacing.sm,
+                        ),
+                        child: Text(
+                          'Passer',
+                          style: SDTypography.labelLarge.copyWith(
+                            color: SDColors.neutral700,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ),
 
-          // Indicateurs + bouton rond flèche
-          Positioned(
-            left: 24,
-            right: 24,
-            bottom: bottomInset + SDSpacing.md,
-            child: Row(
-              children: [
-                Expanded(
-                  child: Row(
-                    children: List.generate(_contents.length, (index) {
-                      final active = _currentPage == index;
-                      return AnimatedContainer(
-                        duration: const Duration(milliseconds: 280),
-                        curve: Curves.easeOutCubic,
-                        margin: const EdgeInsets.only(right: 6),
-                        height: 6,
-                        width: active ? 28 : 8,
-                        decoration: BoxDecoration(
-                          color: active
-                              ? _kOnboardingAccent
-                              : SDColors.neutral200,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      );
-                    }),
-                  ),
+              // Indicateurs + bouton rond flèche
+              Positioned(
+                left: 24,
+                right: 24,
+                bottom: bottomInset + SDSpacing.md,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Row(
+                        children: List.generate(_contents.length, (index) {
+                          final active = _currentPage == index;
+                          return AnimatedContainer(
+                            duration: const Duration(milliseconds: 280),
+                            curve: Curves.easeOutCubic,
+                            margin: const EdgeInsets.only(right: 6),
+                            height: 6,
+                            width: active ? 28 : 8,
+                            decoration: BoxDecoration(
+                              color: active
+                                  ? _kOnboardingAccent
+                                  : SDColors.neutral200,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          );
+                        }),
+                      ),
+                    ),
+                    _RoundArrowButton(
+                      color: _kOnboardingAccent,
+                      onTap: _goNext,
+                    ),
+                  ],
                 ),
-                _RoundArrowButton(
-                  color: _kOnboardingAccent,
-                  onTap: _goNext,
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
         ),
-      ),
       ),
     );
   }

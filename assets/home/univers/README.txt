@@ -1,6 +1,7 @@
-[DÉPRÉCIÉ — ne plus utiliser ce dossier]
+Cartes univers — écran Accueil (photo à droite, texte à gauche)
 
-Les visuels des 3 cartes accueil sont maintenant dans :
-  assets\banner\
-Voir : assets\banner\README.txt
-et : lib\mobile\view\homepagem\home_universe_assets.dart
+  metier.png     → Métiers
+  freelance.png  → Freelance
+
+É-marché (si activé) : assets/banner/marketplace.png
+Voir : lib/mobile/view/homepagem/home_universe_assets.dart

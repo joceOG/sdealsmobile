@@ -147,7 +147,10 @@ class ApiErrorParser {
 
     // Priorité : message du premier champ utile
     String message;
-    if (fieldErrors.isNotEmpty) {
+    final businessMessage = _messageForBusinessCode(code, rawError);
+    if (businessMessage != null) {
+      message = businessMessage;
+    } else if (fieldErrors.isNotEmpty) {
       final first = fieldErrors.entries.first;
       message = _humanizeFieldMessage(first.key, first.value);
     } else if (rawError.isNotEmpty && !ApiException._looksTechnical(rawError)) {
@@ -267,6 +270,27 @@ class ApiErrorParser {
       return _messageForStatus(status, null);
     }
     return raw;
+  }
+
+  static String? _messageForBusinessCode(String? code, String rawError) {
+    if (code == null || code.isEmpty) return null;
+    switch (code) {
+      case 'ORDER_FIELD_FORBIDDEN':
+        return 'Cette commande contient des champs non autorisés.';
+      case 'MULTI_VENDOR_ORDER_NOT_SUPPORTED':
+        return 'Les articles doivent provenir de la même boutique.';
+      case 'VENDOR_NOT_AVAILABLE':
+        return 'Cette boutique est indisponible pour le moment.';
+      case 'INSUFFICIENT_STOCK':
+        return 'Stock insuffisant pour un ou plusieurs articles.';
+      case 'ARTICLE_NOT_FOUND':
+        return 'Un article n’existe plus ou n’est plus disponible.';
+      default:
+        if (rawError.isNotEmpty && !ApiException._looksTechnical(rawError)) {
+          return rawError;
+        }
+        return null;
+    }
   }
 
   static String _messageForStatus(int status, String? fallback) {

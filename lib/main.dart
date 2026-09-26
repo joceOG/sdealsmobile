@@ -10,7 +10,10 @@ import 'package:sdealsmobile/data/models/vendeur.dart' hide Utilisateur;
 import 'data/models/utilisateur.dart';
 import 'data/services/authCubit.dart';
 import 'data/services/crashlytics_service.dart';
+import 'data/services/fcm_route_policy.dart';
 import 'data/services/fcm_service.dart';
+import 'data/services/protected_action_intent.dart';
+import 'mobile/view/common/auth_completion.dart';
 import 'data/services/token_store.dart';
 import 'data/utils/go_router_refresh_stream.dart';
 import 'mobile/view/locationpagem/locationpageblocm/locationPageBlocM.dart';
@@ -74,28 +77,38 @@ void main() async {
   const mapsKeyDefine = String.fromEnvironment('GOOGLE_MAPS_API_KEY');
   const legalBaseDefine = String.fromEnvironment('LEGAL_BASE_URL');
 
-  // Release fail-closed : API_URL via --dart-define uniquement (pas d'.env embarqué).
-  if (apiUrlDefine.isNotEmpty) {
-    dotenv.env['API_URL'] = apiUrlDefine;
-  } else if (kReleaseMode) {
-    throw StateError(
-      'API_URL manquant en release. Build avec '
-      '--dart-define=API_URL=https://…/api',
-    );
-  } else {
-    try {
-      await dotenv.load(fileName: '.env');
-    } catch (_) {
-      try {
-        await dotenv.load(fileName: '.env.example');
-      } catch (_) {}
+  // flutter_dotenv : tout accès à dotenv.env AVANT load/testLoad → NotInitializedError.
+  // Ne jamais embarquer un vrai .env (secrets) dans les assets Flutter (extractible).
+  // Les defines / valeurs publiques passent par mergeWith après init.
+  final mergeWith = <String, String>{
+    if (apiUrlDefine.isNotEmpty) 'API_URL': apiUrlDefine,
+    if (mapsKeyDefine.isNotEmpty) 'GOOGLE_MAPS_API_KEY': mapsKeyDefine,
+    if (legalBaseDefine.isNotEmpty) 'LEGAL_BASE_URL': legalBaseDefine,
+  };
+
+  if (kReleaseMode) {
+    // Fail-closed : API_URL obligatoire via --dart-define au build.
+    if (apiUrlDefine.isEmpty) {
+      throw StateError(
+        'API_URL manquant en release. Build avec '
+        '--dart-define=API_URL=https://…/api',
+      );
     }
-  }
-  if (mapsKeyDefine.isNotEmpty) {
-    dotenv.env['GOOGLE_MAPS_API_KEY'] = mapsKeyDefine;
-  }
-  if (legalBaseDefine.isNotEmpty) {
-    dotenv.env['LEGAL_BASE_URL'] = legalBaseDefine;
+    dotenv.testLoad(mergeWith: mergeWith);
+  } else {
+    // Debug : init toujours réussie (testLoad). Pas de .env secret en asset.
+    dotenv.testLoad(mergeWith: mergeWith);
+    // URL API / légal publics (pas des secrets) si absents ou placeholders.
+    final api = (dotenv.env['API_URL'] ?? '').trim();
+    if (api.isEmpty ||
+        api.contains('example.com') ||
+        api.contains('votre-api')) {
+      dotenv.env['API_URL'] = 'https://soutralideals-backend.onrender.com/api';
+    }
+    if ((dotenv.env['LEGAL_BASE_URL'] ?? '').trim().isEmpty) {
+      dotenv.env['LEGAL_BASE_URL'] =
+          'https://soutralideals-web-app.onrender.com';
+    }
   }
 
   final resolvedApi = (dotenv.env['API_URL'] ?? '').trim();
@@ -140,7 +153,14 @@ class MyApp extends StatelessWidget {
     redirect: (context, state) {
       final loggedIn = appAuthCubit.state is AuthAuthenticated;
       final loc = state.matchedLocation;
-      if (loggedIn && (loc == '/login' || loc == '/register')) {
+      if (shouldRedirectAuthedAuthRouteToHome(
+        loggedIn: loggedIn,
+        location: loc,
+        hasPending: ProtectedActionStore.instance.hasPending,
+        hasFcmDestination: FcmService.instance.peekPendingDestination() != null,
+        routeExtra: state.extra,
+      )) {
+        ClientShellSelection.showHome();
         return '/homepage';
       }
       final needsAuth =
@@ -153,8 +173,8 @@ class MyApp extends StatelessWidget {
         path: '/',
         builder: (context, state) {
           return BlocProvider(
-            create: (_) => SplashscreenBlocM(authCubit: appAuthCubit)
-              ..add(LoadSplashM()),
+            create: (_) =>
+                SplashscreenBlocM(authCubit: appAuthCubit)..add(LoadSplashM()),
             child: const SplashScreenM(),
           );
         },
@@ -320,9 +340,18 @@ class MyApp extends StatelessWidget {
       child: Builder(builder: (context) {
         // Deep-links FCM → GoRouter
         FcmService.instance.onNavigate = (data) {
-          final route = FcmService.resolveRoute(data);
-          if (route != null && route.isNotEmpty) {
-            mobileRouter.go(route);
+          final decision = FcmRoutePolicy.decide(
+            data,
+            loggedIn: appAuthCubit.state is AuthAuthenticated,
+          );
+          if (decision.resumeAfterAuth != null) {
+            FcmService.instance.holdDestination(decision.resumeAfterAuth!);
+          }
+          if (FcmRoutePolicy.isAllowedPath(decision.route) ||
+              decision.route == '/login') {
+            mobileRouter.go(decision.route);
+          } else {
+            mobileRouter.go('/homepage');
           }
         };
         final auth = context.read<AuthCubit>().state;
@@ -331,227 +360,237 @@ class MyApp extends StatelessWidget {
         }
 
         return ResponsiveBuilder(builder: (context, sizingInformation) {
-        GoRouter router = mobileRouter;
+          GoRouter router = mobileRouter;
 
-        return AnnotatedRegion<SystemUiOverlayStyle>(
-          value: const SystemUiOverlayStyle(
-            statusBarColor: Colors.transparent,
-            statusBarIconBrightness: Brightness.dark,
-            statusBarBrightness: Brightness.light,
-            systemNavigationBarColor: Colors.white,
-            systemNavigationBarDividerColor: Colors.transparent,
-            systemNavigationBarIconBrightness: Brightness.dark,
-            systemNavigationBarContrastEnforced: false,
-            systemStatusBarContrastEnforced: false,
-          ),
-          child: MaterialApp.router(
-          routerConfig: router,
-          title: 'Soutrali Deals',
-          debugShowCheckedModeBanner: false,
-          theme: ThemeData(
-            // ═══════════════════════════════════════
-            // COLORS
-            // ═══════════════════════════════════════
-            useMaterial3: true,
-            primaryColor: SDColors.primary500,
-            scaffoldBackgroundColor: SDColors.neutral50,
-            cardColor: SDColors.white,
-            dividerColor: SDColors.neutral300,
-            
-            colorScheme: ColorScheme.light(
-              primary: SDColors.primary600,
-              secondary: SDColors.secondary500,
-              surface: SDColors.white,
-              error: SDColors.error500,
-              onPrimary: SDColors.white,
-              onSecondary: SDColors.white,
-              onSurface: SDColors.neutral900,
-              onError: SDColors.white,
+          return AnnotatedRegion<SystemUiOverlayStyle>(
+            value: const SystemUiOverlayStyle(
+              statusBarColor: Colors.transparent,
+              statusBarIconBrightness: Brightness.dark,
+              statusBarBrightness: Brightness.light,
+              systemNavigationBarColor: Colors.white,
+              systemNavigationBarDividerColor: Colors.transparent,
+              systemNavigationBarIconBrightness: Brightness.dark,
+              systemNavigationBarContrastEnforced: false,
+              systemStatusBarContrastEnforced: false,
             ),
-            
-            // ═══════════════════════════════════════
-            // TYPOGRAPHY
-            // ═══════════════════════════════════════
-            fontFamily: SDTypography.fontFamily,
-            textTheme: TextTheme(
-              displayLarge: SDTypography.displayLarge,
-              displayMedium: SDTypography.displayMedium,
-              displaySmall: SDTypography.displaySmall,
-              titleLarge: SDTypography.titleLarge,
-              titleMedium: SDTypography.titleMedium,
-              titleSmall: SDTypography.titleSmall,
-              bodyLarge: SDTypography.bodyLarge,
-              bodyMedium: SDTypography.bodyMedium,
-              bodySmall: SDTypography.bodySmall,
-              labelLarge: SDTypography.labelLarge,
-              labelMedium: SDTypography.labelMedium,
-              labelSmall: SDTypography.labelSmall,
-            ),
-            
-            // ═══════════════════════════════════════
-            // APPBAR
-            // ═══════════════════════════════════════
-            appBarTheme: AppBarTheme(
-              backgroundColor: SDColors.white,
-              elevation: 0,
-              scrolledUnderElevation: 0,
-              centerTitle: false,
-              surfaceTintColor: Colors.transparent,
-              foregroundColor: SDColors.neutral900,
-              systemOverlayStyle: const SystemUiOverlayStyle(
-                statusBarColor: Colors.transparent,
-                statusBarIconBrightness: Brightness.dark,
-                statusBarBrightness: Brightness.light,
-                systemNavigationBarColor: Colors.white,
-                systemNavigationBarIconBrightness: Brightness.dark,
-                systemNavigationBarContrastEnforced: false,
-                systemStatusBarContrastEnforced: false,
-              ),
-              titleTextStyle: SDTypography.displayMedium.copyWith(
-                color: SDColors.neutral900,
-                fontWeight: FontWeight.w700,
-              ),
-              iconTheme: const IconThemeData(
-                color: SDColors.neutral900,
-                size: 22,
-              ),
-            ),
-            
-            // ═══════════════════════════════════════
-            // BUTTONS
-            // ═══════════════════════════════════════
-            elevatedButtonTheme: ElevatedButtonThemeData(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: SDColors.primary600,
-                foregroundColor: SDColors.white,
-                textStyle: SDTypography.labelLarge,
-                padding: SDSpacing.buttonPadding,
-                minimumSize: const Size(120, SDSpacing.buttonHeight),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-                ),
-                elevation: 2,
-              ),
-            ),
-            
-            outlinedButtonTheme: OutlinedButtonThemeData(
-              style: OutlinedButton.styleFrom(
-                foregroundColor: SDColors.primary600,
-                textStyle: SDTypography.labelLarge,
-                padding: SDSpacing.buttonPadding,
-                minimumSize: const Size(120, SDSpacing.buttonHeight),
-                side: const BorderSide(color: SDColors.primary600, width: 2),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-                ),
-              ),
-            ),
-            
-            textButtonTheme: TextButtonThemeData(
-              style: TextButton.styleFrom(
-                foregroundColor: SDColors.primary600,
-                textStyle: SDTypography.labelLarge,
-                padding: SDSpacing.buttonPadding,
-              ),
-            ),
-            
-            // ═══════════════════════════════════════
-            // INPUT FIELDS
-            // ═══════════════════════════════════════
-            inputDecorationTheme: InputDecorationTheme(
-              filled: true,
-              fillColor: SDColors.white,
-              contentPadding: SDSpacing.inputPadding,
-              
-              labelStyle: SDTypography.bodyMedium.copyWith(
-                color: SDColors.neutral600,
-              ),
-              hintStyle: SDTypography.bodyMedium.copyWith(
-                color: SDColors.neutral400,
-              ),
-              errorStyle: SDTypography.bodySmall.copyWith(
-                color: SDColors.error500,
-              ),
-              
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-                borderSide: const BorderSide(color: SDColors.neutral300, width: 1),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-                borderSide: const BorderSide(color: SDColors.neutral300, width: 1),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-                borderSide: const BorderSide(color: SDColors.primary600, width: 2),
-              ),
-              errorBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-                borderSide: const BorderSide(color: SDColors.error500, width: 1),
-              ),
-            ),
-            
-            // ═══════════════════════════════════════
-            // CARDS
-            // ═══════════════════════════════════════
-            cardTheme: CardThemeData(
-              color: SDColors.white,
-              elevation: 2,
-              shadowColor: SDColors.neutral900.withValues(alpha: 0.1),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
-              ),
-            ),
-            
-            // ═══════════════════════════════════════
-            // LIST TILES
-            // ═══════════════════════════════════════
-            listTileTheme: ListTileThemeData(
-              contentPadding: const EdgeInsets.all(SDSpacing.sm),
-              titleTextStyle: SDTypography.titleMedium,
-              subtitleTextStyle: SDTypography.bodyMedium.copyWith(
-                color: SDColors.neutral600,
-              ),
-            ),
-            
-            // ═══════════════════════════════════════
-            // FLOATING ACTION BUTTON
-            // ═══════════════════════════════════════
-            floatingActionButtonTheme: FloatingActionButtonThemeData(
-              backgroundColor: SDColors.primary600,
-              foregroundColor: SDColors.white,
-              elevation: 4,
-            ),
-            
-            // ═══════════════════════════════════════
-            // BOTTOM NAVIGATION BAR
-            // ═══════════════════════════════════════
-            bottomNavigationBarTheme: BottomNavigationBarThemeData(
-              backgroundColor: SDColors.white,
-              selectedItemColor: SDColors.primary600,
-              unselectedItemColor: SDColors.neutral500,
-              selectedLabelStyle: SDTypography.labelSmall,
-              unselectedLabelStyle: SDTypography.labelSmall,
-              type: BottomNavigationBarType.fixed,
-            ),
+            child: MaterialApp.router(
+              routerConfig: router,
+              title: 'Soutrali Deals',
+              debugShowCheckedModeBanner: false,
+              theme: ThemeData(
+                // ═══════════════════════════════════════
+                // COLORS
+                // ═══════════════════════════════════════
+                useMaterial3: true,
+                primaryColor: SDColors.primary500,
+                scaffoldBackgroundColor: SDColors.neutral50,
+                cardColor: SDColors.white,
+                dividerColor: SDColors.neutral300,
 
-            // SnackBars bruts (sans AppSnackBar) : couleur marque + coins arrondis
-            snackBarTheme: SnackBarThemeData(
-              behavior: SnackBarBehavior.floating,
-              elevation: 2,
-              backgroundColor: SDColors.primary700,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              contentTextStyle: SDTypography.bodyMedium.copyWith(
-                color: SDColors.white,
-                fontWeight: FontWeight.w600,
+                colorScheme: ColorScheme.light(
+                  primary: SDColors.primary600,
+                  secondary: SDColors.secondary500,
+                  surface: SDColors.white,
+                  error: SDColors.error500,
+                  onPrimary: SDColors.white,
+                  onSecondary: SDColors.white,
+                  onSurface: SDColors.neutral900,
+                  onError: SDColors.white,
+                ),
+
+                // ═══════════════════════════════════════
+                // TYPOGRAPHY
+                // ═══════════════════════════════════════
+                fontFamily: SDTypography.fontFamily,
+                textTheme: TextTheme(
+                  displayLarge: SDTypography.displayLarge,
+                  displayMedium: SDTypography.displayMedium,
+                  displaySmall: SDTypography.displaySmall,
+                  titleLarge: SDTypography.titleLarge,
+                  titleMedium: SDTypography.titleMedium,
+                  titleSmall: SDTypography.titleSmall,
+                  bodyLarge: SDTypography.bodyLarge,
+                  bodyMedium: SDTypography.bodyMedium,
+                  bodySmall: SDTypography.bodySmall,
+                  labelLarge: SDTypography.labelLarge,
+                  labelMedium: SDTypography.labelMedium,
+                  labelSmall: SDTypography.labelSmall,
+                ),
+
+                // ═══════════════════════════════════════
+                // APPBAR
+                // ═══════════════════════════════════════
+                appBarTheme: AppBarTheme(
+                  backgroundColor: SDColors.white,
+                  elevation: 0,
+                  scrolledUnderElevation: 0,
+                  centerTitle: false,
+                  surfaceTintColor: Colors.transparent,
+                  foregroundColor: SDColors.neutral900,
+                  systemOverlayStyle: const SystemUiOverlayStyle(
+                    statusBarColor: Colors.transparent,
+                    statusBarIconBrightness: Brightness.dark,
+                    statusBarBrightness: Brightness.light,
+                    systemNavigationBarColor: Colors.white,
+                    systemNavigationBarIconBrightness: Brightness.dark,
+                    systemNavigationBarContrastEnforced: false,
+                    systemStatusBarContrastEnforced: false,
+                  ),
+                  titleTextStyle: SDTypography.displayMedium.copyWith(
+                    color: SDColors.neutral900,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  iconTheme: const IconThemeData(
+                    color: SDColors.neutral900,
+                    size: 22,
+                  ),
+                ),
+
+                // ═══════════════════════════════════════
+                // BUTTONS
+                // ═══════════════════════════════════════
+                elevatedButtonTheme: ElevatedButtonThemeData(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: SDColors.primary600,
+                    foregroundColor: SDColors.white,
+                    textStyle: SDTypography.labelLarge,
+                    padding: SDSpacing.buttonPadding,
+                    minimumSize: const Size(120, SDSpacing.buttonHeight),
+                    shape: RoundedRectangleBorder(
+                      borderRadius:
+                          BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                    ),
+                    elevation: 2,
+                  ),
+                ),
+
+                outlinedButtonTheme: OutlinedButtonThemeData(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: SDColors.primary600,
+                    textStyle: SDTypography.labelLarge,
+                    padding: SDSpacing.buttonPadding,
+                    minimumSize: const Size(120, SDSpacing.buttonHeight),
+                    side:
+                        const BorderSide(color: SDColors.primary600, width: 2),
+                    shape: RoundedRectangleBorder(
+                      borderRadius:
+                          BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                    ),
+                  ),
+                ),
+
+                textButtonTheme: TextButtonThemeData(
+                  style: TextButton.styleFrom(
+                    foregroundColor: SDColors.primary600,
+                    textStyle: SDTypography.labelLarge,
+                    padding: SDSpacing.buttonPadding,
+                  ),
+                ),
+
+                // ═══════════════════════════════════════
+                // INPUT FIELDS
+                // ═══════════════════════════════════════
+                inputDecorationTheme: InputDecorationTheme(
+                  filled: true,
+                  fillColor: SDColors.white,
+                  contentPadding: SDSpacing.inputPadding,
+                  labelStyle: SDTypography.bodyMedium.copyWith(
+                    color: SDColors.neutral600,
+                  ),
+                  hintStyle: SDTypography.bodyMedium.copyWith(
+                    color: SDColors.neutral400,
+                  ),
+                  errorStyle: SDTypography.bodySmall.copyWith(
+                    color: SDColors.error500,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius:
+                        BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                    borderSide:
+                        const BorderSide(color: SDColors.neutral300, width: 1),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius:
+                        BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                    borderSide:
+                        const BorderSide(color: SDColors.neutral300, width: 1),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius:
+                        BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                    borderSide:
+                        const BorderSide(color: SDColors.primary600, width: 2),
+                  ),
+                  errorBorder: OutlineInputBorder(
+                    borderRadius:
+                        BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                    borderSide:
+                        const BorderSide(color: SDColors.error500, width: 1),
+                  ),
+                ),
+
+                // ═══════════════════════════════════════
+                // CARDS
+                // ═══════════════════════════════════════
+                cardTheme: CardThemeData(
+                  color: SDColors.white,
+                  elevation: 2,
+                  shadowColor: SDColors.neutral900.withValues(alpha: 0.1),
+                  shape: RoundedRectangleBorder(
+                    borderRadius:
+                        BorderRadius.circular(SDSpacing.borderRadiusLarge),
+                  ),
+                ),
+
+                // ═══════════════════════════════════════
+                // LIST TILES
+                // ═══════════════════════════════════════
+                listTileTheme: ListTileThemeData(
+                  contentPadding: const EdgeInsets.all(SDSpacing.sm),
+                  titleTextStyle: SDTypography.titleMedium,
+                  subtitleTextStyle: SDTypography.bodyMedium.copyWith(
+                    color: SDColors.neutral600,
+                  ),
+                ),
+
+                // ═══════════════════════════════════════
+                // FLOATING ACTION BUTTON
+                // ═══════════════════════════════════════
+                floatingActionButtonTheme: FloatingActionButtonThemeData(
+                  backgroundColor: SDColors.primary600,
+                  foregroundColor: SDColors.white,
+                  elevation: 4,
+                ),
+
+                // ═══════════════════════════════════════
+                // BOTTOM NAVIGATION BAR
+                // ═══════════════════════════════════════
+                bottomNavigationBarTheme: BottomNavigationBarThemeData(
+                  backgroundColor: SDColors.white,
+                  selectedItemColor: SDColors.primary600,
+                  unselectedItemColor: SDColors.neutral500,
+                  selectedLabelStyle: SDTypography.labelSmall,
+                  unselectedLabelStyle: SDTypography.labelSmall,
+                  type: BottomNavigationBarType.fixed,
+                ),
+
+                // SnackBars bruts (sans AppSnackBar) : couleur marque + coins arrondis
+                snackBarTheme: SnackBarThemeData(
+                  behavior: SnackBarBehavior.floating,
+                  elevation: 2,
+                  backgroundColor: SDColors.primary700,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  contentTextStyle: SDTypography.bodyMedium.copyWith(
+                    color: SDColors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
             ),
-          ),
-        ),
-        );
-      });
+          );
+        });
       }),
     );
   }

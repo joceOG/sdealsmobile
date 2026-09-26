@@ -15,7 +15,8 @@ import 'package:sdealsmobile/mobile/view/jobpagem/screens/provider_profile_scree
 import 'package:sdealsmobile/mobile/view/common/widgets/app_image.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:sdealsmobile/data/services/protected_action_intent.dart';
+import 'package:sdealsmobile/mobile/view/common/auth_completion.dart';
 // ✅ Design System
 import '../../../../design_system/design_system.dart';
 
@@ -23,6 +24,7 @@ import '../../../../design_system/design_system.dart';
 class DetailPage extends StatefulWidget {
   final String title;
   final String image;
+
   /// ID Mongo du service — filtre `/prestataire?service=` (recommandé).
   final String? serviceId;
 
@@ -43,6 +45,7 @@ class _DetailPageState extends State<DetailPage> {
   List<Map<String, dynamic>> _providers = [];
   bool _filterVerifiedOnly = false;
   LatLng? _userLocation;
+
   /// ID service résolu (paramètre ou premier prestataire chargé).
   String? _effectiveServiceId;
   String? _selectedProviderId;
@@ -168,7 +171,8 @@ class _DetailPageState extends State<DetailPage> {
                         style: SDTypography.bodyMedium,
                         decoration: InputDecoration(
                           hintText: 'Nom, ville, spécialité…',
-                          prefixIcon: Icon(Icons.search, color: SDColors.neutral500),
+                          prefixIcon:
+                              Icon(Icons.search, color: SDColors.neutral500),
                           filled: true,
                           fillColor: SDColors.neutral100,
                           border: OutlineInputBorder(
@@ -184,7 +188,8 @@ class _DetailPageState extends State<DetailPage> {
                         ),
                       ),
                     ),
-                    Divider(height: 1, thickness: 1, color: SDColors.neutral200),
+                    Divider(
+                        height: 1, thickness: 1, color: SDColors.neutral200),
                   ],
                 ),
               )
@@ -276,8 +281,7 @@ class _DetailPageState extends State<DetailPage> {
                 SliverToBoxAdapter(child: SizedBox(height: SDSpacing.xxl)),
               ],
             ),
-      bottomNavigationBar:
-          _providers.isEmpty ? null : _buildStickyCta(context),
+      bottomNavigationBar: _providers.isEmpty ? null : _buildStickyCta(context),
     );
   }
 
@@ -296,7 +300,9 @@ class _DetailPageState extends State<DetailPage> {
             : '';
         final loc = (p['localisation'] ?? '').toString().toLowerCase();
         final specs = p['specialite'] is List
-            ? (p['specialite'] as List).map((e) => e.toString().toLowerCase()).join(' ')
+            ? (p['specialite'] as List)
+                .map((e) => e.toString().toLowerCase())
+                .join(' ')
             : '';
         return nom.contains(q) || loc.contains(q) || specs.contains(q);
       }).toList();
@@ -393,9 +399,7 @@ class _DetailPageState extends State<DetailPage> {
 
   /// Heuristique « Top » : champs backend uniquement (pas de délai fictif).
   bool _showTopBadge(Map<String, dynamic> p) {
-    return _isVerified(p) &&
-        _noteAsDouble(p) >= 4.0 &&
-        _nbMissionInt(p) >= 3;
+    return _isVerified(p) && _noteAsDouble(p) >= 4.0 && _nbMissionInt(p) >= 3;
   }
 
   void _sortProvidersInPlace(List<Map<String, dynamic>> list) {
@@ -459,8 +463,7 @@ class _DetailPageState extends State<DetailPage> {
   }
 
   Widget _buildCompactServiceHeader() {
-    final verifiedCount =
-        _providers.where(_isVerified).length;
+    final verifiedCount = _providers.where(_isVerified).length;
     final n = _providers.length;
     return Padding(
       padding: EdgeInsets.fromLTRB(SDSpacing.md, SDSpacing.sm, SDSpacing.md, 0),
@@ -579,8 +582,8 @@ class _DetailPageState extends State<DetailPage> {
             ),
             _filterChip(
               label: 'Plus',
-              selected: _filterMaxDistanceKm != null &&
-                  _filterMaxDistanceKm! > 10,
+              selected:
+                  _filterMaxDistanceKm != null && _filterMaxDistanceKm! > 10,
               onTap: () => setState(() => _filterMaxDistanceKm = 20),
             ),
           ],
@@ -689,8 +692,7 @@ class _DetailPageState extends State<DetailPage> {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      onPressed: () =>
-                          setState(() => _filterSpecialite = null),
+                      onPressed: () => setState(() => _filterSpecialite = null),
                       backgroundColor: _filterSpecialite == null
                           ? SDColors.primary700
                           : SDColors.neutral100,
@@ -805,16 +807,23 @@ class _DetailPageState extends State<DetailPage> {
   Future<void> _contactProvider(Map<String, dynamic> p) async {
     final u = p['utilisateur'];
     final tel = u is Map ? (u['telephone']?.toString().trim() ?? '') : '';
-    if (tel.isNotEmpty) {
-      final uri = Uri.parse('tel:$tel');
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri);
-        return;
-      }
-    }
-    if (!mounted) return;
     final id = p['_id']?.toString();
-    if (id == null || id.isEmpty) return;
+    final ready = await ensureAuthenticatedForAction(
+      context: context,
+      type: ProtectedActionType.callProvider,
+      originRoute: 'detailPage',
+      technicalId: id,
+      explanation: 'Connectez-vous pour contacter ce professionnel',
+    );
+    if (!ready || !mounted) return;
+    if (tel.isNotEmpty) {
+      final result = await DialerSession.openOnce(tel);
+      if (!mounted) return;
+      if (result.opened) return;
+      await showDialerFeedback(context, result);
+      return;
+    }
+    if (id == null || id.isEmpty || !mounted) return;
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -827,25 +836,21 @@ class _DetailPageState extends State<DetailPage> {
   }
 
   String _formatPrice(num price) {
-    final formatted =
-        NumberFormat('#,###', 'fr_FR').format(price.toInt()).replaceAll(',', ' ');
+    final formatted = NumberFormat('#,###', 'fr_FR')
+        .format(price.toInt())
+        .replaceAll(',', ' ');
     return '$formatted FCFA';
   }
 
-  void _toggleProviderFavorite(String id) {
-    final auth = context.read<AuthCubit>().state;
-    if (auth is! AuthAuthenticated) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Connectez-vous pour ajouter en favoris.',
-            style: SDTypography.bodyMedium,
-          ),
-        ),
-      );
-      context.push('/login');
-      return;
-    }
+  void _toggleProviderFavorite(String id) async {
+    final ready = await ensureAuthenticatedForAction(
+      context: context,
+      type: ProtectedActionType.addFavorite,
+      originRoute: 'detailPage',
+      technicalId: id,
+      explanation: 'Connectez-vous pour ajouter un favori',
+    );
+    if (!ready || !mounted) return;
     setState(() {
       if (_favoritedProviderIds.contains(id)) {
         _favoritedProviderIds.remove(id);
@@ -911,8 +916,7 @@ class _DetailPageState extends State<DetailPage> {
                         label: '≥ 4 ★',
                         selected: _filterMinNote == 4,
                         onTap: () => apply(
-                          () => _filterMinNote =
-                              _filterMinNote == 4 ? null : 4,
+                          () => _filterMinNote = _filterMinNote == 4 ? null : 4,
                         ),
                       ),
                       _filterChip(
@@ -1218,22 +1222,17 @@ class _DetailPageState extends State<DetailPage> {
                     child: ElevatedButton.icon(
                       onPressed: id.isEmpty
                           ? null
-                          : () {
+                          : () async {
                               setState(() => _selectedProviderId = id);
-                              final auth =
-                                  context.read<AuthCubit>().state;
-                              if (auth is! AuthAuthenticated) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      'Connectez-vous pour commander.',
-                                      style: SDTypography.bodyMedium,
-                                    ),
-                                  ),
-                                );
-                                context.push('/login');
-                                return;
-                              }
+                              final ready = await ensureAuthenticatedForAction(
+                                context: context,
+                                type: ProtectedActionType.requestService,
+                                originRoute: 'detailPage',
+                                technicalId: id,
+                                explanation:
+                                    'Connectez-vous pour demander un service',
+                              );
+                              if (!ready || !mounted) return;
                               _openCheckoutSheet();
                             },
                       icon: Icon(Icons.shopping_cart_outlined,
@@ -1286,8 +1285,9 @@ class _DetailPageState extends State<DetailPage> {
     await Clipboard.setData(ClipboardData(text: text));
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Texte copié dans le presse-papiers',
-          style: SDTypography.bodyMedium)),
+      SnackBar(
+          content: Text('Texte copié dans le presse-papiers',
+              style: SDTypography.bodyMedium)),
     );
   }
 
@@ -1304,9 +1304,11 @@ class _DetailPageState extends State<DetailPage> {
             style: SDTypography.bodyMedium,
             decoration: InputDecoration(
               hintText: 'Décrivez le problème…',
-              hintStyle: SDTypography.bodyMedium.copyWith(color: SDColors.neutral400),
+              hintStyle:
+                  SDTypography.bodyMedium.copyWith(color: SDColors.neutral400),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                borderRadius:
+                    BorderRadius.circular(SDSpacing.borderRadiusMedium),
               ),
             ),
           ),
@@ -1319,8 +1321,9 @@ class _DetailPageState extends State<DetailPage> {
               onPressed: () async {
                 if (controller.text.trim().isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Veuillez saisir un motif.',
-                        style: SDTypography.bodyMedium)),
+                    SnackBar(
+                        content: Text('Veuillez saisir un motif.',
+                            style: SDTypography.bodyMedium)),
                   );
                   return;
                 }
@@ -1347,7 +1350,9 @@ class _DetailPageState extends State<DetailPage> {
                 backgroundColor: SDColors.error500,
                 foregroundColor: SDColors.white,
               ),
-              child: Text('Envoyer', style: SDTypography.labelMedium.copyWith(color: SDColors.white)),
+              child: Text('Envoyer',
+                  style:
+                      SDTypography.labelMedium.copyWith(color: SDColors.white)),
             ),
           ],
         );
@@ -1357,8 +1362,9 @@ class _DetailPageState extends State<DetailPage> {
     if (result == true) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Signalement envoyé. Merci.',
-            style: SDTypography.bodyMedium),
+        SnackBar(
+            content: Text('Signalement envoyé. Merci.',
+                style: SDTypography.bodyMedium),
             backgroundColor: SDColors.success500),
       );
     }
@@ -1380,7 +1386,8 @@ class _DetailPageState extends State<DetailPage> {
               backgroundColor: SDColors.primary700,
               padding: EdgeInsets.symmetric(vertical: SDSpacing.sm),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
+                borderRadius:
+                    BorderRadius.circular(SDSpacing.borderRadiusLarge),
               ),
               elevation: 6,
             ),
@@ -1388,21 +1395,17 @@ class _DetailPageState extends State<DetailPage> {
                 color: SDColors.white),
             label: Text(
               "Commander ce service",
-              style: SDTypography.labelMedium.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: SDColors.white),
+              style: SDTypography.labelMedium
+                  .copyWith(fontWeight: FontWeight.bold, color: SDColors.white),
             ),
-            onPressed: () {
-              final auth = context.read<AuthCubit>().state;
-              if (auth is! AuthAuthenticated) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                      content: Text('Veuillez vous connecter pour commander.',
-                          style: SDTypography.bodyMedium)),
-                );
-                context.push('/login');
-                return;
-              }
+            onPressed: () async {
+              final ready = await ensureAuthenticatedForAction(
+                context: context,
+                type: ProtectedActionType.requestService,
+                originRoute: 'detailPage',
+                explanation: 'Connectez-vous pour demander un service',
+              );
+              if (!ready || !mounted) return;
               _openCheckoutSheet();
             },
           ),
@@ -1425,7 +1428,8 @@ class _DetailPageState extends State<DetailPage> {
         return Container(
           decoration: BoxDecoration(
             color: SDColors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(SDSpacing.xxxl)),
+            borderRadius:
+                BorderRadius.vertical(top: Radius.circular(SDSpacing.xxxl)),
           ),
           padding: EdgeInsets.only(
             bottom: MediaQuery.of(context).viewInsets.bottom + SDSpacing.sm,
@@ -1447,7 +1451,8 @@ class _DetailPageState extends State<DetailPage> {
                           padding: EdgeInsets.all(SDSpacing.xs),
                           decoration: BoxDecoration(
                             color: SDColors.primary700.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                            borderRadius: BorderRadius.circular(
+                                SDSpacing.borderRadiusMedium),
                           ),
                           child: Icon(
                             Icons.shopping_cart_checkout_rounded,
@@ -1485,12 +1490,13 @@ class _DetailPageState extends State<DetailPage> {
                       ],
                     ),
                     SizedBox(height: SDSpacing.md),
-                    
+
                     // Sélecteur de prestataire moderne
                     if (_providers.isNotEmpty) ...[
                       Row(
                         children: [
-                          Icon(Icons.person, color: SDColors.neutral700, size: 20),
+                          Icon(Icons.person,
+                              color: SDColors.neutral700, size: 20),
                           SizedBox(width: SDSpacing.xs),
                           Text(
                             'Choisir un prestataire',
@@ -1498,14 +1504,17 @@ class _DetailPageState extends State<DetailPage> {
                               fontWeight: FontWeight.w600,
                             ),
                           ),
-                          Text(' *', style: SDTypography.titleSmall.copyWith(color: SDColors.error500)),
+                          Text(' *',
+                              style: SDTypography.titleSmall
+                                  .copyWith(color: SDColors.error500)),
                         ],
                       ),
                       SizedBox(height: SDSpacing.xs),
                       Container(
                         decoration: BoxDecoration(
                           border: Border.all(color: SDColors.neutral300),
-                          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                          borderRadius: BorderRadius.circular(
+                              SDSpacing.borderRadiusMedium),
                         ),
                         child: DropdownButtonFormField<String>(
                           value: _selectedProviderId != null &&
@@ -1519,10 +1528,15 @@ class _DetailPageState extends State<DetailPage> {
                           style: SDTypography.bodyMedium,
                           decoration: InputDecoration(
                             border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(horizontal: SDSpacing.sm, vertical: SDSpacing.xs),
-                            prefixIcon: Icon(Icons.person_pin_circle, color: SDColors.primary700),
+                            contentPadding: EdgeInsets.symmetric(
+                                horizontal: SDSpacing.sm,
+                                vertical: SDSpacing.xs),
+                            prefixIcon: Icon(Icons.person_pin_circle,
+                                color: SDColors.primary700),
                           ),
-                          hint: Text('Sélectionnez un prestataire', style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral500)),
+                          hint: Text('Sélectionnez un prestataire',
+                              style: SDTypography.bodyMedium
+                                  .copyWith(color: SDColors.neutral500)),
                           items: _filteredSortedProviders.map((provider) {
                             final u = provider['utilisateur'] is Map
                                 ? Map<String, dynamic>.from(
@@ -1545,15 +1559,18 @@ class _DetailPageState extends State<DetailPage> {
                                   Expanded(
                                     child: Text(
                                       name,
-                                      style: SDTypography.bodyMedium.copyWith(fontWeight: FontWeight.w500),
+                                      style: SDTypography.bodyMedium.copyWith(
+                                          fontWeight: FontWeight.w500),
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
-                                  Icon(Icons.star, size: 14, color: SDColors.warning500),
+                                  Icon(Icons.star,
+                                      size: 14, color: SDColors.warning500),
                                   SizedBox(width: SDSpacing.xxxs),
                                   Text(
                                     noteLabel,
-                                    style: SDTypography.labelSmall.copyWith(color: SDColors.neutral600),
+                                    style: SDTypography.labelSmall
+                                        .copyWith(color: SDColors.neutral600),
                                   ),
                                   SizedBox(width: SDSpacing.xs),
                                   Text(
@@ -1576,7 +1593,7 @@ class _DetailPageState extends State<DetailPage> {
                       ),
                       SizedBox(height: SDSpacing.sm),
                     ],
-                    
+
                     // Adresse
                     TextField(
                       controller: adresseCtrl,
@@ -1585,19 +1602,24 @@ class _DetailPageState extends State<DetailPage> {
                         labelText: 'Adresse',
                         labelStyle: SDTypography.bodyMedium,
                         hintText: 'Ex: Rue 12, Cocody',
-                        hintStyle: SDTypography.bodyMedium.copyWith(color: SDColors.neutral400),
-                        prefixIcon: Icon(Icons.home, color: SDColors.primary700),
+                        hintStyle: SDTypography.bodyMedium
+                            .copyWith(color: SDColors.neutral400),
+                        prefixIcon:
+                            Icon(Icons.home, color: SDColors.primary700),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                          borderRadius: BorderRadius.circular(
+                              SDSpacing.borderRadiusMedium),
                         ),
                         focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-                          borderSide: BorderSide(color: SDColors.primary700, width: 2),
+                          borderRadius: BorderRadius.circular(
+                              SDSpacing.borderRadiusMedium),
+                          borderSide:
+                              BorderSide(color: SDColors.primary700, width: 2),
                         ),
                       ),
                     ),
                     SizedBox(height: SDSpacing.xs),
-                    
+
                     // Ville
                     TextField(
                       controller: villeCtrl,
@@ -1606,29 +1628,37 @@ class _DetailPageState extends State<DetailPage> {
                         labelText: 'Ville',
                         labelStyle: SDTypography.bodyMedium,
                         hintText: 'Ex: Abidjan',
-                        hintStyle: SDTypography.bodyMedium.copyWith(color: SDColors.neutral400),
-                        prefixIcon: Icon(Icons.location_city, color: SDColors.primary700),
+                        hintStyle: SDTypography.bodyMedium
+                            .copyWith(color: SDColors.neutral400),
+                        prefixIcon: Icon(Icons.location_city,
+                            color: SDColors.primary700),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                          borderRadius: BorderRadius.circular(
+                              SDSpacing.borderRadiusMedium),
                         ),
                         focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-                          borderSide: BorderSide(color: SDColors.primary700, width: 2),
+                          borderRadius: BorderRadius.circular(
+                              SDSpacing.borderRadiusMedium),
+                          borderSide:
+                              BorderSide(color: SDColors.primary700, width: 2),
                         ),
                       ),
                     ),
                     SizedBox(height: SDSpacing.xs),
-                    
+
                     // Date/Heure
                     Container(
                       decoration: BoxDecoration(
                         border: Border.all(color: SDColors.neutral300),
-                        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                        borderRadius:
+                            BorderRadius.circular(SDSpacing.borderRadiusMedium),
                       ),
-                      padding: EdgeInsets.symmetric(horizontal: SDSpacing.sm, vertical: SDSpacing.xs),
+                      padding: EdgeInsets.symmetric(
+                          horizontal: SDSpacing.sm, vertical: SDSpacing.xs),
                       child: Row(
                         children: [
-                          Icon(Icons.calendar_today, color: SDColors.primary700),
+                          Icon(Icons.calendar_today,
+                              color: SDColors.primary700),
                           SizedBox(width: SDSpacing.xs),
                           Expanded(
                             child: Text(
@@ -1636,7 +1666,9 @@ class _DetailPageState extends State<DetailPage> {
                                   ? 'Choisir une date et heure (optionnel)'
                                   : '${selectedDateTime!.day}/${selectedDateTime!.month}/${selectedDateTime!.year} à ${selectedDateTime!.hour}:${selectedDateTime!.minute.toString().padLeft(2, '0')}',
                               style: SDTypography.bodyMedium.copyWith(
-                                color: selectedDateTime == null ? SDColors.neutral500 : SDColors.neutral900,
+                                color: selectedDateTime == null
+                                    ? SDColors.neutral500
+                                    : SDColors.neutral900,
                               ),
                             ),
                           ),
@@ -1645,8 +1677,10 @@ class _DetailPageState extends State<DetailPage> {
                               final date = await showDatePicker(
                                 context: context,
                                 firstDate: DateTime.now(),
-                                lastDate: DateTime.now().add(const Duration(days: 90)),
-                                initialDate: DateTime.now().add(const Duration(days: 1)),
+                                lastDate: DateTime.now()
+                                    .add(const Duration(days: 90)),
+                                initialDate:
+                                    DateTime.now().add(const Duration(days: 1)),
                               );
                               if (date == null) return;
                               final time = await showTimePicker(
@@ -1654,16 +1688,19 @@ class _DetailPageState extends State<DetailPage> {
                                 initialTime: TimeOfDay.now(),
                               );
                               if (time == null) return;
-                              final dt = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+                              final dt = DateTime(date.year, date.month,
+                                  date.day, time.hour, time.minute);
                               setSheetState(() => selectedDateTime = dt);
                             },
-                            child: Text('Choisir', style: SDTypography.labelMedium.copyWith(color: SDColors.primary700)),
+                            child: Text('Choisir',
+                                style: SDTypography.labelMedium
+                                    .copyWith(color: SDColors.primary700)),
                           ),
                         ],
                       ),
                     ),
                     SizedBox(height: SDSpacing.xs),
-                    
+
                     // Notes
                     TextField(
                       controller: notesCtrl,
@@ -1673,22 +1710,27 @@ class _DetailPageState extends State<DetailPage> {
                         labelText: 'Notes / Instructions (optionnel)',
                         labelStyle: SDTypography.bodyMedium,
                         hintText: 'Ajoutez des détails supplémentaires...',
-                        hintStyle: SDTypography.bodyMedium.copyWith(color: SDColors.neutral400),
+                        hintStyle: SDTypography.bodyMedium
+                            .copyWith(color: SDColors.neutral400),
                         prefixIcon: Padding(
                           padding: EdgeInsets.only(bottom: SDSpacing.lg),
-                          child: Icon(Icons.note_alt, color: SDColors.primary700),
+                          child:
+                              Icon(Icons.note_alt, color: SDColors.primary700),
                         ),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                          borderRadius: BorderRadius.circular(
+                              SDSpacing.borderRadiusMedium),
                         ),
                         focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-                          borderSide: BorderSide(color: SDColors.primary700, width: 2),
+                          borderRadius: BorderRadius.circular(
+                              SDSpacing.borderRadiusMedium),
+                          borderSide:
+                              BorderSide(color: SDColors.primary700, width: 2),
                         ),
                       ),
                     ),
                     SizedBox(height: SDSpacing.md),
-                    
+
                     // Message GRATUIT amélioré et plus visible
                     Container(
                       padding: EdgeInsets.all(SDSpacing.sm),
@@ -1698,8 +1740,10 @@ class _DetailPageState extends State<DetailPage> {
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
-                        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-                        border: Border.all(color: SDColors.success200, width: 2),
+                        borderRadius:
+                            BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                        border:
+                            Border.all(color: SDColors.success200, width: 2),
                         boxShadow: [
                           BoxShadow(
                             color: SDColors.success200.withOpacity(0.3),
@@ -1716,7 +1760,8 @@ class _DetailPageState extends State<DetailPage> {
                               color: SDColors.success500,
                               shape: BoxShape.circle,
                             ),
-                            child: Icon(Icons.check_circle, color: SDColors.white, size: 24),
+                            child: Icon(Icons.check_circle,
+                                color: SDColors.white, size: 24),
                           ),
                           SizedBox(width: SDSpacing.sm),
                           Expanded(
@@ -1744,7 +1789,7 @@ class _DetailPageState extends State<DetailPage> {
                       ),
                     ),
                     SizedBox(height: SDSpacing.md),
-                    
+
                     // Bouton de soumission moderne
                     SizedBox(
                       width: double.infinity,
@@ -1756,7 +1801,8 @@ class _DetailPageState extends State<DetailPage> {
                           elevation: 3,
                           shadowColor: SDColors.primary700.withOpacity(0.4),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
+                            borderRadius: BorderRadius.circular(
+                                SDSpacing.borderRadiusLarge),
                           ),
                         ),
                         onPressed: () async {
@@ -1769,61 +1815,83 @@ class _DetailPageState extends State<DetailPage> {
                               SnackBar(
                                 content: Row(
                                   children: [
-                                    Icon(Icons.warning_amber_rounded, color: SDColors.white),
+                                    Icon(Icons.warning_amber_rounded,
+                                        color: SDColors.white),
                                     SizedBox(width: SDSpacing.xs),
-                                    Expanded(child: Text('Veuillez sélectionner un prestataire',
-                                        style: SDTypography.bodyMedium.copyWith(color: SDColors.white))),
+                                    Expanded(
+                                        child: Text(
+                                            'Veuillez sélectionner un prestataire',
+                                            style: SDTypography.bodyMedium
+                                                .copyWith(
+                                                    color: SDColors.white))),
                                   ],
                                 ),
                                 backgroundColor: SDColors.warning500,
                                 behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium)),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(
+                                        SDSpacing.borderRadiusMedium)),
                               ),
                             );
                             return;
                           }
-                          
+
                           // Validation adresse et ville (requis)
                           if (adresseCtrl.text.trim().isEmpty) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Row(
                                   children: [
-                                    Icon(Icons.location_off, color: SDColors.white),
+                                    Icon(Icons.location_off,
+                                        color: SDColors.white),
                                     SizedBox(width: SDSpacing.xs),
-                                    Expanded(child: Text('Veuillez renseigner votre adresse',
-                                        style: SDTypography.bodyMedium.copyWith(color: SDColors.white))),
+                                    Expanded(
+                                        child: Text(
+                                            'Veuillez renseigner votre adresse',
+                                            style: SDTypography.bodyMedium
+                                                .copyWith(
+                                                    color: SDColors.white))),
                                   ],
                                 ),
                                 backgroundColor: SDColors.error500,
                                 behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium)),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(
+                                        SDSpacing.borderRadiusMedium)),
                               ),
                             );
                             return;
                           }
-                          
+
                           if (villeCtrl.text.trim().isEmpty) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Row(
                                   children: [
-                                    Icon(Icons.location_city_outlined, color: SDColors.white),
+                                    Icon(Icons.location_city_outlined,
+                                        color: SDColors.white),
                                     SizedBox(width: SDSpacing.xs),
-                                    Expanded(child: Text('Veuillez renseigner votre ville',
-                                        style: SDTypography.bodyMedium.copyWith(color: SDColors.white))),
+                                    Expanded(
+                                        child: Text(
+                                            'Veuillez renseigner votre ville',
+                                            style: SDTypography.bodyMedium
+                                                .copyWith(
+                                                    color: SDColors.white))),
                                   ],
                                 ),
                                 backgroundColor: SDColors.error500,
                                 behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium)),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(
+                                        SDSpacing.borderRadiusMedium)),
                               ),
                             );
                             return;
                           }
-                          
+
                           // Date/heure optionnels - utiliser valeur par défaut si non renseigné
-                          final dateTimeToUse = selectedDateTime ?? DateTime.now().add(Duration(days: 1));
+                          final dateTimeToUse = selectedDateTime ??
+                              DateTime.now().add(Duration(days: 1));
 
                           // Montrer un loader
                           showDialog(
@@ -1836,9 +1904,11 @@ class _DetailPageState extends State<DetailPage> {
                                   child: Column(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      CircularProgressIndicator(color: SDColors.primary700),
+                                      CircularProgressIndicator(
+                                          color: SDColors.primary700),
                                       SizedBox(height: SDSpacing.sm),
-                                      Text('Envoi en cours...', style: SDTypography.bodyMedium),
+                                      Text('Envoi en cours...',
+                                          style: SDTypography.bodyMedium),
                                     ],
                                   ),
                                 ),
@@ -1860,28 +1930,34 @@ class _DetailPageState extends State<DetailPage> {
                                   : notesCtrl.text.trim(),
                               moyenPaiement: 'GRATUIT',
                             );
-                            
+
                             if (!mounted) return;
                             Navigator.pop(context); // Fermer le loader
                             Navigator.pop(context); // Fermer le modal
-                            
+
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Row(
                                   children: [
-                                    Icon(Icons.check_circle, color: SDColors.white),
+                                    Icon(Icons.check_circle,
+                                        color: SDColors.white),
                                     SizedBox(width: SDSpacing.xs),
-                                    Expanded(child: Text('Commande confirmée',
-                                        style: SDTypography.bodyMedium.copyWith(color: SDColors.white))),
+                                    Expanded(
+                                        child: Text('Commande confirmée',
+                                            style: SDTypography.bodyMedium
+                                                .copyWith(
+                                                    color: SDColors.white))),
                                   ],
                                 ),
                                 backgroundColor: SDColors.primary700,
                                 behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium)),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(
+                                        SDSpacing.borderRadiusMedium)),
                                 duration: Duration(seconds: 3),
                               ),
                             );
-                            
+
                             final id = created['_id']?.toString();
                             if (id != null) {
                               Navigator.push(
@@ -1898,20 +1974,26 @@ class _DetailPageState extends State<DetailPage> {
                             if (!mounted) return;
                             Navigator.pop(context); // Fermer le loader
                             Navigator.pop(context); // Fermer le modal
-                            
+
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Row(
                                   children: [
-                                    Icon(Icons.error_outline, color: SDColors.white),
+                                    Icon(Icons.error_outline,
+                                        color: SDColors.white),
                                     SizedBox(width: SDSpacing.xs),
-                                    Expanded(child: Text('Erreur: ${e.toString()}',
-                                        style: SDTypography.bodyMedium.copyWith(color: SDColors.white))),
+                                    Expanded(
+                                        child: Text('Erreur: ${e.toString()}',
+                                            style: SDTypography.bodyMedium
+                                                .copyWith(
+                                                    color: SDColors.white))),
                                   ],
                                 ),
                                 backgroundColor: SDColors.error500,
                                 behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium)),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(
+                                        SDSpacing.borderRadiusMedium)),
                                 duration: Duration(seconds: 4),
                               ),
                             );
@@ -1920,7 +2002,8 @@ class _DetailPageState extends State<DetailPage> {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.send_rounded, size: 22, color: SDColors.white),
+                            Icon(Icons.send_rounded,
+                                size: 22, color: SDColors.white),
                             SizedBox(width: SDSpacing.xs),
                             Text(
                               'Confirmer la commande',
@@ -1942,7 +2025,6 @@ class _DetailPageState extends State<DetailPage> {
       },
     );
   }
-
 }
 
 /// Carte inline : marqueurs uniquement si `localisationmaps` présent (données réelles).
@@ -2012,7 +2094,8 @@ class _DetailProvidersMapState extends State<_DetailProvidersMap> {
         Marker(
           markerId: const MarkerId('__user__'),
           position: widget.userLocation!,
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+          icon:
+              BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
           infoWindow: const InfoWindow(title: 'Votre position'),
         ),
       );

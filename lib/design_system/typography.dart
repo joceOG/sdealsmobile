@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 /// Système typographique Soutrali Deals
 /// Basé sur Material Design 3 Type Scale
-/// 
+///
 /// **Utilisation:**
 /// ```dart
 /// Text('Titre', style: SDTypography.titleLarge)
@@ -11,11 +11,11 @@ class SDTypography {
   // Font Family - Inter (Modern, readable, professional)
   // ✅ Font files installed in assets/fonts/
   static const String fontFamily = 'Inter';
-  
+
   // ═══════════════════════════════════════
   // HEADINGS (Titres principaux)
   // ═══════════════════════════════════════
-  
+
   /// Display Large - 32px Bold
   /// Usage: Hero titles, splash screens
   static const displayLarge = TextStyle(
@@ -25,7 +25,7 @@ class SDTypography {
     letterSpacing: -0.5,
     height: 1.2,
   );
-  
+
   /// Display Medium - 28px Bold
   /// Usage: Page titles principales
   static const displayMedium = TextStyle(
@@ -35,7 +35,7 @@ class SDTypography {
     letterSpacing: -0.25,
     height: 1.2,
   );
-  
+
   /// Display Small - 24px SemiBold
   /// Usage: Section headers importantes
   static const displaySmall = TextStyle(
@@ -45,7 +45,7 @@ class SDTypography {
     letterSpacing: 0,
     height: 1.3,
   );
-  
+
   // ═══════════════════════════════════════
   // HEADLINES (Titres alternatifs / Material 3)
   // ═══════════════════════════════════════
@@ -62,7 +62,7 @@ class SDTypography {
   // ═══════════════════════════════════════
   // TITLES (Sous-titres)
   // ═══════════════════════════════════════
-  
+
   /// Title Large - 20px SemiBold
   /// Usage: AppBar titles, card headers
   static const titleLarge = TextStyle(
@@ -72,7 +72,7 @@ class SDTypography {
     letterSpacing: 0,
     height: 1.4,
   );
-  
+
   /// Title Medium - 18px SemiBold
   /// Usage: Card titles, list headers
   static const titleMedium = TextStyle(
@@ -82,7 +82,7 @@ class SDTypography {
     letterSpacing: 0.15,
     height: 1.4,
   );
-  
+
   /// Title Small - 16px SemiBold
   /// Usage: Small section headers
   static const titleSmall = TextStyle(
@@ -92,11 +92,11 @@ class SDTypography {
     letterSpacing: 0.1,
     height: 1.4,
   );
-  
+
   // ═══════════════════════════════════════
   // BODY (Corps de texte)
   // ═══════════════════════════════════════
-  
+
   /// Body Large - 16px Regular
   /// Usage: Main body text, descriptions
   static const bodyLarge = TextStyle(
@@ -106,7 +106,7 @@ class SDTypography {
     letterSpacing: 0.5,
     height: 1.5,
   );
-  
+
   /// Body Medium - 14px Regular
   /// Usage: Secondary text, metadata
   static const bodyMedium = TextStyle(
@@ -116,7 +116,7 @@ class SDTypography {
     letterSpacing: 0.25,
     height: 1.5,
   );
-  
+
   /// Body Small - 12px Regular
   /// Usage: Captions, hints, fine print
   static const bodySmall = TextStyle(
@@ -126,11 +126,11 @@ class SDTypography {
     letterSpacing: 0.4,
     height: 1.5,
   );
-  
+
   // ═══════════════════════════════════════
   // LABELS (Boutons, tabs, badges)
   // ═══════════════════════════════════════
-  
+
   /// Label Large - 16px SemiBold
   /// Usage: Primary buttons, prominent CTAs
   static const labelLarge = TextStyle(
@@ -140,7 +140,7 @@ class SDTypography {
     letterSpacing: 0.5,
     height: 1.2,
   );
-  
+
   /// Label Medium - 14px SemiBold
   /// Usage: Secondary buttons, tabs
   static const labelMedium = TextStyle(
@@ -150,7 +150,7 @@ class SDTypography {
     letterSpacing: 0.5,
     height: 1.2,
   );
-  
+
   /// Label Small - 12px SemiBold
   /// Usage: Badges, chips, small buttons
   static const labelSmall = TextStyle(
@@ -160,11 +160,11 @@ class SDTypography {
     letterSpacing: 0.5,
     height: 1.2,
   );
-  
+
   // ═══════════════════════════════════════
   // SPECIAL (Prix, montants importants)
   // ═══════════════════════════════════════
-  
+
   /// Price Display - 24px Bold
   /// Usage: Large price displays, important numbers
   static const priceDisplay = TextStyle(
@@ -174,7 +174,7 @@ class SDTypography {
     letterSpacing: -0.25,
     height: 1.2,
   );
-  
+
   /// Price Medium - 18px SemiBold
   /// Usage: Medium price displays
   static const priceMedium = TextStyle(
@@ -191,16 +191,69 @@ class SDTypography {
   /// Erreur sous un champ
   static TextStyle get fieldError => bodySmall;
 
+  /// Titre de carte client — 16 / w600. Alias de [titleSmall], déjà conforme.
+  /// Ne pas lui donner une autre taille : les écrans migreront vers cet alias.
   static const cardTitle = titleSmall;
+
+  /// Titre de section client — 18 / w600. Alias de [titleMedium], déjà conforme.
   static const sectionTitle = titleMedium;
+
+  /// Legacy 28 / w700. Encore utilisé par les formulaires d'auth.
+  /// Les écrans client 10D doivent utiliser [screenTitle] (22), pas ce token.
   static const pageTitle = displayMedium;
-  
+
+  // ═══════════════════════════════════════
+  // RÔLES CLIENT 10D (migration progressive)
+  // Ne remplacent pas display* / titleLarge / body* / priceDisplay :
+  // ceux-ci restent pour l'existant et le prestataire.
+  // ═══════════════════════════════════════
+
+  /// Titre d'écran client — 22 / w600. Un seul par écran.
+  /// Interdit sur l'accueil : [displayLarge] (32) et [pageTitle] (28).
+  static const screenTitle = TextStyle(
+    fontFamily: fontFamily,
+    fontSize: 22,
+    fontWeight: FontWeight.w600,
+    letterSpacing: 0,
+    height: 1.3,
+  );
+
+  /// Corps client — 15 / w400. [bodyLarge] (16) et [bodyMedium] (14) inchangés.
+  static const body = TextStyle(
+    fontFamily: fontFamily,
+    fontSize: 15,
+    fontWeight: FontWeight.w400,
+    letterSpacing: 0.15,
+    height: 1.4,
+  );
+
+  /// Légende client — 13 / w400. Distance, zone, métadonnées.
+  /// [bodySmall] (12) inchangé.
+  static const caption = TextStyle(
+    fontFamily: fontFamily,
+    fontSize: 13,
+    fontWeight: FontWeight.w400,
+    letterSpacing: 0.2,
+    height: 1.4,
+  );
+
+  /// Prix client unique — 16 / w600.
+  /// [priceDisplay] (24) et [priceMedium] (18) restent pour l'existant.
+  /// Ne pas inventer une autre taille de prix selon l'écran.
+  static const price = TextStyle(
+    fontFamily: fontFamily,
+    fontSize: 16,
+    fontWeight: FontWeight.w600,
+    letterSpacing: 0,
+    height: 1.3,
+  );
+
   // ═══════════════════════════════════════
   // HELPER METHOD
   // ═══════════════════════════════════════
-  
+
   /// Applique une couleur à un TextStyle
-  /// 
+  ///
   /// Example: `SDTypography.titleLarge.withColor(Colors.white)`
   static TextStyle withColor(TextStyle style, Color color) {
     return style.copyWith(color: color);

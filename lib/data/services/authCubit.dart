@@ -4,9 +4,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
 import '../models/utilisateur.dart';
+import '../models/professional_capabilities.dart';
 import 'api_client.dart';
 import 'token_store.dart';
 import 'fcm_service.dart';
+import 'protected_action_intent.dart';
 import 'websocket_service.dart';
 
 abstract class AuthState {}
@@ -21,6 +23,7 @@ class AuthAuthenticated extends AuthState {
   final List<String> roles;
   final String? activeRole;
   final Map<String, dynamic>? roleDetails;
+  final UserProfessionalCapabilities? professional;
   final String? refreshToken;
 
   AuthAuthenticated({
@@ -29,6 +32,7 @@ class AuthAuthenticated extends AuthState {
     this.roles = const ['CLIENT'],
     this.activeRole,
     this.roleDetails,
+    this.professional,
     this.refreshToken,
   });
 }
@@ -56,6 +60,7 @@ class AuthCubit extends Cubit<AuthState> {
         roles: current.roles,
         activeRole: current.activeRole,
         roleDetails: current.roleDetails,
+        professional: current.professional,
         refreshToken: refresh,
       ));
     };
@@ -69,7 +74,16 @@ class AuthCubit extends Cubit<AuthState> {
       final userJson = prefs.getString('auth_user');
       final rolesJson = prefs.getString('auth_roles');
       final activeRole = prefs.getString('auth_active_role');
+      final capsJson = prefs.getString('auth_professional_caps');
       final refreshToken = await TokenStore.getRefreshToken();
+      UserProfessionalCapabilities? restoredCaps;
+      if (capsJson != null && capsJson.isNotEmpty) {
+        try {
+          restoredCaps = UserProfessionalCapabilities.fromJson(
+            Map<String, dynamic>.from(jsonDecode(capsJson) as Map),
+          );
+        } catch (_) {}
+      }
 
       if (token != null && userJson != null) {
         try {
@@ -104,6 +118,7 @@ class AuthCubit extends Cubit<AuthState> {
           utilisateur: utilisateur,
           roles: roles,
           activeRole: activeRole ?? (roles.isNotEmpty ? roles.first : 'CLIENT'),
+          professional: restoredCaps,
           refreshToken: refreshToken,
         ));
         // Met à jour PRESTATAIRE / FREELANCE / VENDEUR si le doc existe
@@ -122,9 +137,17 @@ class AuthCubit extends Cubit<AuthState> {
     List<String> roles = const ['CLIENT'],
     String? activeRole,
     Map<String, dynamic>? roleDetails,
+    UserProfessionalCapabilities? professional,
     String? refreshToken,
   }) {
-    _saveAuthToStorage(token, utilisateur, roles, activeRole, refreshToken);
+    _saveAuthToStorage(
+      token,
+      utilisateur,
+      roles,
+      activeRole,
+      refreshToken,
+      professional: professional,
+    );
 
     emit(AuthAuthenticated(
       token: token,
@@ -132,6 +155,7 @@ class AuthCubit extends Cubit<AuthState> {
       roles: roles,
       activeRole: activeRole ?? (roles.isNotEmpty ? roles.first : 'CLIENT'),
       roleDetails: roleDetails,
+      professional: professional,
       refreshToken: refreshToken,
     ));
 
@@ -144,12 +168,21 @@ class AuthCubit extends Cubit<AuthState> {
     Utilisateur utilisateur,
     List<String> roles,
     String? activeRole,
-    String? refreshToken,
-  ) async {
+    String? refreshToken, {
+    UserProfessionalCapabilities? professional,
+  }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('auth_user', jsonEncode(utilisateur.toJson()));
       await prefs.setString('auth_roles', jsonEncode(roles));
+      if (professional != null) {
+        await prefs.setString(
+          'auth_professional_caps',
+          jsonEncode(professional.toJson()),
+        );
+      } else {
+        await prefs.remove('auth_professional_caps');
+      }
       if (activeRole != null) {
         await prefs.setString('auth_active_role', activeRole);
       }
@@ -168,17 +201,20 @@ class AuthCubit extends Cubit<AuthState> {
     required List<String> roles,
     String? activeRole,
     Map<String, dynamic>? roleDetails,
+    UserProfessionalCapabilities? professional,
   }) {
     final current = state;
     if (current is AuthAuthenticated) {
       final newRoles = roles.isNotEmpty ? roles : current.roles;
       final newActiveRole = activeRole ?? current.activeRole;
+      final newProfessional = professional ?? current.professional;
       _saveAuthToStorage(
         current.token,
         current.utilisateur,
         newRoles,
         newActiveRole,
         current.refreshToken,
+        professional: newProfessional,
       );
       emit(AuthAuthenticated(
         token: current.token,
@@ -186,6 +222,7 @@ class AuthCubit extends Cubit<AuthState> {
         roles: newRoles,
         activeRole: newActiveRole,
         roleDetails: roleDetails ?? current.roleDetails,
+        professional: newProfessional,
         refreshToken: current.refreshToken,
       ));
     }
@@ -200,17 +237,23 @@ class AuthCubit extends Cubit<AuthState> {
 
     try {
       final data = await ApiClient().getUserRoles(userId, token: current.token);
+      final professional =
+          UserProfessionalCapabilities.fromRolesApiResponse(data);
       final raw = data['roles'];
       final roles = raw is List
           ? raw.map((e) => e.toString().toUpperCase()).toList()
-          : <String>['CLIENT'];
+          : professional.toLegacyRolesList();
       if (!roles.contains('CLIENT')) {
         roles.insert(0, 'CLIENT');
       }
       final details = data['details'] is Map
           ? Map<String, dynamic>.from(data['details'] as Map)
           : null;
-      setRoles(roles: roles, roleDetails: details);
+      setRoles(
+        roles: roles,
+        roleDetails: details,
+        professional: professional,
+      );
     } catch (e) {
       if (kDebugMode) {
         print('refreshRoles: $e');
@@ -228,6 +271,7 @@ class AuthCubit extends Cubit<AuthState> {
       current.roles,
       current.activeRole,
       current.refreshToken,
+      professional: current.professional,
     );
     emit(AuthAuthenticated(
       token: current.token,
@@ -235,6 +279,7 @@ class AuthCubit extends Cubit<AuthState> {
       roles: current.roles,
       activeRole: current.activeRole,
       roleDetails: current.roleDetails,
+      professional: current.professional,
       refreshToken: current.refreshToken,
     ));
   }
@@ -250,6 +295,7 @@ class AuthCubit extends Cubit<AuthState> {
         current.roles,
         role,
         current.refreshToken,
+        professional: current.professional,
       );
 
       emit(AuthAuthenticated(
@@ -258,6 +304,7 @@ class AuthCubit extends Cubit<AuthState> {
         roles: current.roles,
         activeRole: role,
         roleDetails: current.roleDetails,
+        professional: current.professional,
         refreshToken: current.refreshToken,
       ));
     }
@@ -280,6 +327,7 @@ class AuthCubit extends Cubit<AuthState> {
       } catch (_) {}
     }
     WebSocketService().disconnectForLogout();
+    SessionExit.clearPending();
     await _clearAuthFromStorage();
     emit(AuthInitial());
   }
@@ -291,6 +339,7 @@ class AuthCubit extends Cubit<AuthState> {
       await prefs.remove('auth_user');
       await prefs.remove('auth_roles');
       await prefs.remove('auth_active_role');
+      await prefs.remove('auth_professional_caps');
       await TokenStore.clear();
     } catch (e) {
       if (kDebugMode) {

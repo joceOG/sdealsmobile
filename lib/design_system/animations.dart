@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 /// Système d'animations Soutrali Deals
 /// Basé sur Material Design 3 Motion System
-/// 
+///
 /// **Utilisation:**
 /// ```dart
 /// AnimatedContainer(
@@ -14,61 +14,62 @@ class SDAnimations {
   // ═══════════════════════════════════════
   // DURÉES (Material Design 3)
   // ═══════════════════════════════════════
-  
+
   /// Ultra short - 100ms
   /// Usage: Micro-interactions, button press feedback
   static const ultraShort = Duration(milliseconds: 100);
-  
+
   /// Short - 200ms ✅ Default
   /// Usage: Standard transitions, card taps, simple animations
   static const short = Duration(milliseconds: 200);
-  
+
   /// Medium - 300ms
   /// Usage: Page transitions, modal open/close
   static const medium = Duration(milliseconds: 300);
-  
+
   /// Long - 400ms
   /// Usage: Hero animations, complex transitions
   static const long = Duration(milliseconds: 400);
-  
+
   /// Extra long - 500ms
   /// Usage: Full screen modals, major UI changes
   static const extraLong = Duration(milliseconds: 500);
-  
+
   // ═══════════════════════════════════════
   // CURVES (Easing functions)
   // ═══════════════════════════════════════
-  
+
   /// Emphasized - easeInOutCubic ✅ Most used
   /// Usage: Standard animations, balanced feel
   static const emphasized = Curves.easeInOutCubic;
-  
+
   /// Decelerated - easeOut
   /// Usage: Elements entering screen (fade in, slide in)
   static const decelerated = Curves.easeOut;
-  
+
   /// Accelerated - easeIn
   /// Usage: Elements leaving screen (fade out, slide out)
   static const accelerated = Curves.easeIn;
-  
+
   /// Standard - easeInOut
   /// Usage: Neutral transitions
   static const standard = Curves.easeInOut;
-  
+
   /// Bounce - elasticOut
-  /// Usage: Fun interactions, playful feedback
+  /// Conservé pour compatibilité. Le client 10D ne doit pas l'utiliser
+  /// (pas de rebond, pas d'élasticité). Migration documentée, pas de suppression.
   static const bounce = Curves.elasticOut;
-  
+
   /// Linear - no easing
   /// Usage: Progress indicators, loading spinners
   static const linear = Curves.linear;
-  
+
   // ═══════════════════════════════════════
   // PRESET ANIMATIONS
   // ═══════════════════════════════════════
-  
+
   /// Fade in animation
-  /// 
+  ///
   /// Usage:
   /// ```dart
   /// SDAnimations.fadeIn(
@@ -92,9 +93,9 @@ class SDAnimations {
       child: child,
     );
   }
-  
+
   /// Slide from bottom animation
-  /// 
+  ///
   /// Usage:
   /// ```dart
   /// SDAnimations.slideFromBottom(
@@ -117,9 +118,9 @@ class SDAnimations {
       child: child,
     );
   }
-  
+
   /// Scale bounce animation
-  /// 
+  ///
   /// Usage:
   /// ```dart
   /// SDAnimations.scaleBounce(
@@ -142,7 +143,7 @@ class SDAnimations {
       child: child,
     );
   }
-  
+
   /// Slide from left animation
   static Widget slideFromLeft({
     required Widget child,
@@ -160,7 +161,7 @@ class SDAnimations {
       child: child,
     );
   }
-  
+
   /// Slide from right animation
   static Widget slideFromRight({
     required Widget child,
@@ -178,13 +179,13 @@ class SDAnimations {
       child: child,
     );
   }
-  
+
   // ═══════════════════════════════════════
   // PAGE TRANSITIONS
   // ═══════════════════════════════════════
-  
+
   /// Page route avec slide transition
-  /// 
+  ///
   /// Usage:
   /// ```dart
   /// Navigator.push(
@@ -213,7 +214,7 @@ class SDAnimations {
         beginOffset = const Offset(0.0, 1.0);
         break;
     }
-    
+
     return PageRouteBuilder<T>(
       transitionDuration: duration ?? medium,
       pageBuilder: (context, animation, secondaryAnimation) => page,
@@ -231,7 +232,7 @@ class SDAnimations {
       },
     );
   }
-  
+
   /// Page route avec fade transition
   static PageRouteBuilder<T> fadePageRoute<T>(
     Widget page, {
@@ -271,7 +272,7 @@ class SDAnimationConfig {
     scaleFrom: 0.95,
     scaleTo: 1.0,
   );
-  
+
   /// Card tap animation config
   static const cardTap = AnimationConfig(
     duration: SDAnimations.short,
@@ -279,7 +280,7 @@ class SDAnimationConfig {
     scaleFrom: 0.98,
     scaleTo: 1.0,
   );
-  
+
   /// List item appear animation config
   static const listItemAppear = AnimationConfig(
     duration: SDAnimations.medium,
@@ -297,7 +298,7 @@ class AnimationConfig {
   final double? scaleTo;
   final double? opacityFrom;
   final double? opacityTo;
-  
+
   const AnimationConfig({
     required this.duration,
     required this.curve,
@@ -306,4 +307,32 @@ class AnimationConfig {
     this.opacityFrom,
     this.opacityTo,
   });
+}
+
+/// Mouvement client 10D. N'altère pas [SDAnimations.short] (200 ms, partagé)
+/// ni les transitions de navigation. Pas encore branché sur les écrans.
+class SDClientMotion {
+  SDClientMotion._();
+
+  static const touchFeedback = Duration(milliseconds: 100);
+  static const stateChange = Duration(milliseconds: 150);
+  static const sheetOpen = Duration(milliseconds: 200);
+  static const skeleton = Duration(milliseconds: 150);
+  static const favorite = Duration(milliseconds: 120);
+
+  static const Curve touchCurve = Curves.easeOut;
+  static const Curve stateCurve = Curves.easeOutCubic;
+  static const Curve sheetCurve = Curves.easeOutCubic;
+  static const Curve skeletonCurve = Curves.easeOut;
+  static const Curve favoriteCurve = Curves.easeOut;
+
+  /// Reduce Motion : état final immédiat, sans rebond ni élasticité.
+  static bool reduceMotion(BuildContext context) =>
+      MediaQuery.disableAnimationsOf(context);
+
+  static Duration resolve(BuildContext context, Duration duration) =>
+      reduceMotion(context) ? Duration.zero : duration;
+
+  static Curve resolveCurve(BuildContext context, Curve curve) =>
+      reduceMotion(context) ? Curves.linear : curve;
 }

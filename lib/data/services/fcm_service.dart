@@ -6,6 +6,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:sdealsmobile/data/services/api_client.dart';
+import 'package:sdealsmobile/data/services/fcm_route_policy.dart';
 import 'package:sdealsmobile/data/services/token_store.dart';
 
 /// Handler background (doit être top-level).
@@ -15,7 +16,8 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     await Firebase.initializeApp();
   } catch (_) {}
   if (kDebugMode) {
-    print('[FCM] background: ${message.messageId} ${message.notification?.title}');
+    print(
+        '[FCM] background: ${message.messageId} ${message.notification?.title}');
   }
 }
 
@@ -179,13 +181,21 @@ class FcmService {
     }
   }
 
-  /// À consommer une seule fois depuis le splash (priorité sur Accueil).
+  /// Route allowlistée, ou null. Ne renvoie jamais une route brute du payload.
   String? consumePendingLaunchRoute() {
     final data = _pendingLaunchData;
     _pendingLaunchData = null;
     if (data == null) return null;
     return resolveRoute(data);
   }
+
+  void holdDestination(String route) => PendingLaunchDestination.hold(route);
+
+  String? peekPendingDestination() => PendingLaunchDestination.peek();
+
+  String? consumePendingDestination() => PendingLaunchDestination.consume();
+
+  void clearPendingDestination() => PendingLaunchDestination.clear();
 
   /// À appeler après login (token access disponible).
   Future<void> syncTokenWithBackend() async {
@@ -228,22 +238,8 @@ class FcmService {
     } catch (_) {}
   }
 
-  /// Navigation deep-link depuis payload FCM.
+  /// Navigation deep-link. Route inconnue ou arbitraire → null (l'accueil gère l'absence).
   static String? resolveRoute(Map<String, dynamic> data) {
-    final explicit = data['route']?.toString();
-    if (explicit != null && explicit.isNotEmpty) return explicit;
-
-    final type = (data['type']?.toString() ?? '').toUpperCase();
-    final conversationId = data['conversationId']?.toString();
-    final missionId = data['missionId']?.toString();
-
-    if (conversationId != null && conversationId.isNotEmpty) {
-      return '/chat/$conversationId';
-    }
-    if (missionId != null && missionId.isNotEmpty) {
-      return '/mission-details/$missionId';
-    }
-    if (type.contains('MESSAGE')) return '/homepage';
-    return '/homepage';
+    return FcmRoutePolicy.mapToAllowedRoute(data);
   }
 }

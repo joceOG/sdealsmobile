@@ -1,8 +1,10 @@
 import '../../../../data/services/authCubit.dart';
+import '../../../../data/services/protected_action_intent.dart';
 import '../../../../data/utils/display_text.dart';
 import '../../../../design_system/design_system.dart';
 import '../../../data/models/conversation_model.dart';
 import '../../../data/models/message_model.dart';
+import '../../common/auth_completion.dart';
 import '../../common/widgets/empty_state_widget.dart';
 import '../../searchpagem/screens/searchPageScreenM.dart';
 import '../chatpageblocm/chatPageBlocM.dart';
@@ -317,8 +319,7 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
     }
   }
 
-  List<ConversationModel> _filteredConversations(
-      List<ConversationModel> all) {
+  List<ConversationModel> _filteredConversations(List<ConversationModel> all) {
     final q = _listSearchController.text.trim().toLowerCase();
     return all.where((c) {
       if (!_matchesInboxFilter(c.type, _inboxFilter)) return false;
@@ -396,67 +397,67 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
     return SDAppBarIconThemed(
       style: SDAppBarIconStyles.onLightSurface,
       bar: AppBar(
-      backgroundColor: SDColors.white,
-      surfaceTintColor: Colors.transparent,
-      elevation: 0,
-      scrolledUnderElevation: 0,
-      centerTitle: true,
-      automaticallyImplyLeading: false,
-      leading: IconButton(
-        icon: Icon(Icons.arrow_back_ios_new_rounded,
-            color: SDColors.neutral900, size: 20),
-        onPressed: () {
-          context.read<ChatPageBlocM>().add(const LoadConversations());
-        },
-      ),
-      title: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Flexible(
-            child: Text(
-              state.selectedConversation!.participantName,
-              style: SDTypography.titleMedium.copyWith(
-                color: SDColors.neutral900,
-                fontWeight: FontWeight.w800,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          SizedBox(width: SDSpacing.xxs),
-          Container(
-            padding: EdgeInsets.symmetric(
-              horizontal: SDSpacing.xxs,
-              vertical: 2,
-            ),
-            decoration: BoxDecoration(
-              color: _getConversationColor(state.selectedConversation!.type)
-                  .withOpacity(0.15),
-              borderRadius:
-                  BorderRadius.circular(SDSpacing.borderRadiusSmall),
-            ),
-            child: Text(
-              _getConversationLabel(state.selectedConversation!.type),
-              style: SDTypography.labelSmall.copyWith(
-                color:
-                    _getConversationColor(state.selectedConversation!.type),
-                fontWeight: FontWeight.w700,
+        backgroundColor: SDColors.white,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        centerTitle: true,
+        automaticallyImplyLeading: false,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back_ios_new_rounded,
+              color: SDColors.neutral900, size: 20),
+          onPressed: () {
+            context.read<ChatPageBlocM>().add(const LoadConversations());
+          },
+        ),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: Text(
+                state.selectedConversation!.participantName,
+                style: SDTypography.titleMedium.copyWith(
+                  color: SDColors.neutral900,
+                  fontWeight: FontWeight.w800,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
+            SizedBox(width: SDSpacing.xxs),
+            Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: SDSpacing.xxs,
+                vertical: 2,
+              ),
+              decoration: BoxDecoration(
+                color: _getConversationColor(state.selectedConversation!.type)
+                    .withOpacity(0.15),
+                borderRadius:
+                    BorderRadius.circular(SDSpacing.borderRadiusSmall),
+              ),
+              child: Text(
+                _getConversationLabel(state.selectedConversation!.type),
+                style: SDTypography.labelSmall.copyWith(
+                  color:
+                      _getConversationColor(state.selectedConversation!.type),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.more_vert_rounded, color: SDColors.neutral800),
+            onPressed: () {},
           ),
         ],
-      ),
-      actions: [
-        IconButton(
-          icon: Icon(Icons.more_vert_rounded, color: SDColors.neutral800),
-          onPressed: () {},
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Divider(height: 1, color: SDColors.neutral200),
         ),
-      ],
-      bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(1),
-        child: Divider(height: 1, color: SDColors.neutral200),
       ),
-    ),
     );
   }
 
@@ -485,7 +486,8 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
           ),
           child: IconButton(
             onPressed: _onComposeTap,
-            icon: Icon(Icons.edit_rounded, color: SDColors.primary700, size: 22),
+            icon:
+                Icon(Icons.edit_rounded, color: SDColors.primary700, size: 22),
             tooltip: 'Nouveau message',
             visualDensity: VisualDensity.compact,
           ),
@@ -585,19 +587,15 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
                   Icon(
                     icon,
                     size: 18,
-                    color: selected
-                        ? SDColors.neutral900
-                        : SDColors.neutral600,
+                    color: selected ? SDColors.neutral900 : SDColors.neutral600,
                   ),
                   const SizedBox(width: 6),
                   Text(
                     label,
                     style: SDTypography.labelMedium.copyWith(
-                      color: selected
-                          ? SDColors.neutral900
-                          : SDColors.neutral700,
-                      fontWeight:
-                          selected ? FontWeight.w800 : FontWeight.w600,
+                      color:
+                          selected ? SDColors.neutral900 : SDColors.neutral700,
+                      fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
                       fontSize: 13,
                     ),
                   ),
@@ -808,8 +806,22 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
           description:
               'Discutez directement avec les prestataires, freelances et vendeurs.',
           icon: Icons.forum_outlined,
-          onPrimary: () => context.push('/login'),
-          onSecondary: () => context.push('/register'),
+          onPrimary: () {
+            pushAuthForPendingAction(
+              context: context,
+              type: ProtectedActionType.startConversation,
+              originRoute: 'chat',
+              route: '/login',
+            );
+          },
+          onSecondary: () {
+            pushAuthForPendingAction(
+              context: context,
+              type: ProtectedActionType.startConversation,
+              originRoute: 'chat',
+              route: '/register',
+            );
+          },
         ),
       ),
     );
@@ -824,709 +836,758 @@ class _ChatPageScreenMState extends State<ChatPageScreenM>
     }
 
     return BlocConsumer<ChatPageBlocM, ChatPageStateM>(
-        listener: (context, state) {
-          // Gérer les erreurs
-          if (state.error != null && state.error!.isNotEmpty) {
-            ScaffoldMessenger.of(context)
-                .showSnackBar(SnackBar(content: Text(state.error!)));
-          }
+      listener: (context, state) {
+        // Gérer les erreurs
+        if (state.error != null && state.error!.isNotEmpty) {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text(state.error!)));
+        }
 
-          // Faire défiler vers le bas après l'envoi ou la réception d'un message
-          if (state.status == ChatPageStatus.loaded &&
-              state.selectedConversation != null &&
-              state.messagesByConversation
-                  .containsKey(state.selectedConversation!.id)) {
-            Future.delayed(const Duration(milliseconds: 100), () {
-              if (_scrollController.hasClients) {
-                _scrollController.animateTo(
-                  _scrollController.position.maxScrollExtent,
-                  duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeOut,
-                );
-              }
-            });
-          }
-        },
-        builder: (context, state) {
-          // Déterminer si on est sur mobile ou sur un écran plus grand
-          final bool isMobile = MediaQuery.of(context).size.width < 600;
-          final bool showConversationList =
-              !isMobile || state.selectedConversation == null;
-          final bool showConversation =
-              !isMobile || state.selectedConversation != null;
-          final bool showMobileChatAppBar =
-              isMobile && state.selectedConversation != null;
+        // Faire défiler vers le bas après l'envoi ou la réception d'un message
+        if (state.status == ChatPageStatus.loaded &&
+            state.selectedConversation != null &&
+            state.messagesByConversation
+                .containsKey(state.selectedConversation!.id)) {
+          Future.delayed(const Duration(milliseconds: 100), () {
+            if (_scrollController.hasClients) {
+              _scrollController.animateTo(
+                _scrollController.position.maxScrollExtent,
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeOut,
+              );
+            }
+          });
+        }
+      },
+      builder: (context, state) {
+        // Déterminer si on est sur mobile ou sur un écran plus grand
+        final bool isMobile = MediaQuery.of(context).size.width < 600;
+        final bool showConversationList =
+            !isMobile || state.selectedConversation == null;
+        final bool showConversation =
+            !isMobile || state.selectedConversation != null;
+        final bool showMobileChatAppBar =
+            isMobile && state.selectedConversation != null;
 
-          final filtered = _filteredConversations(state.conversations);
+        final filtered = _filteredConversations(state.conversations);
 
-          return Scaffold(
-            key: _scaffoldKey,
-            backgroundColor: SDColors.white,
-            appBar: showMobileChatAppBar
-                ? PreferredSize(
-                    preferredSize: Size.fromHeight(kToolbarHeight + 1),
-                    child: _buildMobileConversationAppBar(state),
-                  )
-                : null,
-            body: SafeArea(
-              top: !showMobileChatAppBar,
-              bottom: false,
-              child: Column(
-            children: [
-              if (showConversationList) ...[
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-                  child: Column(
+        return Scaffold(
+          key: _scaffoldKey,
+          backgroundColor: SDColors.white,
+          appBar: showMobileChatAppBar
+              ? PreferredSize(
+                  preferredSize: Size.fromHeight(kToolbarHeight + 1),
+                  child: _buildMobileConversationAppBar(state),
+                )
+              : null,
+          body: SafeArea(
+            top: !showMobileChatAppBar,
+            bottom: false,
+            child: Column(
+              children: [
+                if (showConversationList) ...[
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _buildMessagesTopHeader(),
+                        SizedBox(height: SDSpacing.md),
+                        _buildExplorerStyleInboxSearch(context),
+                      ],
+                    ),
+                  ),
+                  _buildFilterChips(),
+                ],
+                Expanded(
+                  child: Row(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _buildMessagesTopHeader(),
-                      SizedBox(height: SDSpacing.md),
-                      _buildExplorerStyleInboxSearch(context),
-                    ],
-                  ),
-                ),
-                _buildFilterChips(),
-              ],
-              Expanded(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Liste des conversations (affichée uniquement si nécessaire selon la responsivité)
-                    if (showConversationList)
-                      Flexible(
-                        flex: 3,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: SDColors.white,
-                            borderRadius: BorderRadius.circular(SDSpacing.borderRadiusXLarge),
-                            boxShadow: [
-                              BoxShadow(
-                                color: SDColors.neutral900.withOpacity(0.05),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            children: [
-                              Expanded(
-                                child: state.status == ChatPageStatus.loading
-                                    ? const Center(
-                                        child: CircularProgressIndicator())
-                                    : state.conversations.isEmpty
-                                        ? EmptyStateWidget(
-                                            imagePath: 'assets/messages_vides.png',
-                                            title: 'Aucune conversation pour le moment',
-                                            message:
-                                                'Contactez un professionnel pour commencer à échanger.',
-                                            imageSize: 180,
-                                          )
-                                        : filtered.isEmpty
-                                            ? Center(
-                                                child: Padding(
-                                                  padding: EdgeInsets.all(SDSpacing.md),
-                                                  child: Column(
-                                                    mainAxisSize: MainAxisSize.min,
-                                                    children: [
-                                                      Icon(Icons.search_off_rounded,
-                                                          size: 48,
-                                                          color: SDColors.neutral400),
-                                                      SizedBox(height: SDSpacing.sm),
-                                                      Text(
-                                                        'Aucun résultat',
-                                                        style: SDTypography.titleSmall
-                                                            .copyWith(
-                                                                fontWeight:
-                                                                    FontWeight.w700),
-                                                      ),
-                                                      Text(
-                                                        'Essayez un autre filtre ou une autre recherche.',
-                                                        textAlign: TextAlign.center,
-                                                        style: SDTypography.bodySmall
-                                                            .copyWith(
-                                                                color: SDColors
-                                                                    .neutral500),
-                                                      ),
-                                                    ],
+                      // Liste des conversations (affichée uniquement si nécessaire selon la responsivité)
+                      if (showConversationList)
+                        Flexible(
+                          flex: 3,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: SDColors.white,
+                              borderRadius: BorderRadius.circular(
+                                  SDSpacing.borderRadiusXLarge),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: SDColors.neutral900.withOpacity(0.05),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              children: [
+                                Expanded(
+                                  child: state.status == ChatPageStatus.loading
+                                      ? const Center(
+                                          child: CircularProgressIndicator())
+                                      : state.conversations.isEmpty
+                                          ? EmptyStateWidget(
+                                              imagePath:
+                                                  'assets/messages_vides.png',
+                                              title:
+                                                  'Aucune conversation pour le moment',
+                                              message:
+                                                  'Contactez un professionnel pour commencer à échanger.',
+                                              imageSize: 180,
+                                            )
+                                          : filtered.isEmpty
+                                              ? Center(
+                                                  child: Padding(
+                                                    padding: EdgeInsets.all(
+                                                        SDSpacing.md),
+                                                    child: Column(
+                                                      mainAxisSize:
+                                                          MainAxisSize.min,
+                                                      children: [
+                                                        Icon(
+                                                            Icons
+                                                                .search_off_rounded,
+                                                            size: 48,
+                                                            color: SDColors
+                                                                .neutral400),
+                                                        SizedBox(
+                                                            height:
+                                                                SDSpacing.sm),
+                                                        Text(
+                                                          'Aucun résultat',
+                                                          style: SDTypography
+                                                              .titleSmall
+                                                              .copyWith(
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w700),
+                                                        ),
+                                                        Text(
+                                                          'Essayez un autre filtre ou une autre recherche.',
+                                                          textAlign:
+                                                              TextAlign.center,
+                                                          style: SDTypography
+                                                              .bodySmall
+                                                              .copyWith(
+                                                                  color: SDColors
+                                                                      .neutral500),
+                                                        ),
+                                                      ],
+                                                    ),
                                                   ),
+                                                )
+                                              : ListView.builder(
+                                                  padding: EdgeInsets.only(
+                                                      bottom: SDSpacing.sm),
+                                                  itemCount: filtered.length,
+                                                  itemBuilder:
+                                                      (context, index) {
+                                                    final conversation =
+                                                        filtered[index];
+                                                    final isSelected = state
+                                                            .selectedConversation
+                                                            ?.id ==
+                                                        conversation.id;
+                                                    return _buildInboxConversationRow(
+                                                      conversation,
+                                                      isSelected: isSelected,
+                                                    );
+                                                  },
                                                 ),
-                                              )
-                                            : ListView.builder(
-                                                padding: EdgeInsets.only(
-                                                    bottom: SDSpacing.sm),
-                                                itemCount: filtered.length,
-                                                itemBuilder: (context, index) {
-                                                  final conversation =
-                                                      filtered[index];
-                                                  final isSelected = state
-                                                          .selectedConversation
-                                                          ?.id ==
-                                                      conversation.id;
-                                                  return _buildInboxConversationRow(
-                                                    conversation,
-                                                    isSelected: isSelected,
-                                                  );
-                                                },
-                                              ),
-                              ),
-                            ],
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                    // Zone de messages (affichée uniquement si une conversation est sélectionnée sur mobile)
-                    if (showConversation)
-                      Flexible(
-                        flex: 7,
-                        child: AnimatedContainer(
-                          duration: SDAnimations.medium,
-                          curve: Curves.easeInOut,
-                          decoration: BoxDecoration(
-                            color: SDColors.white,
-                            borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
-                            boxShadow: [
-                              BoxShadow(
-                                color: SDColors.neutral900.withOpacity(0.05),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: state.selectedConversation == null
-                              ? Center(
-                                  child: Text('Sélectionnez une conversation'))
-                              : AnimatedOpacity(
-                                  duration: const Duration(milliseconds: 200),
-                                  opacity: state.selectedConversation != null
-                                      ? 1.0
-                                      : 0.0,
-                                  child: Column(
-                                    children: [
-                                      // En-tête de la conversation
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            vertical: 12.0, horizontal: 16.0),
-                                        decoration: BoxDecoration(
-                                          border: Border(
-                                            bottom: BorderSide(
-                                              color:
-                                                  Colors.grey.withOpacity(0.3),
-                                              width: 1,
+                      // Zone de messages (affichée uniquement si une conversation est sélectionnée sur mobile)
+                      if (showConversation)
+                        Flexible(
+                          flex: 7,
+                          child: AnimatedContainer(
+                            duration: SDAnimations.medium,
+                            curve: Curves.easeInOut,
+                            decoration: BoxDecoration(
+                              color: SDColors.white,
+                              borderRadius: BorderRadius.circular(
+                                  SDSpacing.borderRadiusLarge),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: SDColors.neutral900.withOpacity(0.05),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: state.selectedConversation == null
+                                ? Center(
+                                    child:
+                                        Text('Sélectionnez une conversation'))
+                                : AnimatedOpacity(
+                                    duration: const Duration(milliseconds: 200),
+                                    opacity: state.selectedConversation != null
+                                        ? 1.0
+                                        : 0.0,
+                                    child: Column(
+                                      children: [
+                                        // En-tête de la conversation
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              vertical: 12.0, horizontal: 16.0),
+                                          decoration: BoxDecoration(
+                                            border: Border(
+                                              bottom: BorderSide(
+                                                color: Colors.grey
+                                                    .withOpacity(0.3),
+                                                width: 1,
+                                              ),
                                             ),
                                           ),
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            // Avatar
-                                            Container(
-                                              width: 40,
-                                              height: 40,
-                                              decoration: BoxDecoration(
-                                                shape: BoxShape.circle,
-                                                color: Colors.grey.shade300,
-                                                image: state
+                                          child: Row(
+                                            children: [
+                                              // Avatar
+                                              Container(
+                                                width: 40,
+                                                height: 40,
+                                                decoration: BoxDecoration(
+                                                  shape: BoxShape.circle,
+                                                  color: Colors.grey.shade300,
+                                                  image: state
+                                                          .selectedConversation!
+                                                          .participantImage
+                                                          .isNotEmpty
+                                                      ? DecorationImage(
+                                                          image: AssetImage(state
+                                                              .selectedConversation!
+                                                              .participantImage),
+                                                          fit: BoxFit.cover,
+                                                        )
+                                                      : null,
+                                                ),
+                                                child: state
                                                         .selectedConversation!
                                                         .participantImage
-                                                        .isNotEmpty
-                                                    ? DecorationImage(
-                                                        image: AssetImage(state
-                                                            .selectedConversation!
-                                                            .participantImage),
-                                                        fit: BoxFit.cover,
+                                                        .isEmpty
+                                                    ? Center(
+                                                        child: Text(
+                                                          state
+                                                              .selectedConversation!
+                                                              .participantName[
+                                                                  0]
+                                                              .toUpperCase(),
+                                                          style: TextStyle(
+                                                            color: Colors.white,
+                                                            fontWeight:
+                                                                FontWeight.bold,
+                                                          ),
+                                                        ),
                                                       )
                                                     : null,
                                               ),
-                                              child: state.selectedConversation!
-                                                      .participantImage.isEmpty
-                                                  ? Center(
-                                                      child: Text(
-                                                        state
-                                                            .selectedConversation!
-                                                            .participantName[0]
-                                                            .toUpperCase(),
-                                                        style: TextStyle(
-                                                          color: Colors.white,
-                                                          fontWeight:
-                                                              FontWeight.bold,
+                                              const SizedBox(width: 12),
+                                              // Nom et statut
+                                              Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    state.selectedConversation!
+                                                        .participantName,
+                                                    style: TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      fontSize: 16,
+                                                    ),
+                                                  ),
+                                                  Row(
+                                                    children: [
+                                                      Container(
+                                                        width: 8,
+                                                        height: 8,
+                                                        decoration:
+                                                            BoxDecoration(
+                                                          shape:
+                                                              BoxShape.circle,
+                                                          color: state
+                                                                  .selectedConversation!
+                                                                  .isOnline
+                                                              ? Colors.green
+                                                              : Colors.grey
+                                                                  .shade400,
                                                         ),
                                                       ),
-                                                    )
-                                                  : null,
-                                            ),
-                                            const SizedBox(width: 12),
-                                            // Nom et statut
-                                            Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  state.selectedConversation!
-                                                      .participantName,
-                                                  style: TextStyle(
-                                                    fontWeight: FontWeight.bold,
-                                                    fontSize: 16,
-                                                  ),
-                                                ),
-                                                Row(
-                                                  children: [
-                                                    Container(
-                                                      width: 8,
-                                                      height: 8,
-                                                      decoration: BoxDecoration(
-                                                        shape: BoxShape.circle,
-                                                        color: state
-                                                                .selectedConversation!
+                                                      const SizedBox(width: 4),
+                                                      Text(
+                                                        state.selectedConversation!
                                                                 .isOnline
-                                                            ? Colors.green
-                                                            : Colors
-                                                                .grey.shade400,
+                                                            ? 'En ligne'
+                                                            : 'Hors ligne',
+                                                        style: TextStyle(
+                                                          fontSize: 12,
+                                                          color: Colors
+                                                              .grey.shade600,
+                                                        ),
                                                       ),
-                                                    ),
-                                                    const SizedBox(width: 4),
-                                                    Text(
-                                                      state.selectedConversation!
-                                                              .isOnline
-                                                          ? 'En ligne'
-                                                          : 'Hors ligne',
-                                                      style: TextStyle(
-                                                        fontSize: 12,
-                                                        color: Colors
-                                                            .grey.shade600,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ],
-                                            ),
-                                          ],
+                                                    ],
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
                                         ),
-                                      ),
-                                      // Liste des messages
-                                      Expanded(
-                                        child: state.messagesByConversation
-                                                    .containsKey(state
-                                                        .selectedConversation!
-                                                        .id) &&
-                                                state
-                                                    .messagesByConversation[state
-                                                        .selectedConversation!
-                                                        .id]!
-                                                    .isNotEmpty
-                                            ? ListView.builder(
-                                                controller: _scrollController,
-                                                padding:
-                                                    const EdgeInsets.all(16.0),
-                                                itemCount: state
-                                                    .messagesByConversation[state
-                                                        .selectedConversation!
-                                                        .id]!
-                                                    .length,
-                                                itemBuilder: (context, index) {
-                                                  final message = state
-                                                          .messagesByConversation[
-                                                      state
+                                        // Liste des messages
+                                        Expanded(
+                                          child: state.messagesByConversation
+                                                      .containsKey(state
                                                           .selectedConversation!
-                                                          .id]![index];
-                                                  final bool isMe = message
-                                                          .senderId ==
-                                                      _currentUserId;
+                                                          .id) &&
+                                                  state
+                                                      .messagesByConversation[state
+                                                          .selectedConversation!
+                                                          .id]!
+                                                      .isNotEmpty
+                                              ? ListView.builder(
+                                                  controller: _scrollController,
+                                                  padding: const EdgeInsets.all(
+                                                      16.0),
+                                                  itemCount: state
+                                                      .messagesByConversation[state
+                                                          .selectedConversation!
+                                                          .id]!
+                                                      .length,
+                                                  itemBuilder:
+                                                      (context, index) {
+                                                    final message = state
+                                                            .messagesByConversation[
+                                                        state
+                                                            .selectedConversation!
+                                                            .id]![index];
+                                                    final bool isMe =
+                                                        message.senderId ==
+                                                            _currentUserId;
 
-                                                  return Padding(
-                                                    padding:
-                                                        const EdgeInsets.only(
-                                                            bottom: 12.0),
-                                                    child: Row(
-                                                      mainAxisAlignment: isMe
-                                                          ? MainAxisAlignment
-                                                              .end
-                                                          : MainAxisAlignment
-                                                              .start,
-                                                      crossAxisAlignment:
-                                                          CrossAxisAlignment
-                                                              .end,
-                                                      children: [
-                                                        // Avatar du participant (uniquement pour les messages reçus)
-                                                        if (!isMe &&
-                                                                index == 0 ||
-                                                            !isMe &&
-                                                                index > 0 &&
-                                                                state
-                                                                        .messagesByConversation[
-                                                                            state.selectedConversation!.id]![
-                                                                            index -
-                                                                                1]
-                                                                        .senderId ==
-                                                                    _currentUserId)
-                                                          Container(
-                                                            width: 28,
-                                                            height: 28,
-                                                            margin:
-                                                                const EdgeInsets
-                                                                    .only(
-                                                                    right: 8.0),
-                                                            decoration:
-                                                                BoxDecoration(
-                                                              shape: BoxShape
-                                                                  .circle,
-                                                              color: Colors.grey
-                                                                  .shade300,
-                                                              image: state
+                                                    return Padding(
+                                                      padding:
+                                                          const EdgeInsets.only(
+                                                              bottom: 12.0),
+                                                      child: Row(
+                                                        mainAxisAlignment: isMe
+                                                            ? MainAxisAlignment
+                                                                .end
+                                                            : MainAxisAlignment
+                                                                .start,
+                                                        crossAxisAlignment:
+                                                            CrossAxisAlignment
+                                                                .end,
+                                                        children: [
+                                                          // Avatar du participant (uniquement pour les messages reçus)
+                                                          if (!isMe &&
+                                                                  index == 0 ||
+                                                              !isMe &&
+                                                                  index > 0 &&
+                                                                  state
+                                                                          .messagesByConversation[state
+                                                                              .selectedConversation!
+                                                                              .id]![index - 1]
+                                                                          .senderId ==
+                                                                      _currentUserId)
+                                                            Container(
+                                                              width: 28,
+                                                              height: 28,
+                                                              margin:
+                                                                  const EdgeInsets
+                                                                      .only(
+                                                                      right:
+                                                                          8.0),
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                shape: BoxShape
+                                                                    .circle,
+                                                                color: Colors
+                                                                    .grey
+                                                                    .shade300,
+                                                                image: state
+                                                                        .selectedConversation!
+                                                                        .participantImage
+                                                                        .isNotEmpty
+                                                                    ? DecorationImage(
+                                                                        image: AssetImage(state
+                                                                            .selectedConversation!
+                                                                            .participantImage),
+                                                                        fit: BoxFit
+                                                                            .cover,
+                                                                      )
+                                                                    : null,
+                                                                border: Border.all(
+                                                                    color: Colors
+                                                                        .white,
+                                                                    width: 1.5),
+                                                                boxShadow: [
+                                                                  BoxShadow(
+                                                                    color: Colors
+                                                                        .black12,
+                                                                    blurRadius:
+                                                                        3,
+                                                                    offset:
+                                                                        Offset(
+                                                                            0,
+                                                                            1),
+                                                                  ),
+                                                                ],
+                                                              ),
+                                                              child: state
                                                                       .selectedConversation!
                                                                       .participantImage
-                                                                      .isNotEmpty
-                                                                  ? DecorationImage(
-                                                                      image: AssetImage(state
-                                                                          .selectedConversation!
-                                                                          .participantImage),
-                                                                      fit: BoxFit
-                                                                          .cover,
+                                                                      .isEmpty
+                                                                  ? Center(
+                                                                      child:
+                                                                          Text(
+                                                                        state
+                                                                            .selectedConversation!
+                                                                            .participantName[0]
+                                                                            .toUpperCase(),
+                                                                        style:
+                                                                            TextStyle(
+                                                                          color:
+                                                                              Colors.white,
+                                                                          fontWeight:
+                                                                              FontWeight.bold,
+                                                                          fontSize:
+                                                                              12,
+                                                                        ),
+                                                                      ),
                                                                     )
                                                                   : null,
-                                                              border: Border.all(
-                                                                  color: Colors
+                                                            )
+                                                          else if (!isMe)
+                                                            SizedBox(
+                                                                width:
+                                                                    36), // Espacement pour aligner les messages
+
+                                                          Container(
+                                                            padding:
+                                                                const EdgeInsets
+                                                                    .symmetric(
+                                                                    horizontal:
+                                                                        14.0,
+                                                                    vertical:
+                                                                        10.0),
+                                                            decoration:
+                                                                BoxDecoration(
+                                                              color: isMe
+                                                                  ? Color(
+                                                                      0xFFE6F8E6)
+                                                                  : Colors
                                                                       .white,
-                                                                  width: 1.5),
+                                                              borderRadius:
+                                                                  BorderRadius
+                                                                      .only(
+                                                                topLeft: Radius
+                                                                    .circular(
+                                                                        18.0),
+                                                                topRight: Radius
+                                                                    .circular(
+                                                                        18.0),
+                                                                bottomLeft: isMe
+                                                                    ? Radius
+                                                                        .circular(
+                                                                            18.0)
+                                                                    : Radius
+                                                                        .circular(
+                                                                            4.0),
+                                                                bottomRight: isMe
+                                                                    ? Radius
+                                                                        .circular(
+                                                                            4.0)
+                                                                    : Radius
+                                                                        .circular(
+                                                                            18.0),
+                                                              ),
                                                               boxShadow: [
                                                                 BoxShadow(
                                                                   color: Colors
-                                                                      .black12,
+                                                                      .black
+                                                                      .withOpacity(
+                                                                          0.05),
                                                                   blurRadius: 3,
                                                                   offset:
                                                                       Offset(
                                                                           0, 1),
                                                                 ),
                                                               ],
-                                                            ),
-                                                            child: state
-                                                                    .selectedConversation!
-                                                                    .participantImage
-                                                                    .isEmpty
-                                                                ? Center(
-                                                                    child: Text(
-                                                                      state
-                                                                          .selectedConversation!
-                                                                          .participantName[
-                                                                              0]
-                                                                          .toUpperCase(),
-                                                                      style:
-                                                                          TextStyle(
-                                                                        color: Colors
-                                                                            .white,
-                                                                        fontWeight:
-                                                                            FontWeight.bold,
-                                                                        fontSize:
-                                                                            12,
-                                                                      ),
-                                                                    ),
-                                                                  )
-                                                                : null,
-                                                          )
-                                                        else if (!isMe)
-                                                          SizedBox(
-                                                              width:
-                                                                  36), // Espacement pour aligner les messages
-
-                                                        Container(
-                                                          padding:
-                                                              const EdgeInsets
-                                                                  .symmetric(
-                                                                  horizontal:
-                                                                      14.0,
-                                                                  vertical:
-                                                                      10.0),
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: isMe
-                                                                ? Color(
-                                                                    0xFFE6F8E6)
-                                                                : Colors.white,
-                                                            borderRadius:
-                                                                BorderRadius
-                                                                    .only(
-                                                              topLeft: Radius
-                                                                  .circular(
-                                                                      18.0),
-                                                              topRight: Radius
-                                                                  .circular(
-                                                                      18.0),
-                                                              bottomLeft: isMe
-                                                                  ? Radius
-                                                                      .circular(
-                                                                          18.0)
-                                                                  : Radius
-                                                                      .circular(
-                                                                          4.0),
-                                                              bottomRight: isMe
-                                                                  ? Radius
-                                                                      .circular(
-                                                                          4.0)
-                                                                  : Radius
-                                                                      .circular(
-                                                                          18.0),
-                                                            ),
-                                                            boxShadow: [
-                                                              BoxShadow(
-                                                                color: Colors
-                                                                    .black
-                                                                    .withOpacity(
-                                                                        0.05),
-                                                                blurRadius: 3,
-                                                                offset: Offset(
-                                                                    0, 1),
-                                                              ),
-                                                            ],
-                                                            border: Border.all(
-                                                                color: isMe
-                                                                    ? Colors
-                                                                        .green
-                                                                        .shade100
-                                                                    : Colors
-                                                                        .grey
-                                                                        .shade200,
-                                                                width: 1),
-                                                          ),
-                                                          constraints:
-                                                              BoxConstraints(
-                                                            maxWidth: MediaQuery.of(
-                                                                        context)
-                                                                    .size
-                                                                    .width *
-                                                                0.65,
-                                                          ),
-                                                          child: Column(
-                                                            crossAxisAlignment: isMe
-                                                                ? CrossAxisAlignment
-                                                                    .end
-                                                                : CrossAxisAlignment
-                                                                    .start,
-                                                            children: [
-                                                              Text(
-                                                                message.content,
-                                                                style:
-                                                                    TextStyle(
-                                                                  fontSize: 15,
+                                                              border: Border.all(
                                                                   color: isMe
                                                                       ? Colors
-                                                                          .black87
+                                                                          .green
+                                                                          .shade100
                                                                       : Colors
-                                                                          .black87,
-                                                                  height: 1.3,
-                                                                ),
-                                                              ),
-                                                              const SizedBox(
-                                                                  height: 4),
-                                                              Row(
-                                                                mainAxisSize:
-                                                                    MainAxisSize
-                                                                        .min,
-                                                                children: [
-                                                                  Text(
-                                                                    _formatMessageTime(
-                                                                        message
-                                                                            .timestamp),
-                                                                    style:
-                                                                        TextStyle(
-                                                                      fontSize:
-                                                                          11,
-                                                                      color: Colors
                                                                           .grey
-                                                                          .shade600,
-                                                                      fontWeight:
-                                                                          FontWeight
-                                                                              .w500,
-                                                                    ),
+                                                                          .shade200,
+                                                                  width: 1),
+                                                            ),
+                                                            constraints:
+                                                                BoxConstraints(
+                                                              maxWidth: MediaQuery.of(
+                                                                          context)
+                                                                      .size
+                                                                      .width *
+                                                                  0.65,
+                                                            ),
+                                                            child: Column(
+                                                              crossAxisAlignment: isMe
+                                                                  ? CrossAxisAlignment
+                                                                      .end
+                                                                  : CrossAxisAlignment
+                                                                      .start,
+                                                              children: [
+                                                                Text(
+                                                                  message
+                                                                      .content,
+                                                                  style:
+                                                                      TextStyle(
+                                                                    fontSize:
+                                                                        15,
+                                                                    color: isMe
+                                                                        ? Colors
+                                                                            .black87
+                                                                        : Colors
+                                                                            .black87,
+                                                                    height: 1.3,
                                                                   ),
-                                                                  if (isMe) ...[
-                                                                    const SizedBox(
-                                                                        width:
-                                                                            4),
-                                                                    Icon(
-                                                                      message.status ==
-                                                                              MessageStatus.seen
-                                                                          ? Icons.done_all
-                                                                          : message.status == MessageStatus.delivered
-                                                                              ? Icons.done_all
-                                                                              : message.status == MessageStatus.sent
-                                                                                  ? Icons.done
-                                                                                  : Icons.access_time,
-                                                                      size: 14,
-                                                                      color: message.status ==
-                                                                              MessageStatus
-                                                                                  .seen
-                                                                          ? Colors
-                                                                              .blue
-                                                                          : Colors
-                                                                              .grey,
+                                                                ),
+                                                                const SizedBox(
+                                                                    height: 4),
+                                                                Row(
+                                                                  mainAxisSize:
+                                                                      MainAxisSize
+                                                                          .min,
+                                                                  children: [
+                                                                    Text(
+                                                                      _formatMessageTime(
+                                                                          message
+                                                                              .timestamp),
+                                                                      style:
+                                                                          TextStyle(
+                                                                        fontSize:
+                                                                            11,
+                                                                        color: Colors
+                                                                            .grey
+                                                                            .shade600,
+                                                                        fontWeight:
+                                                                            FontWeight.w500,
+                                                                      ),
                                                                     ),
+                                                                    if (isMe) ...[
+                                                                      const SizedBox(
+                                                                          width:
+                                                                              4),
+                                                                      Icon(
+                                                                        message.status ==
+                                                                                MessageStatus.seen
+                                                                            ? Icons.done_all
+                                                                            : message.status == MessageStatus.delivered
+                                                                                ? Icons.done_all
+                                                                                : message.status == MessageStatus.sent
+                                                                                    ? Icons.done
+                                                                                    : Icons.access_time,
+                                                                        size:
+                                                                            14,
+                                                                        color: message.status ==
+                                                                                MessageStatus.seen
+                                                                            ? Colors.blue
+                                                                            : Colors.grey,
+                                                                      ),
+                                                                    ],
                                                                   ],
-                                                                ],
-                                                              ),
-                                                            ],
+                                                                ),
+                                                              ],
+                                                            ),
                                                           ),
-                                                        ),
-                                                      ],
+                                                        ],
+                                                      ),
+                                                    );
+                                                  },
+                                                )
+                                              : Center(
+                                                  child: Text('Aucun message')),
+                                        ),
+                                        // Zone de saisie
+                                        Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            if (state.partnerTyping)
+                                              Padding(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 16,
+                                                        vertical: 4),
+                                                child: Align(
+                                                  alignment:
+                                                      Alignment.centerLeft,
+                                                  child: Text(
+                                                    'en train d\'écrire…',
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      fontStyle:
+                                                          FontStyle.italic,
+                                                      color:
+                                                          Colors.grey.shade600,
                                                     ),
-                                                  );
-                                                },
-                                              )
-                                            : Center(
-                                                child: Text('Aucun message')),
-                                      ),
-                                      // Zone de saisie
-                                      Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          if (state.partnerTyping)
-                                            Padding(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                      horizontal: 16,
-                                                      vertical: 4),
-                                              child: Align(
-                                                alignment:
-                                                    Alignment.centerLeft,
-                                                child: Text(
-                                                  'en train d\'écrire…',
-                                                  style: TextStyle(
-                                                    fontSize: 12,
-                                                    fontStyle: FontStyle.italic,
-                                                    color:
-                                                        Colors.grey.shade600,
                                                   ),
                                                 ),
                                               ),
-                                            ),
-                                          if (_selectedImage != null)
-                                            Padding(
+                                            if (_selectedImage != null)
+                                              Padding(
+                                                padding:
+                                                    const EdgeInsets.fromLTRB(
+                                                        12, 8, 12, 0),
+                                                child: Stack(
+                                                  children: [
+                                                    ClipRRect(
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              12),
+                                                      child: Image.file(
+                                                        _selectedImage!,
+                                                        height: 96,
+                                                        width: 96,
+                                                        fit: BoxFit.cover,
+                                                      ),
+                                                    ),
+                                                    Positioned(
+                                                      top: 0,
+                                                      right: 0,
+                                                      child: IconButton(
+                                                        icon: const Icon(
+                                                            Icons.close,
+                                                            size: 18),
+                                                        style: IconButton
+                                                            .styleFrom(
+                                                          backgroundColor:
+                                                              Colors.black54,
+                                                          foregroundColor:
+                                                              Colors.white,
+                                                          padding:
+                                                              EdgeInsets.zero,
+                                                          minimumSize:
+                                                              const Size(
+                                                                  28, 28),
+                                                        ),
+                                                        onPressed: () =>
+                                                            setState(() =>
+                                                                _selectedImage =
+                                                                    null),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            Container(
                                               padding:
-                                                  const EdgeInsets.fromLTRB(
-                                                      12, 8, 12, 0),
-                                              child: Stack(
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 8.0,
+                                                      vertical: 8.0),
+                                              decoration: BoxDecoration(
+                                                color: Colors.white,
+                                                border: Border(
+                                                  top: BorderSide(
+                                                    color: Colors.grey
+                                                        .withOpacity(0.3),
+                                                    width: 1,
+                                                  ),
+                                                ),
+                                              ),
+                                              child: Row(
                                                 children: [
-                                                  ClipRRect(
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                            12),
-                                                    child: Image.file(
-                                                      _selectedImage!,
-                                                      height: 96,
-                                                      width: 96,
-                                                      fit: BoxFit.cover,
+                                                  // Bouton photo du problème
+                                                  IconButton(
+                                                    icon: const Icon(
+                                                        Icons.image_outlined),
+                                                    tooltip:
+                                                        'Photo du problème',
+                                                    onPressed: _pickImage,
+                                                  ),
+                                                  // Bouton vocal
+                                                  Padding(
+                                                    padding: const EdgeInsets
+                                                        .symmetric(
+                                                        horizontal: 2),
+                                                    child: VoiceRecorderWidget(
+                                                      onSend: (audioFile,
+                                                          duration) {
+                                                        final conv = _chatBloc
+                                                            .state
+                                                            .selectedConversation;
+                                                        if (conv == null)
+                                                          return;
+                                                        _chatBloc.add(
+                                                            SendAudioMessage(
+                                                          conversationId:
+                                                              conv.id,
+                                                          audioFile: audioFile,
+                                                          dureeFichier:
+                                                              duration,
+                                                        ));
+                                                      },
                                                     ),
                                                   ),
-                                                  Positioned(
-                                                    top: 0,
-                                                    right: 0,
-                                                    child: IconButton(
-                                                      icon: const Icon(
-                                                          Icons.close,
-                                                          size: 18),
-                                                      style: IconButton
-                                                          .styleFrom(
-                                                        backgroundColor:
-                                                            Colors.black54,
-                                                        foregroundColor:
-                                                            Colors.white,
-                                                        padding:
-                                                            EdgeInsets.zero,
-                                                        minimumSize:
-                                                            const Size(
-                                                                28, 28),
+                                                  // Champ de texte
+                                                  Expanded(
+                                                    child: TextField(
+                                                      controller:
+                                                          _messageController,
+                                                      focusNode: _focusNode,
+                                                      onChanged:
+                                                          _onMessageChanged,
+                                                      decoration:
+                                                          InputDecoration(
+                                                        hintText:
+                                                            'Message (optionnel)',
+                                                        border:
+                                                            OutlineInputBorder(
+                                                          borderRadius:
+                                                              BorderRadius
+                                                                  .circular(
+                                                                      20.0),
+                                                          borderSide:
+                                                              BorderSide.none,
+                                                        ),
+                                                        filled: true,
+                                                        fillColor: Colors
+                                                            .grey.shade100,
+                                                        contentPadding:
+                                                            const EdgeInsets
+                                                                .symmetric(
+                                                                horizontal:
+                                                                    16.0,
+                                                                vertical: 8.0),
                                                       ),
-                                                      onPressed: () =>
-                                                          setState(() =>
-                                                              _selectedImage =
-                                                                  null),
                                                     ),
+                                                  ),
+                                                  // Bouton d'envoi texte
+                                                  IconButton(
+                                                    icon: Icon(Icons.send,
+                                                        color: Colors.green),
+                                                    onPressed: _sendMessage,
                                                   ),
                                                 ],
                                               ),
                                             ),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 8.0, vertical: 8.0),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white,
-                                          border: Border(
-                                            top: BorderSide(
-                                              color:
-                                                  Colors.grey.withOpacity(0.3),
-                                              width: 1,
-                                            ),
-                                          ),
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            // Bouton photo du problème
-                                            IconButton(
-                                              icon: const Icon(Icons.image_outlined),
-                                              tooltip: 'Photo du problème',
-                                              onPressed: _pickImage,
-                                            ),
-                                            // Bouton vocal
-                                            Padding(
-                                              padding: const EdgeInsets.symmetric(horizontal: 2),
-                                              child: VoiceRecorderWidget(
-                                                onSend: (audioFile, duration) {
-                                                  final conv = _chatBloc.state.selectedConversation;
-                                                  if (conv == null) return;
-                                                  _chatBloc.add(SendAudioMessage(
-                                                    conversationId: conv.id,
-                                                    audioFile: audioFile,
-                                                    dureeFichier: duration,
-                                                  ));
-                                                },
-                                              ),
-                                            ),
-                                            // Champ de texte
-                                            Expanded(
-                                              child: TextField(
-                                                controller: _messageController,
-                                                focusNode: _focusNode,
-                                                onChanged: _onMessageChanged,
-                                                decoration: InputDecoration(
-                                                  hintText:
-                                                      'Message (optionnel)',
-                                                  border: OutlineInputBorder(
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                            20.0),
-                                                    borderSide: BorderSide.none,
-                                                  ),
-                                                  filled: true,
-                                                  fillColor:
-                                                      Colors.grey.shade100,
-                                                  contentPadding:
-                                                      const EdgeInsets
-                                                          .symmetric(
-                                                          horizontal: 16.0,
-                                                          vertical: 8.0),
-                                                ),
-                                              ),
-                                            ),
-                                            // Bouton d'envoi texte
-                                            IconButton(
-                                              icon: Icon(Icons.send,
-                                                  color: Colors.green),
-                                              onPressed: _sendMessage,
-                                            ),
                                           ],
                                         ),
-                                      ),
-                                        ],
-                                      ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
-                                ),
+                          ),
                         ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
-          ), // Column
-            ), // SafeArea
-          ); // Scaffold
-        },
+              ],
+            ), // Column
+          ), // SafeArea
+        ); // Scaffold
+      },
     ); // BlocConsumer
   }
 

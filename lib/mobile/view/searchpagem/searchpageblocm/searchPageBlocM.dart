@@ -1,17 +1,14 @@
-import 'package:sdealsmobile/mobile/view/searchpagem/searchpageblocm/searchPageEventM.dart';
-import 'package:sdealsmobile/mobile/view/searchpagem/searchpageblocm/searchPageStateM.dart';
-
 import 'package:bloc/bloc.dart';
-
-import 'package:sdealsmobile/data/models/categorie.dart';
 import 'package:sdealsmobile/data/services/api_client.dart';
 import 'package:sdealsmobile/data/services/local_storage_service.dart';
-
-
+import 'package:sdealsmobile/mobile/view/searchpagem/searchpageblocm/searchPageEventM.dart';
+import 'package:sdealsmobile/mobile/view/searchpagem/searchpageblocm/searchPageStateM.dart';
 
 class SearchPageBlocM extends Bloc<SearchPageEventM, SearchPageStateM> {
   final ApiClient _apiClient = ApiClient();
   final LocalStorageService _localStorageService = LocalStorageService();
+  int _suggestionRequestId = 0;
+  int _searchRequestId = 0;
 
   SearchPageBlocM() : super(SearchPageStateM.initial()) {
     on<FetchSuggestions>(_onFetchSuggestions);
@@ -22,22 +19,31 @@ class SearchPageBlocM extends Bloc<SearchPageEventM, SearchPageStateM> {
     on<ClearHistory>(_onClearHistory);
     on<RemoveFromHistory>(_onRemoveFromHistory);
     on<UpdateFilters>(_onUpdateFilters);
-    
+
     // Legacy support
     on<LoadCategorieDataM>((event, emit) {});
   }
 
-  Future<void> _onLoadHistory(LoadHistory event, Emitter<SearchPageStateM> emit) async {
+  Future<void> _onLoadHistory(
+    LoadHistory event,
+    Emitter<SearchPageStateM> emit,
+  ) async {
     final history = await _localStorageService.getSearchHistory();
     emit(state.copyWith(history: history));
   }
 
-  Future<void> _onAddToHistory(AddToHistory event, Emitter<SearchPageStateM> emit) async {
+  Future<void> _onAddToHistory(
+    AddToHistory event,
+    Emitter<SearchPageStateM> emit,
+  ) async {
     await _localStorageService.addToHistory(event.query);
-    add(LoadHistory()); // Rafraîchir l'historique
+    add(LoadHistory());
   }
 
-  Future<void> _onClearHistory(ClearHistory event, Emitter<SearchPageStateM> emit) async {
+  Future<void> _onClearHistory(
+    ClearHistory event,
+    Emitter<SearchPageStateM> emit,
+  ) async {
     await _localStorageService.clearHistory();
     emit(state.copyWith(history: []));
   }
@@ -55,19 +61,25 @@ class SearchPageBlocM extends Bloc<SearchPageEventM, SearchPageStateM> {
     FetchSuggestions event,
     Emitter<SearchPageStateM> emit,
   ) async {
-    // Si vide, on vide les suggestions API mais on garde l'historique
     if (event.query.trim().isEmpty) {
       final history = await _localStorageService.getSearchHistory();
       emit(state.copyWith(suggestions: [], history: history));
       return;
     }
 
-    // Parité web : suggestions dès 1 caractère
+    if (event.query.trim().length < 2) {
+      emit(state.copyWith(suggestions: []));
+      return;
+    }
+
+    final requestQuery = event.query.trim();
+    final requestId = ++_suggestionRequestId;
     try {
-      final suggestions = await _apiClient.getSuggestions(event.query.trim());
+      final suggestions = await _apiClient.getSuggestions(requestQuery);
+      if (requestId != _suggestionRequestId) return;
       emit(state.copyWith(suggestions: suggestions));
     } catch (e) {
-      print('Erreur suggestions: $e');
+      if (requestId != _suggestionRequestId) return;
       emit(state.copyWith(suggestions: []));
     }
   }
@@ -76,30 +88,44 @@ class SearchPageBlocM extends Bloc<SearchPageEventM, SearchPageStateM> {
     PerformGlobalSearch event,
     Emitter<SearchPageStateM> emit,
   ) async {
-    // Sauvegarder dans l'historique
-    if (event.query.isNotEmpty) {
-      await _localStorageService.addToHistory(event.query);
-      // On rafraîchit l'historique en fond
-      final history = await _localStorageService.getSearchHistory();
-      emit(state.copyWith(isLoading: true, query: event.query, error: '', history: history));
-    } else {
-      emit(state.copyWith(isLoading: true, query: event.query, error: ''));
+    final query = event.query.trim();
+    if (query.length < 2) {
+      emit(state.copyWith(
+        isLoading: false,
+        hasSearched: false,
+        query: query,
+        error: '',
+        suggestions: [],
+      ));
+      return;
     }
+
+    await _localStorageService.addToHistory(query);
+    final history = await _localStorageService.getSearchHistory();
+    final requestId = ++_searchRequestId;
+    emit(state.copyWith(
+      isLoading: true,
+      query: query,
+      error: '',
+      history: history,
+    ));
 
     try {
       final result = await _apiClient.searchGlobal(
-        event.query,
+        query,
         minPrice: state.minPrice != 0 ? state.minPrice.toInt() : null,
         maxPrice: state.maxPrice != 1000000 ? state.maxPrice.toInt() : null,
         city: state.city.isNotEmpty ? state.city : null,
       );
-      
+      if (requestId != _searchRequestId) return;
+
       final results = result['results'] ?? {};
       final counts = result['counts'] ?? {};
 
       emit(state.copyWith(
         isLoading: false,
         hasSearched: true,
+        query: query,
         services: results['services'] ?? [],
         articles: results['articles'] ?? [],
         freelances: results['freelances'] ?? [],
@@ -108,10 +134,12 @@ class SearchPageBlocM extends Bloc<SearchPageEventM, SearchPageStateM> {
         counts: Map<String, int>.from(counts),
       ));
     } catch (e) {
+      if (requestId != _searchRequestId) return;
       emit(state.copyWith(
         isLoading: false,
         hasSearched: true,
-        error: "Erreur lors de la recherche: $e",
+        query: query,
+        error: 'Erreur lors de la recherche: $e',
       ));
     }
   }
@@ -122,15 +150,11 @@ class SearchPageBlocM extends Bloc<SearchPageEventM, SearchPageStateM> {
       maxPrice: event.maxPrice,
       city: event.city,
     ));
-    // Optionnel : Lancer la recherche automatiquement ou attendre un bouton "Appliquer"
-    // Ici, on met juste à jour l'état UI, l'event PerformGlobalSearch utilisera ces valeurs.
   }
 
-  Future<void> _onClearSearch(
-    ClearSearch event,
-    Emitter<SearchPageStateM> emit,
-  ) async {
-    final history = await _localStorageService.getSearchHistory();
-    emit(SearchPageStateM.initial().copyWith(history: history));
+  void _onClearSearch(ClearSearch event, Emitter<SearchPageStateM> emit) {
+    _suggestionRequestId++;
+    _searchRequestId++;
+    emit(SearchPageStateM.initial().copyWith(history: state.history));
   }
 }

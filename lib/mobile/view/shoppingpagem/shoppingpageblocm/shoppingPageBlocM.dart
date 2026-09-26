@@ -182,12 +182,12 @@ class ShoppingPageBlocM extends Bloc<ShoppingPageEventM, ShoppingPageStateM> {
         return;
       }
 
-      // Pas de catalogue fictif : liste vide plutôt que faux succès
+      // Catalogue vide valide (endpoint OK) — pas une erreur réseau.
       emit(state.copyWith(
         products: const [],
         filteredProducts: const [],
         isLoading: false,
-        error: 'Aucun produit disponible',
+        error: '',
       ));
     } catch (error) {
       emit(state.copyWith(error: error.toString(), isLoading: false));
@@ -835,7 +835,7 @@ class ShoppingPageBlocM extends Bloc<ShoppingPageEventM, ShoppingPageStateM> {
     } catch (error) {
       print('❌ Erreur checkout: $error');
       emit(state.copyWith(
-        cartError: 'Impossible de finaliser la commande: ${error.toString()}',
+        cartError: ApiException.userFacing(error),
         isCartLoading: false,
       ));
     }

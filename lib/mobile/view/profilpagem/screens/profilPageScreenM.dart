@@ -1,10 +1,13 @@
 import '../../../../data/services/authCubit.dart';
+import '../../../../data/services/auth_professional_access.dart';
 import '../../../../data/utils/display_text.dart';
 import '../../../../design_system/design_system.dart';
-import 'package:characters/characters.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import '../../common/auth_completion.dart';
+import '../../common/publish_options.dart';
+import '../../common/widgets/client_universe_pictograms.dart';
 import '../../orderpagem/screens/service_requests_list_screen.dart';
 import '../profilpageblocm/profilPageBlocM.dart';
 import 'edit_profile_screen.dart';
@@ -33,6 +36,8 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
   static const String _guestProfilIllustration = 'assets/profil_vide.png';
 
   static const double _hPad = 20;
+  static const EdgeInsets _groupPadding =
+      EdgeInsets.symmetric(horizontal: 16, vertical: 12);
 
   @override
   void initState() {
@@ -114,137 +119,198 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
             }
 
             return ListView(
-              padding: const EdgeInsets.only(bottom: 32),
+              padding: const EdgeInsets.only(bottom: 24),
               children: [
                 _buildPageTitle('Profil'),
                 _buildProfileHeader(context),
                 const SizedBox(height: 8),
                 _buildSectionLabel('Activité'),
-                MenuItem(
-                  icon: Icons.inventory_2_outlined,
-                  title: 'Mes commandes',
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const ServiceRequestsListScreen(),
-                      ),
-                    );
-                  },
-                ),
-                MenuItem(
-                  icon: Icons.favorite_border,
-                  title: 'Favoris',
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => BlocProvider(
-                          create: (context) => FavoritePageBlocM(),
-                          child: const FavoritePageScreenM(),
+                _profileGroup([
+                  MenuItem(
+                    icon: Icons.shopping_bag_outlined,
+                    title: 'Mes commandes',
+                    padding: _groupPadding,
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const ServiceRequestsListScreen(),
                         ),
-                      ),
-                    );
-                  },
-                ),
-                MenuItem(
-                  icon: Icons.rate_review_outlined,
-                  title: 'Avis & évaluations',
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => BlocProvider(
-                          create: (context) => AvisPageBlocM(),
-                          child: const AvisPageScreenM(),
+                      );
+                    },
+                  ),
+                  MenuItem(
+                    icon: Icons.favorite_border,
+                    title: 'Favoris',
+                    padding: _groupPadding,
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => BlocProvider(
+                            create: (context) => FavoritePageBlocM(),
+                            child: const FavoritePageScreenM(),
+                          ),
                         ),
-                      ),
-                    );
-                  },
-                ),
-                MenuItem(
-                  icon: Icons.history,
-                  title: 'Historique',
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => BlocProvider(
-                          create: (context) => HistoryPageBlocM(),
-                          child: const HistoryPageScreenM(),
+                      );
+                    },
+                  ),
+                  MenuItem(
+                    icon: Icons.star_outline,
+                    title: 'Avis et évaluations',
+                    padding: _groupPadding,
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => BlocProvider(
+                            create: (context) => AvisPageBlocM(),
+                            child: const AvisPageScreenM(),
+                          ),
                         ),
-                      ),
-                    );
-                  },
-                ),
-                MenuItem(
-                  icon: Icons.notifications_outlined,
-                  title: 'Notifications',
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => BlocProvider(
-                          create: (context) => AlertPageBlocM(),
-                          child: const AlertPageScreenM(),
+                      );
+                    },
+                  ),
+                  MenuItem(
+                    icon: Icons.history,
+                    title: 'Historique',
+                    padding: _groupPadding,
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => BlocProvider(
+                            create: (context) => HistoryPageBlocM(),
+                            child: const HistoryPageScreenM(),
+                          ),
                         ),
-                      ),
-                    );
-                  },
-                ),
+                      );
+                    },
+                  ),
+                  MenuItem(
+                    icon: Icons.notifications_none_rounded,
+                    title: 'Notifications',
+                    padding: _groupPadding,
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => BlocProvider(
+                            create: (context) => AlertPageBlocM(),
+                            child: const AlertPageScreenM(),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ]),
                 _buildPrestataireModeSection(),
+                _buildSectionLabel('Professionnel'),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: _hPad),
+                  child: Material(
+                    color: SDColors.primary50,
+                    borderRadius: BorderRadius.circular(SDSpacing.radiusCard),
+                    clipBehavior: Clip.antiAlias,
+                    child: MenuItem(
+                      icon: Icons.handyman_outlined,
+                      leading: const ClientUniversePictogram.metiers(size: 32),
+                      title: SDClientNav.becomeProfessional,
+                      subtitle: 'Proposer vos services sur Soutrali Deals',
+                      titleFontWeight: FontWeight.w600,
+                      padding: _groupPadding,
+                      onTap: () => showPublishOptions(context),
+                    ),
+                  ),
+                ),
                 _buildSectionLabel('Compte'),
-                MenuItem(
-                  icon: Icons.settings_outlined,
-                  title: 'Paramètres',
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const ProfileSettingsHubScreen(),
-                      ),
-                    );
-                  },
-                ),
-                MenuItem(
-                  icon: Icons.location_on_outlined,
-                  title: 'Localisation',
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => BlocProvider(
-                          create: (context) => LocationPageBlocM(),
-                          child: const LocationPageScreenM(),
+                _profileGroup([
+                  MenuItem(
+                    icon: Icons.settings_outlined,
+                    title: 'Paramètres',
+                    padding: _groupPadding,
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const ProfileSettingsHubScreen(),
                         ),
-                      ),
-                    );
-                  },
-                ),
-                MenuItem(
-                  icon: Icons.help_outline,
-                  title: 'Aide & Support',
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const HelpSupportScreen(),
-                      ),
-                    );
-                  },
-                ),
-                MenuItem(
-                  icon: Icons.info_outline,
-                  title: 'À propos',
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const AboutScreen(),
-                      ),
-                    );
-                  },
-                ),
-                MenuItem(
-                  icon: Icons.logout,
-                  title: 'Se déconnecter',
-                  isLogout: true,
-                  onTap: _showLogoutDialog,
+                      );
+                    },
+                  ),
+                  MenuItem(
+                    icon: Icons.location_on_outlined,
+                    title: 'Localisation',
+                    padding: _groupPadding,
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => BlocProvider(
+                            create: (context) => LocationPageBlocM(),
+                            child: const LocationPageScreenM(),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  MenuItem(
+                    icon: Icons.help_outline,
+                    title: 'Aide et support',
+                    padding: _groupPadding,
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const HelpSupportScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  MenuItem(
+                    icon: Icons.info_outline,
+                    title: 'À propos',
+                    padding: _groupPadding,
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const AboutScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ]),
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: MenuItem(
+                    icon: Icons.logout,
+                    title: 'Se déconnecter',
+                    isLogout: true,
+                    onTap: _showLogoutDialog,
+                  ),
                 ),
               ],
             );
           },
+        ),
+      ),
+    );
+  }
+
+  /// Surface commune pour toute liste de menus standards du Profil.
+  /// Fond [SDColors.neutral100] (#F5F5F5), proche de #F6F6F6. Pas de carte verte.
+  Widget _profileGroup(List<Widget> children) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: _hPad),
+      child: Material(
+        color: SDColors.neutral100,
+        borderRadius: BorderRadius.circular(SDSpacing.radiusCard),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          children: [
+            for (var i = 0; i < children.length; i++) ...[
+              if (i > 0)
+                const Divider(
+                  height: 1,
+                  color: SDColors.neutral200,
+                  indent: 52,
+                ),
+              children[i],
+            ],
+          ],
         ),
       ),
     );
@@ -265,7 +331,7 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
 
   Widget _buildSectionLabel(String title) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(_hPad, 28, _hPad, 4),
+      padding: const EdgeInsets.fromLTRB(_hPad, 24, _hPad, 8),
       child: Text(
         title,
         style: SDTypography.titleMedium.copyWith(
@@ -278,85 +344,96 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
 
   Widget _buildProfileHeader(BuildContext context) {
     final authState = context.read<AuthCubit>().state;
-    final String rawName = authState is AuthAuthenticated
-        ? authState.utilisateur.fullName
-        : '';
-    final String userName =
-        rawName.isEmpty ? 'Utilisateur' : rawName;
-    final String userEmail = authState is AuthAuthenticated
-        ? (authState.utilisateur.email ?? '')
-        : '';
+    final String rawName =
+        authState is AuthAuthenticated ? authState.utilisateur.fullName : '';
+    final String userName = rawName.isEmpty ? 'Utilisateur' : rawName;
     final String? userPhoto = authState is AuthAuthenticated
         ? safeImageUrl(authState.utilisateur.photoProfil)
         : null;
-
     final hasNetworkPhoto = userPhoto != null;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(_hPad, 12, _hPad, 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          CircleAvatar(
-            radius: 32,
-            backgroundColor: SDColors.neutral200,
-            backgroundImage:
-                hasNetworkPhoto ? NetworkImage(userPhoto) as ImageProvider : null,
-            child: !hasNetworkPhoto
-                ? Text(
-                    userName.isNotEmpty
-                        ? userName.characters.first.toUpperCase()
-                        : 'U',
-                    style: SDTypography.titleLarge.copyWith(
-                      color: SDColors.neutral900,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  )
-                : null,
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  userName,
-                  style: SDTypography.titleLarge.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: SDColors.neutral900,
+      padding: const EdgeInsets.fromLTRB(_hPad, 4, _hPad, 8),
+      child: Material(
+        color: SDColors.primary50,
+        borderRadius: BorderRadius.circular(SDSpacing.radiusCard),
+        child: InkWell(
+          onTap: _navigateToEditProfile,
+          borderRadius: BorderRadius.circular(SDSpacing.radiusCard),
+          child: ConstrainedBox(
+            constraints:
+                const BoxConstraints(minHeight: SDSpacing.minTouchTarget),
+            child: Padding(
+              padding: const EdgeInsets.all(SDSpacing.spaceRelated),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 24,
+                    backgroundColor: SDColors.primary500,
+                    backgroundImage: hasNetworkPhoto
+                        ? NetworkImage(userPhoto) as ImageProvider
+                        : null,
+                    child: !hasNetworkPhoto
+                        ? Text(
+                            userName.isNotEmpty
+                                ? userName.characters.first.toUpperCase()
+                                : '?',
+                            style: SDTypography.cardTitle.copyWith(
+                              color: SDColors.white,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          )
+                        : null,
                   ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (userEmail.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    userEmail,
-                    style: SDTypography.bodyMedium.copyWith(
-                      color: SDColors.neutral600,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          userName,
+                          style: SDTypography.cardTitle.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: SDColors.neutral900,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.edit_outlined,
+                              size: 14,
+                              color: SDColors.primary700,
+                            ),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                'Modifier le profil',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: SDTypography.caption.copyWith(
+                                  color: SDColors.primary700,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const Icon(
+                    Icons.chevron_right,
+                    color: SDColors.neutral400,
+                    size: 22,
                   ),
                 ],
-                const SizedBox(height: 8),
-                GestureDetector(
-                  onTap: _navigateToEditProfile,
-                  child: Text(
-                    'Éditer le profil',
-                    style: SDTypography.bodyMedium.copyWith(
-                      color: SDColors.neutral900,
-                      fontWeight: FontWeight.w600,
-                      decoration: TextDecoration.underline,
-                      decorationColor: SDColors.neutral900,
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -415,8 +492,8 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
               onPressed: () async {
                 Navigator.pop(dialogContext);
                 await context.read<AuthCubit>().logout();
-                if (!mounted) return;
-                context.go('/login');
+                if (!context.mounted) return;
+                exitToGuestHome(context);
               },
               child: Text(
                 'Se déconnecter',
@@ -432,8 +509,7 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
   Widget _buildPrestataireModeSection() {
     return BlocBuilder<AuthCubit, AuthState>(
       builder: (context, state) {
-        if (state is! AuthAuthenticated ||
-            !state.roles.contains('PRESTATAIRE')) {
+        if (state is! AuthAuthenticated || !state.canOperatePrestataire) {
           return const SizedBox.shrink();
         }
 
@@ -441,11 +517,14 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildSectionLabel('Mes espaces'),
-            MenuItem(
-              icon: Icons.handyman_outlined,
-              title: 'Espace Métiers',
-              onTap: () => _switchToPrestataireMode(context),
-            ),
+            _profileGroup([
+              MenuItem(
+                icon: Icons.handyman_outlined,
+                title: 'Espace Métiers',
+                padding: _groupPadding,
+                onTap: () => _switchToPrestataireMode(context),
+              ),
+            ]),
           ],
         );
       },

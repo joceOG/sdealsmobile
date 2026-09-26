@@ -11,6 +11,7 @@ import '../../../../data/services/api_client.dart';
 import '../loginpageblocm/loginPageBlocM.dart';
 import '../loginpageblocm/loginPageEventM.dart';
 import '../loginpageblocm/loginPageStateM.dart';
+import '../../common/auth_completion.dart';
 import '../../common/utils/app_snackbar.dart';
 import '../../common/widgets/auth_form_widgets.dart';
 import '../../common/widgets/phone_country_field.dart';
@@ -77,50 +78,54 @@ class _LoginPageScreenMState extends State<LoginPageScreenM> {
       // Builder = context *sous* le provider (sinon Google Sign-In plante).
       child: Builder(
         builder: (context) {
-        return Scaffold(
-        backgroundColor: SDColors.white,
-        appBar: SDAppBar(
-          title: '',
-          useGradient: false,
-          backgroundColor: SDColors.white,
-          centerTitle: false,
-          showBackButton: false,
-          leading: AuthBackButton(
-            onPressed: () => Navigator.of(context).maybePop(),
-          ),
-        ),
-        body: BlocListener<LoginPageBlocM, LoginPageStateM>(
-          listener: (context, state) {
-            if (state is LoginPageSuccessM) {
-              if (state.phoneVerificationSuggested) {
-                _promptOptionalPhoneVerification(context, state);
-                return;
-              }
-              _finishLogin(context, state);
-            } else if (state is LoginPageFailureM) {
-              AppSnackBar.error(context, state.error);
-            } else if (state is LoginGooglePhoneRequiredM &&
-                state.errorMessage != null &&
-                state.phase == GooglePhonePhase.error) {
-              AppSnackBar.error(context, state.errorMessage!);
-            }
-          },
-          child: BlocBuilder<LoginPageBlocM, LoginPageStateM>(
-            builder: (context, state) {
-              if (state is LoginGooglePhoneRequiredM) {
-                return _buildGooglePhoneStep(context, state);
-              }
-              return _buildLoginForm(context, state);
-            },
-          ),
-        ),
-      );
+          return Scaffold(
+            backgroundColor: SDColors.white,
+            appBar: SDAppBar(
+              title: '',
+              useGradient: false,
+              backgroundColor: SDColors.white,
+              centerTitle: false,
+              showBackButton: false,
+              leading: AuthBackButton(
+                onPressed: () => Navigator.of(context).maybePop(),
+              ),
+            ),
+            body: BlocListener<LoginPageBlocM, LoginPageStateM>(
+              listener: (context, state) {
+                if (state is LoginPageSuccessM) {
+                  if (state.phoneVerificationSuggested) {
+                    _promptOptionalPhoneVerification(context, state);
+                    return;
+                  }
+                  _finishLogin(context, state);
+                } else if (state is LoginPageFailureM) {
+                  AppSnackBar.error(context, state.error);
+                } else if (state is LoginGooglePhoneRequiredM &&
+                    state.errorMessage != null &&
+                    state.phase == GooglePhonePhase.error) {
+                  AppSnackBar.error(context, state.errorMessage!);
+                }
+              },
+              child: BlocBuilder<LoginPageBlocM, LoginPageStateM>(
+                builder: (context, state) {
+                  if (state is LoginGooglePhoneRequiredM) {
+                    return _buildGooglePhoneStep(context, state);
+                  }
+                  return _buildLoginForm(context, state);
+                },
+              ),
+            ),
+          );
         },
       ),
     );
   }
 
+  bool _loginFinished = false;
+
   void _finishLogin(BuildContext context, LoginPageSuccessM state) {
+    if (_loginFinished || !context.mounted) return;
+    _loginFinished = true;
     final utilisateur = Utilisateur.fromMap(state.utilisateur);
     final userRole = utilisateur.role.toUpperCase();
     final roles = [userRole];
@@ -134,12 +139,7 @@ class _LoginPageScreenMState extends State<LoginPageScreenM> {
           refreshToken: state.refreshToken,
         );
     unawaited(context.read<AuthCubit>().refreshRoles());
-
-    final router = GoRouter.of(context);
-    if (Navigator.of(context).canPop()) {
-      Navigator.of(context).pop();
-    }
-    router.go('/homepage');
+    AuthCompletion.goAfterSuccess(context);
   }
 
   Future<void> _promptOptionalPhoneVerification(
@@ -227,7 +227,8 @@ class _LoginPageScreenMState extends State<LoginPageScreenM> {
               PhoneCountryField(
                 controller: _googlePhoneController,
                 selectedCountry: _googlePhoneCountry,
-                errorText: _loginFieldError(state, const ['telephone', 'phone']),
+                errorText:
+                    _loginFieldError(state, const ['telephone', 'phone']),
                 onCountryChanged: (c) {
                   setState(() => _googlePhoneCountry = c);
                   context.read<LoginPageBlocM>().add(GooglePhoneChangedM(
@@ -307,9 +308,7 @@ class _LoginPageScreenMState extends State<LoginPageScreenM> {
                     ? null
                     : () {
                         _googleOtpController.clear();
-                        context
-                            .read<LoginPageBlocM>()
-                            .add(GooglePhoneChangedM(
+                        context.read<LoginPageBlocM>().add(GooglePhoneChangedM(
                               phone: _googlePhoneController.text.trim(),
                               phoneCountry: _googlePhoneCountry.isoCode.name,
                             ));
@@ -401,7 +400,8 @@ class _LoginPageScreenMState extends State<LoginPageScreenM> {
                 keyboardType: TextInputType.emailAddress,
                 prefixIcon: Icons.email_outlined,
                 controller: _emailController,
-                errorText: _loginFieldError(state, const ['email', 'identifiant']),
+                errorText:
+                    _loginFieldError(state, const ['email', 'identifiant']),
               ),
             const AuthFieldGap(),
             SDInput(
@@ -437,7 +437,8 @@ class _LoginPageScreenMState extends State<LoginPageScreenM> {
               text: 'Se connecter',
               fullWidth: true,
               isLoading: loading,
-              onPressed: loading || !_canSubmit ? null : () => _submitLogin(context),
+              onPressed:
+                  loading || !_canSubmit ? null : () => _submitLogin(context),
             ),
             const AuthFieldGap(large: true),
             Wrap(
@@ -451,7 +452,18 @@ class _LoginPageScreenMState extends State<LoginPageScreenM> {
                   ),
                 ),
                 TextButton(
-                  onPressed: () => context.push('/register'),
+                  onPressed: () async {
+                    final protected = routeIsProtectedAuth(context);
+                    final ok = await context.push<bool>(
+                      '/register',
+                      extra: protected ? AuthEntryMode.protectedAction : null,
+                    );
+                    if (ok == true && protected && context.mounted) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (context.mounted) Navigator.of(context).pop(true);
+                      });
+                    }
+                  },
                   style: TextButton.styleFrom(
                     padding: EdgeInsets.symmetric(
                       horizontal: SDSpacing.xxs,
@@ -497,9 +509,8 @@ class _LoginPageScreenMState extends State<LoginPageScreenM> {
 
   Future<void> _showForgotPasswordDialog() async {
     final emailField = TextEditingController(
-      text: _loginMode == AuthLoginMode.email
-          ? _emailController.text.trim()
-          : '',
+      text:
+          _loginMode == AuthLoginMode.email ? _emailController.text.trim() : '',
     );
     final submitted = await showDialog<bool>(
       context: context,

@@ -109,10 +109,12 @@ flutter:
     - assets/splash/
     # Racine : metier.png, marketplace.png, freelances.png (cartes accueil)
     - assets/banner/
+    - assets/home/
+    - assets/home/univers/
     # Sous-dossier : bannières carrousel page Métiers (banner1…3)
     - assets/banner/metiers/
     - assets/profil_vide.png
-    # Ne jamais embarquer .env : API_URL / clés via --dart-define ou secrets Gradle.
+    # Ne jamais embarquer .env (secrets extractibles). Defines / testLoad en code.
 
   # To add assets to your application, add an assets section, like this:
   # assets:

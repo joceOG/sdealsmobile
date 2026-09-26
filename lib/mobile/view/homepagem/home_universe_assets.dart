@@ -1,17 +1,10 @@
-/// Illustrations des 3 cartes « Métiers / Freelance / Marketplace » (écran d’accueil).
-///
-/// Fichiers attendus dans : `sdealsmobile/assets/banner/`
-/// - [metiers] → `metier.png` (sans « s », comme ton fichier actuel)
-/// - [freelance] → `freelances.png`
-/// - [marketplace] → `marketplace.png`
-///
-/// Le [pubspec.yaml] doit déclarer `assets/banner/` (déjà fait).
-///
-/// Carrousel page Métiers (autre usage) : `assets/banner/metiers/banner1.png` …
+/// Illustrations des cartes univers sur l’accueil (Métiers / Freelance / É-marché).
 class HomeUniverseAssets {
   HomeUniverseAssets._();
 
-  static const String metiers = 'assets/banner/metier.png';
-  static const String freelance = 'assets/banner/freelances.png';
+  static const String metiers = 'assets/home/univers/metier.png';
+  static const String freelance = 'assets/home/univers/freelance.png';
+
+  /// É-marché — même visuel que le hub banner lorsque le flag est activé.
   static const String marketplace = 'assets/banner/marketplace.png';
 }

@@ -81,8 +81,9 @@ class _ServiceRequestSheetState extends State<ServiceRequestSheet> {
   }
 
   String _formatPrice(num prix) {
-    final formatted =
-        NumberFormat('#,###', 'fr_FR').format(prix.toInt()).replaceAll(',', ' ');
+    final formatted = NumberFormat('#,###', 'fr_FR')
+        .format(prix.toInt())
+        .replaceAll(',', ' ');
     return '$formatted FCFA';
   }
 
@@ -465,6 +466,8 @@ class _ServiceRequestSheetState extends State<ServiceRequestSheet> {
                   foregroundColor: Colors.white,
                   disabledBackgroundColor: _green.withValues(alpha: 0.5),
                   elevation: 2,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
                   ),

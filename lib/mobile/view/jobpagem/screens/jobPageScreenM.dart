@@ -4,11 +4,11 @@ import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:intl/intl.dart';
-
 import 'package:sdealsmobile/data/models/categorie.dart';
 import 'package:sdealsmobile/data/models/prestataire.dart';
 import 'package:sdealsmobile/data/services/authCubit.dart';
+import 'package:sdealsmobile/data/services/protected_action_intent.dart';
+import 'package:sdealsmobile/mobile/view/common/auth_completion.dart';
 import 'package:sdealsmobile/data/utils/display_text.dart';
 import 'package:sdealsmobile/data/utils/media_url.dart';
 import 'package:sdealsmobile/design_system/design_system.dart';
@@ -21,6 +21,7 @@ import 'package:sdealsmobile/mobile/view/jobpagem/utils/navigation_helper.dart';
 import 'package:sdealsmobile/mobile/view/jobpagem/widgets/service_request_sheet.dart';
 import 'package:sdealsmobile/mobile/view/searchpagem/screens/searchPageScreenM.dart';
 import 'package:sdealsmobile/mobile/view/common/widgets/app_image.dart';
+import 'package:sdealsmobile/mobile/view/common/widgets/client_provider_list_card.dart';
 
 /// Métiers / Explorer — Vue Liste (défaut) + Vue Carte, même état BLoC.
 class JobPageScreenM extends StatelessWidget {
@@ -30,8 +31,8 @@ class JobPageScreenM extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final existing = context.findAncestorWidgetOfExactType<
-        BlocProvider<JobPageBlocM>>();
+    final existing =
+        context.findAncestorWidgetOfExactType<BlocProvider<JobPageBlocM>>();
     if (existing != null) {
       return const _JobPageView();
     }
@@ -56,7 +57,7 @@ class _JobPageView extends StatefulWidget {
 class _JobPageViewState extends State<_JobPageView> {
   _ExplorerView _view = _ExplorerView.list;
   LatLng? _userLocation;
-  String _locationLabel = 'Localisation…';
+  String _locationLabel = SDClientLocationPolicy.fallbackCity;
   GoogleMapController? _mapController;
   Set<Marker> _markers = {};
   String? _selectedProviderId;
@@ -87,12 +88,12 @@ class _JobPageViewState extends State<_JobPageView> {
 
   Future<void> _getCurrentLocation() async {
     try {
-      var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
+      // Pas de prompt GPS automatique : seulement si deja accorde.
+      final permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {
+        if (!mounted) return;
+        setState(() => _locationLabel = SDClientLocationPolicy.fallbackCity);
         return;
       }
       final position = await Geolocator.getCurrentPosition(
@@ -104,7 +105,10 @@ class _JobPageViewState extends State<_JobPageView> {
       });
       await _updateLocationLabel(position.latitude, position.longitude);
       _reloadNearby();
-    } catch (_) {}
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _locationLabel = SDClientLocationPolicy.fallbackCity);
+    }
   }
 
   Future<void> _updateLocationLabel(double lat, double lng) async {
@@ -112,9 +116,8 @@ class _JobPageViewState extends State<_JobPageView> {
       final marks = await placemarkFromCoordinates(lat, lng);
       if (!mounted || marks.isEmpty) return;
       final p = marks.first;
-      final area = (p.subLocality?.isNotEmpty == true)
-          ? p.subLocality
-          : p.locality;
+      final area =
+          (p.subLocality?.isNotEmpty == true) ? p.subLocality : p.locality;
       final city = p.locality ?? p.country;
       setState(() {
         _locationLabel = [area, city]
@@ -265,8 +268,7 @@ class _JobPageViewState extends State<_JobPageView> {
     for (final p in providers) {
       final lat = p.localisationMaps!.latitude;
       final lng = p.localisationMaps!.longitude;
-      final key =
-          '${(lat / cell).floor()}_${(lng / cell).floor()}';
+      final key = '${(lat / cell).floor()}_${(lng / cell).floor()}';
       final existing = buckets[key];
       if (existing == null) {
         buckets[key] = _MapCluster(lat: lat, lng: lng, members: [p]);
@@ -287,7 +289,7 @@ class _JobPageViewState extends State<_JobPageView> {
       nom: p.utilisateur.nom,
       fallback: 'Prestataire',
     );
-    return n.isEmpty ? 'Prestataire' : n;
+    return n.isEmpty ? 'Prestataire' : displayTitleCase(n);
   }
 
   String _metier(Prestataire p) {
@@ -300,28 +302,52 @@ class _JobPageViewState extends State<_JobPageView> {
   }
 
   String _priceLabel(Prestataire p) {
-    final price = p.prixprestataire > 0
-        ? p.prixprestataire
-        : (p.tarifHoraireMin ?? 0);
-    if (price <= 0) return '—';
-    return NumberFormat('#,###', 'fr_FR')
-        .format(price.round())
-        .replaceAll(',', ' ');
+    final price =
+        p.prixprestataire > 0 ? p.prixprestataire : (p.tarifHoraireMin ?? 0);
+    final hourlyKnown = p.tarifHoraireMin != null && p.tarifHoraireMin! > 0;
+    return formatOptionalPrice(
+          price,
+          suffix: 'FCFA',
+          perUnit: hourlyKnown && p.prixprestataire <= 0 ? '/h' : null,
+        ) ??
+        '';
   }
 
-  String _ratingLabel(Prestataire p) {
+  String? _ratingLabel(Prestataire p) {
     final n = double.tryParse('${p.note ?? ''}'.replaceAll(',', '.'));
-    if (n == null || n <= 0) return '—';
+    if (n == null || n <= 0) return null;
     return n.toStringAsFixed(1).replaceAll('.', ',');
   }
 
   String? _distanceLabel(Prestataire p, Map<String, double> distances) {
     final d = distances[p.idprestataire];
-    if (d == null) return null;
-    // Éviter "0,0 km" : afficher "À proximité" sous 100 m.
-    if (d < 0.1) return 'À proximité';
-    if (d < 1.0) return '< 1 km';
+    if (d == null || d.isNaN || d < 0) return null;
+    if (d < 0.1) return '< 100 m';
+    if (d < 1.0) return '${(d * 1000).round()} m';
     return '${d.toStringAsFixed(1).replaceAll('.', ',')} km';
+  }
+
+  Future<void> _callProvider(Prestataire p) async {
+    final ready = await ensureAuthenticatedForAction(
+      context: context,
+      type: ProtectedActionType.callProvider,
+      originRoute: 'jobList',
+      technicalId: p.idprestataire,
+      explanation: 'Connectez-vous pour appeler ce professionnel',
+    );
+    if (!ready || !mounted) return;
+    final tel = cleanDisplayPart(p.utilisateur.telephone) ?? '';
+    if (tel.isEmpty) {
+      NavigationHelper.navigateToProviderProfile(
+        context,
+        providerId: p.idprestataire,
+        providerData: p.toJson(),
+      );
+      return;
+    }
+    final result = await DialerSession.openOnce(tel);
+    if (!mounted) return;
+    await showDialerFeedback(context, result);
   }
 
   void _onProviderMarkerTap(Prestataire p) {
@@ -359,11 +385,7 @@ class _JobPageViewState extends State<_JobPageView> {
         ),
         onContact: () {
           Navigator.pop(ctx);
-          NavigationHelper.navigateToProviderProfile(
-            context,
-            providerId: p.idprestataire,
-            providerData: p.toJson(),
-          );
+          _callProvider(p);
         },
         onRequest: () {
           Navigator.pop(ctx);
@@ -399,9 +421,8 @@ class _JobPageViewState extends State<_JobPageView> {
       serviceId: p.service.idservice,
       serviceName: p.service.nomservice,
       providerName: _providerName(p),
-      prix: p.prixprestataire > 0
-          ? p.prixprestataire
-          : (p.tarifHoraireMin ?? 0),
+      prix:
+          p.prixprestataire > 0 ? p.prixprestataire : (p.tarifHoraireMin ?? 0),
     );
   }
 
@@ -565,14 +586,17 @@ class _JobPageViewState extends State<_JobPageView> {
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
           child: Row(
             children: [
-              Text(
-                'Catégories',
-                style: SDTypography.titleSmall.copyWith(
-                  fontWeight: FontWeight.w800,
-                  color: SDColors.neutral900,
+              Expanded(
+                child: Text(
+                  'Catégories',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: SDTypography.titleSmall.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: SDColors.neutral900,
+                  ),
                 ),
               ),
-              const Spacer(),
               TextButton(
                 onPressed: () {
                   Navigator.of(context).push(
@@ -586,7 +610,7 @@ class _JobPageViewState extends State<_JobPageView> {
                   );
                 },
                 child: Text(
-                  'Voir tout >',
+                  'Voir tout',
                   style: SDTypography.labelMedium.copyWith(
                     color: SDColors.primary700,
                     fontWeight: FontWeight.w700,
@@ -627,16 +651,14 @@ class _JobPageViewState extends State<_JobPageView> {
                           categorie: c,
                           selected: selected,
                           onTap: () {
-                            final next =
-                                selected ? '' : c.nomcategorie;
+                            final next = selected ? '' : c.nomcategorie;
                             if (_userLocation != null) {
                               context.read<JobPageBlocM>().add(
                                     LoadNearbyProvidersM(
                                       latitude: _userLocation!.latitude,
                                       longitude: _userLocation!.longitude,
                                       radius: state.searchRadius,
-                                      category:
-                                          next.isEmpty ? null : next,
+                                      category: next.isEmpty ? null : next,
                                     ),
                                   );
                             } else {
@@ -748,7 +770,8 @@ class _JobPageViewState extends State<_JobPageView> {
       child: Row(
         children: [
           _FilterChip(
-            label: '≤ ${radius == radius.roundToDouble() ? radius.toInt() : radius} km',
+            label:
+                '≤ ${radius == radius.roundToDouble() ? radius.toInt() : radius} km',
             icon: Icons.place_outlined,
             selected: true,
             onTap: () => _pickRadius(state),
@@ -761,20 +784,6 @@ class _JobPageViewState extends State<_JobPageView> {
             onTap: () {
               context.read<JobPageBlocM>().add(UpdateExplorerFiltersM(
                     filterVerifiedOnly: !state.filterVerifiedOnly,
-                  ));
-            },
-          ),
-          const SizedBox(width: 8),
-          _FilterChip(
-            label: '4 +',
-            icon: Icons.star_border_rounded,
-            selected: state.filterMinRating != null,
-            accent: const Color(0xFFFBBF24),
-            onTap: () {
-              context.read<JobPageBlocM>().add(UpdateExplorerFiltersM(
-                    filterMinRating:
-                        state.filterMinRating == null ? 4.0 : null,
-                    clearMinRating: state.filterMinRating != null,
                   ));
             },
           ),
@@ -816,32 +825,58 @@ class _JobPageViewState extends State<_JobPageView> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 12),
-            Text(
-              'Rayon de recherche',
-              style: SDTypography.titleSmall.copyWith(
-                fontWeight: FontWeight.w800,
-                color: SDColors.neutral900,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(8, 8, 8, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: SDColors.neutral300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-            ),
-            ...options.map(
-              (r) => ListTile(
-                title: Text('≤ ${r.toInt()} km'),
-                trailing: state.searchRadius == r
-                    ? const Icon(Icons.check, color: SDColors.primary600)
-                    : null,
-                onTap: () => Navigator.pop(ctx, r),
+              Text(
+                'Rayon de recherche',
+                style: SDTypography.titleSmall.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: SDColors.neutral900,
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-          ],
+              const SizedBox(height: 8),
+              ...options.map(
+                (r) {
+                  final selected = state.searchRadius == r;
+                  return ListTile(
+                    title: Text(
+                      '${r.toInt()} km',
+                      style: SDTypography.bodyMedium.copyWith(
+                        color: SDColors.neutral900,
+                        fontWeight:
+                            selected ? FontWeight.w800 : FontWeight.w600,
+                      ),
+                    ),
+                    trailing: selected
+                        ? const Icon(Icons.check_circle,
+                            color: SDColors.primary600)
+                        : const Icon(Icons.circle_outlined,
+                            color: SDColors.neutral300),
+                    onTap: () => Navigator.pop(ctx, r),
+                  );
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
     if (chosen == null || !mounted) return;
+    context
+        .read<JobPageBlocM>()
+        .add(UpdateExplorerFiltersM(searchRadius: chosen));
     if (_userLocation != null) {
       context.read<JobPageBlocM>().add(LoadNearbyProvidersM(
             latitude: _userLocation!.latitude,
@@ -869,8 +904,7 @@ class _JobPageViewState extends State<_JobPageView> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(Icons.person_search_outlined,
-                  size: 48,
-                  color: SDColors.neutral900.withValues(alpha: 0.35)),
+                  size: 48, color: SDColors.neutral900.withValues(alpha: 0.35)),
               const SizedBox(height: 12),
               Text(
                 'Aucun professionnel pour ces filtres',
@@ -884,8 +918,8 @@ class _JobPageViewState extends State<_JobPageView> {
               Text(
                 'Élargissez le rayon ou retirez un filtre.',
                 textAlign: TextAlign.center,
-                style: SDTypography.bodySmall
-                    .copyWith(color: SDColors.neutral500),
+                style:
+                    SDTypography.bodySmall.copyWith(color: SDColors.neutral500),
               ),
             ],
           ),
@@ -905,29 +939,27 @@ class _JobPageViewState extends State<_JobPageView> {
         separatorBuilder: (_, __) => const SizedBox(height: 12),
         itemBuilder: (context, i) {
           final p = list[i];
-          return _ProviderCompareCard(
-            provider: p,
+          final price = _priceLabel(p);
+          final loc = cleanDisplayPart(p.localisation);
+          return ClientProviderListCard(
             name: _providerName(p),
             metier: _metier(p),
-            rating: _ratingLabel(p),
-            distance: _distanceLabel(p, state.providerDistances),
-            price: _priceLabel(p),
+            location: loc != null ? displayTitleCase(loc) : null,
+            ratingLabel: _ratingLabel(p),
+            distanceLabel: _distanceLabel(p, state.providerDistances),
+            priceLabel: price.isEmpty ? null : price,
             photoUrl: providerPhotoUrl(
               selfie: p.selfie,
               photoProfil: p.utilisateur.photoProfil,
             ),
+            verified: p.verifier == true,
             onOpen: () => NavigationHelper.navigateToProviderProfile(
               context,
               providerId: p.idprestataire,
+              providerData: p.toJson(),
             ),
-            onContact: () => NavigationHelper.navigateToProviderProfile(
-              context,
-              providerId: p.idprestataire,
-            ),
-            onAsk: () => NavigationHelper.navigateToProviderProfile(
-              context,
-              providerId: p.idprestataire,
-            ),
+            onCall: () => _callProvider(p),
+            onAsk: () => _requestService(p),
           );
         },
       ),
@@ -1012,26 +1044,7 @@ class _JobPageViewState extends State<_JobPageView> {
                         onTap: () {
                           context.read<JobPageBlocM>().add(
                                 UpdateExplorerFiltersM(
-                                  filterVerifiedOnly:
-                                      !state.filterVerifiedOnly,
-                                ),
-                              );
-                        },
-                      ),
-                      const SizedBox(width: 8),
-                      _FilterChip(
-                        label: '4 +',
-                        icon: Icons.star_border_rounded,
-                        selected: state.filterMinRating != null,
-                        accent: const Color(0xFFFBBF24),
-                        onTap: () {
-                          context.read<JobPageBlocM>().add(
-                                UpdateExplorerFiltersM(
-                                  filterMinRating: state.filterMinRating == null
-                                      ? 4.0
-                                      : null,
-                                  clearMinRating:
-                                      state.filterMinRating != null,
+                                  filterVerifiedOnly: !state.filterVerifiedOnly,
                                 ),
                               );
                         },
@@ -1103,7 +1116,7 @@ class _JobPageViewState extends State<_JobPageView> {
                           Padding(
                             padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                             child: Text(
-                              '$count professionnel${count > 1 ? 's' : ''} à proximité',
+                              '$count professionnel${count > 1 ? 's' : ''} dans cette zone',
                               textAlign: TextAlign.center,
                               style: SDTypography.labelMedium.copyWith(
                                 fontWeight: FontWeight.w800,
@@ -1194,7 +1207,8 @@ class _JobPageViewState extends State<_JobPageView> {
                                           strokeWidth: 2,
                                         ),
                                       )
-                                    : const Text('Charger plus de professionnels'),
+                                    : const Text(
+                                        'Charger plus de professionnels'),
                               ),
                             ),
                           if (!state.providersHasMore && providers.isNotEmpty)
@@ -1456,7 +1470,8 @@ class _FilterChip extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 14, color: selected ? color : SDColors.neutral700),
+              Icon(icon,
+                  size: 14, color: selected ? color : SDColors.neutral700),
               const SizedBox(width: 6),
               Text(
                 label,
@@ -1750,7 +1765,7 @@ class _MapBottomSheet extends StatelessWidget {
   final String? selectedId;
   final String Function(Prestataire) nameOf;
   final String Function(Prestataire) metierOf;
-  final String Function(Prestataire) ratingOf;
+  final String? Function(Prestataire) ratingOf;
   final String Function(Prestataire) priceOf;
   final ValueChanged<Prestataire> onOpen;
 
@@ -1847,27 +1862,34 @@ class _MapBottomSheet extends StatelessWidget {
                                     if (p.verifier) ...[
                                       const SizedBox(width: 4),
                                       const Icon(Icons.verified,
-                                          size: 14,
-                                          color: SDColors.primary600),
+                                          size: 14, color: SDColors.primary600),
                                     ],
                                   ],
                                 ),
                                 Text(
-                                  '${metierOf(p)} · ⭐ ${ratingOf(p)}${d != null ? ' · ${d.toStringAsFixed(1)} km' : ''}',
+                                  [
+                                    metierOf(p),
+                                    if (ratingOf(p) != null) '★ ${ratingOf(p)}',
+                                    if (d != null)
+                                      d < 0.1
+                                          ? '< 100 m'
+                                          : d < 1
+                                              ? '${(d * 1000).round()} m'
+                                              : '${d.toStringAsFixed(1).replaceAll('.', ',')} km',
+                                  ].join(' · '),
                                   style: SDTypography.labelSmall
                                       .copyWith(color: SDColors.neutral600),
-                                  maxLines: 1,
+                                  maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                 ),
-                                Text(
-                                  priceOf(p) == '—'
-                                      ? 'Sur devis'
-                                      : '${priceOf(p)} FCFA',
-                                  style: SDTypography.labelSmall.copyWith(
-                                    color: SDColors.primary700,
-                                    fontWeight: FontWeight.w800,
+                                if (priceOf(p).trim().isNotEmpty)
+                                  Text(
+                                    priceOf(p),
+                                    style: SDTypography.labelSmall.copyWith(
+                                      color: SDColors.primary700,
+                                      fontWeight: FontWeight.w800,
+                                    ),
                                   ),
-                                ),
                               ],
                             ),
                           ),
@@ -1889,12 +1911,12 @@ class _MapBottomSheet extends StatelessWidget {
   }
 }
 
-/// Fiche prestataire détaillée (carte plein écran / tap marker).
+/// Fiche prestataire (tap marqueur carte plein écran).
 class _ProviderMapDetailSheet extends StatelessWidget {
   final Prestataire provider;
   final String name;
   final String metier;
-  final String rating;
+  final String? rating;
   final String? distance;
   final String price;
   final String? photoUrl;
@@ -1917,271 +1939,176 @@ class _ProviderMapDetailSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final specialites = provider.specialite ?? const <String>[];
-    final experience = provider.anneeExperience?.trim();
+    final experience = formatExperienceLabel(provider.anneeExperience);
     final zone = (provider.zoneIntervention != null &&
             provider.zoneIntervention!.isNotEmpty)
         ? provider.zoneIntervention!.take(2).join(', ')
         : (provider.localisation.trim().isNotEmpty
-            ? provider.localisation
+            ? displayTitleCase(provider.localisation)
             : null);
-    final priceText = price == '—' ? 'Sur devis' : 'À partir de $price FCFA/h';
+    final priceText = price.trim().isEmpty ? null : price;
 
-    return DraggableScrollableSheet(
-      initialChildSize: 0.72,
-      minChildSize: 0.45,
-      maxChildSize: 0.95,
-      expand: false,
-      builder: (context, scrollController) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: SDColors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: ListView(
-            controller: scrollController,
-            padding: const EdgeInsets.fromLTRB(20, 10, 20, 28),
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: SDColors.neutral300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
+    return SafeArea(
+      child: Container(
+        decoration: const BoxDecoration(
+          color: SDColors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 10, 20, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: SDColors.neutral300,
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              const SizedBox(height: 16),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  ClipOval(
-                    child: AppImage(
-                      imageUrl: photoUrl ?? '',
-                      width: 72,
-                      height: 72,
-                      fit: BoxFit.cover,
-                      borderRadius: 36,
-                    ),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ClipOval(
+                  child: AppImage(
+                    imageUrl: photoUrl ?? '',
+                    width: 64,
+                    height: 64,
+                    fit: BoxFit.cover,
+                    borderRadius: 32,
                   ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Flexible(
-                              child: Text(
-                                name,
-                                style: SDTypography.titleMedium.copyWith(
-                                  fontWeight: FontWeight.w800,
-                                  color: SDColors.neutral900,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              name,
+                              style: SDTypography.titleMedium.copyWith(
+                                fontWeight: FontWeight.w800,
+                                color: SDColors.neutral900,
                               ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            if (provider.verifier) ...[
-                              const SizedBox(width: 4),
-                              const Icon(Icons.verified,
-                                  size: 18, color: SDColors.primary600),
-                            ],
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          metier,
-                          style: SDTypography.bodyMedium.copyWith(
-                            color: SDColors.neutral600,
-                            fontWeight: FontWeight.w600,
                           ),
+                          if (provider.verifier) ...[
+                            const SizedBox(width: 4),
+                            const Icon(Icons.verified,
+                                size: 18, color: SDColors.primary600),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        metier,
+                        style: SDTypography.bodyMedium.copyWith(
+                          color: SDColors.neutral600,
+                          fontWeight: FontWeight.w600,
                         ),
-                        const SizedBox(height: 6),
-                        Wrap(
-                          spacing: 10,
-                          runSpacing: 4,
-                          children: [
+                      ),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 4,
+                        children: [
+                          if (rating != null)
                             Text(
-                              '⭐ $rating',
+                              '★ $rating',
                               style: SDTypography.labelSmall.copyWith(
                                 fontWeight: FontWeight.w700,
                                 color: SDColors.neutral800,
                               ),
                             ),
-                            if (distance != null)
-                              Text(
-                                distance!,
-                                style: SDTypography.labelSmall.copyWith(
-                                  color: SDColors.neutral600,
-                                ),
-                              ),
+                          if (distance != null)
                             Text(
-                              'Disponible',
+                              distance!,
                               style: SDTypography.labelSmall.copyWith(
-                                color: SDColors.primary700,
-                                fontWeight: FontWeight.w700,
+                                color: SDColors.neutral600,
                               ),
                             ),
-                          ],
+                          if (zone != null)
+                            Text(
+                              zone,
+                              style: SDTypography.labelSmall.copyWith(
+                                color: SDColors.neutral600,
+                              ),
+                            ),
+                          if (experience != null)
+                            Text(
+                              experience,
+                              style: SDTypography.labelSmall.copyWith(
+                                color: SDColors.neutral600,
+                              ),
+                            ),
+                        ],
+                      ),
+                      if (priceText != null) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          priceText,
+                          style: SDTypography.labelMedium.copyWith(
+                            color: SDColors.primary700,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
                       ],
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: onOpenProfile,
-                    icon: const Icon(Icons.favorite_border_rounded,
-                        color: SDColors.neutral500),
-                    tooltip: 'Voir profil',
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Container(
-                width: double.infinity,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                decoration: BoxDecoration(
-                  color: SDColors.primary600,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Text(
-                  priceText,
-                  textAlign: TextAlign.center,
-                  style: SDTypography.titleSmall.copyWith(
-                    color: SDColors.white,
-                    fontWeight: FontWeight.w800,
+                    ],
                   ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: onContact,
-                      icon: const Icon(Icons.chat_bubble_outline_rounded,
-                          size: 18),
-                      label: const Text('Contacter'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: SDColors.primary700,
-                        side: const BorderSide(color: SDColors.primary600),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: onOpenProfile,
+              child: const Text('Voir le profil'),
+            ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: onContact,
+                    icon: const Icon(Icons.phone_rounded, size: 18),
+                    label: const Text('Appeler'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: SDColors.primary600,
+                      foregroundColor: SDColors.white,
+                      minimumSize: const Size(48, 48),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    flex: 2,
-                    child: ElevatedButton(
-                      onPressed: onRequest,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: SDColors.primary600,
-                        foregroundColor: SDColors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: const Text('Demander un service'),
-                    ),
-                  ),
-                ],
-              ),
-              if (specialites.isNotEmpty) ...[
-                const SizedBox(height: 22),
-                Text(
-                  'Services proposés',
-                  style: SDTypography.titleSmall.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: SDColors.neutral900,
-                  ),
                 ),
-                const SizedBox(height: 10),
-                ...specialites.take(5).map(
-                      (s) => Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                color: SDColors.primary50,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Icon(Icons.handyman_outlined,
-                                  color: SDColors.primary700, size: 20),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                s,
-                                style: SDTypography.bodyMedium.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                  color: SDColors.neutral900,
-                                ),
-                              ),
-                            ),
-                            if (price != '—')
-                              Text(
-                                'dès $price F',
-                                style: SDTypography.labelSmall.copyWith(
-                                  color: SDColors.primary700,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                          ],
-                        ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: onRequest,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: SDColors.primary700,
+                      side: const BorderSide(color: SDColors.primary600),
+                      minimumSize: const Size(48, 48),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-              ],
-              const SizedBox(height: 18),
-              Text(
-                'À propos',
-                style: SDTypography.titleSmall.copyWith(
-                  fontWeight: FontWeight.w800,
-                  color: SDColors.neutral900,
-                ),
-              ),
-              const SizedBox(height: 8),
-              if (experience != null && experience.isNotEmpty)
-                Text(
-                  '$experience ans d’expérience',
-                  style: SDTypography.bodyMedium.copyWith(
-                    color: SDColors.neutral700,
-                    fontWeight: FontWeight.w600,
+                    child: const Text('Demander'),
                   ),
                 ),
-              if (zone != null) ...[
-                const SizedBox(height: 4),
-                Text(
-                  zone,
-                  style: SDTypography.bodySmall
-                      .copyWith(color: SDColors.neutral600),
-                ),
               ],
-              if ((provider.description ?? '').trim().isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Text(
-                  provider.description!.trim(),
-                  style: SDTypography.bodyMedium
-                      .copyWith(color: SDColors.neutral600),
-                ),
-              ],
-              const SizedBox(height: 16),
-              TextButton(
-                onPressed: onOpenProfile,
-                child: const Text('Voir le profil complet'),
-              ),
-            ],
-          ),
-        );
-      },
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

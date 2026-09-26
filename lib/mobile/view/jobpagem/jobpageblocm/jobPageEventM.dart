@@ -100,16 +100,18 @@ class LoadMoreProvidersM extends JobPageEventM {
   const LoadMoreProvidersM();
 }
 
-/// Filtres locaux Liste|Carte (vérifié / note) — sans rechargement API.
+/// Filtres locaux Liste|Carte (vérifié / note / rayon) — sans rechargement API sauf rayon+GPS.
 class UpdateExplorerFiltersM extends JobPageEventM {
   final bool? filterVerifiedOnly;
   final double? filterMinRating;
   final bool clearMinRating;
+  final double? searchRadius;
 
   const UpdateExplorerFiltersM({
     this.filterVerifiedOnly,
     this.filterMinRating,
     this.clearMinRating = false,
+    this.searchRadius,
   });
 
   @override
@@ -117,5 +119,6 @@ class UpdateExplorerFiltersM extends JobPageEventM {
         filterVerifiedOnly ?? false,
         filterMinRating ?? -1,
         clearMinRating,
+        searchRadius ?? -1,
       ];
 }

@@ -9,7 +9,8 @@ import '../../freelancepagem/screens/freelance_details_screen.dart';
 import '../../shoppingpagem/screens/productDetailsScreenM.dart';
 import '../../shoppingpagem/screens/vendorDetailsScreenM.dart';
 import '../../shoppingpagem/shoppingpageblocm/shoppingPageBlocM.dart';
-import '../../shoppingpagem/shoppingpageblocm/shoppingPageStateM.dart' as shop_model;
+import '../../shoppingpagem/shoppingpageblocm/shoppingPageStateM.dart'
+    as shop_model;
 import '../../../../data/models/vendeur.dart';
 import '../../common/widgets/empty_state_widget.dart';
 import 'package:sdealsmobile/mobile/view/searchpagem/searchpageblocm/searchPageBlocM.dart';
@@ -17,10 +18,14 @@ import 'package:sdealsmobile/mobile/view/searchpagem/searchpageblocm/searchPageE
 import 'package:sdealsmobile/mobile/view/searchpagem/searchpageblocm/searchPageStateM.dart';
 import '../../common/widgets/app_image.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:sdealsmobile/data/config/client_feature_flags.dart';
+import 'package:sdealsmobile/data/utils/display_text.dart';
+import 'package:sdealsmobile/data/utils/network_user_message.dart';
 import '../../common/widgets/skeleton_loader.dart';
 
 class SearchPageScreenM extends StatelessWidget {
   final int initialIndex;
+
   /// Si renseigné, lance la recherche globale au chargement (ex. depuis Explorer).
   final String? initialQuery;
 
@@ -52,7 +57,8 @@ class _SearchBody extends StatefulWidget {
   State<_SearchBody> createState() => _SearchBodyState();
 }
 
-class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderStateMixin {
+class _SearchBodyState extends State<_SearchBody>
+    with SingleTickerProviderStateMixin {
   static const _popularSearches = [
     'Plombier',
     'Électricien',
@@ -72,9 +78,12 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
   @override
   void initState() {
     super.initState();
-    final safeIndex = widget.initialIndex.clamp(0, 5);
-    _tabController = TabController(length: 6, vsync: this, initialIndex: safeIndex);
-    
+    final tabCount = ClientFeatureFlags.searchTabLabels.length;
+    final safeIndex =
+        ClientFeatureFlags.clampSearchTabIndex(widget.initialIndex);
+    _tabController =
+        TabController(length: tabCount, vsync: this, initialIndex: safeIndex);
+
     // Listen to tab changes to dismiss keyboard
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) {
@@ -105,17 +114,16 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
 
   void _onSearchChanged(String query) {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
-    _debounce = Timer(const Duration(milliseconds: 300), () {
-      // Pour l'historique (query vide) ou les suggestions (query texte)
-      // on appelle toujours FetchSuggestions.
+    _debounce = Timer(const Duration(milliseconds: 350), () {
       context.read<SearchPageBlocM>().add(FetchSuggestions(query));
       setState(() => _showSuggestions = true);
     });
   }
 
   void _onSubmit(String query) {
-    if (query.trim().isNotEmpty) {
-      context.read<SearchPageBlocM>().add(PerformGlobalSearch(query));
+    final q = query.trim();
+    if (q.length >= 2) {
+      context.read<SearchPageBlocM>().add(PerformGlobalSearch(q));
       setState(() => _showSuggestions = false);
       FocusScope.of(context).unfocus();
     }
@@ -129,7 +137,8 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: SDColors.neutral50, // Light grey background like Facebook/Telegram
+      backgroundColor:
+          SDColors.neutral50, // Light grey background like Facebook/Telegram
       appBar: _buildAppBar(),
       body: BlocBuilder<SearchPageBlocM, SearchPageStateM>(
         builder: (context, state) {
@@ -144,7 +153,30 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
           }
 
           if (state.error.isNotEmpty) {
-            return Center(child: Text('Erreur: ${state.error}'));
+            final msg = userFacingNetworkMessage(state.error);
+            return Center(
+              child: Padding(
+                padding: EdgeInsets.all(SDSpacing.md),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(msg, textAlign: TextAlign.center),
+                    SizedBox(height: SDSpacing.sm),
+                    ElevatedButton(
+                      onPressed: () {
+                        final q = _searchController.text.trim();
+                        if (q.length >= 2) {
+                          context
+                              .read<SearchPageBlocM>()
+                              .add(PerformGlobalSearch(q));
+                        }
+                      },
+                      child: const Text('Réessayer'),
+                    ),
+                  ],
+                ),
+              ),
+            );
           }
 
           final typedQuery = _searchController.text.trim();
@@ -183,8 +215,10 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
                       _buildServicesTab(state),
                       _buildFreelancesTab(state),
                       _buildPrestatairesTab(state),
-                      _buildShopTab(state),
-                      _buildVendorsTab(state),
+                      if (ClientFeatureFlags.emarketEnabled) ...[
+                        _buildShopTab(state),
+                        _buildVendorsTab(state),
+                      ],
                     ],
                   ),
                 ),
@@ -219,7 +253,8 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
               height: 40,
               decoration: BoxDecoration(
                 color: SDColors.neutral50,
-                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
+                borderRadius:
+                    BorderRadius.circular(SDSpacing.borderRadiusLarge),
                 border: Border.all(color: SDColors.primary100),
               ),
               alignment: Alignment.centerLeft,
@@ -241,13 +276,17 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
                   _onSearchChanged(_searchController.text);
                 },
                 decoration: InputDecoration(
-                  hintText: 'Rechercher services, produits...',
-                  hintStyle:
-                      SDTypography.bodyMedium.copyWith(color: SDColors.neutral400),
-                  prefixIcon: Icon(Icons.search, color: SDColors.primary600, size: 20),
+                  hintText: ClientFeatureFlags.emarketEnabled
+                      ? 'Rechercher services, produits...'
+                      : 'Rechercher un service ou une compétence',
+                  hintStyle: SDTypography.bodyMedium
+                      .copyWith(color: SDColors.neutral400),
+                  prefixIcon:
+                      Icon(Icons.search, color: SDColors.primary600, size: 20),
                   suffixIcon: _searchController.text.isNotEmpty
                       ? IconButton(
-                          icon: Icon(Icons.close, color: SDColors.neutral500, size: 18),
+                          icon: Icon(Icons.close,
+                              color: SDColors.neutral500, size: 18),
                           onPressed: () {
                             _searchController.clear();
                             context.read<SearchPageBlocM>().add(ClearSearch());
@@ -279,7 +318,9 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
                 shape: BoxShape.circle,
                 border: Border.all(color: SDColors.neutral200),
                 boxShadow: [
-                  BoxShadow(color: SDColors.neutral900.withOpacity(0.08), blurRadius: 4),
+                  BoxShadow(
+                      color: SDColors.neutral900.withOpacity(0.08),
+                      blurRadius: 4),
                 ],
               ),
               child: Icon(Icons.tune, color: SDColors.primary600, size: 20),
@@ -316,19 +357,22 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
     // Variables locales pour le modal
     double localMin = state.minPrice;
     double localMax = state.maxPrice;
-    final TextEditingController cityCtrl = TextEditingController(text: state.city);
+    final TextEditingController cityCtrl =
+        TextEditingController(text: state.city);
 
     return StatefulBuilder(
       builder: (context, setModalState) {
         return Container(
           decoration: BoxDecoration(
             color: SDColors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(SDSpacing.borderRadiusLarge)),
+            borderRadius: BorderRadius.vertical(
+                top: Radius.circular(SDSpacing.borderRadiusLarge)),
           ),
           padding: EdgeInsets.only(
-            left: SDSpacing.md, right: SDSpacing.md, top: SDSpacing.md,
-            bottom: MediaQuery.of(context).viewInsets.bottom + SDSpacing.md
-          ),
+              left: SDSpacing.md,
+              right: SDSpacing.md,
+              top: SDSpacing.md,
+              bottom: MediaQuery.of(context).viewInsets.bottom + SDSpacing.md),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -337,7 +381,9 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Filtres', style: SDTypography.titleMedium.copyWith(fontWeight: FontWeight.bold)),
+                  Text('Filtres',
+                      style: SDTypography.titleMedium
+                          .copyWith(fontWeight: FontWeight.bold)),
                   IconButton(
                     icon: Icon(Icons.close, color: SDColors.neutral900),
                     onPressed: () => Navigator.pop(context),
@@ -345,15 +391,18 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
                 ],
               ),
               Divider(color: SDColors.neutral200),
-              
+
               // 1. Prix
-              Text('Prix (FCFA)', style: SDTypography.titleSmall.copyWith(fontWeight: FontWeight.bold)),
+              Text('Prix (FCFA)',
+                  style: SDTypography.titleSmall
+                      .copyWith(fontWeight: FontWeight.bold)),
               RangeSlider(
                 values: RangeValues(localMin, localMax),
                 min: 0,
                 max: 1000000,
                 divisions: 20,
-                labels: RangeLabels('${localMin.round()}', '${localMax.round()}'),
+                labels:
+                    RangeLabels('${localMin.round()}', '${localMax.round()}'),
                 activeColor: SDColors.primary600,
                 onChanged: (values) {
                   setModalState(() {
@@ -365,22 +414,32 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('${localMin.round()} FCFA', style: SDTypography.bodySmall.copyWith(color: SDColors.neutral600)),
-                  Text('${localMax.round()} FCFA', style: SDTypography.bodySmall.copyWith(color: SDColors.neutral600)),
+                  Text('${localMin.round()} FCFA',
+                      style: SDTypography.bodySmall
+                          .copyWith(color: SDColors.neutral600)),
+                  Text('${localMax.round()} FCFA',
+                      style: SDTypography.bodySmall
+                          .copyWith(color: SDColors.neutral600)),
                 ],
               ),
               SizedBox(height: SDSpacing.sm),
 
               // 2. Ville
-              Text('Ville / Commune', style: SDTypography.titleSmall.copyWith(fontWeight: FontWeight.bold)),
+              Text('Ville / Commune',
+                  style: SDTypography.titleSmall
+                      .copyWith(fontWeight: FontWeight.bold)),
               SizedBox(height: SDSpacing.xs),
               TextField(
                 controller: cityCtrl,
                 decoration: InputDecoration(
                   hintText: 'Ex: Cocody, Abidjan...',
-                  prefixIcon: Icon(Icons.location_on, color: SDColors.neutral500),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium)),
-                  contentPadding: EdgeInsets.symmetric(horizontal: SDSpacing.sm, vertical: 0),
+                  prefixIcon:
+                      Icon(Icons.location_on, color: SDColors.neutral500),
+                  border: OutlineInputBorder(
+                      borderRadius:
+                          BorderRadius.circular(SDSpacing.borderRadiusMedium)),
+                  contentPadding: EdgeInsets.symmetric(
+                      horizontal: SDSpacing.sm, vertical: 0),
                 ),
               ),
               SizedBox(height: SDSpacing.md),
@@ -392,15 +451,19 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
                     child: OutlinedButton(
                       onPressed: () {
                         // Reset
-                        context.read<SearchPageBlocM>().add(const UpdateFilters(minPrice: 0, maxPrice: 1000000, city: ''));
-                        context.read<SearchPageBlocM>().add(PerformGlobalSearch(state.query));
+                        context.read<SearchPageBlocM>().add(const UpdateFilters(
+                            minPrice: 0, maxPrice: 1000000, city: ''));
+                        context
+                            .read<SearchPageBlocM>()
+                            .add(PerformGlobalSearch(state.query));
                         Navigator.pop(context);
                       },
                       style: OutlinedButton.styleFrom(
                         foregroundColor: SDColors.neutral600,
                         side: BorderSide(color: SDColors.neutral400),
                       ),
-                      child: Text('Réinitialiser', style: SDTypography.labelMedium),
+                      child: Text('Réinitialiser',
+                          style: SDTypography.labelMedium),
                     ),
                   ),
                   SizedBox(width: SDSpacing.xs),
@@ -409,19 +472,23 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
                       onPressed: () {
                         // Appliquer
                         context.read<SearchPageBlocM>().add(UpdateFilters(
-                          minPrice: localMin,
-                          maxPrice: localMax,
-                          city: cityCtrl.text,
-                        ));
-                         // Lancer la recherche avec les nouveaux filtres
-                        context.read<SearchPageBlocM>().add(PerformGlobalSearch(state.query));
+                              minPrice: localMin,
+                              maxPrice: localMax,
+                              city: cityCtrl.text,
+                            ));
+                        // Lancer la recherche avec les nouveaux filtres
+                        context
+                            .read<SearchPageBlocM>()
+                            .add(PerformGlobalSearch(state.query));
                         Navigator.pop(context);
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: SDColors.primary600,
                         foregroundColor: SDColors.white,
                       ),
-                      child: Text('Appliquer', style: SDTypography.labelMedium.copyWith(color: SDColors.white)),
+                      child: Text('Appliquer',
+                          style: SDTypography.labelMedium
+                              .copyWith(color: SDColors.white)),
                     ),
                   ),
                 ],
@@ -431,6 +498,24 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
         );
       },
     );
+  }
+
+  int _countForSearchTab(String label, Map<String, int> counts) {
+    switch (label) {
+      case 'Services':
+        return counts['services'] ?? 0;
+      case 'Freelances':
+        return counts['freelances'] ?? 0;
+      case 'Professionnels':
+      case 'Presta.':
+        return counts['prestataires'] ?? 0;
+      case 'Shop':
+        return counts['articles'] ?? 0;
+      case 'Boutiques':
+        return counts['vendeurs'] ?? 0;
+      default:
+        return 0;
+    }
   }
 
   Widget _buildTabBar(Map<String, int> counts) {
@@ -444,23 +529,26 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
         unselectedLabelColor: SDColors.neutral500,
         indicatorColor: SDColors.primary600,
         indicatorWeight: 3,
-        labelStyle: SDTypography.labelMedium.copyWith(fontWeight: FontWeight.bold),
+        labelStyle:
+            SDTypography.labelMedium.copyWith(fontWeight: FontWeight.bold),
         tabs: [
-          const Tab(text: 'Tout'),
-          Tab(text: 'Services (${counts['services'] ?? 0})'),
-          Tab(text: 'Freelances (${counts['freelances'] ?? 0})'),
-          Tab(text: 'Presta. (${counts['prestataires'] ?? 0})'),
-          Tab(text: 'Shop (${counts['articles'] ?? 0})'),
-          Tab(text: 'Boutiques (${counts['vendeurs'] ?? 0})'),
+          for (final label in ClientFeatureFlags.searchTabLabels)
+            Tab(
+              text: label == 'Tout'
+                  ? label
+                  : '$label (${_countForSearchTab(label, counts)})',
+            ),
         ],
       ),
     );
   }
 
   Widget _buildDiscoveryPanel(List<String> history, {String filterQuery = ''}) {
+    final cleaned =
+        history.map((h) => h.trim()).where((h) => h.isNotEmpty).toList();
     final filteredHistory = filterQuery.isEmpty
-        ? history
-        : history
+        ? cleaned
+        : cleaned
             .where((h) => h.toLowerCase().contains(filterQuery.toLowerCase()))
             .toList();
 
@@ -474,14 +562,18 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
                 SDSpacing.md, SDSpacing.md, SDSpacing.md, SDSpacing.xs),
             child: Text(
               'Que cherchez-vous ?',
-              style: SDTypography.titleMedium.copyWith(fontWeight: FontWeight.w800),
+              style: SDTypography.titleMedium
+                  .copyWith(fontWeight: FontWeight.w800),
             ),
           ),
           Padding(
             padding: EdgeInsets.symmetric(horizontal: SDSpacing.md),
             child: Text(
-              'Services, freelances, produits ou boutiques à Abidjan…',
-              style: SDTypography.bodySmall.copyWith(color: SDColors.neutral600),
+              ClientFeatureFlags.emarketEnabled
+                  ? 'Services, freelances, produits ou boutiques à Abidjan…'
+                  : 'Services et freelances à Abidjan…',
+              style:
+                  SDTypography.bodySmall.copyWith(color: SDColors.neutral600),
             ),
           ),
           if (filteredHistory.isNotEmpty) ...[
@@ -600,8 +692,8 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
       color: SDColors.white,
       child: ListView.separated(
         itemCount: suggestions.length,
-        separatorBuilder: (_, __) =>
-            Divider(height: 1, indent: SDSpacing.sm, color: SDColors.neutral200),
+        separatorBuilder: (_, __) => Divider(
+            height: 1, indent: SDSpacing.sm, color: SDColors.neutral200),
         itemBuilder: (context, index) {
           final suggestion = suggestions[index];
           return ListTile(
@@ -637,7 +729,6 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
           ...state.services.take(2).map((s) => _buildServiceCard(s)).toList(),
           SizedBox(height: SDSpacing.sm),
         ],
-        
         if (state.freelances.isNotEmpty) ...[
           _buildSectionHeader('Freelances', 2, state.counts['freelances'] ?? 0),
           _buildHorizontalScroll(
@@ -648,9 +739,9 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
           ),
           SizedBox(height: SDSpacing.sm),
         ],
-
         if (state.prestataires.isNotEmpty) ...[
-          _buildSectionHeader('Prestataires', 3, state.counts['prestataires'] ?? 0),
+          _buildSectionHeader(
+              'Prestataires', 3, state.counts['prestataires'] ?? 0),
           _buildHorizontalScroll(
             state.prestataires
                 .take(5)
@@ -659,14 +750,12 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
           ),
           SizedBox(height: SDSpacing.sm),
         ],
-
-        if (state.articles.isNotEmpty) ...[
+        if (ClientFeatureFlags.emarketEnabled && state.articles.isNotEmpty) ...[
           _buildSectionHeader('Boutique', 4, state.counts['articles'] ?? 0),
           _buildArticleGrid(state.articles.take(2).toList()),
           SizedBox(height: SDSpacing.sm),
         ],
-
-        if (state.vendeurs.isNotEmpty) ...[
+        if (ClientFeatureFlags.emarketEnabled && state.vendeurs.isNotEmpty) ...[
           _buildSectionHeader('Boutiques', 5, state.counts['vendeurs'] ?? 0),
           ...state.vendeurs.take(3).map(_buildVendorCard),
         ],
@@ -676,7 +765,11 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
 
   // --- TAB: SERVICES ---
   Widget _buildServicesTab(SearchPageStateM state) {
-    if (state.services.isEmpty) return Center(child: Text("Aucun service trouvé", style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral600)));
+    if (state.services.isEmpty)
+      return Center(
+          child: Text("Aucun service trouvé",
+              style: SDTypography.bodyMedium
+                  .copyWith(color: SDColors.neutral600)));
     return ListView.builder(
       padding: EdgeInsets.all(SDSpacing.sm),
       itemCount: state.services.length,
@@ -686,7 +779,11 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
 
   // --- TAB: FREELANCES ---
   Widget _buildFreelancesTab(SearchPageStateM state) {
-    if (state.freelances.isEmpty) return Center(child: Text("Aucun freelance trouvé", style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral600)));
+    if (state.freelances.isEmpty)
+      return Center(
+          child: Text("Aucun freelance trouvé",
+              style: SDTypography.bodyMedium
+                  .copyWith(color: SDColors.neutral600)));
     return ListView.builder(
       padding: EdgeInsets.all(SDSpacing.sm),
       itemCount: state.freelances.length,
@@ -697,7 +794,11 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
 
   // --- TAB: PRESTATAIRES ---
   Widget _buildPrestatairesTab(SearchPageStateM state) {
-    if (state.prestataires.isEmpty) return Center(child: Text("Aucun prestataire trouvé", style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral600)));
+    if (state.prestataires.isEmpty)
+      return Center(
+          child: Text("Aucun prestataire trouvé",
+              style: SDTypography.bodyMedium
+                  .copyWith(color: SDColors.neutral600)));
     return ListView.builder(
       padding: EdgeInsets.all(SDSpacing.sm),
       itemCount: state.prestataires.length,
@@ -708,7 +809,11 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
 
   // --- TAB: ARTICLES ---
   Widget _buildShopTab(SearchPageStateM state) {
-    if (state.articles.isEmpty) return Center(child: Text("Aucun article trouvé", style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral600)));
+    if (state.articles.isEmpty)
+      return Center(
+          child: Text("Aucun article trouvé",
+              style: SDTypography.bodyMedium
+                  .copyWith(color: SDColors.neutral600)));
     return GridView.builder(
       padding: EdgeInsets.all(SDSpacing.sm),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -792,7 +897,8 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
           ].join(' · '),
           style: SDTypography.bodySmall.copyWith(color: SDColors.neutral600),
         ),
-        trailing: Icon(Icons.arrow_forward_ios, size: 14, color: SDColors.neutral400),
+        trailing:
+            Icon(Icons.arrow_forward_ios, size: 14, color: SDColors.neutral400),
         onTap: () => _openVendor(vendeur),
       ),
     );
@@ -807,12 +913,14 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(title, style: SDTypography.titleMedium.copyWith(fontWeight: FontWeight.bold)),
+          Text(title,
+              style: SDTypography.titleMedium
+                  .copyWith(fontWeight: FontWeight.bold)),
           GestureDetector(
             onTap: () => _tabController.animateTo(tabIndex),
-            child: Text('Voir tout', 
-              style: SDTypography.labelMedium.copyWith(color: SDColors.primary600, fontWeight: FontWeight.bold)
-            ), 
+            child: Text('Voir tout',
+                style: SDTypography.labelMedium.copyWith(
+                    color: SDColors.primary600, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -822,7 +930,11 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
   Widget _buildHorizontalScroll(List<Widget> children) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      child: Row(children: children.map((c) => Padding(padding: EdgeInsets.only(right: SDSpacing.xs), child: c)).toList()),
+      child: Row(
+          children: children
+              .map((c) => Padding(
+                  padding: EdgeInsets.only(right: SDSpacing.xs), child: c))
+              .toList()),
     );
   }
 
@@ -841,23 +953,42 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
   // --- CARDS ---
 
   Widget _buildServiceCard(dynamic service) {
-    // Extract properties safely
-    final String name = service['nomservice'] ?? 'Service';
-    final String image = service['imageservice'] ?? '';
-    final int price = int.tryParse(service['prixmoyen']?.toString() ?? '0') ?? 0;
+    final String name = service['nomservice']?.toString() ?? 'Service';
+    final String image = service['imageservice']?.toString() ?? '';
+    final cat = service['categorie'];
+    final String categoryName = cat is Map
+        ? (cat['nomcategorie']?.toString() ?? '')
+        : (service['nomcategorie']?.toString() ?? '');
+    final priceRaw = service['prixmoyen'] ?? service['prixprestataire'];
+    final priceLabel = formatOptionalPrice(priceRaw, suffix: 'FCFA');
+    final prestataire = service['prestataire'];
+    String? providerHint;
+    if (prestataire is Map) {
+      final u = prestataire['utilisateur'];
+      if (u is Map) {
+        providerHint = joinPersonName(
+          prenom: u['prenom'],
+          nom: u['nom'],
+          fallback: '',
+        );
+        if (providerHint.isEmpty) providerHint = null;
+      }
+    }
     final String? sid = () {
       final a = service['_id']?.toString().trim();
       final b = service['idservice']?.toString().trim();
       final v = (a != null && a.isNotEmpty) ? a : (b ?? '');
       return v.isNotEmpty ? v : null;
     }();
-    
+
     return Container(
       margin: EdgeInsets.only(bottom: SDSpacing.xs),
       decoration: BoxDecoration(
         color: SDColors.white,
         borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-        boxShadow: [BoxShadow(color: SDColors.neutral900.withOpacity(0.05), blurRadius: 4)],
+        boxShadow: [
+          BoxShadow(color: SDColors.neutral900.withOpacity(0.05), blurRadius: 4)
+        ],
       ),
       child: ListTile(
         contentPadding: EdgeInsets.all(SDSpacing.xs),
@@ -871,8 +1002,32 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
           ),
         ),
         title: Text(name, style: SDTypography.titleSmall),
-        subtitle: Text('À partir de $price FCFA', style: SDTypography.bodySmall.copyWith(color: SDColors.success500)),
-        trailing: Icon(Icons.arrow_forward_ios, size: 14, color: SDColors.neutral500),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (categoryName.isNotEmpty)
+              Text(
+                categoryName,
+                style: SDTypography.labelSmall
+                    .copyWith(color: SDColors.neutral500),
+              ),
+            if (priceLabel != null)
+              Text(
+                priceLabel,
+                style:
+                    SDTypography.bodySmall.copyWith(color: SDColors.primary700),
+              ),
+            if (providerHint != null)
+              Text(
+                providerHint,
+                style: SDTypography.labelSmall
+                    .copyWith(color: SDColors.neutral600),
+              ),
+          ],
+        ),
+        isThreeLine: true,
+        trailing:
+            Icon(Icons.arrow_forward_ios, size: 14, color: SDColors.neutral500),
         onTap: () {
           Navigator.push(
             context,
@@ -919,7 +1074,8 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
 
   Widget _buildPersonSquare(dynamic person, {required bool isFreelance}) {
     final String name = person['name'] ?? 'Profil';
-    final String job = person['job'] ?? (isFreelance ? 'Freelance' : 'Prestataire');
+    final String job =
+        person['job'] ?? (isFreelance ? 'Freelance' : 'Prestataire');
     final String image = person['imagePath']?.toString() ?? '';
 
     return GestureDetector(
@@ -931,7 +1087,8 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
           color: SDColors.white,
           borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
           boxShadow: [
-            BoxShadow(color: SDColors.neutral900.withOpacity(0.05), blurRadius: 4)
+            BoxShadow(
+                color: SDColors.neutral900.withOpacity(0.05), blurRadius: 4)
           ],
         ),
         child: Column(
@@ -963,7 +1120,8 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
 
   Widget _buildPersonCard(dynamic person, {required bool isFreelance}) {
     final String name = person['name'] ?? 'Profil';
-    final String job = person['job'] ?? (isFreelance ? 'Freelance' : 'Prestataire');
+    final String job =
+        person['job'] ?? (isFreelance ? 'Freelance' : 'Prestataire');
     final String image = person['imagePath']?.toString() ?? '';
     final dynamic rating = person['rating'] ?? 0.0;
 
@@ -981,11 +1139,13 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
           radius: 25,
           backgroundImage:
               image.isNotEmpty ? CachedNetworkImageProvider(image) : null,
-          child:
-              image.isEmpty ? Icon(Icons.person, color: SDColors.neutral400) : null,
+          child: image.isEmpty
+              ? Icon(Icons.person, color: SDColors.neutral400)
+              : null,
         ),
         title: Text(name,
-            style: SDTypography.titleSmall.copyWith(fontWeight: FontWeight.bold)),
+            style:
+                SDTypography.titleSmall.copyWith(fontWeight: FontWeight.bold)),
         subtitle: Row(
           children: [
             Flexible(
@@ -1008,7 +1168,8 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
     final String name = article['nomArticle'] ?? 'Article';
     final String image = article['photoArticle'] ?? '';
     // ✅ Fix: Parsing sécurisé car le backend envoie parfois une String
-    final int price = int.tryParse(article['prixArticle']?.toString() ?? '0') ?? 0;
+    final int price =
+        int.tryParse(article['prixArticle']?.toString() ?? '0') ?? 0;
 
     return GestureDetector(
       onTap: () {
@@ -1020,7 +1181,9 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
           size: '', // Info non dispo direct ici, on laisse vide
           price: price.toString(),
           brand: article['marque'] ?? 'Générique',
-          vendeurId: article['vendeur'] is Map ? article['vendeur']['_id'] : article['vendeur'],
+          vendeurId: article['vendeur'] is Map
+              ? article['vendeur']['_id']
+              : article['vendeur'],
         );
 
         Navigator.push(
@@ -1037,19 +1200,26 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
         decoration: BoxDecoration(
           color: SDColors.white,
           borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-          boxShadow: [BoxShadow(color: SDColors.neutral900.withOpacity(0.05), blurRadius: 4)],
+          boxShadow: [
+            BoxShadow(
+                color: SDColors.neutral900.withOpacity(0.05), blurRadius: 4)
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
               child: ClipRRect(
-                borderRadius: BorderRadius.vertical(top: Radius.circular(SDSpacing.borderRadiusMedium)),
+                borderRadius: BorderRadius.vertical(
+                    top: Radius.circular(SDSpacing.borderRadiusMedium)),
                 child: Image.network(
-                  image, 
-                  width: double.infinity, 
+                  image,
+                  width: double.infinity,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(color: SDColors.neutral200, child: Icon(Icons.shopping_bag, color: SDColors.neutral400)),
+                  errorBuilder: (_, __, ___) => Container(
+                      color: SDColors.neutral200,
+                      child:
+                          Icon(Icons.shopping_bag, color: SDColors.neutral400)),
                 ),
               ),
             ),
@@ -1058,14 +1228,16 @@ class _SearchBodyState extends State<_SearchBody> with SingleTickerProviderState
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(name, 
-                    maxLines: 2, 
-                    overflow: TextOverflow.ellipsis,
-                    style: SDTypography.bodySmall.copyWith(fontWeight: FontWeight.bold)
-                  ),
-                  Text('$price FCFA', 
-                    style: SDTypography.labelMedium.copyWith(color: SDColors.primary600, fontWeight: FontWeight.bold) // ✅ Standard Green
-                  ),
+                  Text(name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: SDTypography.bodySmall
+                          .copyWith(fontWeight: FontWeight.bold)),
+                  Text('$price FCFA',
+                      style: SDTypography.labelMedium.copyWith(
+                          color: SDColors.primary600,
+                          fontWeight: FontWeight.bold) // ✅ Standard Green
+                      ),
                 ],
               ),
             ),

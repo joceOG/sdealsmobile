@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../../../data/models/prestataire.dart';
 import '../../../../data/services/api_client.dart';
 import '../../../../data/services/authCubit.dart';
+import '../../../../data/services/protected_action_intent.dart';
+import '../../common/auth_completion.dart';
 import '../../../../data/utils/media_url.dart';
 import '../screens/fullMapScreenM.dart';
 import '../../common/widgets/app_image.dart';
@@ -36,7 +37,7 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
 
   /// Remettre à `true` quand le catalogue aura assez de profils proches.
   static const bool _showSimilarProviders = false;
-  
+
   Prestataire? _provider;
   bool _isLoading = true;
   String? _error;
@@ -183,18 +184,22 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
             SizedBox(height: SDSpacing.xs),
             Text(
               _error ?? 'Une erreur est survenue',
-              style: SDTypography.titleSmall.copyWith(color: SDColors.neutral600),
+              style:
+                  SDTypography.titleSmall.copyWith(color: SDColors.neutral600),
               textAlign: TextAlign.center,
             ),
             SizedBox(height: SDSpacing.md),
             ElevatedButton.icon(
               onPressed: _loadProviderData,
               icon: Icon(Icons.refresh, color: SDColors.white),
-              label: Text('Réessayer', style: SDTypography.labelMedium.copyWith(color: SDColors.white)),
+              label: Text('Réessayer',
+                  style:
+                      SDTypography.labelMedium.copyWith(color: SDColors.white)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: SDColors.primary700,
                 foregroundColor: SDColors.white,
-                padding: EdgeInsets.symmetric(horizontal: SDSpacing.md, vertical: SDSpacing.xs),
+                padding: EdgeInsets.symmetric(
+                    horizontal: SDSpacing.md, vertical: SDSpacing.xs),
               ),
             ),
           ],
@@ -215,7 +220,8 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
               SDSpacing.sm,
               SDSpacing.sm,
               SDSpacing.sm,
-              SDResponsive.scrollPaddingBelowCta(context, ctaHeight: SDCtaBarHeight.single),
+              SDResponsive.scrollPaddingBelowCta(context,
+                  ctaHeight: SDCtaBarHeight.single),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -483,7 +489,8 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.payments_outlined, color: SDColors.neutral900, size: 22),
+                Icon(Icons.payments_outlined,
+                    color: SDColors.neutral900, size: 22),
                 SizedBox(width: SDSpacing.xs),
                 Flexible(
                   child: Text(
@@ -536,14 +543,14 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
     if (_userLocation == null || _provider!.localisationMaps == null) {
       return 'N/A';
     }
-    
+
     final distance = Geolocator.distanceBetween(
       _userLocation!.latitude,
       _userLocation!.longitude,
       _provider!.localisationMaps!.latitude,
       _provider!.localisationMaps!.longitude,
     );
-    
+
     if (distance < 1000) {
       return '${distance.toInt()}m';
     } else {
@@ -554,7 +561,7 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
   String _formatPriceRange() {
     final min = _provider!.tarifHoraireMin;
     final max = _provider!.tarifHoraireMax;
-    
+
     if (min != null && max != null) {
       return '${min.toInt()} - ${max.toInt()} FCFA/h';
     } else if (min != null) {
@@ -568,104 +575,109 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
 
   Widget _buildAboutContent() {
     return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Description
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Description
+        _buildSection(
+          'Description',
+          Icons.description_outlined,
+          child: Text(
+            _provider!.description ??
+                'Prestataire professionnel et expérimenté.',
+            style: SDTypography.bodyMedium.copyWith(height: 1.5),
+          ),
+        ),
+        SizedBox(height: SDSpacing.lg),
+
+        // Spécialités
+        if (_provider!.specialite != null && _provider!.specialite!.isNotEmpty)
           _buildSection(
-            'Description',
-            Icons.description_outlined,
-            child: Text(
-              _provider!.description ?? 'Prestataire professionnel et expérimenté.',
-              style: SDTypography.bodyMedium.copyWith(height: 1.5),
+            'Spécialités',
+            Icons.auto_awesome_outlined,
+            child: Wrap(
+              spacing: SDSpacing.xs,
+              runSpacing: SDSpacing.xs,
+              children: _provider!.specialite!
+                  .map((s) => Chip(
+                        label: Text(
+                          s,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: SDTypography.labelMedium,
+                        ),
+                        backgroundColor: SDColors.primary50,
+                        side: BorderSide(color: SDColors.primary200),
+                        labelStyle: SDTypography.labelMedium.copyWith(
+                          color: SDColors.primary800,
+                        ),
+                        visualDensity: VisualDensity.compact,
+                      ))
+                  .toList(),
             ),
           ),
+        if (_provider!.specialite != null && _provider!.specialite!.isNotEmpty)
           SizedBox(height: SDSpacing.lg),
-          
-          // Spécialités
-          if (_provider!.specialite != null && _provider!.specialite!.isNotEmpty)
-            _buildSection(
-              'Spécialités',
-              Icons.auto_awesome_outlined,
-              child: Wrap(
-                spacing: SDSpacing.xs,
-                runSpacing: SDSpacing.xs,
-                children: _provider!.specialite!
-                    .map((s) => Chip(
-                          label: Text(
-                            s,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: SDTypography.labelMedium,
-                          ),
-                          backgroundColor: SDColors.primary50,
-                          side: BorderSide(color: SDColors.primary200),
-                          labelStyle: SDTypography.labelMedium.copyWith(
-                            color: SDColors.primary800,
-                          ),
-                          visualDensity: VisualDensity.compact,
-                        ))
-                    .toList(),
-              ),
+
+        // Zones d'intervention
+        if (_provider!.zoneIntervention != null &&
+            _provider!.zoneIntervention!.isNotEmpty)
+          _buildSection(
+            'Zones d\'intervention',
+            Icons.location_city_outlined,
+            child: Wrap(
+              spacing: SDSpacing.xs,
+              runSpacing: SDSpacing.xs,
+              children: _provider!.zoneIntervention!
+                  .map((z) => Chip(
+                        label: Text(
+                          z,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: SDTypography.labelMedium,
+                        ),
+                        avatar: Icon(Icons.location_on_outlined,
+                            size: 16, color: SDColors.neutral900),
+                        backgroundColor: SDColors.neutral100,
+                        side: BorderSide(color: SDColors.neutral200),
+                        visualDensity: VisualDensity.compact,
+                      ))
+                  .toList(),
             ),
-          if (_provider!.specialite != null && _provider!.specialite!.isNotEmpty)
-            SizedBox(height: SDSpacing.lg),
-          
-          // Zones d'intervention
-          if (_provider!.zoneIntervention != null && _provider!.zoneIntervention!.isNotEmpty)
-            _buildSection(
-              'Zones d\'intervention',
-              Icons.location_city_outlined,
-              child: Wrap(
-                spacing: SDSpacing.xs,
-                runSpacing: SDSpacing.xs,
-                children: _provider!.zoneIntervention!
-                    .map((z) => Chip(
-                          label: Text(
-                            z,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: SDTypography.labelMedium,
-                          ),
-                          avatar: Icon(Icons.location_on_outlined,
-                              size: 16, color: SDColors.neutral900),
-                          backgroundColor: SDColors.neutral100,
-                          side: BorderSide(color: SDColors.neutral200),
-                          visualDensity: VisualDensity.compact,
-                        ))
-                    .toList(),
-              ),
+          ),
+        if (_provider!.zoneIntervention != null &&
+            _provider!.zoneIntervention!.isNotEmpty)
+          SizedBox(height: SDSpacing.lg),
+
+        // Diplômes et certifications
+        if (_provider!.diplomeCertificat != null &&
+            _provider!.diplomeCertificat!.isNotEmpty)
+          _buildSection(
+            'Diplômes & Certifications',
+            Icons.school_outlined,
+            child: Column(
+              children: _provider!.diplomeCertificat!
+                  .map((d) => ListTile(
+                        leading: Icon(Icons.verified_outlined,
+                            color: SDColors.neutral900, size: 22),
+                        title: Text(
+                          d,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: SDTypography.bodyMedium,
+                        ),
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                      ))
+                  .toList(),
             ),
-          if (_provider!.zoneIntervention != null && _provider!.zoneIntervention!.isNotEmpty)
-            SizedBox(height: SDSpacing.lg),
-          
-          // Diplômes et certifications
-          if (_provider!.diplomeCertificat != null && _provider!.diplomeCertificat!.isNotEmpty)
-            _buildSection(
-              'Diplômes & Certifications',
-              Icons.school_outlined,
-              child: Column(
-                children: _provider!.diplomeCertificat!
-                    .map((d) => ListTile(
-                          leading: Icon(Icons.verified_outlined,
-                              color: SDColors.neutral900, size: 22),
-                          title: Text(
-                            d,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: SDTypography.bodyMedium,
-                          ),
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                        ))
-                    .toList(),
-              ),
-            ),
-          if (_provider!.diplomeCertificat != null && _provider!.diplomeCertificat!.isNotEmpty)
-            SizedBox(height: SDSpacing.lg),
-          
-          // Localisation compacte (adresse + vignette map)
-          _buildCompactLocationBlock(),
-        ],
+          ),
+        if (_provider!.diplomeCertificat != null &&
+            _provider!.diplomeCertificat!.isNotEmpty)
+          SizedBox(height: SDSpacing.lg),
+
+        // Localisation compacte (adresse + vignette map)
+        _buildCompactLocationBlock(),
+      ],
     );
   }
 
@@ -841,8 +853,7 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
           initialPosition: pos,
           providers: [_provider!.toJson()],
           searchRadius: _provider!.rayonIntervention ?? 10.0,
-          selectedCategory:
-              _provider!.service.categorie?.nomcategorie,
+          selectedCategory: _provider!.service.categorie?.nomcategorie,
           selectedService: _provider!.service.nomservice,
         ),
       ),
@@ -851,75 +862,74 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
 
   Widget _buildServicesContent() {
     return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildSection(
-            'Service principal',
-            Icons.work_outline_rounded,
-            child: Material(
-              color: SDColors.white,
-              borderRadius: BorderRadius.circular(12),
-              child: Padding(
-                padding: EdgeInsets.all(SDSpacing.sm),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: EdgeInsets.all(SDSpacing.sm),
-                      decoration: BoxDecoration(
-                        color: SDColors.primary50,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Icon(Icons.build_circle_outlined,
-                          color: SDColors.neutral900, size: 24),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSection(
+          'Service principal',
+          Icons.work_outline_rounded,
+          child: Material(
+            color: SDColors.white,
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: EdgeInsets.all(SDSpacing.sm),
+              child: Row(
+                children: [
+                  Container(
+                    padding: EdgeInsets.all(SDSpacing.sm),
+                    decoration: BoxDecoration(
+                      color: SDColors.primary50,
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    SizedBox(width: SDSpacing.sm),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
+                    child: Icon(Icons.build_circle_outlined,
+                        color: SDColors.neutral900, size: 24),
+                  ),
+                  SizedBox(width: SDSpacing.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _provider!.service.nomservice,
+                          style: SDTypography.titleSmall.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if ((_provider!.service.categorie?.nomcategorie ?? '')
+                            .isNotEmpty)
                           Text(
-                            _provider!.service.nomservice,
-                            style: SDTypography.titleSmall.copyWith(
-                              fontWeight: FontWeight.w600,
+                            _provider!.service.categorie?.nomcategorie ?? '',
+                            style: SDTypography.bodySmall.copyWith(
+                              color: SDColors.neutral600,
                             ),
-                            maxLines: 2,
+                            maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
-                          if ((_provider!.service.categorie?.nomcategorie ?? '')
-                              .isNotEmpty)
-                            Text(
-                              _provider!.service.categorie?.nomcategorie ?? '',
-                              style: SDTypography.bodySmall.copyWith(
-                                color: SDColors.neutral600,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                        ],
-                      ),
+                      ],
                     ),
-                    Text(
-                      '${_provider!.prixprestataire.toInt()} FCFA',
-                      style: SDTypography.titleSmall.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: SDColors.neutral900,
-                      ),
+                  ),
+                  Text(
+                    '${_provider!.prixprestataire.toInt()} FCFA',
+                    style: SDTypography.titleSmall.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: SDColors.neutral900,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
-          SizedBox(height: SDSpacing.sm),
-
-          Text(
-            'Ce prestataire propose des services de qualité avec une expertise reconnue.',
-            style: SDTypography.bodyMedium.copyWith(
-              color: SDColors.neutral600,
-              height: 1.45,
-            ),
+        ),
+        SizedBox(height: SDSpacing.sm),
+        Text(
+          'Ce prestataire propose des services de qualité avec une expertise reconnue.',
+          style: SDTypography.bodyMedium.copyWith(
+            color: SDColors.neutral600,
+            height: 1.45,
           ),
-        ],
+        ),
+      ],
     );
   }
 
@@ -929,143 +939,144 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
       return Icon(Icons.star_rounded, color: Colors.amber.shade700, size: 22);
     }
     if (n > index && n < i) {
-      return Icon(Icons.star_half_rounded, color: Colors.amber.shade700, size: 22);
+      return Icon(Icons.star_half_rounded,
+          color: Colors.amber.shade700, size: 22);
     }
-    return Icon(Icons.star_outline_rounded, color: Colors.amber.shade400, size: 22);
+    return Icon(Icons.star_outline_rounded,
+        color: Colors.amber.shade400, size: 22);
   }
 
   Widget _buildReviewsContent() {
     final note = _parsedProviderNote();
 
     return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Note & avis',
-            style: SDTypography.titleSmall.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Note & avis',
+          style: SDTypography.titleSmall.copyWith(
+            fontWeight: FontWeight.bold,
           ),
-          SizedBox(height: SDSpacing.sm),
-          if (note != null) ...[
-            Material(
-              color: SDColors.white,
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                width: double.infinity,
-                padding: EdgeInsets.all(SDSpacing.md),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: SDColors.neutral200),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      note.toStringAsFixed(
-                        note == note.roundToDouble() ? 0 : 1,
-                      ),
-                      style: SDTypography.headlineMedium.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.amber.shade800,
-                      ),
+        ),
+        SizedBox(height: SDSpacing.sm),
+        if (note != null) ...[
+          Material(
+            color: SDColors.white,
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              width: double.infinity,
+              padding: EdgeInsets.all(SDSpacing.md),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: SDColors.neutral200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    note.toStringAsFixed(
+                      note == note.roundToDouble() ? 0 : 1,
                     ),
-                    SizedBox(height: SDSpacing.xxxs),
-                    Row(
-                      children: List.generate(
-                        5,
-                        (i) => _reviewStarIcon(i, note),
-                      ),
+                    style: SDTypography.headlineMedium.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.amber.shade800,
                     ),
-                    SizedBox(height: SDSpacing.xs),
-                    Text(
-                      'Note moyenne (agrégée)',
-                      style: SDTypography.bodySmall
-                          .copyWith(color: SDColors.neutral600),
+                  ),
+                  SizedBox(height: SDSpacing.xxxs),
+                  Row(
+                    children: List.generate(
+                      5,
+                      (i) => _reviewStarIcon(i, note),
                     ),
-                  ],
-                ),
+                  ),
+                  SizedBox(height: SDSpacing.xs),
+                  Text(
+                    'Note moyenne (agrégée)',
+                    style: SDTypography.bodySmall
+                        .copyWith(color: SDColors.neutral600),
+                  ),
+                ],
               ),
             ),
-            SizedBox(height: SDSpacing.md),
-          ],
-          Text(
-            'Avis clients',
-            style: SDTypography.titleSmall.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
           ),
-          SizedBox(height: SDSpacing.sm),
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.all(SDSpacing.lg),
-            decoration: BoxDecoration(
-              color: SDColors.white,
-              borderRadius:
-                  BorderRadius.circular(SDSpacing.borderRadiusLarge),
-              border: Border.all(color: SDColors.neutral200),
-            ),
-            child: Column(
-              children: [
-                Icon(Icons.reviews_outlined,
-                    size: 48, color: SDColors.neutral400),
-                SizedBox(height: SDSpacing.sm),
-                Text(
-                  'Aucun avis pour le moment',
-                  textAlign: TextAlign.center,
-                  style: SDTypography.titleSmall.copyWith(
-                    color: SDColors.neutral800,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                SizedBox(height: SDSpacing.xs),
-                Text(
-                  'Les avis apparaîtront ici après les prestations réalisées.',
-                  textAlign: TextAlign.center,
-                  style: SDTypography.bodySmall
-                      .copyWith(color: SDColors.neutral600, height: 1.4),
-                ),
-              ],
-            ),
-          ),
+          SizedBox(height: SDSpacing.md),
         ],
+        Text(
+          'Avis clients',
+          style: SDTypography.titleSmall.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        SizedBox(height: SDSpacing.sm),
+        Container(
+          width: double.infinity,
+          padding: EdgeInsets.all(SDSpacing.lg),
+          decoration: BoxDecoration(
+            color: SDColors.white,
+            borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
+            border: Border.all(color: SDColors.neutral200),
+          ),
+          child: Column(
+            children: [
+              Icon(Icons.reviews_outlined,
+                  size: 48, color: SDColors.neutral400),
+              SizedBox(height: SDSpacing.sm),
+              Text(
+                'Aucun avis pour le moment',
+                textAlign: TextAlign.center,
+                style: SDTypography.titleSmall.copyWith(
+                  color: SDColors.neutral800,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              SizedBox(height: SDSpacing.xs),
+              Text(
+                'Les avis apparaîtront ici après les prestations réalisées.',
+                textAlign: TextAlign.center,
+                style: SDTypography.bodySmall
+                    .copyWith(color: SDColors.neutral600, height: 1.4),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
   Widget _buildPortfolioContent() {
     return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Portfolio',
-            style: SDTypography.titleSmall.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Portfolio',
+          style: SDTypography.titleSmall.copyWith(
+            fontWeight: FontWeight.bold,
           ),
-          SizedBox(height: SDSpacing.sm),
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.all(SDSpacing.lg),
-            decoration: BoxDecoration(
-              color: SDColors.white,
-              borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
-              border: Border.all(color: SDColors.neutral200),
-            ),
-            child: Column(
-              children: [
-                Icon(Icons.photo_library_outlined,
-                    size: 56, color: SDColors.neutral400),
-                SizedBox(height: SDSpacing.md),
-                Text(
-                  'Aucune réalisation publiée pour le moment',
-                  textAlign: TextAlign.center,
-                  style: SDTypography.bodyMedium
-                      .copyWith(color: SDColors.neutral600, height: 1.45),
-                ),
-              ],
-            ),
+        ),
+        SizedBox(height: SDSpacing.sm),
+        Container(
+          width: double.infinity,
+          padding: EdgeInsets.all(SDSpacing.lg),
+          decoration: BoxDecoration(
+            color: SDColors.white,
+            borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
+            border: Border.all(color: SDColors.neutral200),
           ),
-        ],
+          child: Column(
+            children: [
+              Icon(Icons.photo_library_outlined,
+                  size: 56, color: SDColors.neutral400),
+              SizedBox(height: SDSpacing.md),
+              Text(
+                'Aucune réalisation publiée pour le moment',
+                textAlign: TextAlign.center,
+                style: SDTypography.bodyMedium
+                    .copyWith(color: SDColors.neutral600, height: 1.45),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -1202,7 +1213,8 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
 
   // Actions
   void _onShareProfile() async {
-    final text = 'Découvrez ${_provider!.utilisateur.fullName} - ${_provider!.service.nomservice} sur Soutrali Deals';
+    final text =
+        'Découvrez ${_provider!.utilisateur.fullName} - ${_provider!.service.nomservice} sur Soutrali Deals';
     await Clipboard.setData(ClipboardData(text: text));
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1212,14 +1224,16 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
   }
 
   void _onToggleFavorite() async {
+    final ready = await ensureAuthenticatedForAction(
+      context: context,
+      type: ProtectedActionType.addFavorite,
+      originRoute: 'providerProfile',
+      technicalId: _provider?.idprestataire,
+      explanation: 'Connectez-vous pour ajouter un favori',
+    );
+    if (!ready || !mounted) return;
     final auth = context.read<AuthCubit>().state;
-    if (auth is! AuthAuthenticated) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Connectez-vous pour ajouter en favoris.')),
-      );
-      context.push('/login');
-      return;
-    }
+    if (auth is! AuthAuthenticated) return;
     if (_provider == null) return;
 
     final previous = _isFavorited;
@@ -1320,37 +1334,31 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
   }
 
   void _onContactProvider() async {
-    final phone = _provider?.utilisateur.telephone;
-    if (phone == null || phone.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Numéro de téléphone non disponible')),
-      );
-      return;
-    }
-
-    final url = 'tel:$phone';
-    if (await canLaunchUrl(Uri.parse(url))) {
-      await launchUrl(Uri.parse(url));
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Impossible d\'appeler ce numéro')),
-        );
-      }
-    }
+    final ready = await ensureAuthenticatedForAction(
+      context: context,
+      type: ProtectedActionType.callProvider,
+      originRoute: 'providerProfile',
+      technicalId: _provider?.idprestataire,
+      explanation: 'Connectez-vous pour contacter ce professionnel',
+    );
+    if (!ready || !mounted) return;
+    final result =
+        await DialerSession.openOnce(_provider?.utilisateur.telephone);
+    if (!mounted) return;
+    await showDialerFeedback(context, result);
   }
 
-  void _onRequestService() {
+  void _onRequestService() async {
+    final ready = await ensureAuthenticatedForAction(
+      context: context,
+      type: ProtectedActionType.requestService,
+      originRoute: 'providerProfile',
+      technicalId: _provider?.idprestataire,
+      explanation: 'Connectez-vous pour demander un service',
+    );
+    if (!ready || !mounted) return;
     final auth = context.read<AuthCubit>().state;
-    if (auth is! AuthAuthenticated) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Veuillez vous connecter pour demander un devis.')),
-      );
-      context.push('/login');
-      return;
-    }
-
-    // Ouvrir le formulaire de demande de devis
+    if (auth is! AuthAuthenticated || _provider == null) return;
     _openRequestQuoteSheet(auth);
   }
 
@@ -1368,4 +1376,3 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
     );
   }
 }
-

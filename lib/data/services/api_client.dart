@@ -2300,7 +2300,7 @@ extension CartApi on ApiClient {
     throw Exception('Erreur mise à jour adresse: ${response.statusCode}');
   }
 
-  // ✅ Checkout - Convertir le panier en commande
+  // ✅ Checkout — panier → commande (serveur DASH-8E.3B.1)
   Future<Map<String, dynamic>> checkout({
     required String userId,
     String? moyenPaiement,
@@ -2314,7 +2314,25 @@ extension CartApi on ApiClient {
     if (response.statusCode == 201) {
       return ApiClient.decodeJson(response) as Map<String, dynamic>;
     }
-    throw Exception('Erreur checkout: ${response.statusCode} ${response.body}');
+    ApiClient.throwApiError(response);
+  }
+
+  /// POST /commande — contrat { articleId, quantite } (docs/api/COMMANDE_CREATE.md)
+  Future<Map<String, dynamic>> createCommande({
+    required List<Map<String, dynamic>> articles,
+    required Map<String, dynamic> infoCommande,
+    String? dateLivraison,
+  }) async {
+    final response = await post('/commande', body: {
+      'articles': articles,
+      'infoCommande': infoCommande,
+      if (dateLivraison != null) 'dateLivraison': dateLivraison,
+    });
+
+    if (response.statusCode == 201) {
+      return ApiClient.decodeJson(response) as Map<String, dynamic>;
+    }
+    ApiClient.throwApiError(response);
   }
 }
 

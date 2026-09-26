@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:sdealsmobile/data/services/authCubit.dart';
+import 'package:sdealsmobile/data/services/protected_action_intent.dart';
+import 'package:sdealsmobile/mobile/view/common/auth_completion.dart';
 import '../../../../data/models/prestataire.dart';
 import '../../../../data/utils/display_text.dart';
 import '../../../../data/utils/media_url.dart';
@@ -114,26 +117,19 @@ class ProviderPopup extends StatelessWidget {
     };
   }
 
-  Future<void> _contact(BuildContext context, String? rawTel) async {
-    final tel = (rawTel ?? '').trim();
-    if (tel.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Aucun numéro de téléphone disponible pour ce professionnel.',
-          ),
-        ),
-      );
-      return;
-    }
-    final uri = Uri(scheme: 'tel', path: tel);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
-    } else if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Impossible d’ouvrir l’appel.')),
-      );
-    }
+  Future<void> _contact(
+      BuildContext context, String? rawTel, String providerId) async {
+    final ready = await ensureAuthenticatedForAction(
+      context: context,
+      type: ProtectedActionType.callProvider,
+      originRoute: 'providerProfile',
+      technicalId: providerId,
+      explanation: 'Connectez-vous pour contacter ce professionnel',
+    );
+    if (!ready || !context.mounted) return;
+    final result = await DialerSession.openOnce(rawTel);
+    if (!context.mounted) return;
+    await showDialerFeedback(context, result);
   }
 
   @override
@@ -226,6 +222,7 @@ class ProviderPopup extends StatelessWidget {
                             onPressed: () => _contact(
                               context,
                               data['telephone']?.toString(),
+                              _getProviderId(),
                             ),
                             icon: const Icon(Icons.phone, size: 18),
                             label: const Text('Contacter'),

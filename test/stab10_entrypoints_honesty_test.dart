@@ -13,8 +13,10 @@ void main() {
 
   test('Inscription vendeur : pas de faux succès déclenchable', () {
     final home = read('lib/mobile/view/home.dart');
+    final publish = read('lib/mobile/view/common/publish_options.dart');
     expect(home.contains('SellerRegistrationScreen'), isFalse);
-    expect(home.contains('arrive bientôt'), isTrue);
+    expect(publish.contains('SellerRegistrationScreen'), isFalse);
+    expect(publish.contains('arrive bientôt'), isTrue);
   });
 
   test('SoutraPay prestataire : pas d’écran simulé ouvert', () {

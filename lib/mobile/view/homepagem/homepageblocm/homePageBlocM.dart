@@ -29,8 +29,9 @@ class HomePageBlocM extends Bloc<HomePageEventM, HomePageStateM> {
         error: '',
       ));
     } catch (error) {
+      final message = userFacingNetworkMessage(error);
       emit(state.copyWith(
-        error: userFacingNetworkMessage(error),
+        error: message,
         isLoading: false,
       ));
     }

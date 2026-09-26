@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../morepageblocm/morePageBlocM.dart';
 import '../../../../data/services/authCubit.dart';
+import '../../../../data/services/auth_professional_access.dart';
 import 'package:go_router/go_router.dart';
 import '../../searchpagem/screens/searchPageScreenM.dart';
 import '../../common/widgets/standard_screen_header.dart';
@@ -169,7 +170,7 @@ class _MorePagePageScreenStateM extends State<MorePageScreenM> {
     return BlocBuilder<AuthCubit, AuthState>(
       builder: (context, state) {
         // Vérifier si l'utilisateur a le rôle PRESTATAIRE
-        if (state is AuthAuthenticated && state.roles.contains('PRESTATAIRE')) {
+        if (state is AuthAuthenticated && state.canOperatePrestataire) {
           return _AnimatedCardWithBadge(
             icon: Icons.handyman,
             label: 'Mode Prestataire',

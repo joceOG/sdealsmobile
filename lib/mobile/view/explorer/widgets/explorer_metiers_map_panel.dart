@@ -52,10 +52,8 @@ class _ExplorerMetiersMapPanelState extends State<ExplorerMetiersMapPanel> {
 
   Future<void> _initLocation() async {
     try {
-      var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
+      // 10D-3 : pas de demande GPS au chargement d'Explorer.
+      final permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {
         return;
@@ -156,9 +154,8 @@ class _ExplorerMetiersMapPanelState extends State<ExplorerMetiersMapPanel> {
   }
 
   String _price(Prestataire p) {
-    final price = p.prixprestataire > 0
-        ? p.prixprestataire
-        : (p.tarifHoraireMin ?? 0);
+    final price =
+        p.prixprestataire > 0 ? p.prixprestataire : (p.tarifHoraireMin ?? 0);
     if (price <= 0) return '—';
     return NumberFormat('#,###', 'fr_FR')
         .format(price.round())
@@ -375,8 +372,7 @@ class _ExplorerMiniProviderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final priceText =
-        price == '—' ? 'Sur devis' : 'À partir de $price FCFA/h';
+    final priceText = price == '—' ? 'Sur devis' : 'À partir de $price FCFA/h';
 
     return Material(
       color: SDColors.white,
@@ -513,8 +509,8 @@ class _ExplorerMiniProviderCard extends StatelessWidget {
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: onContact,
-                    icon: const Icon(Icons.chat_bubble_outline_rounded,
-                        size: 16),
+                    icon:
+                        const Icon(Icons.chat_bubble_outline_rounded, size: 16),
                     label: const Text('Contacter'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: SDColors.primary700,

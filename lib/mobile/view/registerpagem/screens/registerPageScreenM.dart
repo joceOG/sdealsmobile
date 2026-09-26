@@ -6,12 +6,14 @@ import '../../../../data/models/utilisateur.dart';
 import '../../../../data/models/phone_verification_config.dart';
 import '../../../../data/services/api_client.dart';
 import '../../../../data/services/authCubit.dart';
+import '../../../../data/services/protected_action_intent.dart';
 import '../../../../data/services/google_auth_service.dart';
 import '../../../../data/services/token_store.dart';
 import '../registerpageblocm/registerPageBlocM.dart';
 import '../registerpageblocm/registerPageEventM.dart';
 import '../registerpageblocm/registerPageStateM.dart';
 
+import '../../common/auth_completion.dart';
 import '../../../../design_system/design_system.dart';
 import '../../common/utils/app_snackbar.dart';
 import '../../common/widgets/auth_form_widgets.dart';
@@ -25,6 +27,7 @@ class RegisterPageScreenM extends StatefulWidget {
 }
 
 class _RegisterPageScreenMState extends State<RegisterPageScreenM> {
+  bool _successPopAllowed = false;
   bool agreeToTerms = false;
 
   late final TextEditingController _prenomController;
@@ -109,8 +112,7 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM> {
     final deferredSignup = _isDeferredSignup;
     final emailOk =
         !deferredSignup || _emailController.text.trim().contains('@');
-    final phoneOk =
-        deferredSignup || _phoneController.text.trim().isNotEmpty;
+    final phoneOk = deferredSignup || _phoneController.text.trim().isNotEmpty;
     return agreeToTerms &&
         _nomController.text.trim().length >= 2 &&
         emailOk &&
@@ -137,8 +139,31 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM> {
     if (context.canPop()) {
       context.pop();
     } else {
-      context.go('/login');
+      _goLoginKeepingEntry(context);
     }
+  }
+
+  void _goLoginKeepingEntry(BuildContext context) {
+    final extra =
+        routeIsProtectedAuth(context) ? AuthEntryMode.protectedAction : null;
+    context.go('/login', extra: extra);
+  }
+
+  void _returnAfterAuth(BuildContext context) {
+    if (!ProtectedActionStore.instance.hasPending) {
+      AuthCompletion.goAfterSuccess(context);
+      return;
+    }
+    if (_successPopAllowed) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) AuthCompletion.goAfterSuccess(context);
+      });
+      return;
+    }
+    setState(() => _successPopAllowed = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (context.mounted) AuthCompletion.goAfterSuccess(context);
+    });
   }
 
   void _submit(BuildContext context) {
@@ -191,7 +216,8 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM> {
               activeRole: role,
               refreshToken: refreshToken,
             );
-        context.push('/homepage');
+        if (!context.mounted) return;
+        _returnAfterAuth(context);
       } on GooglePhoneVerificationRequiredException {
         if (!context.mounted) return;
         await GoogleAuthService.instance.signOut();
@@ -199,12 +225,12 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM> {
           context,
           'Vérifiez votre téléphone via Connexion Google pour finaliser.',
         );
-        context.go('/login');
+        _goLoginKeepingEntry(context);
       } on GoogleAccountLinkRequiredException catch (e) {
         if (!context.mounted) return;
         await GoogleAuthService.instance.signOut();
         AppSnackBar.error(context, e.toString());
-        context.go('/login');
+        _goLoginKeepingEntry(context);
       }
     } catch (e) {
       if (!context.mounted) return;
@@ -225,7 +251,7 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM> {
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: false,
+      canPop: _successPopAllowed,
       onPopInvokedWithResult: (bool didPop, Object? result) {
         if (didPop) return;
         if (!context.mounted) return;
@@ -262,9 +288,7 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM> {
               } else {
                 AppSnackBar.success(context, 'Inscription réussie');
               }
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (context.mounted) context.push('/homepage');
-              });
+              _returnAfterAuth(context);
             }
             if (state.errorMessage != null &&
                 state.phase == RegisterPhase.error) {
@@ -274,17 +298,15 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM> {
           builder: (context, state) {
             final mq = MediaQuery.of(context);
             return SingleChildScrollView(
-              keyboardDismissBehavior:
-                  ScrollViewKeyboardDismissBehavior.onDrag,
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               child: Padding(
                 padding: EdgeInsets.fromLTRB(
                   SDSpacing.md,
                   0,
                   SDSpacing.md,
-                  SDSpacing.lg +
-                      mq.viewPadding.bottom +
-                      mq.viewInsets.bottom,
+                  SDSpacing.lg + mq.viewPadding.bottom + mq.viewInsets.bottom,
                 ),
+                // OTP = même route /register : le marqueur extra reste sur la pile.
                 child: state.showOtpStep
                     ? _buildOtpStep(context, state)
                     : _buildFormStep(context, state),
@@ -300,9 +322,8 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM> {
     final phoneLabel = _isDeferredSignup
         ? 'Numéro de téléphone (facultatif)'
         : 'Numéro de téléphone';
-    final phoneHelper = _isDeferredSignup
-        ? 'Vous pourrez le vérifier plus tard.'
-        : null;
+    final phoneHelper =
+        _isDeferredSignup ? 'Vous pourrez le vérifier plus tard.' : null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -391,9 +412,8 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM> {
               text: 'Créer mon compte',
               fullWidth: true,
               isLoading: state.isBusy,
-              onPressed: state.isBusy || !canSubmit
-                  ? null
-                  : () => _submit(context),
+              onPressed:
+                  state.isBusy || !canSubmit ? null : () => _submit(context),
             );
           },
         ),
@@ -416,7 +436,7 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM> {
               ),
             ),
             TextButton(
-              onPressed: () => context.go('/login'),
+              onPressed: () => _goLoginKeepingEntry(context),
               style: TextButton.styleFrom(
                 padding: EdgeInsets.symmetric(
                   horizontal: SDSpacing.xxs,

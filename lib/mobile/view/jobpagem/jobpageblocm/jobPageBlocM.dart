@@ -32,6 +32,7 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
         filterVerifiedOnly: event.filterVerifiedOnly,
         filterMinRating: event.filterMinRating,
         clearMinRating: event.clearMinRating,
+        searchRadius: event.searchRadius,
       ));
     });
   }

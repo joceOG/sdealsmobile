@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
+import 'package:sdealsmobile/data/services/authCubit.dart';
+import 'package:sdealsmobile/data/services/protected_action_intent.dart';
+import 'package:sdealsmobile/mobile/view/common/auth_completion.dart';
 import '../models/freelance_model.dart';
 import '../../chatpagem/screens/chatPageScreenM.dart';
 import '../../chatpagem/chatpageblocm/chatPageBlocM.dart';
@@ -732,8 +736,10 @@ class FreelanceDetailsScreen extends StatelessWidget {
               if (hasPhone) ...[
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () => _makePhoneCall(freelance.phoneNumber!),
-                    icon: Icon(Icons.phone_outlined, color: SDColors.primary700),
+                    onPressed: () =>
+                        _callFreelance(context, freelance.phoneNumber),
+                    icon:
+                        Icon(Icons.phone_outlined, color: SDColors.primary700),
                     label: Text(
                       'Appeler',
                       maxLines: 1,
@@ -797,29 +803,31 @@ class FreelanceDetailsScreen extends StatelessWidget {
     );
   }
 
-  /// Passer un appel téléphonique
-  Future<void> _makePhoneCall(String phoneNumber) async {
-    final Uri launchUri = Uri(
-      scheme: 'tel',
-      path: phoneNumber,
+  Future<void> _callFreelance(BuildContext context, String? phoneNumber) async {
+    final ready = await ensureAuthenticatedForAction(
+      context: context,
+      type: ProtectedActionType.callProvider,
+      originRoute: 'freelanceDetails',
+      technicalId: freelance.id,
+      explanation: 'Connectez-vous pour contacter ce professionnel',
     );
-    if (await canLaunchUrl(launchUri)) {
-      await launchUrl(launchUri);
-    }
+    if (!ready || !context.mounted) return;
+    final result = await DialerSession.openOnce(phoneNumber);
+    if (!context.mounted) return;
+    await showDialerFeedback(context, result);
   }
 
-  /// Contacter le freelancer
-  void _contactFreelancer(BuildContext context) {
+  Future<void> _contactFreelancer(BuildContext context) async {
+    final ready = await ensureAuthenticatedForAction(
+      context: context,
+      type: ProtectedActionType.startConversation,
+      originRoute: 'freelanceDetails',
+      technicalId: freelance.utilisateurId,
+      explanation: 'Connectez-vous pour démarrer la conversation',
+    );
+    if (!ready || !context.mounted) return;
     final authState = context.read<AuthCubit>().state;
-    if (authState is! AuthAuthenticated) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Connectez-vous pour envoyer un message'),
-        ),
-      );
-      context.push('/login');
-      return;
-    }
+    if (authState is! AuthAuthenticated) return;
 
     final destinataireUserId = freelance.utilisateurId;
     if (destinataireUserId == null || destinataireUserId.isEmpty) {

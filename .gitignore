@@ -53,3 +53,6 @@ app.*.map.json
 **/google-services.json
 **/GoogleService-Info.plist
 android/secrets.properties
+.cursor/
+docs/audit/_analyze_10b.txt
+docs/audit/_analyze_10b_out.txt

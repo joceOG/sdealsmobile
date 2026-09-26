@@ -19,12 +19,16 @@ import 'package:sdealsmobile/mobile/view/jobpagem/screens/jobPageScreenM.dart';
 import 'package:sdealsmobile/mobile/view/jobpagem/screens/provider_profile_screen.dart';
 import 'package:sdealsmobile/mobile/view/searchpagem/screens/searchPageScreenM.dart';
 import 'package:sdealsmobile/mobile/view/shoppingpagem/screens/productDetailsScreenM.dart';
+import 'package:sdealsmobile/data/config/client_feature_flags.dart';
 import 'package:sdealsmobile/mobile/view/shoppingpagem/screens/shoppingPageScreenM.dart';
 import 'package:sdealsmobile/mobile/view/shoppingpagem/shoppingpageblocm/shoppingPageBlocM.dart';
 import 'package:sdealsmobile/mobile/view/shoppingpagem/shoppingpageblocm/shoppingPageEventM.dart'
     as shop_ev;
 import 'package:sdealsmobile/mobile/view/shoppingpagem/shoppingpageblocm/shoppingPageStateM.dart'
     as shop_state;
+import 'package:sdealsmobile/mobile/view/common/widgets/client_universe_pictograms.dart';
+import 'package:sdealsmobile/mobile/view/locationpagem/locationpageblocm/locationPageBlocM.dart';
+import 'package:sdealsmobile/mobile/view/locationpagem/screens/locationPageScreenM.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:sdealsmobile/mobile/view/explorer/widgets/explorer_metiers_map_panel.dart';
@@ -48,6 +52,7 @@ class ExplorerPageScreen extends StatelessWidget {
       providers: [
         BlocProvider(
           create: (_) => JobPageBlocM()
+            ..add(LoadCategorieDataJobM())
             ..add(const LoadProviderMatchingM(serviceType: '', location: '')),
         ),
         BlocProvider(
@@ -56,12 +61,13 @@ class ExplorerPageScreen extends StatelessWidget {
             ..add(free_ev.LoadFreelancersEvent())
             ..add(free_ev.LoadServicesEvent()),
         ),
-        BlocProvider(
-          create: (_) => ShoppingPageBlocM()
-            ..add(shop_ev.LoadCategorieDataM())
-            ..add(shop_ev.LoadProductsEvent())
-            ..add(shop_ev.LoadVendeursEvent()),
-        ),
+        if (ClientFeatureFlags.emarketEnabled)
+          BlocProvider(
+            create: (_) => ShoppingPageBlocM()
+              ..add(shop_ev.LoadCategorieDataM())
+              ..add(shop_ev.LoadProductsEvent())
+              ..add(shop_ev.LoadVendeursEvent()),
+          ),
       ],
       child: const _ExplorerBody(),
     );
@@ -77,7 +83,7 @@ class _ExplorerBody extends StatefulWidget {
 
 class _ExplorerBodyState extends State<_ExplorerBody> {
   final TextEditingController _searchCtrl = TextEditingController();
-  _ExplorerUniverse _universe = _ExplorerUniverse.tous;
+  _ExplorerUniverse _universe = _ExplorerUniverse.metiers;
   _ExplorerViewMode _viewMode = _ExplorerViewMode.list;
 
   @override
@@ -119,8 +125,9 @@ class _ExplorerBodyState extends State<_ExplorerBody> {
       _universe == _ExplorerUniverse.freelance;
 
   bool get _showMarketplace =>
-      _universe == _ExplorerUniverse.tous ||
-      _universe == _ExplorerUniverse.marketplace;
+      ClientFeatureFlags.emarketEnabled &&
+      (_universe == _ExplorerUniverse.tous ||
+          _universe == _ExplorerUniverse.marketplace);
 
   /// Carte utile pour Métiers (et Tous = markers métiers).
   bool get _mapAvailable =>
@@ -130,16 +137,23 @@ class _ExplorerBodyState extends State<_ExplorerBody> {
   void _selectUniverse(_ExplorerUniverse value) {
     setState(() {
       _universe = value;
-      // Airbnb-like : Marketplace / Freelance → Liste ; Métiers → Carte.
-      if (value == _ExplorerUniverse.metiers) {
-        _viewMode = _ExplorerViewMode.map;
-      } else if (value == _ExplorerUniverse.freelance ||
+      // Conserver Liste par défaut ; Carte seulement si l'utilisateur la choisit.
+      if (value == _ExplorerUniverse.freelance ||
           value == _ExplorerUniverse.marketplace) {
-        _viewMode = _ExplorerViewMode.list;
-      } else {
         _viewMode = _ExplorerViewMode.list;
       }
     });
+  }
+
+  void _openLocation() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => BlocProvider(
+          create: (_) => LocationPageBlocM(),
+          child: const LocationPageScreenM(),
+        ),
+      ),
+    );
   }
 
   /// Affiche uniquement les cartes avec une vraie image (réseau ou asset).
@@ -161,71 +175,228 @@ class _ExplorerBodyState extends State<_ExplorerBody> {
 
     return Scaffold(
       backgroundColor: SDColors.white,
-      body: SafeArea(
-        top: true,
-        bottom: false,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildTopTitle(context),
-                  SizedBox(height: SDSpacing.md),
-                  _buildSearchRow(context),
-                  SizedBox(height: SDSpacing.md),
-                  _buildUniverseIcons(),
-                  SizedBox(height: SDSpacing.sm),
-                  if (_mapAvailable) _buildListMapToggle(),
-                  if (!_mapAvailable &&
-                      _universe == _ExplorerUniverse.marketplace)
-                    Padding(
-                      padding: EdgeInsets.only(bottom: SDSpacing.xs),
-                      child: Text(
-                        'Marketplace en liste — la carte est pour les métiers près de vous.',
-                        style: SDTypography.labelSmall.copyWith(
-                          color: SDColors.neutral500,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: showMap
-                  ? const Padding(
-                      padding: EdgeInsets.only(top: 4),
-                      child: ExplorerMetiersMapPanel(),
-                    )
-                  : CustomScrollView(
-                      physics: const BouncingScrollPhysics(),
-                      slivers: [
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildHeroHeader(context, showMap: showMap),
+          Expanded(
+            child: showMap
+                ? const Padding(
+                    padding: EdgeInsets.only(top: 4),
+                    child: ExplorerMetiersMapPanel(),
+                  )
+                : CustomScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    slivers: [
+                      if (_universe == _ExplorerUniverse.metiers ||
+                          _universe == _ExplorerUniverse.tous)
                         SliverToBoxAdapter(
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                if (_showMetiers) _buildMetiersSection(context),
-                                if (_showFreelance)
-                                  _buildFreelanceSection(context),
-                                if (_showMarketplace) ...[
-                                  _buildProductsSection(context),
-                                  _buildShopsSection(context),
-                                ],
-                                SizedBox(height: SDSpacing.lg),
+                          child: _buildQuickCategories(context),
+                        ),
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (_showMetiers) _buildMetiersSection(context),
+                              if (_showFreelance)
+                                _buildFreelanceSection(context),
+                              if (_showMarketplace) ...[
+                                _buildProductsSection(context),
+                                _buildShopsSection(context),
                               ],
-                            ),
+                              SizedBox(height: SDSpacing.lg),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
-            ),
-          ],
+                      ),
+                    ],
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeroHeader(BuildContext context, {required bool showMap}) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: SDColors.primary50,
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(24)),
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Explorer',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: SDTypography.displayMedium.copyWith(
+                  color: SDColors.neutral900,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              SizedBox(height: SDSpacing.xxxs),
+              Text(
+                'Services et freelances',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: SDTypography.bodySmall.copyWith(
+                  color: SDColors.neutral600,
+                  fontSize: 13,
+                ),
+              ),
+              SizedBox(height: SDSpacing.sm),
+              _buildSearchRow(context),
+              SizedBox(height: SDSpacing.sm),
+              _buildLocationRow(),
+              if (!showMap) ...[
+                SizedBox(height: SDSpacing.sm),
+                _buildUniverseIcons(),
+              ],
+              if (_mapAvailable) ...[
+                SizedBox(height: SDSpacing.sm),
+                _buildListMapToggle(),
+              ],
+            ],
+          ),
         ),
       ),
+    );
+  }
+
+  Widget _buildLocationRow() {
+    return Semantics(
+      button: true,
+      label: 'Ville ${SDClientLocationPolicy.fallbackCity}. Modifier',
+      child: InkWell(
+        onTap: _openLocation,
+        borderRadius: BorderRadius.circular(SDSpacing.radiusChip),
+        child: ConstrainedBox(
+          constraints:
+              const BoxConstraints(minHeight: SDSpacing.minTouchTarget),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.location_on,
+                size: SDSpacing.iconStandard,
+                color: SDColors.primary600,
+              ),
+              const SizedBox(width: SDSpacing.spaceSmall),
+              Expanded(
+                child: Text(
+                  SDClientLocationPolicy.fallbackCity,
+                  style: SDTypography.body.copyWith(
+                    color: SDColors.neutral900,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Text(
+                'Modifier',
+                style: SDTypography.caption.copyWith(
+                  color: SDColors.primary600,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickCategories(BuildContext context) {
+    return BlocBuilder<JobPageBlocM, JobPageStateM>(
+      builder: (context, state) {
+        final cats = state.listItems.take(8).toList();
+        if (cats.isEmpty && !state.isLoading) {
+          if (state.error.isNotEmpty) {
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+              child: _explorerInlineState(
+                title: 'Catégories indisponibles',
+                message: state.error,
+                onRetry: () => context
+                    .read<JobPageBlocM>()
+                    .add(LoadCategorieDataJobM()),
+              ),
+            );
+          }
+          return const SizedBox.shrink();
+        }
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 0, 4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Catégories',
+                style: SDTypography.titleSmall.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: SDColors.neutral900,
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 88,
+                child: state.isLoading && cats.isEmpty
+                    ? const Center(
+                        child: SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      )
+                    : ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.only(right: 20),
+                        itemCount: cats.length + 1,
+                        separatorBuilder: (_, __) => const SizedBox(width: 10),
+                        itemBuilder: (context, index) {
+                          if (index == cats.length) {
+                            return _ExplorerCategoryChip(
+                              label: 'Voir tout',
+                              selected: false,
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => const JobPageScreenM(),
+                                  ),
+                                );
+                              },
+                            );
+                          }
+                          final c = cats[index];
+                          return _ExplorerCategoryChip(
+                            label: c.nomcategorie,
+                            selected: false,
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => BlocProvider(
+                                    create: (_) => JobPageBlocM()
+                                      ..add(LoadProvidersByCategoryM(
+                                        category: c.nomcategorie,
+                                      )),
+                                    child: const JobPageScreenM(),
+                                  ),
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -244,8 +415,7 @@ class _ExplorerBodyState extends State<_ExplorerBody> {
               label: 'Liste',
               icon: Icons.view_list_rounded,
               selected: _viewMode == _ExplorerViewMode.list,
-              onTap: () =>
-                  setState(() => _viewMode = _ExplorerViewMode.list),
+              onTap: () => setState(() => _viewMode = _ExplorerViewMode.list),
             ),
           ),
           Expanded(
@@ -253,8 +423,7 @@ class _ExplorerBodyState extends State<_ExplorerBody> {
               label: 'Carte',
               icon: Icons.map_outlined,
               selected: _viewMode == _ExplorerViewMode.map,
-              onTap: () =>
-                  setState(() => _viewMode = _ExplorerViewMode.map),
+              onTap: () => setState(() => _viewMode = _ExplorerViewMode.map),
             ),
           ),
         ],
@@ -262,202 +431,149 @@ class _ExplorerBodyState extends State<_ExplorerBody> {
     );
   }
 
-  /// Même gabarit que Freelance / Marketplace : titre noir, pas de bandeau vert.
-  Widget _buildTopTitle(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Explorer',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: SDTypography.displayMedium.copyWith(
-            color: SDColors.neutral900,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        SizedBox(height: SDSpacing.xxxs),
-        Text(
-          'Services, freelances & shopping',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: SDTypography.bodySmall.copyWith(
-            color: SDColors.neutral500,
-            fontSize: 13,
-          ),
-        ),
-      ],
-    );
-  }
-
-  /// Barre type YouTube : pill, fond clair, contour noir (pas de vert).
+  /// Barre de recherche blanche ouvrant l'écran existant.
   Widget _buildSearchRow(BuildContext context) {
-    return Container(
-      height: 48,
-      padding: const EdgeInsets.only(left: 14, right: 10),
-      decoration: BoxDecoration(
-        color: SDColors.neutral100,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: SDColors.neutral900, width: 1),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.search, color: SDColors.neutral700, size: 22),
-          SizedBox(width: SDSpacing.xs),
-          Expanded(
-            child: TextField(
-              controller: _searchCtrl,
-              textInputAction: TextInputAction.search,
-              onSubmitted: (_) => _openSearch(),
-              cursorColor: SDColors.neutral900,
-              decoration: InputDecoration(
-                hintText: 'Rechercher service, produit ou prestataire..',
-                hintStyle: SDTypography.bodyMedium.copyWith(
-                  color: SDColors.neutral500,
-                  fontSize: 14,
+    return Semantics(
+      button: true,
+      label: 'Rechercher un service ou une compétence',
+      child: Material(
+        color: SDColors.white,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: () => _openSearch(),
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 48),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: SDColors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: SDColors.neutral200),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.search, color: SDColors.neutral600, size: 22),
+                SizedBox(width: SDSpacing.xs),
+                Expanded(
+                  child: Text(
+                    'Rechercher un service ou une compétence',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: SDTypography.bodyMedium.copyWith(
+                      color: SDColors.neutral500,
+                      fontSize: 14,
+                    ),
+                  ),
                 ),
-                // Le thème global applique un focusedBorder vert : on force tout à none.
-                filled: false,
-                isDense: true,
-                contentPadding: EdgeInsets.zero,
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                disabledBorder: InputBorder.none,
-                errorBorder: InputBorder.none,
-                focusedErrorBorder: InputBorder.none,
-              ),
-              style: SDTypography.bodyMedium.copyWith(
-                fontSize: 14,
-                color: SDColors.neutral900,
-              ),
+              ],
             ),
           ),
-          IconButton(
-            onPressed: () => _openSearch(),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-            icon: const Icon(
-              Icons.arrow_forward,
-              color: SDColors.neutral900,
-              size: 22,
-            ),
-            tooltip: 'Rechercher',
-          ),
-        ],
+        ),
       ),
     );
   }
 
-  /// Univers Figma : Métiers / Freelance / Vente & Achat / Plus — style pro.
+  /// Univers actifs uniquement (Métiers / Freelance), pictogrammes 10D-2C.
   Widget _buildUniverseIcons() {
-    const freelanceColor = Color(0xFF2F6FED);
-    const marketplaceColor = Color(0xFF2E7D32); // vert sac (Figma)
-    const plusColor = Color(0xFF9CA3AF);
-
     final items = <({
       String label,
-      IconData icon,
-      Color color,
       _ExplorerUniverse value,
-      bool usePillWhenSelected,
+      Widget Function(bool selected) pictogram,
     })>[
       (
         label: 'Métiers',
-        icon: Icons.person_rounded,
-        color: SDColors.primary600,
         value: _ExplorerUniverse.metiers,
-        usePillWhenSelected: true,
+        pictogram: (selected) => selected
+            ? ColorFiltered(
+                colorFilter: const ColorFilter.mode(
+                  SDColors.white,
+                  BlendMode.srcIn,
+                ),
+                child: const ClientUniversePictogram.metiers(size: 28),
+              )
+            : const ClientUniversePictogram.metiers(size: 28),
       ),
       (
         label: 'Freelance',
-        icon: Icons.person_rounded,
-        color: freelanceColor,
         value: _ExplorerUniverse.freelance,
-        usePillWhenSelected: false,
+        pictogram: (selected) => selected
+            ? ColorFiltered(
+                colorFilter: const ColorFilter.mode(
+                  SDColors.white,
+                  BlendMode.srcIn,
+                ),
+                child: const ClientUniversePictogram.freelance(size: 28),
+              )
+            : const ClientUniversePictogram.freelance(size: 28),
       ),
-      (
-        label: 'Vente & Achat',
-        icon: Icons.shopping_bag_rounded,
-        color: marketplaceColor,
-        value: _ExplorerUniverse.marketplace,
-        usePillWhenSelected: false,
-      ),
-      (
-        label: 'Plus',
-        icon: Icons.apps_rounded,
-        color: plusColor,
-        value: _ExplorerUniverse.tous,
-        usePillWhenSelected: false,
-      ),
+      if (ClientFeatureFlags.emarketEnabled)
+        (
+          label: 'Vente & Achat',
+          value: _ExplorerUniverse.marketplace,
+          pictogram: (selected) => Icon(
+                Icons.shopping_bag_rounded,
+                color: selected ? SDColors.white : SDColors.primary600,
+                size: 26,
+              ),
+        ),
     ];
 
     return SizedBox(
-      height: 88,
+      height: 92,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: items.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 18),
+        separatorBuilder: (_, __) => const SizedBox(width: 14),
         itemBuilder: (context, index) {
           final meta = items[index];
           final selected = _universe == meta.value;
-          final labelColor = selected ? meta.color : SDColors.neutral900;
-
-          return GestureDetector(
-            onTap: () => _selectUniverse(meta.value),
-            behavior: HitTestBehavior.opaque,
-            child: SizedBox(
-              width: meta.label == 'Vente & Achat' ? 78 : 72,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    curve: Curves.easeOut,
-                    width: selected && meta.usePillWhenSelected ? 64 : 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      color: selected ? meta.color : SDColors.white,
-                      borderRadius: BorderRadius.circular(
-                        selected && meta.usePillWhenSelected ? 26 : 26,
+          return Semantics(
+            button: true,
+            selected: selected,
+            label: 'Univers ${meta.label}',
+            child: GestureDetector(
+              onTap: () => _selectUniverse(meta.value),
+              behavior: HitTestBehavior.opaque,
+              child: SizedBox(
+                width: 76,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      curve: Curves.easeOut,
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        color: selected ? SDColors.primary600 : SDColors.white,
+                        borderRadius: BorderRadius.circular(28),
+                        border: Border.all(
+                          color: selected
+                              ? SDColors.primary600
+                              : SDColors.neutral200,
+                          width: 1.2,
+                        ),
                       ),
-                      border: Border.all(
+                      alignment: Alignment.center,
+                      child: meta.pictogram(selected),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      meta.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: SDTypography.labelSmall.copyWith(
                         color: selected
-                            ? meta.color
-                            : SDColors.neutral200,
-                        width: 1.2,
+                            ? SDColors.primary700
+                            : SDColors.neutral900,
+                        fontWeight:
+                            selected ? FontWeight.w800 : FontWeight.w600,
+                        fontSize: 12,
                       ),
-                      boxShadow: selected
-                          ? null
-                          : [
-                              BoxShadow(
-                                color: SDColors.neutral900
-                                    .withValues(alpha: 0.06),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
                     ),
-                    child: Icon(
-                      meta.icon,
-                      color: selected ? SDColors.white : meta.color,
-                      size: 26,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    meta.label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: SDTypography.labelSmall.copyWith(
-                      color: labelColor,
-                      fontWeight:
-                          selected ? FontWeight.w800 : FontWeight.w600,
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           );
@@ -535,6 +651,45 @@ class _ExplorerBodyState extends State<_ExplorerBody> {
     return Padding(
       padding: EdgeInsets.only(bottom: SDSpacing.md + 4),
       child: child,
+    );
+  }
+
+  Widget _explorerInlineState({
+    required String title,
+    required String message,
+    required VoidCallback onRetry,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(SDSpacing.spaceRelated),
+      decoration: BoxDecoration(
+        color: SDColors.neutral50,
+        borderRadius: BorderRadius.circular(SDSpacing.radiusCard),
+        border: Border.all(color: SDColors.neutral200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: SDTypography.titleSmall.copyWith(
+              fontWeight: FontWeight.w800,
+              color: SDColors.neutral900,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            message,
+            style: SDTypography.bodySmall.copyWith(color: SDColors.neutral600),
+          ),
+          const SizedBox(height: SDSpacing.spaceSmall),
+          TextButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh_rounded, size: 18),
+            label: const Text('Réessayer'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -632,8 +787,7 @@ class _ExplorerBodyState extends State<_ExplorerBody> {
                   titleLight: ' populaires',
                   onSeeAll: () => Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (_) =>
-                          const FreelancePageScreen(categories: []),
+                      builder: (_) => const FreelancePageScreen(categories: []),
                     ),
                   ),
                 ),
@@ -667,8 +821,7 @@ class _ExplorerBodyState extends State<_ExplorerBody> {
                 titleLight: ' populaires',
                 onSeeAll: () => Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (_) =>
-                        const FreelancePageScreen(categories: []),
+                    builder: (_) => const FreelancePageScreen(categories: []),
                   ),
                 ),
               ),
@@ -695,10 +848,8 @@ class _ExplorerBodyState extends State<_ExplorerBody> {
     return BlocBuilder<ShoppingPageBlocM, shop_state.ShoppingPageStateM>(
       builder: (context, state) {
         final raw = state.filteredProducts ?? state.products ?? [];
-        final list = raw
-            .where((p) => _hasDisplayableImage(p.image))
-            .take(10)
-            .toList();
+        final list =
+            raw.where((p) => _hasDisplayableImage(p.image)).take(10).toList();
         if ((state.isLoading ?? false) && list.isEmpty) {
           return _sectionGap(
             child: Column(
@@ -728,6 +879,30 @@ class _ExplorerBodyState extends State<_ExplorerBody> {
           );
         }
         if (list.isEmpty) {
+          final err = (state.error ?? '').trim();
+          if (err.isNotEmpty) {
+            return _sectionGap(
+              child: _explorerInlineState(
+                title: 'Catalogue indisponible',
+                message: err,
+                onRetry: () => context
+                    .read<ShoppingPageBlocM>()
+                    .add(shop_ev.LoadProductsEvent()),
+              ),
+            );
+          }
+          if (raw.isEmpty) {
+            return _sectionGap(
+              child: _explorerInlineState(
+                title: 'Aucun article pour le moment',
+                message:
+                    'Le catalogue est vide. Revenez plus tard ou rafraîchissez.',
+                onRetry: () => context
+                    .read<ShoppingPageBlocM>()
+                    .add(shop_ev.LoadProductsEvent()),
+              ),
+            );
+          }
           return const SizedBox.shrink();
         }
         return _sectionGap(
@@ -797,6 +972,66 @@ class _ExplorerBodyState extends State<_ExplorerBody> {
           ),
         );
       },
+    );
+  }
+}
+
+class _ExplorerCategoryChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _ExplorerCategoryChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          width: 84,
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+          decoration: BoxDecoration(
+            color: SDColors.primary50,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: selected ? SDColors.primary600 : SDColors.primary100,
+            ),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                label == 'Voir tout'
+                    ? Icons.grid_view_rounded
+                    : Icons.handyman_outlined,
+                color: SDColors.primary600,
+                size: 22,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                label,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: SDTypography.labelSmall.copyWith(
+                  color: SDColors.neutral900,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -974,8 +1209,7 @@ class _FreelanceExplorerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final verified =
-        freelance.verificationDocuments?.isVerified == true;
+    final verified = freelance.verificationDocuments?.isVerified == true;
 
     return GestureDetector(
       onTap: () {
@@ -1230,8 +1464,7 @@ class _ShopPillCard extends StatelessWidget {
               child: SizedBox(
                 width: 48,
                 height: 48,
-                child: vendeur.shopLogo != null &&
-                        vendeur.shopLogo!.isNotEmpty
+                child: vendeur.shopLogo != null && vendeur.shopLogo!.isNotEmpty
                     ? AppImage(
                         imageUrl: vendeur.shopLogo!,
                         width: 48,
@@ -1240,8 +1473,8 @@ class _ShopPillCard extends StatelessWidget {
                       )
                     : ColoredBox(
                         color: SDColors.primary50,
-                        child: Icon(Icons.storefront,
-                            color: SDColors.primary600),
+                        child:
+                            Icon(Icons.storefront, color: SDColors.primary600),
                       ),
               ),
             ),

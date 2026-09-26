@@ -106,9 +106,21 @@ String? formatOptionalPrice(
       ? price.toDouble()
       : double.tryParse(price.toString().replaceAll(',', '.').trim());
   if (n == null || n <= 0) return null;
-  final base = '${n.toStringAsFixed(0)} $suffix';
+  final grouped = _groupThousands(n.round());
+  final base = '$grouped $suffix';
   if (perUnit != null && perUnit.isNotEmpty) return '$base$perUnit';
   return base;
+}
+
+String _groupThousands(int value) {
+  final s = value.abs().toString();
+  final buf = StringBuffer();
+  for (var i = 0; i < s.length; i++) {
+    if (i > 0 && (s.length - i) % 3 == 0) buf.write('\u00A0');
+    buf.write(s[i]);
+  }
+  final out = buf.toString();
+  return value < 0 ? '-$out' : out;
 }
 
 /// Vrai si une chaîne d'UI contient encore le littéral « null » (tests).
