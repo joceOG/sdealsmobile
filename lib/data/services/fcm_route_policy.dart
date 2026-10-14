@@ -36,6 +36,10 @@ class FcmNavigationDecision {
   final String? resumeAfterAuth;
 }
 
+/// Que faire d'une destination en attente quand la restauration de session
+/// se termine après l'ouverture de l'interface.
+enum PostRestoreAction { none, openPending, openLogin }
+
 class SplashNavDecision {
   const SplashNavDecision({
     required this.route,
@@ -75,7 +79,8 @@ class FcmRoutePolicy {
     if (_id.hasMatch(conversationId)) {
       return '/chat/$conversationId';
     }
-    final missionId = data['missionId']?.toString() ?? '';
+    final missionId =
+        data['prestationId']?.toString() ?? data['missionId']?.toString() ?? '';
     if (_id.hasMatch(missionId)) {
       return '/mission-details/$missionId';
     }
@@ -102,6 +107,10 @@ class FcmRoutePolicy {
     required bool loggedIn,
     required bool openProviderHome,
     Object? providerExtra,
+
+    /// La restauration de session n'est pas terminée : on ne sait pas si
+    /// l'utilisateur est connecté. Ni « invité » (→ /login), ni accès pro.
+    bool sessionPending = false,
   }) {
     final hold = pendingRoute != null &&
             isAllowedPath(pendingRoute) &&
@@ -110,6 +119,11 @@ class FcmRoutePolicy {
         : null;
     if (!onboardingCompleted) {
       return SplashNavDecision(route: '/onboarding', hold: hold);
+    }
+    if (sessionPending && !loggedIn) {
+      // Interface neutre ; la destination reste en attente et sera ouverte
+      // (ou menée au login) dès que la session est fixée.
+      return SplashNavDecision(route: '/homepage', hold: hold);
     }
     if (hold != null && isProtected(hold) && !loggedIn) {
       return SplashNavDecision(route: '/login', hold: hold);
@@ -121,5 +135,21 @@ class FcmRoutePolicy {
       return SplashNavDecision(route: '/providermain', extra: providerExtra);
     }
     return const SplashNavDecision(route: '/homepage');
+  }
+
+  /// Décision quand la restauration passe de « en cours » à un état final.
+  /// [pending] = destination conservée (allowlistée) ; [settled] = la
+  /// restauration n'est plus « en cours » ; [authenticated] = session appliquée.
+  static PostRestoreAction afterSessionRestore({
+    required bool settled,
+    required bool authenticated,
+    required String? pending,
+  }) {
+    if (!settled || pending == null || !isAllowedPath(pending)) {
+      return PostRestoreAction.none;
+    }
+    if (authenticated) return PostRestoreAction.openPending;
+    if (isProtected(pending)) return PostRestoreAction.openLogin;
+    return PostRestoreAction.none;
   }
 }

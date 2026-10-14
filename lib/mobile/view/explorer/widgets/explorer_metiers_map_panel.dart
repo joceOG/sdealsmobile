@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:intl/intl.dart';
 
 import 'package:sdealsmobile/data/models/prestataire.dart';
+import 'package:sdealsmobile/data/services/protected_action_intent.dart';
 import 'package:sdealsmobile/data/utils/display_text.dart';
 import 'package:sdealsmobile/data/utils/media_url.dart';
+import 'package:sdealsmobile/mobile/view/common/auth_completion.dart';
 import 'package:sdealsmobile/design_system/design_system.dart';
 import 'package:sdealsmobile/mobile/view/common/widgets/app_image.dart';
 import 'package:sdealsmobile/mobile/view/jobpagem/jobpageblocm/jobPageBlocM.dart';
@@ -34,6 +35,7 @@ class _ExplorerMetiersMapPanelState extends State<ExplorerMetiersMapPanel> {
   int _syncToken = 0;
   List<Prestataire> _lastProviders = const [];
   Map<String, double> _lastDistances = const {};
+  String? _markerLayoutKey;
 
   @override
   void initState() {
@@ -81,12 +83,158 @@ class _ExplorerMetiersMapPanelState extends State<ExplorerMetiersMapPanel> {
     Map<String, double> distances, {
     double? zoom,
   }) async {
-    _mapZoom = zoom ?? _mapZoom;
+    final z = zoom ?? _mapZoom;
+    _mapZoom = z;
     _lastProviders = providers;
     _lastDistances = distances;
+    final withCoords = _withCoords(providers);
+    final layoutKey = _layoutKey(withCoords, z);
+    if (layoutKey == _markerLayoutKey && _markers.isNotEmpty) return;
     final token = ++_syncToken;
     final markers = <Marker>{};
 
+    // Même règle que Métiers : zoom éloigné → clusters ; zoom proche → avatar + prix.
+    final useClusters = z < 12.5 && withCoords.length > 8;
+    if (useClusters) {
+      for (final c in _buildClusters(withCoords, z)) {
+        if (c.members.length == 1) {
+          final p = c.members.first;
+          final icon = await _avatarIconFor(p);
+          if (!mounted || token != _syncToken) return;
+          markers.add(Marker(
+            markerId: MarkerId(p.idprestataire),
+            position: LatLng(c.lat, c.lng),
+            icon: icon,
+            zIndex: _selected?.idprestataire == p.idprestataire ? 2 : 0,
+            onTap: () => _choose(p),
+          ));
+        } else {
+          final icon =
+              await CustomMarkerService.createClusterMarker(c.members.length);
+          if (!mounted || token != _syncToken) return;
+          markers.add(Marker(
+            markerId: MarkerId('cluster_${c.lat}_${c.lng}'),
+            position: LatLng(c.lat, c.lng),
+            icon: icon,
+            onTap: () {
+              _mapController?.animateCamera(
+                CameraUpdate.newLatLngZoom(LatLng(c.lat, c.lng), z + 2),
+              );
+            },
+          ));
+        }
+      }
+    } else {
+      for (final p in withCoords.take(40)) {
+        final icon = await _avatarIconFor(p);
+        if (!mounted || token != _syncToken) return;
+        markers.add(Marker(
+          markerId: MarkerId(p.idprestataire),
+          position: LatLng(
+            p.localisationMaps!.latitude,
+            p.localisationMaps!.longitude,
+          ),
+          icon: icon,
+          zIndex: _selected?.idprestataire == p.idprestataire ? 2 : 0,
+          onTap: () => _choose(p),
+        ));
+      }
+    }
+
+    if (!mounted || token != _syncToken) return;
+    _markerLayoutKey = layoutKey;
+    setState(() => _markers = markers);
+  }
+
+  String _layoutKey(List<Prestataire> providers, double zoom) {
+    final bucket = zoom >= 12.5
+        ? 3
+        : zoom >= 11
+            ? 2
+            : zoom >= 10
+                ? 1
+                : 0;
+    final parts = [
+      for (final p in providers)
+        '${p.idprestataire}:${providerPriceCopy(prixprestataire: p.prixprestataire, tarifHoraireMin: p.tarifHoraireMin).marker}:${p.verifier}:${p.utilisateur.photoProfil ?? ''}:${p.selfie ?? ''}',
+    ]..sort();
+    return '$bucket|${parts.join('|')}';
+  }
+
+  Future<void> _choose(Prestataire? next) async {
+    final previous = _selected;
+    if (previous?.idprestataire == next?.idprestataire) return;
+    setState(() => _selected = next);
+    await _repaintSelection(previous, next);
+  }
+
+  Future<void> _repaintSelection(Prestataire? previous, Prestataire? next) async {
+    if (!mounted) return;
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    final icons = <String, BitmapDescriptor>{};
+    if (previous != null) {
+      icons[previous.idprestataire] =
+          await _avatarIconFor(previous, selected: false, dpr: dpr);
+    }
+    if (next != null && next.idprestataire != previous?.idprestataire) {
+      icons[next.idprestataire] =
+          await _avatarIconFor(next, selected: true, dpr: dpr);
+    }
+    if (!mounted || icons.isEmpty) return;
+    setState(() {
+      _markers = _markers
+          .map((m) {
+            final icon = icons[m.markerId.value];
+            if (icon == null) return m;
+            return m.copyWith(
+              iconParam: icon,
+              zIndexParam: m.markerId.value == next?.idprestataire ? 2 : 0,
+            );
+          })
+          .toSet();
+    });
+  }
+
+  List<_ExplorerMapCluster> _buildClusters(
+    List<Prestataire> providers,
+    double zoom,
+  ) {
+    final cell = zoom >= 12.5
+        ? 0.0
+        : zoom >= 11
+            ? 0.012
+            : zoom >= 10
+                ? 0.025
+                : 0.05;
+    if (cell <= 0) {
+      return providers
+          .map((p) => _ExplorerMapCluster(
+                lat: p.localisationMaps!.latitude,
+                lng: p.localisationMaps!.longitude,
+                members: [p],
+              ))
+          .toList();
+    }
+
+    final buckets = <String, _ExplorerMapCluster>{};
+    for (final p in providers) {
+      final lat = p.localisationMaps!.latitude;
+      final lng = p.localisationMaps!.longitude;
+      final key = '${(lat / cell).floor()}_${(lng / cell).floor()}';
+      final existing = buckets[key];
+      if (existing == null) {
+        buckets[key] = _ExplorerMapCluster(lat: lat, lng: lng, members: [p]);
+      } else {
+        existing.members.add(p);
+        final n = existing.members.length;
+        existing.lat = ((existing.lat * (n - 1)) + lat) / n;
+        existing.lng = ((existing.lng * (n - 1)) + lng) / n;
+      }
+    }
+    return buckets.values.toList();
+  }
+
+  List<Prestataire> _withCoords(List<Prestataire> providers) {
     final withCoords = <Prestataire>[];
     for (final p in providers) {
       final lat = p.localisationMaps?.latitude;
@@ -94,26 +242,14 @@ class _ExplorerMetiersMapPanelState extends State<ExplorerMetiersMapPanel> {
       if (lat == null || lng == null || lat == 0 || lng == 0) continue;
       withCoords.add(p);
     }
-
-    for (final p in withCoords.take(40)) {
-      final icon = await _avatarIconFor(p);
-      if (!mounted || token != _syncToken) return;
-      markers.add(Marker(
-        markerId: MarkerId(p.idprestataire),
-        position: LatLng(
-          p.localisationMaps!.latitude,
-          p.localisationMaps!.longitude,
-        ),
-        icon: icon,
-        onTap: () => setState(() => _selected = p),
-      ));
-    }
-
-    if (!mounted || token != _syncToken) return;
-    setState(() => _markers = markers);
+    return withCoords;
   }
 
-  Future<BitmapDescriptor> _avatarIconFor(Prestataire p) {
+  Future<BitmapDescriptor> _avatarIconFor(
+    Prestataire p, {
+    bool? selected,
+    double? dpr,
+  }) {
     final photo = providerPhotoUrl(
       selfie: p.selfie,
       photoProfil: p.utilisateur.photoProfil,
@@ -128,10 +264,15 @@ class _ExplorerMetiersMapPanelState extends State<ExplorerMetiersMapPanel> {
             .join()
         : '?';
     return CustomMarkerService.createAvatarPriceMarker(
-      priceLabel: _price(p),
+      priceLabel: providerPriceCopy(
+        prixprestataire: p.prixprestataire,
+        tarifHoraireMin: p.tarifHoraireMin,
+      ).marker,
       initials: initials,
       photoUrl: photo,
       isVerified: p.verifier,
+      selected: selected ?? _selected?.idprestataire == p.idprestataire,
+      devicePixelRatio: dpr ?? MediaQuery.devicePixelRatioOf(context),
     );
   }
 
@@ -153,18 +294,9 @@ class _ExplorerMetiersMapPanelState extends State<ExplorerMetiersMapPanel> {
     return p.service.categorie?.nomcategorie ?? 'Prestataire';
   }
 
-  String _price(Prestataire p) {
-    final price =
-        p.prixprestataire > 0 ? p.prixprestataire : (p.tarifHoraireMin ?? 0);
-    if (price <= 0) return '—';
-    return NumberFormat('#,###', 'fr_FR')
-        .format(price.round())
-        .replaceAll(',', ' ');
-  }
-
-  String _rating(Prestataire p) {
+  String? _rating(Prestataire p) {
     final n = double.tryParse('${p.note ?? ''}'.replaceAll(',', '.'));
-    if (n == null || n <= 0) return '—';
+    if (n == null || n <= 0) return null;
     return n.toStringAsFixed(1).replaceAll('.', ',');
   }
 
@@ -172,6 +304,22 @@ class _ExplorerMetiersMapPanelState extends State<ExplorerMetiersMapPanel> {
     final d = distances[p.idprestataire];
     if (d == null) return null;
     return '${d.toStringAsFixed(1).replaceAll('.', ',')} km';
+  }
+
+  Future<void> _contactProvider(Prestataire p) async {
+    final ready = await ensureAuthenticatedForAction(
+      context: context,
+      type: ProtectedActionType.callProvider,
+      originRoute: 'explorer',
+      technicalId: p.idprestataire,
+      explanation: 'Connectez-vous pour contacter ce professionnel',
+    );
+    if (!ready || !mounted) return;
+    final tel = cleanDisplayPart(p.utilisateur.telephone) ?? '';
+    if (tel.isEmpty) return;
+    final result = await DialerSession.openOnce(tel);
+    if (!mounted) return;
+    await showDialerFeedback(context, result);
   }
 
   void _openFullMetiers() {
@@ -198,6 +346,7 @@ class _ExplorerMetiersMapPanelState extends State<ExplorerMetiersMapPanel> {
       },
       builder: (context, state) {
         final providers = state.displayProviders;
+        final nearbyCount = _withCoords(providers).length;
         final sheetPad = _selected != null ? 200.0 : 88.0;
 
         return Stack(
@@ -218,7 +367,7 @@ class _ExplorerMetiersMapPanelState extends State<ExplorerMetiersMapPanel> {
                     _syncMarkers(providers, state.providerDistances);
                   }
                 },
-                onTap: (_) => setState(() => _selected = null),
+                onTap: (_) => _choose(null),
                 onCameraMove: (pos) => _mapZoom = pos.zoom,
                 onCameraIdle: () {
                   _syncMarkers(
@@ -232,22 +381,28 @@ class _ExplorerMetiersMapPanelState extends State<ExplorerMetiersMapPanel> {
               ),
             ),
             Positioned(
-              left: 12,
-              bottom: sheetPad,
+              top: 12,
+              right: 12,
               child: Material(
                 color: SDColors.white,
-                shape: const CircleBorder(),
                 elevation: 2,
+                borderRadius: BorderRadius.circular(8),
+                clipBehavior: Clip.antiAlias,
                 child: IconButton(
-                  tooltip: 'Agrandir / Voir tout Métiers',
+                  tooltip: 'Agrandir la carte',
                   onPressed: _openFullMetiers,
-                  icon: const Icon(Icons.open_in_full_rounded,
+                  icon: const Icon(Icons.fullscreen,
                       color: SDColors.neutral900, size: 22),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints.tightFor(
+                    width: 40,
+                    height: 40,
+                  ),
                 ),
               ),
             ),
             Positioned(
-              left: 68,
+              left: 12,
               bottom: sheetPad + 8,
               child: Container(
                 padding:
@@ -263,7 +418,7 @@ class _ExplorerMetiersMapPanelState extends State<ExplorerMetiersMapPanel> {
                   ],
                 ),
                 child: Text(
-                  '• ${providers.length} professionnel${providers.length > 1 ? 's' : ''} à proximité',
+                  '• $nearbyCount professionnel${nearbyCount > 1 ? 's' : ''} à proximité',
                   style: SDTypography.labelSmall.copyWith(
                     fontWeight: FontWeight.w700,
                     color: SDColors.neutral800,
@@ -296,26 +451,27 @@ class _ExplorerMetiersMapPanelState extends State<ExplorerMetiersMapPanel> {
               Positioned(
                 left: 12,
                 right: 12,
-                bottom: 12,
+                bottom: 12 + MediaQuery.paddingOf(context).bottom,
                 child: _ExplorerMiniProviderCard(
                   provider: _selected!,
                   name: _name(_selected!),
                   metier: _metier(_selected!),
                   rating: _rating(_selected!),
                   distance: _distance(_selected!, state.providerDistances),
-                  price: _price(_selected!),
+                  price: providerPriceCopy(
+                    prixprestataire: _selected!.prixprestataire,
+                    tarifHoraireMin: _selected!.tarifHoraireMin,
+                  ).sheet,
                   photoUrl: providerPhotoUrl(
                     selfie: _selected!.selfie,
                     photoProfil: _selected!.utilisateur.photoProfil,
                   ),
-                  onClose: () => setState(() => _selected = null),
-                  onContact: () {
-                    NavigationHelper.navigateToProviderProfile(
-                      context,
-                      providerId: _selected!.idprestataire,
-                      providerData: _selected!.toJson(),
-                    );
-                  },
+                  onClose: () => _choose(null),
+                  onContact: (cleanDisplayPart(_selected!.utilisateur.telephone) ??
+                              '')
+                          .isEmpty
+                      ? null
+                      : () => _contactProvider(_selected!),
                   onProfile: () {
                     NavigationHelper.navigateToProviderProfile(
                       context,
@@ -349,12 +505,12 @@ class _ExplorerMiniProviderCard extends StatelessWidget {
   final Prestataire provider;
   final String name;
   final String metier;
-  final String rating;
+  final String? rating;
   final String? distance;
   final String price;
   final String? photoUrl;
   final VoidCallback onClose;
-  final VoidCallback onContact;
+  final VoidCallback? onContact;
   final VoidCallback onProfile;
 
   const _ExplorerMiniProviderCard({
@@ -372,8 +528,6 @@ class _ExplorerMiniProviderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final priceText = price == '—' ? 'Sur devis' : 'À partir de $price FCFA/h';
-
     return Material(
       color: SDColors.white,
       elevation: 8,
@@ -461,12 +615,13 @@ class _ExplorerMiniProviderCard extends StatelessWidget {
                         runSpacing: 4,
                         crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
-                          Text(
-                            '⭐ $rating',
-                            style: SDTypography.labelSmall.copyWith(
-                              fontWeight: FontWeight.w700,
+                          if (rating != null)
+                            Text(
+                              '⭐ $rating',
+                              style: SDTypography.labelSmall.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
-                          ),
                           if (distance != null)
                             Text(
                               distance!,
@@ -476,18 +631,11 @@ class _ExplorerMiniProviderCard extends StatelessWidget {
                                 color: SDColors.neutral600,
                               ),
                             ),
-                          Text(
-                            'Disponible aujourd’hui',
-                            style: SDTypography.labelSmall.copyWith(
-                              color: SDColors.primary700,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
                         ],
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        priceText,
+                        price,
                         style: SDTypography.labelMedium.copyWith(
                           color: SDColors.primary700,
                           fontWeight: FontWeight.w800,
@@ -506,23 +654,25 @@ class _ExplorerMiniProviderCard extends StatelessWidget {
             const SizedBox(height: 10),
             Row(
               children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: onContact,
-                    icon:
-                        const Icon(Icons.chat_bubble_outline_rounded, size: 16),
-                    label: const Text('Contacter'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: SDColors.primary700,
-                      side: const BorderSide(color: SDColors.primary600),
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                if (onContact != null) ...[
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: onContact,
+                      icon: const Icon(Icons.chat_bubble_outline_rounded,
+                          size: 16),
+                      label: const Text('Contacter'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: SDColors.primary700,
+                        side: const BorderSide(color: SDColors.primary600),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 8),
+                  const SizedBox(width: 8),
+                ],
                 Expanded(
                   child: ElevatedButton(
                     onPressed: onProfile,
@@ -544,4 +694,16 @@ class _ExplorerMiniProviderCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ExplorerMapCluster {
+  double lat;
+  double lng;
+  final List<Prestataire> members;
+
+  _ExplorerMapCluster({
+    required this.lat,
+    required this.lng,
+    required this.members,
+  });
 }

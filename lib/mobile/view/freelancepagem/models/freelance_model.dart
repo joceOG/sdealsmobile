@@ -8,19 +8,52 @@ class PortfolioItem extends Equatable {
   final String imageUrl;
   final String projectUrl;
 
+  /// Images supplémentaires (galerie). Si vide, on revient à [imageUrl].
+  final List<String> images;
+
+  /// Points de contribution du freelance (ex. « Conception du logo »).
+  final List<String> contributions;
+
+  /// Tags associés à la réalisation (ex. « Identité visuelle »).
+  final List<String> tags;
+
+  /// Catégorie / type de prestation affiché en chip.
+  final String category;
+
   const PortfolioItem({
     required this.title,
     required this.description,
     this.imageUrl = '',
     this.projectUrl = '',
+    this.images = const [],
+    this.contributions = const [],
+    this.tags = const [],
+    this.category = '',
   });
 
+  /// Galerie complète : images dédiées si disponibles, sinon imageUrl seul.
+  List<String> get allImages {
+    final valid = images.where((u) => u.startsWith('http')).toList();
+    if (valid.isNotEmpty) return valid;
+    if (imageUrl.isNotEmpty) return [imageUrl];
+    return const [];
+  }
+
   factory PortfolioItem.fromJson(Map<String, dynamic> json) {
+    List<String> _strings(dynamic raw) {
+      if (raw is List) return raw.map((e) => e.toString()).toList();
+      return const [];
+    }
+
     return PortfolioItem(
       title: json['title'] as String? ?? '',
       description: json['description'] as String? ?? '',
       imageUrl: json['imageUrl'] as String? ?? '',
       projectUrl: json['projectUrl'] as String? ?? '',
+      images: _strings(json['images']),
+      contributions: _strings(json['contributions']),
+      tags: _strings(json['tags']),
+      category: json['category'] as String? ?? '',
     );
   }
 
@@ -30,11 +63,16 @@ class PortfolioItem extends Equatable {
       'description': description,
       'imageUrl': imageUrl,
       'projectUrl': projectUrl,
+      'images': images,
+      'contributions': contributions,
+      'tags': tags,
+      'category': category,
     };
   }
 
   @override
-  List<Object?> get props => [title, description, imageUrl, projectUrl];
+  List<Object?> get props =>
+      [title, description, imageUrl, projectUrl, images, contributions, tags, category];
 }
 
 /// 🔒 Modèle pour les documents de vérification
@@ -203,12 +241,26 @@ class FreelanceModel extends Equatable {
     final ratingRaw = (json['rating'] as num?)?.toDouble();
     final hourlyRaw = (json['hourlyRate'] as num?)?.toDouble();
 
+    // Photo publique : imagePath en priorité, sinon utilisateur.photoProfil
+    // (recensement V1 ou inscription sans upload direct).
+    // Ni CNI, ni selfie KYC ne sont utilisés ici.
+    String resolvePhoto() {
+      final direct = safeImageUrl(json['imagePath']);
+      if (direct != null) return direct;
+      final u = json['utilisateur'];
+      if (u is Map) {
+        final profil = safeImageUrl(u['photoProfil']?.toString());
+        if (profil != null) return profil;
+      }
+      return '';
+    }
+
     return FreelanceModel(
       id: safeString('_id'),
       name: resolveName(),
       job: safeString('job', fallback: 'Non renseigné'),
       category: safeString('category', fallback: 'Non renseigné'),
-      imagePath: safeImageUrl(json['imagePath']) ?? '',
+      imagePath: resolvePhoto(),
       rating: (ratingRaw != null && ratingRaw > 0) ? ratingRaw : 0.0,
       completedJobs: json['completedJobs'] as int? ?? 0,
       isTopRated: json['isTopRated'] as bool? ?? false,

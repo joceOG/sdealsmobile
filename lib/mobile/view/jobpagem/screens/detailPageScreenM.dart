@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -9,6 +10,7 @@ import 'package:sdealsmobile/data/services/api_client.dart';
 import 'package:sdealsmobile/data/services/authCubit.dart';
 import 'package:sdealsmobile/data/utils/display_text.dart';
 import 'package:sdealsmobile/data/utils/media_url.dart';
+import 'package:sdealsmobile/data/utils/network_user_message.dart';
 import 'package:sdealsmobile/data/utils/string_list_normalizer.dart';
 import 'package:sdealsmobile/mobile/view/orderpagem/screens/service_request_summary_screen.dart';
 import 'package:sdealsmobile/mobile/view/jobpagem/screens/provider_profile_screen.dart';
@@ -35,6 +37,14 @@ class DetailPage extends StatefulWidget {
     super.key,
   });
 
+  /// Remplace l’appel réseau des prestataires dans les tests.
+  @visibleForTesting
+  static Future<List<Map<String, dynamic>>> Function(String? serviceId)?
+      debugFetchPrestataires;
+
+  @visibleForTesting
+  static void debugReset() => debugFetchPrestataires = null;
+
   @override
   State<DetailPage> createState() => _DetailPageState();
 }
@@ -42,6 +52,10 @@ class DetailPage extends StatefulWidget {
 class _DetailPageState extends State<DetailPage> {
   final ApiClient _api = ApiClient();
   bool _loading = true;
+  bool _loadFailed = false;
+
+  /// Vrai seulement après une requête prestataires réellement terminée.
+  bool _providersFetchCompleted = false;
   List<Map<String, dynamic>> _providers = [];
   bool _filterVerifiedOnly = false;
   LatLng? _userLocation;
@@ -84,31 +98,53 @@ class _DetailPageState extends State<DetailPage> {
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
+      if (!mounted) return;
       setState(() {
         _userLocation = LatLng(position.latitude, position.longitude);
       });
     } catch (e) {
       // Position par défaut (Abidjan) si géolocalisation échoue
+      if (!mounted) return;
       setState(() {
         _userLocation = const LatLng(5.3599, -4.0083);
       });
     }
   }
 
+  /// Message lisible du dernier échec (jamais l'exception brute).
+  String _loadErrorMessage = '';
+
+  bool get _hasServiceId =>
+      _effectiveServiceId != null && _effectiveServiceId!.isNotEmpty;
+
   Future<void> _loadProviders() async {
     setState(() {
       _loading = true;
+      _loadFailed = false;
     });
+    if (!_hasServiceId) {
+      if (!mounted) return;
+      setState(() {
+        _providers = [];
+        _loading = false;
+        _providersFetchCompleted = false;
+      });
+      return;
+    }
     try {
-      final results = await _api.fetchPrestatairesByService(
-        serviceId: _effectiveServiceId,
-        serviceName: _effectiveServiceId == null ? widget.title : null,
-        verified: null,
-        limit: 50,
-      );
+      final fetch = DetailPage.debugFetchPrestataires;
+      final results = fetch != null
+          ? await fetch(_effectiveServiceId)
+          : await _api.fetchPrestataires(
+              serviceId: _effectiveServiceId,
+              limit: 50,
+              forceRefresh: true,
+            );
       if (!mounted) return;
       setState(() {
         _providers = results;
+        _loadFailed = false;
+        _providersFetchCompleted = true;
         if (_effectiveServiceId == null &&
             _providers.isNotEmpty &&
             _providers.first['service'] != null) {
@@ -120,9 +156,20 @@ class _DetailPageState extends State<DetailPage> {
       });
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur chargement prestataires: $e')),
-      );
+      final message = userFacingNetworkMessage(e);
+      setState(() {
+        _loadFailed = true;
+        _providersFetchCompleted = false;
+        _loadErrorMessage = message.isEmpty ? genericUserMessage : message;
+      });
+      // Liste déjà affichée (nouvel essai) : on la garde et on signale
+      // l'échec. Liste vide : l'état d'erreur du corps suffit (pas un
+      // faux « aucun prestataire »).
+      if (_providers.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_loadErrorMessage)),
+        );
+      }
     } finally {
       if (!mounted) return;
       setState(() {
@@ -195,7 +242,9 @@ class _DetailPageState extends State<DetailPage> {
               )
             : null,
       ),
-      body: _loading
+      // États exclusifs : chargement (sans données) | erreur | vide | liste.
+      // Un nouvel essai avec des données déjà affichées les conserve.
+      body: _loading && _providers.isEmpty
           ? Center(
               child: CircularProgressIndicator(color: SDColors.primary700),
             )
@@ -206,20 +255,7 @@ class _DetailPageState extends State<DetailPage> {
                 SliverToBoxAdapter(child: _buildAggregatedSpecialitesRow()),
                 SliverToBoxAdapter(child: _buildListMapToggle()),
                 if (_providers.isEmpty)
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: EdgeInsets.all(SDSpacing.xl),
-                      child: Center(
-                        child: Text(
-                          'Aucun prestataire pour ce service pour le moment.',
-                          textAlign: TextAlign.center,
-                          style: SDTypography.bodyMedium.copyWith(
-                            color: SDColors.neutral600,
-                          ),
-                        ),
-                      ),
-                    ),
-                  )
+                  SliverToBoxAdapter(child: _buildNoProvidersState())
                 else if (filtered.isEmpty)
                   SliverToBoxAdapter(
                     child: Padding(
@@ -462,9 +498,81 @@ class _DetailPageState extends State<DetailPage> {
     return out;
   }
 
+  /// Sous-titre d'en-tête, cohérent avec l'état du corps : « Chargement… »
+  /// seulement pendant une requête, jamais à côté de l'état vide.
+  String _providersStatusLabel() {
+    final n = _providers.length;
+    if (n > 0) {
+      return '$n prestataire${n > 1 ? 's' : ''} disponible${n > 1 ? 's' : ''}';
+    }
+    if (_loading) return 'Chargement des professionnels…';
+    if (_loadFailed) return 'Liste indisponible pour le moment';
+    if (!_hasServiceId) return 'Service non identifié';
+    return 'Aucun prestataire disponible';
+  }
+
+  /// Corps quand la liste est vide : erreur (avec Réessayer), service non
+  /// identifié, ou vrai vide après une requête réussie (SD-ILL-007).
+  Widget _buildNoProvidersState() {
+    if (_loadFailed) {
+      return Padding(
+        padding: EdgeInsets.all(SDSpacing.xl),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.wifi_off_rounded,
+                  size: 32, color: SDColors.neutral500),
+              SizedBox(height: SDSpacing.sm),
+              Text(
+                _loadErrorMessage.isEmpty
+                    ? genericUserMessage
+                    : _loadErrorMessage,
+                textAlign: TextAlign.center,
+                style: SDTypography.bodyMedium.copyWith(
+                  color: SDColors.neutral700,
+                ),
+              ),
+              SizedBox(height: SDSpacing.md),
+              OutlinedButton(
+                onPressed: _loading ? null : _loadProviders,
+                child: const Text('Réessayer'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    final message = _hasServiceId
+        ? 'Aucun prestataire pour ce service pour le moment.'
+        : 'Ce service n’est pas identifié : impossible d’afficher ses prestataires. Revenez à la liste des services.';
+    return Padding(
+      padding: EdgeInsets.all(SDSpacing.xl),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_providersFetchCompleted) ...[
+              const SDIllustration(
+                asset: SDIllustrations.professionalsEmpty,
+              ),
+              SizedBox(height: SDSpacing.md),
+            ],
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: SDTypography.bodyMedium.copyWith(
+                color: SDColors.neutral600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildCompactServiceHeader() {
     final verifiedCount = _providers.where(_isVerified).length;
-    final n = _providers.length;
     return Padding(
       padding: EdgeInsets.fromLTRB(SDSpacing.md, SDSpacing.sm, SDSpacing.md, 0),
       child: Row(
@@ -492,9 +600,7 @@ class _DetailPageState extends State<DetailPage> {
                 ),
                 SizedBox(height: SDSpacing.xxxs),
                 Text(
-                  n == 0
-                      ? 'Chargement des professionnels…'
-                      : '$n prestataire${n > 1 ? 's' : ''} disponible${n > 1 ? 's' : ''}',
+                  _providersStatusLabel(),
                   style: SDTypography.bodySmall.copyWith(
                     color: SDColors.neutral600,
                   ),

@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../colors.dart';
 import '../typography.dart';
 import '../spacing.dart';
 
 /// Champ de formulaire standardisé Soutrali Deals
-/// 
+///
 /// **Utilisation:**
 /// ```dart
 /// SDInput(
@@ -17,43 +18,43 @@ import '../spacing.dart';
 class SDInput extends StatefulWidget {
   /// Label du champ
   final String label;
-  
+
   /// Texte d'aide (hint)
   final String? hint;
-  
+
   /// Contrôleur de texte
   final TextEditingController? controller;
-  
+
   /// Masquer le texte (password)
   final bool obscureText;
-  
+
   /// Type de clavier
   final TextInputType? keyboardType;
-  
+
   /// Fonction de validation
   final String? Function(String?)? validator;
-  
+
   /// Icône préfixe
   final IconData? prefixIcon;
-  
+
   /// Widget suffixe personnalisé
   final Widget? suffixIcon;
-  
+
   /// Nombre max de lignes
   final int? maxLines;
-  
+
   /// Callback onChanged
   final ValueChanged<String>? onChanged;
-  
+
   /// Callback onSubmitted
   final ValueChanged<String>? onSubmitted;
-  
+
   /// Champ désactivé
   final bool enabled;
-  
+
   /// Texte initial
   final String? initialValue;
-  
+
   /// Focus node
   final FocusNode? focusNode;
 
@@ -62,7 +63,16 @@ class SDInput extends StatefulWidget {
 
   /// Texte d'aide sous le champ (STAB-13).
   final String? helperText;
-  
+
+  /// Libellé au-dessus du champ (reste visible après saisie).
+  final bool labelAbove;
+
+  final Iterable<String>? autofillHints;
+  final TextInputAction? textInputAction;
+  final TextCapitalization textCapitalization;
+  final List<TextInputFormatter>? inputFormatters;
+  final int? maxLength;
+
   const SDInput({
     super.key,
     required this.label,
@@ -81,19 +91,25 @@ class SDInput extends StatefulWidget {
     this.focusNode,
     this.errorText,
     this.helperText,
+    this.labelAbove = false,
+    this.autofillHints,
+    this.textInputAction,
+    this.textCapitalization = TextCapitalization.none,
+    this.inputFormatters,
+    this.maxLength,
   });
-  
+
   @override
   State<SDInput> createState() => _SDInputState();
 }
 
 class _SDInputState extends State<SDInput> {
   bool _obscureTextVisible = false;
-  
+
   @override
   Widget build(BuildContext context) {
     Widget? suffixWidget = widget.suffixIcon;
-    
+
     // Si c'est un champ password, ajouter le toggle visibility
     if (widget.obscureText) {
       suffixWidget = IconButton(
@@ -110,23 +126,28 @@ class _SDInputState extends State<SDInput> {
         tooltip: _obscureTextVisible ? 'Masquer' : 'Afficher',
       );
     }
-    
-    return TextFormField(
+
+    final field = TextFormField(
       controller: widget.controller,
       focusNode: widget.focusNode,
       initialValue: widget.initialValue,
       obscureText: widget.obscureText && !_obscureTextVisible,
       keyboardType: widget.keyboardType,
+      textInputAction: widget.textInputAction,
+      textCapitalization: widget.textCapitalization,
+      autofillHints: widget.autofillHints,
       validator: widget.validator,
       onChanged: widget.onChanged,
       onFieldSubmitted: widget.onSubmitted,
       enabled: widget.enabled,
       maxLines: widget.maxLines,
+      inputFormatters: widget.inputFormatters,
+      maxLength: widget.maxLength,
       style: SDTypography.bodyLarge.copyWith(
         color: widget.enabled ? SDColors.neutral900 : SDColors.neutral500,
       ),
       decoration: InputDecoration(
-        labelText: widget.label,
+        labelText: widget.labelAbove ? null : widget.label,
         labelStyle: SDTypography.bodyMedium.copyWith(
           color: SDColors.neutral600,
         ),
@@ -142,11 +163,11 @@ class _SDInputState extends State<SDInput> {
               )
             : null,
         suffixIcon: suffixWidget,
-        
+
         // ═══════════════════════════════════════
         // BORDERS
         // ═══════════════════════════════════════
-        
+
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
           borderSide: const BorderSide(
@@ -189,26 +210,32 @@ class _SDInputState extends State<SDInput> {
             width: 1,
           ),
         ),
-        
+
         // ═══════════════════════════════════════
         // FILL & PADDING
         // ═══════════════════════════════════════
-        
+
         contentPadding: widget.maxLines == 1
-            ? SDSpacing.inputPadding
+            ? (widget.labelAbove
+                ? const EdgeInsets.symmetric(
+                    horizontal: SDSpacing.sm,
+                    vertical: SDSpacing.sm,
+                  )
+                : SDSpacing.inputPadding)
             : const EdgeInsets.all(SDSpacing.sm),
         filled: true,
         fillColor: widget.enabled ? SDColors.white : SDColors.neutral100,
-        
+
         // ═══════════════════════════════════════
         // ERROR STYLE
         // ═══════════════════════════════════════
-        
+
         errorStyle: SDTypography.fieldError.copyWith(
           color: SDColors.error500,
         ),
         errorMaxLines: 2,
         errorText: widget.errorText,
+        counterText: widget.maxLength != null ? '' : null,
         helperText: widget.errorText == null ? widget.helperText : null,
         helperStyle: SDTypography.helper.copyWith(
           color: SDColors.neutral600,
@@ -216,6 +243,23 @@ class _SDInputState extends State<SDInput> {
         ),
         helperMaxLines: 2,
       ),
+    );
+
+    if (!widget.labelAbove) return field;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          widget.label,
+          style: SDTypography.labelLarge.copyWith(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: SDColors.neutral800,
+          ),
+        ),
+        const SizedBox(height: 6),
+        field,
+      ],
     );
   }
 }
@@ -227,7 +271,7 @@ class SDSearchInput extends StatelessWidget {
   final ValueChanged<String>? onChanged;
   final VoidCallback? onSubmitted;
   final FocusNode? focusNode;
-  
+
   const SDSearchInput({
     super.key,
     this.hint = 'Rechercher...',
@@ -236,7 +280,7 @@ class SDSearchInput extends StatelessWidget {
     this.onSubmitted,
     this.focusNode,
   });
-  
+
   @override
   Widget build(BuildContext context) {
     return Container(

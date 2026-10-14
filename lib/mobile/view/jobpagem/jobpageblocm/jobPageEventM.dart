@@ -31,15 +31,25 @@ class LoadProviderMatchingM extends JobPageEventM {
   final String serviceType;
   final String location;
   final List<String>? preferences;
+  final String? serviceId;
+  final String? categoryId;
 
   const LoadProviderMatchingM({
     required this.serviceType,
     required this.location,
     this.preferences,
+    this.serviceId,
+    this.categoryId,
   });
 
   @override
-  List<Object> get props => [serviceType, location, preferences ?? []];
+  List<Object> get props => [
+        serviceType,
+        location,
+        preferences ?? [],
+        serviceId ?? '',
+        categoryId ?? '',
+      ];
 }
 
 // ✅ NOUVEAU : Événements de géolocalisation
@@ -48,36 +58,43 @@ class LoadNearbyProvidersM extends JobPageEventM {
   final double longitude;
   final double radius; // en km
   final String? category;
+  final String? categoryId;
   final String? service;
+  final String? serviceId;
 
   const LoadNearbyProvidersM({
     required this.latitude,
     required this.longitude,
     this.radius = 5.0,
     this.category,
+    this.categoryId,
     this.service,
+    this.serviceId,
   });
 
   @override
   List<Object> get props =>
-      [latitude, longitude, radius, category ?? '', service ?? ''];
+      [latitude, longitude, radius, category ?? '', categoryId ?? '', service ?? '', serviceId ?? ''];
 }
 
 class LoadProvidersByCategoryM extends JobPageEventM {
   final String category;
+  final String categoryId;
   final double? latitude;
   final double? longitude;
   final double radius;
 
   const LoadProvidersByCategoryM({
     required this.category,
+    this.categoryId = '',
     this.latitude,
     this.longitude,
     this.radius = 5.0,
   });
 
   @override
-  List<Object> get props => [category, latitude ?? 0, longitude ?? 0, radius];
+  List<Object> get props =>
+      [category, categoryId, latitude ?? 0, longitude ?? 0, radius];
 }
 
 class LoadUrgentProvidersM extends JobPageEventM {

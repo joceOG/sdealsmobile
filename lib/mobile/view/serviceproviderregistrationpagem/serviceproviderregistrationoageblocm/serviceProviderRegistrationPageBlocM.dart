@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
+import 'package:sdealsmobile/data/models/professional_capabilities.dart';
 import 'package:sdealsmobile/data/services/api_client.dart';
 import 'package:sdealsmobile/data/utils/display_text.dart';
 
@@ -73,12 +74,16 @@ class ServiceProviderRegistrationBlocM extends Bloc<
 
       if (prestataireResponse.statusCode == 201 ||
           prestataireResponse.statusCode == 200) {
-        // ✅ NOUVEAU : Mettre à jour les rôles de l'utilisateur connecté
-        await _updateUserRoles(userId);
+        ProfessionalProfileSnapshot? fromApi;
+        try {
+          final decoded = jsonDecode(prestataireResponse.body);
+          fromApi = _prestataireSnapshotFromResponse(decoded);
+        } catch (_) {}
 
         emit(ServiceProviderRegistrationSuccess(
-            message:
-                'Inscription réussie. Bienvenue sur Soutrali Deals.'));
+          message: 'Inscription réussie. Bienvenue sur Soutrali Deals.',
+          prestataireSnapshot: fromApi,
+        ));
       } else {
         dynamic errorData;
         try {
@@ -200,9 +205,40 @@ class ServiceProviderRegistrationBlocM extends Bloc<
     );
   }
 
-  // ✅ NOUVELLE MÉTHODE : Mettre à jour les rôles de l'utilisateur
-  Future<void> _updateUserRoles(String userId) async {
-    // La mise à jour des rôles est gérée dans l'écran après l'inscription.
+  ProfessionalProfileSnapshot? _prestataireSnapshotFromResponse(dynamic decoded) {
+    if (decoded is! Map) return null;
+    final root = Map<String, dynamic>.from(decoded);
+    Map<String, dynamic>? raw;
+    final prest = root['prestataire'];
+    if (prest is Map) {
+      raw = Map<String, dynamic>.from(prest);
+    } else if (root['data'] is Map) {
+      final data = Map<String, dynamic>.from(root['data'] as Map);
+      if (data['prestataire'] is Map) {
+        raw = Map<String, dynamic>.from(data['prestataire'] as Map);
+      } else if (data['profiles'] is Map) {
+        final profiles = Map<String, dynamic>.from(data['profiles'] as Map);
+        if (profiles['prestataire'] is Map) {
+          raw = Map<String, dynamic>.from(profiles['prestataire'] as Map);
+        }
+      }
+    } else if (root['_id'] != null) {
+      raw = root;
+    }
+    if (raw == null) return null;
+
+    final id = raw['_id']?.toString() ?? raw['id']?.toString();
+    final status = raw['status']?.toString();
+    final canOperate = raw['canOperate'] == true;
+    final exists = id != null && id.isNotEmpty || raw['exists'] == true;
+    if (!exists && id == null) return null;
+
+    return ProfessionalProfileSnapshot(
+      exists: true,
+      id: id,
+      status: status,
+      canOperate: canOperate,
+    );
   }
 
   // ✅ PRÉPARATION DES DONNÉES PRESTATAIRE

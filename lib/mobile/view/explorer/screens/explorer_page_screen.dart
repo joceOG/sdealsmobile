@@ -1,8 +1,9 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:sdealsmobile/data/models/prestataire.dart';
+import 'package:sdealsmobile/data/models/service.dart';
 import 'package:sdealsmobile/data/models/vendeur.dart';
+import 'package:sdealsmobile/data/services/freelance_hub_cache.dart';
 import 'package:sdealsmobile/data/utils/display_text.dart';
 import 'package:sdealsmobile/data/utils/media_url.dart';
 import 'package:sdealsmobile/mobile/view/freelancepagem/freelancepageblocm/freelancePageBlocM.dart';
@@ -11,10 +12,12 @@ import 'package:sdealsmobile/mobile/view/freelancepagem/freelancepageblocm/freel
 import 'package:sdealsmobile/mobile/view/freelancepagem/freelancepageblocm/freelancePageStateM.dart';
 import 'package:sdealsmobile/mobile/view/freelancepagem/models/freelance_model.dart';
 import 'package:sdealsmobile/mobile/view/freelancepagem/screens/freelance_details_screen.dart';
+import 'package:sdealsmobile/mobile/view/freelancepagem/freelance_hub_discovery.dart';
 import 'package:sdealsmobile/mobile/view/freelancepagem/screens/freelancePageScreen.dart';
 import 'package:sdealsmobile/mobile/view/jobpagem/jobpageblocm/jobPageBlocM.dart';
 import 'package:sdealsmobile/mobile/view/jobpagem/jobpageblocm/jobPageEventM.dart';
 import 'package:sdealsmobile/mobile/view/jobpagem/jobpageblocm/jobPageStateM.dart';
+import 'package:sdealsmobile/mobile/view/jobpagem/screens/detailPageScreenM.dart';
 import 'package:sdealsmobile/mobile/view/jobpagem/screens/jobPageScreenM.dart';
 import 'package:sdealsmobile/mobile/view/jobpagem/screens/provider_profile_screen.dart';
 import 'package:sdealsmobile/mobile/view/searchpagem/screens/searchPageScreenM.dart';
@@ -29,11 +32,15 @@ import 'package:sdealsmobile/mobile/view/shoppingpagem/shoppingpageblocm/shoppin
 import 'package:sdealsmobile/mobile/view/common/widgets/client_universe_pictograms.dart';
 import 'package:sdealsmobile/mobile/view/locationpagem/locationpageblocm/locationPageBlocM.dart';
 import 'package:sdealsmobile/mobile/view/locationpagem/screens/locationPageScreenM.dart';
+import 'package:sdealsmobile/mobile/view/common/widgets/provider_photo_card.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:sdealsmobile/mobile/view/explorer/widgets/explorer_metiers_map_panel.dart';
 import '../../../../design_system/design_system.dart';
 import '../../common/widgets/app_image.dart';
+import '../../common/widgets/freelance_discover_card.dart';
+import '../../homepagem/home_place_label.dart';
+import '../../common/widgets/universe_service_shortcut_card.dart';
 import '../../common/widgets/skeleton_loader.dart';
 
 /// Filtre type Figma (chips sous la recherche).
@@ -53,10 +60,11 @@ class ExplorerPageScreen extends StatelessWidget {
         BlocProvider(
           create: (_) => JobPageBlocM()
             ..add(LoadCategorieDataJobM())
+            ..add(LoadServiceDataJobM())  // charge les raccourcis Métiers (shortcuts)
             ..add(const LoadProviderMatchingM(serviceType: '', location: '')),
         ),
         BlocProvider(
-          create: (_) => FreelancePageBlocM()
+          create: (_) => FreelancePageBlocM(cache: FreelanceHubCache.shared)
             ..add(free_ev.LoadCategorieDataM())
             ..add(free_ev.LoadFreelancersEvent())
             ..add(free_ev.LoadServicesEvent()),
@@ -92,12 +100,32 @@ class _ExplorerBodyState extends State<_ExplorerBody> {
     super.dispose();
   }
 
+  /// Périmètre de recherche = univers sélectionné dans Explorer. « Tous »
+  /// reste global ; ailleurs l'élargissement global est un choix explicite
+  /// proposé par l'écran de recherche.
+  String get _searchScope {
+    switch (_universe) {
+      case _ExplorerUniverse.metiers:
+        return 'metiers';
+      case _ExplorerUniverse.freelance:
+        return 'freelance';
+      case _ExplorerUniverse.marketplace:
+        return 'emarket';
+      case _ExplorerUniverse.tous:
+        return 'global';
+    }
+  }
+
   void _openSearch([String? query]) {
     final q = (query ?? _searchCtrl.text).trim();
+    final scope = _searchScope;
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => SearchPageScreenM(
           initialQuery: q.isEmpty ? null : q,
+          scope: scope,
+          // Onglet « Freelances » d'emblée, comme depuis le hub Freelance.
+          initialIndex: scope == 'freelance' ? 2 : 0,
         ),
       ),
     );
@@ -111,6 +139,30 @@ class _ExplorerBodyState extends State<_ExplorerBody> {
             ..add(shop_ev.LoadCategorieDataM())
             ..add(shop_ev.LoadProductsEvent()),
           child: const ShoppingPageScreenM(),
+        ),
+      ),
+    );
+  }
+
+  /// Navigation depuis une carte service Freelance → _FreelanceCategoryPage
+  /// avec le bon contexte (catégorie réelle + libellé service).
+  void _navigateToServiceCategory(BuildContext context, Service s) {
+    final catName = s.categorie?.nomcategorie ?? s.nomservice;
+    final bloc = context.read<FreelancePageBlocM>();
+    bloc.add(free_ev.FilterByCategoryEvent(catName));
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => BlocProvider.value(
+          value: bloc,
+          child: PopScope(
+            onPopInvokedWithResult: (didPop, _) {
+              if (didPop) bloc.add(free_ev.ClearFiltersEvent());
+            },
+            child: _FreelanceCategoryPage(
+              categoryName: catName,
+              serviceName: s.nomservice,
+            ),
+          ),
         ),
       ),
     );
@@ -191,15 +243,19 @@ class _ExplorerBodyState extends State<_ExplorerBody> {
                       if (_universe == _ExplorerUniverse.metiers ||
                           _universe == _ExplorerUniverse.tous)
                         SliverToBoxAdapter(
-                          child: _buildQuickCategories(context),
+                          child: _buildServiceShortcutsMetiers(context),
+                        ),
+                      if (_universe == _ExplorerUniverse.freelance)
+                        SliverToBoxAdapter(
+                          child: _buildServiceShortcutsFreelance(context),
                         ),
                       SliverToBoxAdapter(
                         child: Padding(
-                          padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              if (_showMetiers) _buildMetiersSection(context),
+                              if (_showMetiers) _buildMetiersGrid(context),
                               if (_showFreelance)
                                 _buildFreelanceSection(context),
                               if (_showMarketplace) ...[
@@ -223,46 +279,106 @@ class _ExplorerBodyState extends State<_ExplorerBody> {
     return Container(
       decoration: const BoxDecoration(
         color: SDColors.primary50,
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
       ),
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+          padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                'Explorer',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: SDTypography.displayMedium.copyWith(
-                  color: SDColors.neutral900,
-                  fontWeight: FontWeight.w700,
-                ),
+              // Ligne 1 : titre + bascule Liste/Carte
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Explorer',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: SDTypography.titleLarge.copyWith(
+                        color: SDColors.neutral900,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  if (_mapAvailable && !showMap) _buildListMapToggle(),
+                ],
               ),
-              SizedBox(height: SDSpacing.xxxs),
-              Text(
-                'Services et freelances',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: SDTypography.bodySmall.copyWith(
-                  color: SDColors.neutral600,
-                  fontSize: 13,
-                ),
-              ),
-              SizedBox(height: SDSpacing.sm),
+              const SizedBox(height: 8),
+              // Ligne 2 : barre de recherche
               _buildSearchRow(context),
-              SizedBox(height: SDSpacing.sm),
-              _buildLocationRow(),
-              if (!showMap) ...[
-                SizedBox(height: SDSpacing.sm),
-                _buildUniverseIcons(),
-              ],
-              if (_mapAvailable) ...[
-                SizedBox(height: SDSpacing.sm),
-                _buildListMapToggle(),
-              ],
+              const SizedBox(height: 8),
+              // Ligne 3 : localisation + sélecteur univers
+              Row(
+                children: [
+                  // Localisation compacte
+                  Semantics(
+                    button: true,
+                    label: 'Ville ${SDClientLocationPolicy.fallbackCity}. Modifier',
+                    child: InkWell(
+                      onTap: _openLocation,
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: SDColors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: SDColors.neutral200),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.location_on,
+                                size: 13, color: SDColors.primary600),
+                            const SizedBox(width: 3),
+                            Text(
+                              SDClientLocationPolicy.fallbackCity,
+                              style: SDTypography.labelSmall.copyWith(
+                                color: SDColors.neutral900,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Sélecteur univers compact
+                  Expanded(
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          _buildUniverseChip(
+                            label: 'Métiers',
+                            value: _ExplorerUniverse.metiers,
+                            icon: const ClientUniversePictogram.metiers(size: 14),
+                          ),
+                          const SizedBox(width: 6),
+                          _buildUniverseChip(
+                            label: 'Freelance',
+                            value: _ExplorerUniverse.freelance,
+                            icon: const ClientUniversePictogram.freelance(size: 14),
+                          ),
+                          if (ClientFeatureFlags.emarketEnabled) ...[
+                            const SizedBox(width: 6),
+                            _buildUniverseChip(
+                              label: 'Marché',
+                              value: _ExplorerUniverse.marketplace,
+                              icon: const Icon(Icons.shopping_bag_rounded,
+                                  size: 14),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
@@ -270,6 +386,55 @@ class _ExplorerBodyState extends State<_ExplorerBody> {
     );
   }
 
+  Widget _buildUniverseChip({
+    required String label,
+    required _ExplorerUniverse value,
+    required Widget icon,
+  }) {
+    final selected = _universe == value;
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: 'Univers $label',
+      child: GestureDetector(
+        onTap: () => _selectUniverse(value),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding:
+              const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: selected ? SDColors.primary600 : SDColors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: selected ? SDColors.primary600 : SDColors.neutral200,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ColorFiltered(
+                colorFilter: ColorFilter.mode(
+                  selected ? SDColors.white : SDColors.primary600,
+                  BlendMode.srcIn,
+                ),
+                child: icon,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: SDTypography.labelSmall.copyWith(
+                  color: selected ? SDColors.white : SDColors.neutral800,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ignore: unused_element
   Widget _buildLocationRow() {
     return Semantics(
       button: true,
@@ -311,6 +476,348 @@ class _ExplorerBodyState extends State<_ExplorerBody> {
     );
   }
 
+  /// Libellé court — même logique que JobPage.
+  static String _shortcutLabel(String name) {
+    const labelMap = <String, String>{
+      'plomberie': 'Plombier',
+      'plombier': 'Plombier',
+      'électricité': 'Électricien',
+      'electricite': 'Électricien',
+      'électricien': 'Électricien',
+      'aide ménagère': 'Ménage',
+      'aide menagere': 'Ménage',
+      'ménagère': 'Ménage',
+      'menagere': 'Ménage',
+      'ménage': 'Ménage',
+      'menage': 'Ménage',
+      'maçonnerie': 'Maçon',
+      'maconnerie': 'Maçon',
+      'maçon': 'Maçon',
+      'mécanique auto': 'Mécanicien auto',
+      'mecanique auto': 'Mécanicien auto',
+      'mécanicien': 'Mécanicien auto',
+      'coiffure': 'Coiffeur',
+      'coiffeur': 'Coiffeur',
+    };
+    final lower = name.toLowerCase().trim();
+    for (final entry in labelMap.entries) {
+      if (lower.contains(entry.key)) return entry.value;
+    }
+    return name.length > 14 ? '${name.substring(0, 13)}…' : name;
+  }
+
+  /// Tarif formaté depuis un Prestataire — jamais "0 FCFA".
+  static String? _tarifFor(Prestataire p) {
+    double v = p.prixprestataire;
+    String? suffix;
+    if (v <= 0 && p.tarifHoraireMin != null && p.tarifHoraireMin! > 0) {
+      v = p.tarifHoraireMin!;
+      suffix = '/h';
+    }
+    if (v <= 0) return null;
+    final digits = v.toInt().toString();
+    final buf = StringBuffer();
+    for (var i = 0; i < digits.length; i++) {
+      if (i > 0 && (digits.length - i) % 3 == 0) buf.write('\u00a0');
+      buf.write(digits[i]);
+    }
+    return '${buf.toString()} FCFA${suffix ?? ''}';
+  }
+
+  /// Commune/quartier lisible — jamais GPS.
+  static String? _locationFor(Prestataire p) {
+    final zones = p.zoneIntervention ?? const <String>[];
+    return firstReadablePlace([
+      ...zones,
+      p.localisation,
+    ]);
+  }
+
+  /// Note valide — jamais 0.0.
+  static double? _noteFor(Prestataire p) {
+    final v =
+        double.tryParse(p.note?.replaceAll(',', '.').trim() ?? '');
+    return (v != null && v > 0) ? v : null;
+  }
+
+  /// Raccourcis Métiers — photo plein-format, vrais serviceId, navigation → DetailPage.
+  Widget _buildServiceShortcutsMetiers(BuildContext context) {
+    return BlocBuilder<JobPageBlocM, JobPageStateM>(
+      builder: (context, state) {
+        final items = state.shortcuts.take(6).toList();
+        if (items.isEmpty) {
+          if (state.isLoading2) return const SizedBox.shrink();
+          // Pas de raccourcis configurés → accès direct à JobPage
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+            child: OutlinedButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const JobPageScreenM()),
+              ),
+              icon: const Icon(Icons.handyman_outlined, size: 16),
+              label: const Text('Tous les métiers'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: SDColors.primary700,
+                side: const BorderSide(color: SDColors.primary200),
+              ),
+            ),
+          );
+        }
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 0, 4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Titre + lien "Tous les métiers" sur la même ligne.
+              // Wrap garantit que le lien passe à la ligne plutôt que de
+              // comprimer le titre sur écran étroit ou texte agrandi.
+              Padding(
+                padding: const EdgeInsets.only(right: 16),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Quel professionnel cherchez-vous\u00a0?',
+                        style: SDTypography.titleSmall.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: SDColors.neutral900,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                            builder: (_) => const JobPageScreenM()),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Tous les m\u00e9tiers',
+                            style: SDTypography.labelSmall.copyWith(
+                              color: SDColors.primary600,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(width: 2),
+                          const Icon(Icons.arrow_forward,
+                              size: 13, color: SDColors.primary600),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                height: 128,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.only(right: 16),
+                  itemCount: items.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 10),
+                  itemBuilder: (context, index) {
+                    final s = items[index];
+                    final img = normalizeMediaUrl(s.imageservice);
+                    final label = _shortcutLabel(s.nomservice);
+                    return GestureDetector(
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => DetailPage(
+                            title: s.nomservice,
+                            image: img ?? '',
+                            serviceId: s.idservice,
+                          ),
+                        ),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(14),
+                        child: SizedBox(
+                          width: 116,
+                          height: 128,
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              img != null
+                                  ? AppImage(imageUrl: img, fit: BoxFit.cover)
+                                  : Container(
+                                      color: SDColors.primary100,
+                                      alignment: Alignment.center,
+                                      child: const Icon(
+                                          Icons.handyman_outlined,
+                                          color: SDColors.primary500,
+                                          size: 36),
+                                    ),
+                              Positioned(
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                height: 52,
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topCenter,
+                                      end: Alignment.bottomCenter,
+                                      colors: [
+                                        Colors.transparent,
+                                        Colors.black.withValues(alpha: 0.70),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Positioned(
+                                left: 8,
+                                bottom: 8,
+                                right: 4,
+                                child: Text(
+                                  label,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: SDTypography.labelSmall.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 11,
+                                    height: 1.2,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// Carrousel de services Freelance — cartes illustrées, navigation → résultats catégorie.
+  Widget _buildServiceShortcutsFreelance(BuildContext context) {
+    return BlocBuilder<FreelancePageBlocM, FreelancePageStateM>(
+      builder: (context, state) {
+        final isLoading = state.isLoadingServices;
+        final services = pickFreelanceHubDiscoveryServices(state.services, max: 6);
+
+        // Skeletons pendant le chargement
+        if (isLoading && services.isEmpty) {
+          return _buildFreelanceServicesSkeletons();
+        }
+
+        if (services.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 0, 4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Titre + "Tout voir" — Wrap évite la compression sur petit écran
+              Padding(
+                padding: const EdgeInsets.only(right: 16),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Quel service recherchez-vous\u00a0?',
+                        style: SDTypography.titleSmall.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: SDColors.neutral900,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              const FreelancePageScreen(categories: []),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Tout voir',
+                            style: SDTypography.labelSmall.copyWith(
+                              color: SDColors.primary600,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(width: 2),
+                          const Icon(Icons.arrow_forward_rounded,
+                              size: 13, color: SDColors.primary600),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: SDSpacing.xs),
+              SizedBox(
+                height: 128,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.only(right: 16),
+                  itemCount: services.length,
+                  separatorBuilder: (_, __) =>
+                      const SizedBox(width: SDSpacing.cardInterval),
+                  itemBuilder: (context, i) {
+                    final s = services[i];
+                    final img = normalizeMediaUrl(s.imageservice);
+                    final label = freelanceServiceShortLabel(s);
+                    return UniverseServiceShortcutCard(
+                      label: label,
+                      semanticsLabel: s.nomservice,
+                      imageUrl: img,
+                      fallbackIcon: freelanceServiceFallbackIcon(s),
+                      onTap: () =>
+                          _navigateToServiceCategory(context, services[i]),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildFreelanceServicesSkeletons() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 0, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SkeletonWidget.rounded(width: 220, height: 20, borderRadius: 4),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 128,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.only(right: 16),
+              itemCount: 3,
+              separatorBuilder: (_, __) => const SizedBox(width: 10),
+              itemBuilder: (_, __) => SkeletonWidget.rounded(
+                  width: 116, height: 128, borderRadius: 14),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ignore: unused_element
   Widget _buildQuickCategories(BuildContext context) {
     return BlocBuilder<JobPageBlocM, JobPageStateM>(
       builder: (context, state) {
@@ -402,29 +909,25 @@ class _ExplorerBodyState extends State<_ExplorerBody> {
 
   Widget _buildListMapToggle() {
     return Container(
-      margin: EdgeInsets.only(bottom: SDSpacing.sm),
-      padding: const EdgeInsets.all(4),
+      padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: SDColors.neutral100,
-        borderRadius: BorderRadius.circular(12),
+        color: SDColors.neutral200,
+        borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Expanded(
-            child: _ViewModeBtn(
-              label: 'Liste',
-              icon: Icons.view_list_rounded,
-              selected: _viewMode == _ExplorerViewMode.list,
-              onTap: () => setState(() => _viewMode = _ExplorerViewMode.list),
-            ),
+          _ViewModeBtn(
+            label: 'Liste',
+            icon: Icons.view_list_rounded,
+            selected: _viewMode == _ExplorerViewMode.list,
+            onTap: () => setState(() => _viewMode = _ExplorerViewMode.list),
           ),
-          Expanded(
-            child: _ViewModeBtn(
-              label: 'Carte',
-              icon: Icons.map_outlined,
-              selected: _viewMode == _ExplorerViewMode.map,
-              onTap: () => setState(() => _viewMode = _ExplorerViewMode.map),
-            ),
+          _ViewModeBtn(
+            label: 'Carte',
+            icon: Icons.map_outlined,
+            selected: _viewMode == _ExplorerViewMode.map,
+            onTap: () => setState(() => _viewMode = _ExplorerViewMode.map),
           ),
         ],
       ),
@@ -456,7 +959,7 @@ class _ExplorerBodyState extends State<_ExplorerBody> {
                 SizedBox(width: SDSpacing.xs),
                 Expanded(
                   child: Text(
-                    'Rechercher un service ou une compétence',
+                    'Que recherchez-vous\u00a0?',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: SDTypography.bodyMedium.copyWith(
@@ -474,6 +977,7 @@ class _ExplorerBodyState extends State<_ExplorerBody> {
   }
 
   /// Univers actifs uniquement (Métiers / Freelance), pictogrammes 10D-2C.
+  // ignore: unused_element
   Widget _buildUniverseIcons() {
     final items = <({
       String label,
@@ -693,6 +1197,7 @@ class _ExplorerBodyState extends State<_ExplorerBody> {
     );
   }
 
+  // ignore: unused_element
   Widget _buildMetiersSection(BuildContext context) {
     return BlocBuilder<JobPageBlocM, JobPageStateM>(
       builder: (context, state) {
@@ -770,75 +1275,305 @@ class _ExplorerBodyState extends State<_ExplorerBody> {
     );
   }
 
+  Widget _buildMetiersGrid(BuildContext context) {
+    return BlocBuilder<JobPageBlocM, JobPageStateM>(
+      builder: (context, state) {
+        // displayProviders : nearby prioritaire sur matched, filtres chips respectés.
+        // Explorer affiche tous les profils autorisés (pas seulement ceux avec photo).
+        final list = state.displayProviders.take(12).toList();
+        final isLoading = state.isMatchingLoading || state.isNearbyLoading;
+        final errorMsg = state.matchError.isNotEmpty
+            ? state.matchError
+            : state.nearbyError.isNotEmpty
+                ? state.nearbyError
+                : null;
+
+        // Titre de section — toujours présent
+        final sectionTitle = Padding(
+          padding: const EdgeInsets.only(bottom: SDSpacing.xxs),
+          child: Text(
+            'Découvrir des professionnels',
+            style: SDTypography.titleSmall.copyWith(
+              fontWeight: FontWeight.w800,
+              color: SDColors.neutral900,
+            ),
+          ),
+        );
+
+        // ── Liste vide ──────────────────────────────────────────────────────
+        if (list.isEmpty) {
+          // Skeleton : chargement en cours OU état initial avant que le BLoC
+          // ait émis (isMatchingLoading=false mais matchedProviders vide sans erreur).
+          // Ces deux états sont indiscernables sans flag supplémentaire ;
+          // mieux vaut montrer un skeleton que la page blanche.
+          if (isLoading || errorMsg == null) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                sectionTitle,
+                GridView.builder(
+                  shrinkWrap: true,
+                  primary: false,
+                  padding: EdgeInsets.zero,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate:
+                      const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    childAspectRatio: 0.67,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                  ),
+                  itemCount: 4,
+                  itemBuilder: (_, __) => _ProviderCardSkeleton(),
+                ),
+              ],
+            );
+          }
+          // Erreur réseau sans données précédentes
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              sectionTitle,
+              _ProvidersErrorState(
+                onRetry: () => context.read<JobPageBlocM>().add(
+                      const LoadProviderMatchingM(
+                          serviceType: '', location: ''),
+                    ),
+              ),
+            ],
+          );
+        }
+
+        // ── Données disponibles ─────────────────────────────────────────────
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            sectionTitle,
+            GridView.builder(
+              shrinkWrap: true,
+              primary: false,
+              padding: EdgeInsets.zero,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                childAspectRatio: 0.67,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+              ),
+              itemCount: list.length,
+              itemBuilder: (context, i) {
+                final p = list[i];
+                return ProviderPhotoCard(
+                  name: joinPersonName(
+                    prenom: p.utilisateur.prenom,
+                    nom: p.utilisateur.nom,
+                    fallback: 'Prestataire',
+                  ),
+                  metier: p.service.nomservice.trim().isNotEmpty
+                      ? p.service.nomservice
+                      : null,
+                  photoUrl: providerPhotoUrl(
+                    selfie: p.selfie,
+                    photoProfil: p.utilisateur.photoProfil,
+                  ),
+                  note: _noteFor(p),
+                  tarifLabel: _tarifFor(p),
+                  location: _locationFor(p),
+                  verified: p.verifier,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => ProviderProfileScreen(
+                        providerId: p.idprestataire,
+                        providerData: p.toJson(),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+            // Rafraîchissement en échec avec données déjà visibles → bannière discrète
+            if (errorMsg != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Row(
+                  children: [
+                    const Icon(Icons.wifi_off_outlined,
+                        size: 14, color: SDColors.neutral400),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Actualisation impossible',
+                        style: SDTypography.bodySmall
+                            .copyWith(color: SDColors.neutral500),
+                      ),
+                    ),
+                    TextButton(
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        foregroundColor: SDColors.primary600,
+                      ),
+                      onPressed: () => context.read<JobPageBlocM>().add(
+                            const LoadProviderMatchingM(
+                                serviceType: '', location: ''),
+                          ),
+                      child: Text('Réessayer',
+                          style: SDTypography.labelSmall.copyWith(
+                              color: SDColors.primary600)),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
   Widget _buildFreelanceSection(BuildContext context) {
     return BlocBuilder<FreelancePageBlocM, FreelancePageStateM>(
       builder: (context, state) {
-        final list = state.freelancers
-            .where((f) => _hasDisplayableImage(f.imagePath))
-            .take(12)
-            .toList();
-        if (state.isLoading && list.isEmpty) {
-          return _sectionGap(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _sectionHeader(
-                  titleBold: 'Freelances',
-                  titleLight: ' populaires',
-                  onSeeAll: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const FreelancePageScreen(categories: []),
-                    ),
-                  ),
-                ),
-                SizedBox(height: SDSpacing.xs),
-                SizedBox(
-                  height: 200,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: 4,
-                    separatorBuilder: (_, __) => SizedBox(width: SDSpacing.sm),
-                    itemBuilder: (_, __) => SkeletonWidget.rounded(
-                      width: 148,
-                      height: 188,
-                      borderRadius: 18,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-        }
-        if (list.isEmpty) {
-          return const SizedBox.shrink();
-        }
-        return _sectionGap(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _sectionHeader(
-                titleBold: 'Freelances',
-                titleLight: ' populaires',
-                onSeeAll: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const FreelancePageScreen(categories: []),
-                  ),
-                ),
+        // Tous les profils autorisés — pas de filtre par image.
+        final list = state.freelancers.take(12).toList();
+        final count = state.freelancers.length;
+        final isLoading = state.isLoadingFreelancers;
+        final error = state.freelancersError;
+        final loaded = state.freelancersLoaded;
+
+        // En-tête de section : titre + compteur si données connues
+        Widget sectionTitle = Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Text(
+              'Freelances \u00e0 d\u00e9couvrir',
+              style: SDTypography.titleSmall.copyWith(
+                fontWeight: FontWeight.w800,
+                color: SDColors.neutral900,
               ),
-              SizedBox(height: SDSpacing.xs),
-              SizedBox(
-                height: 200,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: list.length,
-                  separatorBuilder: (_, __) => SizedBox(width: SDSpacing.sm),
-                  itemBuilder: (context, i) {
-                    return _FreelanceExplorerCard(freelance: list[i]);
-                  },
-                ),
+            ),
+            if (count > 0) ...[
+              const SizedBox(width: 6),
+              Text(
+                '$count profil${count > 1 ? 's' : ''}',
+                style: SDTypography.bodySmall
+                    .copyWith(color: SDColors.neutral500),
               ),
             ],
-          ),
+          ],
+        );
+
+        // ── État : chargement / initial ───────────────────────────────────
+        if (!loaded || (isLoading && list.isEmpty)) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              sectionTitle,
+              const SizedBox(height: SDSpacing.xxs),
+              const _FreelanceCardSkeleton(),
+            ],
+          );
+        }
+
+        // ── État : erreur sans données ────────────────────────────────────
+        if (list.isEmpty && error != null && error.isNotEmpty) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              sectionTitle,
+              const SizedBox(height: SDSpacing.xxs),
+              _explorerInlineState(
+                title: 'Chargement impossible',
+                message: 'V\u00e9rifiez votre connexion.',
+                onRetry: () => context
+                    .read<FreelancePageBlocM>()
+                    .add(free_ev.LoadFreelancersEvent(force: true)),
+              ),
+            ],
+          );
+        }
+
+        // ── État : vide après succès ─────────────────────────────────────
+        if (list.isEmpty) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              sectionTitle,
+              const SizedBox(height: SDSpacing.xxs),
+              _explorerInlineState(
+                title: 'Aucun freelance disponible',
+                message: 'De nouveaux talents appara\u00eetront bient\u00f4t.',
+                onRetry: () => context
+                    .read<FreelancePageBlocM>()
+                    .add(free_ev.LoadFreelancersEvent(force: true)),
+              ),
+            ],
+          );
+        }
+
+        // ── Données disponibles ───────────────────────────────────────────
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            sectionTitle,
+            const SizedBox(height: SDSpacing.xxs),
+            ListView.separated(
+              shrinkWrap: true,
+              primary: false,
+              padding: EdgeInsets.zero,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: list.length,
+              separatorBuilder: (_, __) =>
+                  const SizedBox(height: SDSpacing.xs),
+              itemBuilder: (context, i) => FreelanceDiscoverCard(
+                freelance: list[i],
+                onViewProfile: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        FreelanceDetailsScreen(freelance: list[i]),
+                  ),
+                ),
+              ),
+            ),
+            // Bannière erreur discrète lors d'un rafraîchissement raté
+            if (list.isNotEmpty && error != null && error.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Row(
+                  children: [
+                    const Icon(Icons.wifi_off_outlined,
+                        size: 14, color: SDColors.neutral400),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text('Actualisation impossible',
+                          style: SDTypography.bodySmall
+                              .copyWith(color: SDColors.neutral500)),
+                    ),
+                    TextButton(
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        foregroundColor: SDColors.primary600,
+                      ),
+                      onPressed: () => context
+                          .read<FreelancePageBlocM>()
+                          .add(free_ev.LoadFreelancersEvent(force: true)),
+                      child: const Text('R\u00e9essayer'),
+                    ),
+                  ],
+                ),
+              ),
+            const SizedBox(height: SDSpacing.md),
+            // ── Encart "Un besoin précis ?" ────────────────────────────
+            _PreciseNeedEncart(
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const FreelancePageScreen(categories: []),
+                ),
+              ),
+            ),
+          ],
         );
       },
     );
@@ -1202,6 +1937,7 @@ class _MetierCard extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 class _FreelanceExplorerCard extends StatelessWidget {
   final FreelanceModel freelance;
 
@@ -1248,24 +1984,14 @@ class _FreelanceExplorerCard extends StatelessWidget {
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(14),
                       child: freelance.imagePath.startsWith('http')
-                          ? CachedNetworkImage(
+                          ? AppImage(
                               imageUrl: freelance.imagePath,
                               fit: BoxFit.cover,
-                              width: double.infinity,
-                              height: double.infinity,
-                              errorWidget: (_, __, ___) => Icon(
-                                Icons.person,
-                                size: 40,
-                                color: SDColors.neutral400,
-                              ),
                             )
-                          : Image.asset(
-                              freelance.imagePath.isNotEmpty
-                                  ? freelance.imagePath
-                                  : 'assets/profile_picture.jpg',
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Icon(
-                                Icons.person,
+                          : ColoredBox(
+                              color: SDColors.neutral100,
+                              child: Icon(
+                                Icons.person_outline_rounded,
                                 size: 40,
                                 color: SDColors.neutral400,
                               ),
@@ -1315,14 +2041,16 @@ class _FreelanceExplorerCard extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
               child: Row(
                 children: [
-                  Icon(Icons.star_rounded,
-                      size: 14, color: SDColors.warning500),
-                  Text(
-                    freelance.rating.toStringAsFixed(1),
-                    style: SDTypography.labelSmall.copyWith(
-                      fontWeight: FontWeight.w700,
+                  if (freelance.rating > 0) ...[
+                    Icon(Icons.star_rounded,
+                        size: 14, color: SDColors.warning500),
+                    Text(
+                      freelance.rating.toStringAsFixed(1),
+                      style: SDTypography.labelSmall.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  ),
+                  ],
                   const Spacer(),
                   if (freelance.hourlyRate > 0)
                     Text(
@@ -1510,6 +2238,421 @@ class _ShopPillCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ── Skeleton carte freelance ──────────────────────────────────────────────────
+
+class _FreelanceCardSkeleton extends StatelessWidget {
+  const _FreelanceCardSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: SDColors.white,
+        borderRadius: BorderRadius.circular(SDSpacing.radiusCard),
+        border: Border.all(color: SDColors.neutral100),
+      ),
+      padding: const EdgeInsets.all(12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SkeletonWidget.rounded(width: 100, height: 120, borderRadius: 10),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SkeletonWidget.rounded(
+                    width: double.infinity, height: 16, borderRadius: 4),
+                const SizedBox(height: 6),
+                SkeletonWidget.rounded(width: 100, height: 13, borderRadius: 4),
+                const SizedBox(height: 8),
+                SkeletonWidget.rounded(width: 80, height: 11, borderRadius: 4),
+                const SizedBox(height: 8),
+                Row(children: [
+                  SkeletonWidget.rounded(width: 60, height: 24, borderRadius: 8),
+                  const SizedBox(width: 6),
+                  SkeletonWidget.rounded(width: 60, height: 24, borderRadius: 8),
+                ]),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Encart "Un besoin précis ?" ───────────────────────────────────────────────
+
+class _PreciseNeedEncart extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _PreciseNeedEncart({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: SDColors.primary50,
+        borderRadius: BorderRadius.circular(SDSpacing.radiusCard),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: SDColors.primary100,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            alignment: Alignment.center,
+            child: const Icon(Icons.search_rounded,
+                size: 20, color: SDColors.primary600),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Un besoin pr\u00e9cis\u00a0?',
+                  style: SDTypography.labelMedium.copyWith(
+                    color: SDColors.neutral900,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                Text(
+                  'Explorez tous les services freelance.',
+                  style:
+                      SDTypography.bodySmall.copyWith(color: SDColors.neutral600),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: onTap,
+            behavior: HitTestBehavior.opaque,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Parcourir',
+                  style: SDTypography.labelSmall.copyWith(
+                    color: SDColors.primary600,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(width: 2),
+                const Icon(Icons.arrow_forward_rounded,
+                    size: 13, color: SDColors.primary600),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Skeleton carte prestataire ────────────────────────────────────────────────
+
+class _ProviderCardSkeleton extends StatelessWidget {
+  const _ProviderCardSkeleton();
+
+  // ignore: unused_element — référencée dans _buildMetiersGrid via lambda
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: SDColors.white,
+        borderRadius: BorderRadius.circular(SDSpacing.radiusCard),
+        border: Border.all(color: SDColors.neutral100),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Zone photo skeleton
+          Expanded(
+            child: SkeletonWidget.rounded(
+              borderRadius: 0,
+              width: double.infinity,
+              height: double.infinity,
+            ),
+          ),
+          // Lignes texte skeleton
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SkeletonWidget.rounded(width: double.infinity, height: 14, borderRadius: 4),
+                const SizedBox(height: 6),
+                SkeletonWidget.rounded(width: 80, height: 11, borderRadius: 4),
+                const SizedBox(height: 6),
+                SkeletonWidget.rounded(width: 60, height: 11, borderRadius: 4),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── État erreur section professionnels ────────────────────────────────────────
+
+class _ProvidersErrorState extends StatelessWidget {
+  final VoidCallback onRetry;
+
+  const _ProvidersErrorState({required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 16),
+      decoration: BoxDecoration(
+        color: SDColors.neutral50,
+        borderRadius: BorderRadius.circular(SDSpacing.radiusCard),
+        border: Border.all(color: SDColors.neutral200),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              const Icon(Icons.wifi_rounded, size: 48, color: SDColors.neutral300),
+              Positioned(
+                bottom: 0,
+                right: 0,
+                child: Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: const BoxDecoration(
+                    color: SDColors.white,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.cancel, size: 20, color: SDColors.neutral400),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Chargement impossible',
+            style: SDTypography.titleSmall.copyWith(
+              fontWeight: FontWeight.w800,
+              color: SDColors.neutral900,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Vérifiez votre connexion.',
+            style: SDTypography.bodySmall.copyWith(color: SDColors.neutral500),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: onRetry,
+              style: FilledButton.styleFrom(
+                backgroundColor: SDColors.primary600,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(SDSpacing.radiusButton),
+                ),
+              ),
+              child: Text(
+                'Réessayer',
+                style: SDTypography.labelMedium.copyWith(
+                  color: SDColors.white,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Page résultats catégorie Freelance (depuis raccourcis Explorer).
+/// Limite API : filtre par catégorie uniquement (pas par service).
+class _FreelanceCategoryPage extends StatelessWidget {
+  final String categoryName;
+
+  /// Nom du service sélectionné — utilisé dans le sous-titre pour indiquer
+  /// que le filtre s'applique à la catégorie associée, pas au service exact.
+  final String serviceName;
+
+  const _FreelanceCategoryPage({
+    required this.categoryName,
+    required this.serviceName,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: SDColors.white,
+      appBar: AppBar(
+        backgroundColor: SDColors.white,
+        foregroundColor: SDColors.neutral900,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        // Titre = nom réel de la catégorie, pas du service
+        title: Text(
+          categoryName,
+          style: SDTypography.titleSmall.copyWith(
+              fontWeight: FontWeight.w800, color: SDColors.neutral900),
+        ),
+      ),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Précision honnête sur la limite du filtre
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+            child: Text(
+              'Professionnels de la catégorie associée à\u00a0\u00ab\u00a0$serviceName\u00a0\u00bb',
+              style: SDTypography.bodySmall.copyWith(
+                color: SDColors.neutral500,
+                height: 1.4,
+              ),
+            ),
+          ),
+          Expanded(
+            child: BlocBuilder<FreelancePageBlocM, FreelancePageStateM>(
+              builder: (context, state) {
+          if (state.isLoadingFreelancers) {
+            return const Center(
+              child: SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2)),
+            );
+          }
+          final list = state.filteredFreelancers;
+          if (list.isEmpty) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.people_outline_rounded,
+                        size: 48, color: SDColors.neutral300),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Aucun freelance pour cette catégorie.',
+                      textAlign: TextAlign.center,
+                      style: SDTypography.bodyMedium
+                          .copyWith(color: SDColors.neutral500),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+          return ListView.separated(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            itemCount: list.length,
+            separatorBuilder: (_, __) =>
+                const SizedBox(height: SDSpacing.xs),
+            itemBuilder: (context, i) {
+              final f = list[i];
+              final imgUrl = f.imagePath.startsWith('http')
+                  ? f.imagePath
+                  : null;
+              return Material(
+                color: SDColors.white,
+                borderRadius: BorderRadius.circular(SDSpacing.radiusCard),
+                child: InkWell(
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => FreelanceDetailsScreen(freelance: f),
+                    ),
+                  ),
+                  borderRadius: BorderRadius.circular(SDSpacing.radiusCard),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      borderRadius:
+                          BorderRadius.circular(SDSpacing.radiusCard),
+                      border: Border.all(color: SDColors.neutral200),
+                    ),
+                    child: Row(
+                      children: [
+                        ClipOval(
+                          child: SizedBox(
+                            width: 44,
+                            height: 44,
+                            child: imgUrl != null
+                                ? AppImage(
+                                    imageUrl: imgUrl,
+                                    width: 44,
+                                    height: 44,
+                                    fit: BoxFit.cover,
+                                  )
+                                : ColoredBox(
+                                    color: SDColors.primary50,
+                                    child: Center(
+                                      child: Text(
+                                        f.name.isNotEmpty
+                                            ? f.name[0].toUpperCase()
+                                            : '?',
+                                        style:
+                                            SDTypography.titleSmall.copyWith(
+                                          color: SDColors.primary700,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                          ),
+                        ),
+                        const SizedBox(width: SDSpacing.xs),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                f.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: SDTypography.labelMedium.copyWith(
+                                    fontWeight: FontWeight.w700),
+                              ),
+                              Text(
+                                f.job,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: SDTypography.bodySmall.copyWith(
+                                    color: SDColors.primary600),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(Icons.chevron_right_rounded,
+                            color: SDColors.neutral400),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),  // BlocBuilder
+    ),    // Expanded
+  ],      // Column children
+        ),      // Column (body)
     );
   }
 }

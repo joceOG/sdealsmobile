@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:sdealsmobile/data/models/professional_capabilities.dart';
 import 'package:sdealsmobile/data/services/authCubit.dart';
 import 'package:sdealsmobile/data/utils/display_text.dart';
+import 'package:sdealsmobile/mobile/view/common/auth_completion.dart';
 import 'package:sdealsmobile/mobile/view/serviceproviderregistrationpagem/screens/steps/provider_activity_details_step.dart';
 import 'package:sdealsmobile/mobile/view/serviceproviderregistrationpagem/screens/steps/provider_personal_info_step.dart';
 import 'package:sdealsmobile/mobile/view/serviceproviderregistrationpagem/screens/steps/provider_pricing_step.dart';
@@ -12,6 +14,8 @@ import '../serviceproviderregistrationoageblocm/serviceProviderRegistrationPageE
 import '../serviceproviderregistrationoageblocm/serviceProviderRegistrationPageStateM.dart';
 import '../../../../../design_system/design_system.dart';
 import '../../common/utils/app_snackbar.dart';
+import 'widgets/provider_creation_status_presentation.dart';
+import 'widgets/provider_registration_success_view.dart';
 
 class ServiceProviderRegistrationScreenM extends StatefulWidget {
   const ServiceProviderRegistrationScreenM({Key? key}) : super(key: key);
@@ -26,6 +30,10 @@ class _ServiceProviderRegistrationScreenMState
   int _currentStep = 0;
   bool _formUnlocked = false;
   bool _success = false;
+  bool _rolesRefreshInProgress = false;
+  bool _rolesRefreshFailed = false;
+  ProfessionalProfileSnapshot? _prestataireSnapshot;
+  List<dynamic> _professionalInconsistencies = const [];
 
   final Map<String, dynamic> formData = {
     'fullName': '',
@@ -36,7 +44,9 @@ class _ServiceProviderRegistrationScreenMState
     'service': null,
     'serviceName': '',
     'serviceAreas': <String>[],
-    'dailyRate': 0.0,
+    'dailyRate': null,
+    'dailyRateInvalid': false,
+    'dailyRateZero': false,
     'profileImage': null,
     'description': '',
     'localisation': '',
@@ -128,13 +138,17 @@ class _ServiceProviderRegistrationScreenMState
 
   bool _validateStep3() {
     final rate = formData['dailyRate'];
-    if (rate == null ||
-        (rate is num && rate <= 0) ||
-        (rate is String && (double.tryParse(rate) ?? 0) <= 0)) {
-      _showError('Veuillez renseigner votre tarif journalier');
+    if (rate is num && rate > 0) return true;
+    if (formData['dailyRateInvalid'] == true) {
+      _showError('Montant invalide');
       return false;
     }
-    return true;
+    if (formData['dailyRateZero'] == true) {
+      _showError('Le tarif doit être supérieur à 0 FCFA');
+      return false;
+    }
+    _showError('Veuillez renseigner votre tarif journalier');
+    return false;
   }
 
   void _showError(String message) {
@@ -164,6 +178,7 @@ class _ServiceProviderRegistrationScreenMState
   }
 
   void _submitForm() {
+    if (_success) return;
     if (!_validateStep3()) return;
 
     final backendData = _prepareBackendData();
@@ -183,7 +198,7 @@ class _ServiceProviderRegistrationScreenMState
   }
 
   Map<String, dynamic> _prepareBackendData() {
-    final daily = (formData['dailyRate'] as num?)?.toDouble() ?? 0.0;
+    final daily = (formData['dailyRate'] as num).toDouble();
     return {
       'fullName': formData['fullName'],
       'phone': formData['phone'],
@@ -224,12 +239,61 @@ class _ServiceProviderRegistrationScreenMState
     };
   }
 
-  void _openProviderSpace() {
-    final auth = context.read<AuthCubit>().state;
-    if (auth is AuthAuthenticated) {
-      context.push('/providermain', extra: auth.utilisateur);
+  Future<void> _refreshProfessionalStateAfterCreation() async {
+    setState(() {
+      _rolesRefreshInProgress = true;
+      _rolesRefreshFailed = false;
+    });
+    try {
+      await context.read<AuthCubit>().refreshRoles();
+      if (!mounted) return;
+      final auth = context.read<AuthCubit>().state;
+      if (auth is AuthAuthenticated) {
+        final caps = auth.professional;
+        setState(() {
+          _prestataireSnapshot = caps?.prestataire;
+          _professionalInconsistencies = caps?.inconsistencies ?? const [];
+          _rolesRefreshInProgress = false;
+          _rolesRefreshFailed = false;
+        });
+        return;
+      }
+      setState(() {
+        _rolesRefreshInProgress = false;
+        _rolesRefreshFailed = true;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _rolesRefreshInProgress = false;
+        _rolesRefreshFailed = true;
+      });
     }
   }
+
+  void _returnToProfileTab() {
+    context.go('/homepage');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ClientShellProfileTab.show();
+    });
+  }
+
+  String _successServiceLabel() {
+    final name = (formData['serviceName'] as String?)?.trim();
+    if (name != null && name.isNotEmpty) return name;
+    return '—';
+  }
+
+  String _successZonesLabel() {
+    final areas = formData['serviceAreas'];
+    if (areas is List && areas.isNotEmpty) {
+      return areas.map((e) => e.toString()).join(', ');
+    }
+    return '—';
+  }
+
+  ProfessionalProfileSnapshot? _resolvedPrestataireSnapshot() =>
+      _prestataireSnapshot;
 
   @override
   Widget build(BuildContext context) {
@@ -298,18 +362,11 @@ class _ServiceProviderRegistrationScreenMState
         ServiceProviderRegistrationStateM>(
       listener: (context, state) {
         if (state is ServiceProviderRegistrationSuccess) {
-          final auth = context.read<AuthCubit>().state;
-          if (auth is AuthAuthenticated) {
-            final currentRoles = List<String>.from(auth.roles);
-            if (!currentRoles.contains('PRESTATAIRE')) {
-              currentRoles.add('PRESTATAIRE');
-              context.read<AuthCubit>().setRoles(
-                    roles: currentRoles,
-                    activeRole: 'PRESTATAIRE',
-                  );
-            }
-          }
-          setState(() => _success = true);
+          setState(() {
+            _success = true;
+            _prestataireSnapshot = state.prestataireSnapshot;
+          });
+          _refreshProfessionalStateAfterCreation();
         } else if (state is ServiceProviderRegistrationFailure) {
           AppSnackBar.error(context, state.error);
         }
@@ -319,53 +376,23 @@ class _ServiceProviderRegistrationScreenMState
   }
 
   Widget _buildSuccess() {
-    return Scaffold(
-      backgroundColor: SDColors.white,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
-          child: Column(
-            children: [
-              const Spacer(),
-              Container(
-                width: 96,
-                height: 96,
-                decoration: const BoxDecoration(
-                  color: SDColors.primary600,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.check_rounded,
-                    color: SDColors.white, size: 52),
-              ),
-              const SizedBox(height: 28),
-              Text(
-                'Félicitations !',
-                style: SDTypography.displaySmall.copyWith(
-                  fontWeight: FontWeight.w800,
-                  color: SDColors.neutral900,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                'Votre profil prestataire a été créé avec succès.\nVous pourrez bientôt recevoir des demandes.',
-                textAlign: TextAlign.center,
-                style: SDTypography.bodyMedium.copyWith(
-                  color: SDColors.neutral600,
-                  height: 1.45,
-                ),
-              ),
-              const Spacer(),
-              SDButton(
-                text: 'Accéder à mon espace prestataire',
-                icon: Icons.arrow_forward_rounded,
-                iconRight: true,
-                fullWidth: true,
-                onPressed: _openProviderSpace,
-              ),
-              const SizedBox(height: 8),
-            ],
-          ),
-        ),
+    final presentation = ProviderCreationStatusPresentation.resolve(
+      snapshot: _resolvedPrestataireSnapshot(),
+      inconsistencies: _professionalInconsistencies,
+      rolesRefreshFailed: _rolesRefreshFailed,
+    );
+
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _returnToProfileTab();
+      },
+      child: ProviderRegistrationSuccessView(
+        statusPresentation: presentation,
+        serviceName: _successServiceLabel(),
+        zonesLabel: _successZonesLabel(),
+        refreshingStatus: _rolesRefreshInProgress,
+        onBackToProfile: _returnToProfileTab,
       ),
     );
   }
@@ -421,7 +448,8 @@ class _ServiceProviderRegistrationScreenMState
           key: const ValueKey('provider_step_3'),
           formData: formData,
           onDataChanged: _updateFormData,
-          onEditSummary: () => setState(() => _currentStep = 0),
+          onEditService: () => setState(() => _currentStep = 0),
+          onEditZones: () => setState(() => _currentStep = 1),
         );
     }
   }

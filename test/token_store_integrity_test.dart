@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -138,6 +139,21 @@ void main() {
         TokenStore.debugSecureMap!.clear();
         expect(await TokenStore.getAccessToken(), 'persisted-access');
         expect(await TokenStore.getRefreshToken(), 'persisted-refresh');
+      },
+    );
+
+    test(
+      'hydrate trop long ne restaure pas de session',
+      () async {
+        TokenStore.hydrateTimeout = const Duration(milliseconds: 40);
+        TokenStore.debugReadOverride =
+            (_) => Completer<String?>().future;
+
+        await TokenStore.hydrate();
+
+        expect(TokenStore.debugIsHydrated(), isTrue);
+        expect(TokenStore.debugCache(), isNull);
+        expect(await TokenStore.getAccessToken(), isNull);
       },
     );
   });

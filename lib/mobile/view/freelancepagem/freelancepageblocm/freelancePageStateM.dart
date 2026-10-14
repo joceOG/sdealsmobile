@@ -28,6 +28,10 @@ class FreelancePageStateM extends Equatable {
   final String? registrationError;
   final String? registrationSuccess;
 
+  /// Message d'erreur spécifique au filtre catégorie server-side
+  /// (distinct de [freelancersError] qui concerne le chargement initial).
+  final String? filterError;
+
   const FreelancePageStateM({
     required this.isLoading,
     required this.listItems,
@@ -45,6 +49,7 @@ class FreelancePageStateM extends Equatable {
     required this.isRegistrationLoading,
     required this.registrationError,
     required this.registrationSuccess,
+    this.filterError,
   });
 
   factory FreelancePageStateM.initial() {
@@ -65,6 +70,7 @@ class FreelancePageStateM extends Equatable {
       isRegistrationLoading: false,
       registrationError: null,
       registrationSuccess: null,
+      filterError: null,
     );
   }
 
@@ -92,6 +98,7 @@ class FreelancePageStateM extends Equatable {
         isRegistrationLoading,
         registrationError,
         registrationSuccess,
+        filterError,
       ];
 
   static const Object _unset = Object();
@@ -113,6 +120,7 @@ class FreelancePageStateM extends Equatable {
     bool? isRegistrationLoading,
     Object? registrationError = _unset,
     Object? registrationSuccess = _unset,
+    Object? filterError = _unset,
   }) {
     return FreelancePageStateM(
       isLoading: isLoading ?? this.isLoading,
@@ -142,6 +150,9 @@ class FreelancePageStateM extends Equatable {
       registrationSuccess: identical(registrationSuccess, _unset)
           ? this.registrationSuccess
           : registrationSuccess as String?,
+      filterError: identical(filterError, _unset)
+          ? this.filterError
+          : filterError as String?,
     );
   }
 }

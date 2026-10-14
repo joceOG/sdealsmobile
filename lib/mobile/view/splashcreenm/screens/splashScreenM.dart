@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lottie/lottie.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../../data/services/startup_trace.dart';
 import '../../../../design_system/design_system.dart';
 import '../brand_intro_config.dart';
 import '../splashscreenblocm/splashscreenBlocM.dart';
@@ -33,14 +36,17 @@ class _SplashScreenMState extends State<SplashScreenM>
   bool _animCompleted = false;
   bool _lottieFailed = false;
   bool _lottieVisible = false;
+  bool _staticMarkVisible = true;
 
   @override
   void initState() {
     super.initState();
+    StartupTrace.mark('SplashScreenM.init');
     _anim = AnimationController(vsync: this)
       ..addStatusListener((status) {
         if (status == AnimationStatus.completed) {
           _animCompleted = true;
+          StartupTrace.mark('anim_complete');
           _tryNavigate(reason: 'anim_complete');
         }
       });
@@ -69,6 +75,7 @@ class _SplashScreenMState extends State<SplashScreenM>
   }
 
   void _onReady(SplashReadyM state) {
+    StartupTrace.mark('SplashReady');
     _ready = state;
     if (!_animStarted && state.showFullIntro != _showFull) {
       setState(() => _showFull = state.showFullIntro);
@@ -90,6 +97,11 @@ class _SplashScreenMState extends State<SplashScreenM>
     if (!_lottieVisible) {
       setState(() => _lottieVisible = true);
     }
+    // Le PNG natif/Flutter cède la place dès que le Lottie est opaque.
+    Future<void>.delayed(const Duration(milliseconds: 120), () {
+      if (!mounted || !_lottieVisible) return;
+      setState(() => _staticMarkVisible = false);
+    });
     _anim.forward(from: 0);
   }
 
@@ -103,7 +115,6 @@ class _SplashScreenMState extends State<SplashScreenM>
     if (!animDone) return;
 
     if (timedOut && !_animStarted && !_skipRequested) {
-      await Future<void>.delayed(const Duration(milliseconds: 400));
       if (!mounted || _navigated) return;
     }
 
@@ -114,16 +125,12 @@ class _SplashScreenMState extends State<SplashScreenM>
     _navigated = true;
 
     if (wasFull) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt(
-        BrandIntroConfig.prefSeenVersion,
-        BrandIntroConfig.brandIntroVersion,
-      );
+      // Ne pas attendre le disque : un SharedPreferences bloqué fige le splash.
+      unawaited(_rememberIntroSeen());
     }
 
     if (!mounted) return;
-    await Future<void>.delayed(const Duration(milliseconds: 180));
-    if (!mounted) return;
+    StartupTrace.mark('navigate $dest ($reason)');
 
     if (extra != null) {
       context.go(dest, extra: extra);
@@ -132,13 +139,24 @@ class _SplashScreenMState extends State<SplashScreenM>
     }
   }
 
+  Future<void> _rememberIntroSeen() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(
+        BrandIntroConfig.prefSeenVersion,
+        BrandIntroConfig.brandIntroVersion,
+      );
+    } catch (_) {}
+  }
+
   Duration _clampDuration(Duration raw) {
-    final max = _showFull ? BrandIntroConfig.fullMax : BrandIntroConfig.shortMax;
+    final max =
+        _showFull ? BrandIntroConfig.fullMax : BrandIntroConfig.shortMax;
     final minTarget =
         _showFull ? BrandIntroConfig.fullTarget : BrandIntroConfig.shortTarget;
     var d = raw;
     if (d > max) d = max;
-    if (d < const Duration(milliseconds: 400)) d = minTarget;
+    if (d < const Duration(milliseconds: 280)) d = minTarget;
     return d;
   }
 
@@ -186,14 +204,15 @@ class _SplashScreenMState extends State<SplashScreenM>
       alignment: Alignment.center,
       clipBehavior: Clip.none,
       children: [
-        Image.asset(
-          BrandIntroConfig.splashMarkAsset,
-          width: maxWidth,
-          fit: BoxFit.contain,
-          alignment: Alignment.center,
-          filterQuality: FilterQuality.high,
-          gaplessPlayback: true,
-        ),
+        if (_staticMarkVisible)
+          Image.asset(
+            BrandIntroConfig.splashMarkAsset,
+            width: maxWidth,
+            fit: BoxFit.contain,
+            alignment: Alignment.center,
+            filterQuality: FilterQuality.high,
+            gaplessPlayback: true,
+          ),
         if (!_lottieFailed) _buildLottieOverlay(maxWidth),
       ],
     );

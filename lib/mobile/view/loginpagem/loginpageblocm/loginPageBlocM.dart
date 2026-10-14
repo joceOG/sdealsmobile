@@ -7,6 +7,7 @@ import 'package:sdealsmobile/data/services/api_client.dart';
 import 'package:sdealsmobile/data/services/google_auth_service.dart';
 import 'package:sdealsmobile/data/services/token_store.dart';
 import 'package:sdealsmobile/data/utils/phone_canonicalizer.dart';
+import 'package:sdealsmobile/data/utils/phone_otp_code.dart';
 import '../../../../data/models/utilisateur.dart';
 import 'loginPageEventM.dart';
 import 'loginPageStateM.dart';
@@ -38,6 +39,7 @@ class LoginPageBlocM extends Bloc<LoginPageEventM, LoginPageStateM> {
   final int resendCooldownSeconds;
   Timer? _resendTimer;
   bool _googleInFlight = false;
+  int _otpRequestId = 0;
 
   @override
   Future<void> close() {
@@ -235,8 +237,10 @@ class LoginPageBlocM extends Bloc<LoginPageEventM, LoginPageStateM> {
       clearPhoneVerificationToken: true,
       clearError: true,
       clearFieldErrors: true,
+      clearInfo: true,
     ));
 
+    final requestId = ++_otpRequestId;
     try {
       await _api.sendPhoneOtp(
         telephone: e164,
@@ -244,11 +248,14 @@ class LoginPageBlocM extends Bloc<LoginPageEventM, LoginPageStateM> {
       );
       final next = state;
       if (next is! LoginGooglePhoneRequiredM) return;
-      emit(next.copyWith(phase: GooglePhonePhase.otpSent));
+      if (requestId != _otpRequestId || next.e164Phone != e164) return;
+      emit(next.copyWith(phase: GooglePhonePhase.otpSent, clearInfo: true));
       _startResend(emit);
     } catch (e) {
+      if (requestId != _otpRequestId) return;
       final next = state;
       if (next is! LoginGooglePhoneRequiredM) return;
+      if (next.e164Phone != e164) return;
       emit(next.copyWith(
         phase: GooglePhonePhase.error,
         errorMessage: _userFacing(e),
@@ -302,16 +309,24 @@ class LoginPageBlocM extends Bloc<LoginPageEventM, LoginPageStateM> {
       clearPhoneVerificationToken: true,
       clearError: true,
       clearFieldErrors: true,
+      clearInfo: true,
     ));
+    final requestId = ++_otpRequestId;
     try {
       await _api.sendPhoneOtp(telephone: phone, phoneCountry: country);
       final next = state;
       if (next is! LoginGooglePhoneRequiredM) return;
-      emit(next.copyWith(phase: GooglePhonePhase.otpSent));
+      if (requestId != _otpRequestId || next.e164Phone != phone) return;
+      emit(next.copyWith(
+        phase: GooglePhonePhase.otpSent,
+        infoMessage: 'Code renvoyé',
+      ));
       _startResend(emit);
     } catch (e) {
+      if (requestId != _otpRequestId) return;
       final next = state;
       if (next is! LoginGooglePhoneRequiredM) return;
+      if (next.e164Phone != phone) return;
       emit(next.copyWith(
         phase: GooglePhonePhase.error,
         errorMessage: _userFacing(e),
@@ -332,10 +347,13 @@ class LoginPageBlocM extends Bloc<LoginPageEventM, LoginPageStateM> {
     if (phone == null || country == null) return;
 
     final code = event.code.trim();
-    if (code.length != 6 || int.tryParse(code) == null) {
+    if (!isPhoneOtpCode(code)) {
       emit(cur.copyWith(
         phase: GooglePhonePhase.error,
-        errorMessage: 'Saisissez le code à 6 chiffres.',
+        errorMessage: 'Saisissez le code à $kPhoneOtpCodeLength chiffres.',
+        fieldErrors: {
+          'code': 'Saisissez le code à $kPhoneOtpCodeLength chiffres.',
+        },
       ));
       return;
     }
@@ -346,12 +364,18 @@ class LoginPageBlocM extends Bloc<LoginPageEventM, LoginPageStateM> {
       clearFieldErrors: true,
     ));
 
+    final requestId = _otpRequestId;
     try {
       final verified = await _api.verifyPhoneOtp(
         telephone: phone,
         code: code,
         phoneCountry: country,
       );
+      if (requestId != _otpRequestId) return;
+      final still = state;
+      if (still is! LoginGooglePhoneRequiredM || still.e164Phone != phone) {
+        return;
+      }
       final token = verified['phoneVerificationToken']?.toString();
       if (token == null || token.isEmpty) {
         final next = state;
@@ -389,8 +413,10 @@ class LoginPageBlocM extends Bloc<LoginPageEventM, LoginPageStateM> {
         rememberMe: mid.rememberMe,
       );
     } catch (e) {
+      if (requestId != _otpRequestId) return;
       final next = state;
       if (next is! LoginGooglePhoneRequiredM) return;
+      if (next.e164Phone != phone) return;
       emit(next.copyWith(
         phase: GooglePhonePhase.error,
         clearPhoneVerificationToken: true,
@@ -413,6 +439,7 @@ class LoginPageBlocM extends Bloc<LoginPageEventM, LoginPageStateM> {
     final cur = state;
     if (cur is! LoginGooglePhoneRequiredM || !cur.isDeferredOptional) return;
     _resendTimer?.cancel();
+    _otpRequestId += 1;
     final token = cur.pendingToken ?? '';
     final utilisateur = cur.pendingUtilisateur ?? {};
     if (token.isEmpty) {
@@ -433,6 +460,7 @@ class LoginPageBlocM extends Bloc<LoginPageEventM, LoginPageStateM> {
     Emitter<LoginPageStateM> emit,
   ) {
     _resendTimer?.cancel();
+    _otpRequestId += 1;
     emit(LoginGooglePhoneRequiredM(
       googleIdToken: '',
       rememberMe: event.rememberMe,
@@ -479,6 +507,7 @@ class LoginPageBlocM extends Bloc<LoginPageEventM, LoginPageStateM> {
     Emitter<LoginPageStateM> emit,
   ) {
     _resendTimer?.cancel();
+    _otpRequestId += 1;
     emit(LoginPageInitialM());
   }
 
@@ -493,11 +522,15 @@ class LoginPageBlocM extends Bloc<LoginPageEventM, LoginPageStateM> {
       return;
     }
     _resendTimer?.cancel();
-    emit(LoginGooglePhoneRequiredM(
-      googleIdToken: cur.googleIdToken,
-      email: cur.email,
-      rememberMe: cur.rememberMe,
+    _otpRequestId += 1;
+    emit(cur.copyWith(
       phase: GooglePhonePhase.collectPhone,
+      clearE164Phone: true,
+      clearPhoneVerificationToken: true,
+      clearError: true,
+      clearFieldErrors: true,
+      clearInfo: true,
+      resendCooldownSeconds: 0,
     ));
   }
 

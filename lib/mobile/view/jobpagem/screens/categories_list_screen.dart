@@ -1,311 +1,244 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../jobpageblocm/jobPageBlocM.dart';
-import '../jobpageblocm/jobPageEventM.dart';
-import '../jobpageblocm/jobPageStateM.dart';
-import 'detailPageScreenM.dart';
-// ✅ Design System
-import '../../../../design_system/design_system.dart';
+import 'package:sdealsmobile/data/models/categorie.dart';
+import 'package:sdealsmobile/data/utils/media_url.dart';
+import 'package:sdealsmobile/design_system/design_system.dart';
+import 'package:sdealsmobile/mobile/view/common/widgets/app_image.dart';
+import 'package:sdealsmobile/mobile/view/jobpagem/jobpageblocm/jobPageBlocM.dart';
+import 'package:sdealsmobile/mobile/view/jobpagem/jobpageblocm/jobPageEventM.dart';
+import 'package:sdealsmobile/mobile/view/jobpagem/jobpageblocm/jobPageStateM.dart';
+import 'package:sdealsmobile/mobile/view/jobpagem/screens/category_services_screen.dart';
 
-class CategoriesListScreen extends StatefulWidget {
+/// Grille complète des catégories Métiers.
+///
+/// Données : BLoC [JobPageBlocM] → [LoadCategorieDataJobM] → API fetchCategorie("Métiers").
+/// Image   : [Categorie.imagecategorie] via [normalizeMediaUrl] — même chemin que le hub.
+/// Fallback: pictogramme contextuel sur fond neutre si URL absente ou inaccessible.
+class CategoriesListScreen extends StatelessWidget {
   const CategoriesListScreen({super.key});
 
   @override
-  State<CategoriesListScreen> createState() => _CategoriesListScreenState();
+  Widget build(BuildContext context) {
+    // Réutilise le BLoC ancêtre s'il existe (appelé depuis jobPageScreenM),
+    // sinon crée un BLoC autonome (navigation directe).
+    final hasAncestorBloc =
+        context.findAncestorWidgetOfExactType<BlocProvider<JobPageBlocM>>() != null;
+
+    if (hasAncestorBloc) {
+      return const _Body();
+    }
+    return BlocProvider(
+      create: (_) => JobPageBlocM()..add(LoadCategorieDataJobM()),
+      child: const _Body(),
+    );
+  }
 }
 
-class _CategoriesListScreenState extends State<CategoriesListScreen> {
-  @override
-  void initState() {
-    super.initState();
-    // Les catégories sont chargées automatiquement dans le BlocProvider
-  }
+// ── Scaffold + BlocBuilder ────────────────────────────────────────────────────
+
+class _Body extends StatelessWidget {
+  const _Body();
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (_) => JobPageBlocM()..add(LoadCategorieDataJobM()),
-      child: Scaffold(
+    return Scaffold(
+      backgroundColor: SDColors.white,
+      appBar: AppBar(
         backgroundColor: SDColors.white,
-        appBar: SDWhiteAppBar.appBar(
-          title: 'Toutes les Catégories',
+        foregroundColor: SDColors.neutral900,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        title: Text(
+          'Catégories',
+          style: SDTypography.titleSmall.copyWith(
+            fontWeight: FontWeight.w800,
+            color: SDColors.neutral900,
+          ),
         ),
-        body: BlocBuilder<JobPageBlocM, JobPageStateM>(
-          builder: (context, state) {
-            if (state.isLoading) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      padding: EdgeInsets.all(SDSpacing.md),
-                      decoration: BoxDecoration(
-                        color: SDColors.primary700.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusXLarge),
-                      ),
-                      child: CircularProgressIndicator(
-                        color: SDColors.primary700,
-                        strokeWidth: 3,
-                      ),
-                    ),
-                    SizedBox(height: SDSpacing.md),
-                    Text(
-                      'Chargement des catégories...',
-                      style: SDTypography.titleSmall.copyWith(
-                        color: SDColors.primary700,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }
+      ),
+      body: BlocBuilder<JobPageBlocM, JobPageStateM>(
+        builder: (context, state) {
+          if (state.isLoading) {
+            return const Center(
+              child: SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            );
+          }
 
-            if (state.error.isNotEmpty) {
-              return Center(
+          if (state.error.isNotEmpty) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
                 child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Container(
-                      padding: EdgeInsets.all(SDSpacing.md),
-                      decoration: BoxDecoration(
-                        color: SDColors.error50,
-                        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusXLarge),
-                        border: Border.all(
-                          color: SDColors.error200,
-                          width: 1,
-                        ),
-                      ),
-                      child: Icon(
-                        Icons.error_outline,
-                        size: 64,
-                        color: SDColors.error500,
-                      ),
-                    ),
-                    SizedBox(height: SDSpacing.md),
-                    Text(
-                      'Erreur de chargement',
-                      style: SDTypography.titleMedium.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: SDColors.error600,
-                      ),
-                    ),
-                    SizedBox(height: SDSpacing.xs),
+                    const Icon(Icons.wifi_off_outlined,
+                        size: 48, color: SDColors.neutral400),
+                    const SizedBox(height: 12),
                     Text(
                       state.error,
-                      style: SDTypography.bodySmall.copyWith(
-                        color: SDColors.error600,
-                        fontWeight: FontWeight.w500,
-                      ),
                       textAlign: TextAlign.center,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: SDTypography.bodySmall
+                          .copyWith(color: SDColors.neutral600),
                     ),
-                    SizedBox(height: SDSpacing.md),
-                    ElevatedButton(
-                      onPressed: () {
-                        context
-                            .read<JobPageBlocM>()
-                            .add(LoadCategorieDataJobM());
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: SDColors.primary700,
-                        foregroundColor: SDColors.white,
-                        padding: EdgeInsets.symmetric(
-                          horizontal: SDSpacing.md,
-                          vertical: SDSpacing.xs,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-                        ),
-                        elevation: 4,
-                      ),
-                      child: Text(
-                        'Réessayer',
-                        style: SDTypography.labelMedium.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: SDColors.white,
-                        ),
-                      ),
+                    const SizedBox(height: 16),
+                    FilledButton.icon(
+                      onPressed: () => context
+                          .read<JobPageBlocM>()
+                          .add(LoadCategorieDataJobM()),
+                      icon: const Icon(Icons.refresh_rounded, size: 16),
+                      label: const Text('Réessayer'),
+                      style: FilledButton.styleFrom(
+                          backgroundColor: SDColors.primary600),
                     ),
                   ],
                 ),
-              );
-            }
-
-            if (state.listItems.isEmpty) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.category_outlined,
-                      size: 64,
-                      color: SDColors.neutral300,
-                    ),
-                    SizedBox(height: SDSpacing.sm),
-                    Text(
-                      'Aucune catégorie disponible',
-                      style: SDTypography.titleMedium.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: SDColors.neutral700,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }
-
-            return GridView.builder(
-              padding: EdgeInsets.all(SDSpacing.md),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                childAspectRatio: 0.85, // Ajusté pour la nouvelle hauteur
-                crossAxisSpacing: SDSpacing.md,
-                mainAxisSpacing: SDSpacing.md,
               ),
-              itemCount: state.listItems.length,
-              itemBuilder: (context, index) {
-                final category = state.listItems[index];
-                return _buildCategoryCard(category);
-              },
             );
-          },
-        ),
-      ),
-    );
-  }
+          }
 
-  Widget _buildCategoryCard(dynamic category) {
-    return Card(
-      elevation: 6,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusXLarge),
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusXLarge),
-        onTap: () {
-          // Navigation vers les services de cette catégorie
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => DetailPage(
-                title: category.nomcategorie,
-                image: category.imagecategorie.isNotEmpty
-                    ? category.imagecategorie
-                    : 'assets/categories/Image1.png',
+          if (state.listItems.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.category_outlined,
+                      size: 48, color: SDColors.neutral300),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Aucune catégorie disponible',
+                    style: SDTypography.bodyMedium
+                        .copyWith(color: SDColors.neutral500),
+                  ),
+                ],
               ),
+            );
+          }
+
+          return GridView.builder(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              // 2 colonnes, ratio hauteur/largeur : image (≈60 %) + texte (≈40 %)
+              crossAxisCount: 2,
+              childAspectRatio: 0.82,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
             ),
+            itemCount: state.listItems.length,
+            itemBuilder: (context, i) {
+              final cat = state.listItems[i];
+              return _CategoryCard(
+                categorie: cat,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => CategoryServicesScreen(
+                      categorieId: cat.idcategorie,
+                      nomcategorie: cat.nomcategorie,
+                      imagecategorie: cat.imagecategorie,
+                    ),
+                  ),
+                ),
+              );
+            },
           );
         },
-        child: Container(
-          height: 180, // Hauteur fixe pour éviter le débordement
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(SDSpacing.borderRadiusXLarge),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                SDColors.primary700.withOpacity(0.08),
-                SDColors.primary500.withOpacity(0.12),
-                SDColors.primary300.withOpacity(0.08),
-              ],
-            ),
-          ),
-          child: Padding(
-            padding: EdgeInsets.all(SDSpacing.md),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min, // Évite le débordement
-              children: [
-                // Icône de la catégorie avec effet de brillance
-                Container(
-                  width: 70,
-                  height: 70,
-                  decoration: BoxDecoration(
-                    color: SDColors.primary700.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(35),
-                    boxShadow: [
-                      BoxShadow(
-                        color: SDColors.primary700.withOpacity(0.3),
-                        blurRadius: 8,
-                        offset: Offset(0, 4),
+      ),
+    );
+  }
+}
+
+// ── Carte catégorie ───────────────────────────────────────────────────────────
+
+class _CategoryCard extends StatelessWidget {
+  final Categorie categorie;
+  final VoidCallback onTap;
+
+  const _CategoryCard({required this.categorie, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    // Même mécanisme que les chips du hub jobPageScreenM.
+    final imgUrl = normalizeMediaUrl(categorie.imagecategorie);
+
+    return Card(
+      elevation: 1,
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      // clipBehavior arrondit automatiquement l'image ET le texte
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // ── Zone image ── Expanded → prend tout l'espace libre
+            Expanded(
+              child: imgUrl != null
+                  ? AppImage(
+                      imageUrl: imgUrl,
+                      fit: BoxFit.cover,
+                    )
+                  : Container(
+                      color: SDColors.primary50,
+                      alignment: Alignment.center,
+                      child: Icon(
+                        _icon(categorie.nomcategorie),
+                        size: 40,
+                        color: SDColors.primary600,
                       ),
-                    ],
-                  ),
-                  child: Icon(
-                    _getCategoryIcon(category.nomcategorie),
-                    size: 35,
-                    color: SDColors.primary700,
-                  ),
-                ),
-                SizedBox(height: SDSpacing.sm),
-                // Nom de la catégorie avec style amélioré
-                Flexible(
-                  child: Text(
-                    category.nomcategorie,
-                    style: SDTypography.titleSmall.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: SDColors.neutral900,
-                      height: 1.2,
                     ),
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                SizedBox(height: SDSpacing.xs),
-                // Badge "Voir services" avec design amélioré
-                Container(
-                  padding:
-                      EdgeInsets.symmetric(horizontal: SDSpacing.xs, vertical: SDSpacing.xxxs),
-                  decoration: BoxDecoration(
-                    color: SDColors.primary700,
-                    borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
-                    boxShadow: [
-                      BoxShadow(
-                        color: SDColors.primary700.withOpacity(0.3),
-                        blurRadius: 4,
-                        offset: Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Text(
-                    'Voir services',
-                    style: SDTypography.labelSmall.copyWith(
-                      color: SDColors.white,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
             ),
-          ),
+
+            // ── Nom de la catégorie ── hauteur naturelle, jamais de débordement
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+              child: Text(
+                categorie.nomcategorie,
+                style: SDTypography.labelMedium.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: SDColors.neutral900,
+                  height: 1.3,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  IconData _getCategoryIcon(String categoryName) {
-    final name = categoryName.toLowerCase();
-    if (name.contains('plombier') || name.contains('plomberie')) {
-      return Icons.plumbing;
-    } else if (name.contains('électricien') || name.contains('électricité')) {
+  /// Pictogramme contextuel utilisé uniquement quand aucune image n'est disponible.
+  static IconData _icon(String name) {
+    final n = name.toLowerCase();
+    if (n.contains('plomb')) return Icons.plumbing;
+    if (n.contains('électr') || n.contains('electr')) {
       return Icons.electrical_services;
-    } else if (name.contains('coiffeur') || name.contains('coiffure')) {
-      return Icons.content_cut;
-    } else if (name.contains('photographe') || name.contains('photo')) {
-      return Icons.camera_alt;
-    } else if (name.contains('nettoyage') || name.contains('ménage')) {
-      return Icons.cleaning_services;
-    } else if (name.contains('menuiserie') || name.contains('bois')) {
-      return Icons.build;
-    } else if (name.contains('peintre') || name.contains('peinture')) {
-      return Icons.format_paint;
-    } else if (name.contains('jardinier') || name.contains('jardin')) {
-      return Icons.local_florist;
-    } else if (name.contains('cuisinier') || name.contains('cuisine')) {
-      return Icons.restaurant;
-    } else {
-      return Icons.work;
     }
+    if (n.contains('coiff')) return Icons.content_cut;
+    if (n.contains('photo')) return Icons.camera_alt;
+    if (n.contains('ménag') || n.contains('menag') || n.contains('nettoy')) {
+      return Icons.cleaning_services;
+    }
+    if (n.contains('menuis') || n.contains('bois')) return Icons.handyman;
+    if (n.contains('peint')) return Icons.format_paint;
+    if (n.contains('jardin')) return Icons.local_florist;
+    if (n.contains('cuisin')) return Icons.restaurant;
+    if (n.contains('macon') || n.contains('maçon')) return Icons.foundation;
+    if (n.contains('clim') || n.contains('climatisation')) return Icons.ac_unit;
+    if (n.contains('info') || n.contains('tech')) return Icons.computer;
+    if (n.contains('transport') || n.contains('livraison')) return Icons.local_shipping;
+    if (n.contains('médic') || n.contains('soin') || n.contains('santé')) {
+      return Icons.local_hospital;
+    }
+    return Icons.category_outlined; // Fallback neutre — plus générique que la mallette
   }
 }

@@ -54,6 +54,20 @@ class SendMessage extends ChatPageEventM {
   List<Object?> get props => [conversationId, content, type, imageFile];
 }
 
+/// Réémettre un message en échec (texte).
+class RetrySendMessage extends ChatPageEventM {
+  final String conversationId;
+  final String messageId;
+
+  const RetrySendMessage({
+    required this.conversationId,
+    required this.messageId,
+  });
+
+  @override
+  List<Object> get props => [conversationId, messageId];
+}
+
 // Événement pour envoyer un message vocal
 class SendAudioMessage extends ChatPageEventM {
   final String conversationId;

@@ -70,6 +70,8 @@ class LoginGooglePhoneRequiredM extends LoginPageStateM {
   final String? pendingToken;
   final String? pendingRefreshToken;
   final Map<String, dynamic>? pendingUtilisateur;
+  /// Message ponctuel (ex. code renvoyé) — pas un succès de vérification.
+  final String? infoMessage;
 
   LoginGooglePhoneRequiredM({
     required this.googleIdToken,
@@ -86,6 +88,7 @@ class LoginGooglePhoneRequiredM extends LoginPageStateM {
     this.pendingToken,
     this.pendingRefreshToken,
     this.pendingUtilisateur,
+    this.infoMessage,
   });
 
   bool get isBusy =>
@@ -96,6 +99,7 @@ class LoginGooglePhoneRequiredM extends LoginPageStateM {
   LoginGooglePhoneRequiredM copyWith({
     GooglePhonePhase? phase,
     String? e164Phone,
+    bool clearE164Phone = false,
     String? phoneCountry,
     String? phoneVerificationToken,
     bool clearPhoneVerificationToken = false,
@@ -108,13 +112,15 @@ class LoginGooglePhoneRequiredM extends LoginPageStateM {
     String? pendingToken,
     String? pendingRefreshToken,
     Map<String, dynamic>? pendingUtilisateur,
+    String? infoMessage,
+    bool clearInfo = false,
   }) {
     return LoginGooglePhoneRequiredM(
       googleIdToken: googleIdToken,
       email: email,
       rememberMe: rememberMe,
       phase: phase ?? this.phase,
-      e164Phone: e164Phone ?? this.e164Phone,
+      e164Phone: clearE164Phone ? null : (e164Phone ?? this.e164Phone),
       phoneCountry: phoneCountry ?? this.phoneCountry,
       phoneVerificationToken: clearPhoneVerificationToken
           ? null
@@ -129,6 +135,7 @@ class LoginGooglePhoneRequiredM extends LoginPageStateM {
       pendingToken: pendingToken ?? this.pendingToken,
       pendingRefreshToken: pendingRefreshToken ?? this.pendingRefreshToken,
       pendingUtilisateur: pendingUtilisateur ?? this.pendingUtilisateur,
+      infoMessage: clearInfo ? null : (infoMessage ?? this.infoMessage),
     );
   }
 
@@ -148,5 +155,6 @@ class LoginGooglePhoneRequiredM extends LoginPageStateM {
         pendingToken,
         pendingRefreshToken,
         pendingUtilisateur,
+        infoMessage,
       ];
 }

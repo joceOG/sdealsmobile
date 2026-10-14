@@ -32,21 +32,27 @@ String? firstReadablePlace(Iterable<String?> candidates) {
   return null;
 }
 
-/// Une carte entière et un aperçu régulier de la suivante. Jamais un troisième fragment.
+/// Deux cartes portrait entières + aperçu de la troisième.
 class NearbyCarouselMetrics {
-  static const double peek = 40;
+  /// Fragment visible de la 3ème carte (aperçu constant).
+  static const double peek = 24;
 
+  /// Espacement entre cartes.
+  static const double gap = 12;
+
+  /// Largeur d'une carte : 2 cartes + 1 gap + peek tiennent dans la viewport.
   static double cardWidth(double screenWidth) {
     final viewport = screenWidth - 16 * 2;
-    final width = viewport - peek - 12;
-    if (width < 160) return viewport;
-    return width;
+    final w = (viewport - gap - peek) / 2;
+    if (w < 100) return viewport; // écran extrêmement étroit
+    return w;
   }
 
+  /// Vérifie que le fragment visible de la 3ème carte est raisonnable.
   static bool showsRegularPeek(double screenWidth) {
     final viewport = screenWidth - 32;
     final card = cardWidth(screenWidth);
-    final visibleFragment = viewport - card - 12;
-    return visibleFragment >= 32 && visibleFragment <= 48;
+    final visibleFragment = viewport - 2 * card - gap;
+    return visibleFragment >= 16 && visibleFragment <= 36;
   }
 }

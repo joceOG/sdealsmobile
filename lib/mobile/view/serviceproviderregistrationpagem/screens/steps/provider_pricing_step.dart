@@ -1,19 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../../design_system/design_system.dart';
 
-/// Étape 3 Figma — récap + tarif jour + description.
+/// Parse le texte saisi (espaces FR autorisés) — `null` si vide.
+int? parseProviderDailyRateText(String text) {
+  final raw = text.replaceAll(RegExp(r'\s'), '');
+  if (raw.isEmpty) return null;
+  return int.tryParse(raw);
+}
+
+/// Étape 3 — tarif jour, description, récap (ordre maquette).
 class ProviderPricingStep extends StatefulWidget {
   final Map<String, dynamic> formData;
   final Function(Map<String, dynamic>) onDataChanged;
-  final VoidCallback? onEditSummary;
+  final VoidCallback? onEditService;
+  final VoidCallback? onEditZones;
 
   const ProviderPricingStep({
     Key? key,
     required this.formData,
     required this.onDataChanged,
-    this.onEditSummary,
+    this.onEditService,
+    this.onEditZones,
   }) : super(key: key);
 
   @override
@@ -23,16 +33,15 @@ class ProviderPricingStep extends StatefulWidget {
 class _ProviderPricingStepState extends State<ProviderPricingStep> {
   final TextEditingController _dailyRateController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
-  static const _presets = [10000, 15000, 20000];
 
   @override
   void initState() {
     super.initState();
     final rate = widget.formData['dailyRate'];
-    if (rate != null && rate != 0.0 && rate != 0) {
-      _dailyRateController.text = _formatInt((rate as num).round());
+    if (rate is num && rate > 0) {
+      _dailyRateController.text = _formatInt(rate.round());
     }
-    _descriptionController.text = widget.formData['description'] ?? '';
+    _descriptionController.text = widget.formData['description']?.toString() ?? '';
   }
 
   @override
@@ -42,88 +51,77 @@ class _ProviderPricingStepState extends State<ProviderPricingStep> {
     super.dispose();
   }
 
-  String _formatInt(int v) =>
+  static String _formatInt(int v) =>
       NumberFormat('#,###', 'fr_FR').format(v).replaceAll(',', ' ');
 
-  int? get _parsedRate {
+  void _syncDailyRateToForm() {
     final raw = _dailyRateController.text.replaceAll(RegExp(r'\s'), '');
-    return int.tryParse(raw);
+    if (raw.isEmpty) {
+      widget.onDataChanged({
+        'dailyRate': null,
+        'dailyRateInvalid': false,
+        'dailyRateZero': false,
+      });
+      return;
+    }
+    final parsed = int.tryParse(raw);
+    if (parsed == null) {
+      widget.onDataChanged({
+        'dailyRate': null,
+        'dailyRateInvalid': true,
+        'dailyRateZero': false,
+      });
+      return;
+    }
+    if (parsed <= 0) {
+      widget.onDataChanged({
+        'dailyRate': null,
+        'dailyRateInvalid': false,
+        'dailyRateZero': true,
+      });
+      return;
+    }
+    widget.onDataChanged({
+      'dailyRate': parsed.toDouble(),
+      'dailyRateInvalid': false,
+      'dailyRateZero': false,
+    });
   }
 
-  void _updateFormData() {
+  void _syncDescription() {
     widget.onDataChanged({
-      'dailyRate': (_parsedRate ?? 0).toDouble(),
       'description': _descriptionController.text,
     });
   }
 
-  void _applyPreset(int value) {
-    setState(() => _dailyRateController.text = _formatInt(value));
-    _updateFormData();
+  String? _inlineRateError() {
+    if (widget.formData['dailyRateInvalid'] == true) {
+      return 'Montant invalide';
+    }
+    if (widget.formData['dailyRateZero'] == true) {
+      return 'Le tarif doit être supérieur à 0 FCFA';
+    }
+    return null;
   }
 
   @override
   Widget build(BuildContext context) {
     final serviceName =
         (widget.formData['serviceName'] as String?)?.trim().isNotEmpty == true
-            ? widget.formData['serviceName']
+            ? widget.formData['serviceName'] as String
             : '—';
     final categoryName =
         (widget.formData['categoryName'] as String?)?.trim().isNotEmpty == true
-            ? widget.formData['categoryName']
+            ? widget.formData['categoryName'] as String
             : '—';
     final areas = List<String>.from(widget.formData['serviceAreas'] ?? []);
     final hasPosition = widget.formData['position'] != null;
     final descLen = _descriptionController.text.length;
-    final current = _parsedRate;
+    final rateError = _inlineRateError();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: SDColors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: SDColors.neutral200),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Text(
-                    'Récapitulatif',
-                    style: SDTypography.titleSmall.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: SDColors.neutral900,
-                    ),
-                  ),
-                  const Spacer(),
-                  if (widget.onEditSummary != null)
-                    IconButton(
-                      tooltip: 'Modifier',
-                      onPressed: widget.onEditSummary,
-                      icon: const Icon(Icons.edit_outlined,
-                          color: SDColors.primary600, size: 20),
-                    ),
-                ],
-              ),
-              _RecapLine(label: 'Service', value: '$serviceName'),
-              _RecapLine(label: 'Catégorie', value: '$categoryName'),
-              _RecapLine(
-                label: 'Zones',
-                value: areas.isEmpty ? '—' : areas.join(', '),
-              ),
-              _RecapLine(
-                label: 'Position',
-                value: hasPosition ? 'Renseignée' : 'Non renseignée',
-              ),
-            ],
-          ),
-        ),
-        SizedBox(height: SDSpacing.md),
         Text(
           'Tarif par jour (FCFA) *',
           style: SDTypography.titleSmall.copyWith(
@@ -135,9 +133,10 @@ class _ProviderPricingStepState extends State<ProviderPricingStep> {
         TextField(
           controller: _dailyRateController,
           keyboardType: TextInputType.number,
+          inputFormatters: [ProviderFcfaDigitsFormatter()],
           onChanged: (_) {
             setState(() {});
-            _updateFormData();
+            _syncDailyRateToForm();
           },
           style: SDTypography.titleLarge.copyWith(
             fontWeight: FontWeight.w800,
@@ -152,55 +151,39 @@ class _ProviderPricingStepState extends State<ProviderPricingStep> {
             ),
             filled: true,
             fillColor: SDColors.neutral50,
+            errorText: rateError,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
               borderSide: const BorderSide(color: SDColors.neutral200),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: SDColors.neutral200),
+              borderSide: BorderSide(
+                color: rateError != null
+                    ? SDColors.error500
+                    : SDColors.neutral200,
+              ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: SDColors.primary600, width: 1.5),
+              borderSide: BorderSide(
+                color: rateError != null
+                    ? SDColors.error500
+                    : SDColors.primary600,
+                width: 1.5,
+              ),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: SDColors.error500),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: SDColors.error500, width: 1.5),
             ),
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           ),
-        ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            ..._presets.map((p) {
-              final selected = current == p;
-              return ChoiceChip(
-                label: Text(_formatInt(p)),
-                selected: selected,
-                onSelected: (_) => _applyPreset(p),
-                selectedColor: SDColors.primary50,
-                labelStyle: SDTypography.labelMedium.copyWith(
-                  color: selected ? SDColors.primary800 : SDColors.neutral700,
-                  fontWeight: FontWeight.w700,
-                ),
-                side: BorderSide(
-                  color: selected ? SDColors.primary600 : SDColors.neutral300,
-                ),
-              );
-            }),
-            ChoiceChip(
-              label: const Text('Autre'),
-              selected: current != null && !_presets.contains(current),
-              onSelected: (_) {},
-              selectedColor: SDColors.primary50,
-              labelStyle: SDTypography.labelMedium.copyWith(
-                fontWeight: FontWeight.w700,
-                color: SDColors.neutral700,
-              ),
-              side: const BorderSide(color: SDColors.neutral300),
-            ),
-          ],
         ),
         SizedBox(height: SDSpacing.md),
         Text(
@@ -217,7 +200,7 @@ class _ProviderPricingStepState extends State<ProviderPricingStep> {
           maxLength: 500,
           onChanged: (_) {
             setState(() {});
-            _updateFormData();
+            _syncDescription();
           },
           decoration: InputDecoration(
             hintText: 'Présentez votre expérience, vos atouts…',
@@ -265,43 +248,124 @@ class _ProviderPricingStepState extends State<ProviderPricingStep> {
             ],
           ),
         ),
+        SizedBox(height: SDSpacing.lg),
+        Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: SDColors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: SDColors.neutral200),
+          ),
+          child: Column(
+            children: [
+              _RecapRow(
+                label: 'Service',
+                value: serviceName,
+                onEdit: widget.onEditService,
+              ),
+              const Divider(height: 1, thickness: 1, color: SDColors.neutral100),
+              _RecapRow(
+                label: 'Catégorie',
+                value: categoryName,
+              ),
+              const Divider(height: 1, thickness: 1, color: SDColors.neutral100),
+              _RecapRow(
+                label: 'Zones',
+                value: areas.isEmpty ? '—' : areas.join(', '),
+                onEdit: widget.onEditZones,
+              ),
+              const Divider(height: 1, thickness: 1, color: SDColors.neutral100),
+              _RecapRow(
+                label: 'Position GPS',
+                value: hasPosition ? 'Renseignée' : 'Non renseignée',
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }
 }
 
-class _RecapLine extends StatelessWidget {
+/// Saisie montant FCFA avec espaces milliers (partagé inscription + espace pro).
+class ProviderFcfaDigitsFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
+    if (digits.isEmpty) {
+      return const TextEditingValue(
+        text: '',
+        selection: TextSelection.collapsed(offset: 0),
+      );
+    }
+    final n = int.tryParse(digits);
+    if (n == null) return oldValue;
+    final formatted =
+        NumberFormat('#,###', 'fr_FR').format(n).replaceAll(',', ' ');
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+}
+
+class _RecapRow extends StatelessWidget {
+  const _RecapRow({
+    required this.label,
+    required this.value,
+    this.onEdit,
+  });
+
   final String label;
   final String value;
-
-  const _RecapLine({required this.label, required this.value});
+  final VoidCallback? onEdit;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 88,
+            width: 92,
             child: Text(
               label,
-              style: SDTypography.labelSmall.copyWith(
+              style: SDTypography.bodyMedium.copyWith(
                 color: SDColors.neutral500,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: SDTypography.bodySmall.copyWith(
+              style: SDTypography.bodyMedium.copyWith(
                 color: SDColors.neutral900,
                 fontWeight: FontWeight.w700,
+                height: 1.35,
               ),
             ),
           ),
+          if (onEdit != null)
+            TextButton(
+              onPressed: onEdit,
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                minimumSize: const Size(48, 36),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: Text(
+                'Modifier',
+                style: SDTypography.labelMedium.copyWith(
+                  color: SDColors.primary700,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
         ],
       ),
     );

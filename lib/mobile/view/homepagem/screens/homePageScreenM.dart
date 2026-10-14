@@ -27,6 +27,7 @@ import '../homepageblocm/homePageEventM.dart';
 import '../homepageblocm/homePageStateM.dart';
 import '../home_place_label.dart';
 import 'package:sdealsmobile/data/config/client_feature_flags.dart';
+import 'package:sdealsmobile/mobile/view/common/widgets/skeleton_loader.dart';
 import 'package:sdealsmobile/mobile/view/shoppingpagem/screens/shoppingPageScreenM.dart';
 import 'package:sdealsmobile/mobile/view/shoppingpagem/shoppingpageblocm/shoppingPageBlocM.dart';
 import 'package:sdealsmobile/mobile/view/shoppingpagem/shoppingpageblocm/shoppingPageEventM.dart'
@@ -66,6 +67,13 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
   final ApiClient _apiClient = ApiClient();
   List<_HomeMiniItem> _metiersItems = const [];
   bool _homePreviewLoadedOnce = false;
+  bool _previewFailed = false;
+  bool _previewKeptOnError = false;
+  bool _previewSaved = false;
+  bool _notificationsArmed = false;
+  Future<void>? _homeReload;
+  Future<void>? _previewFlight;
+  int _previewGen = 0;
 
   /// Hauteur visuelle approximative de la bottom bar (`SizedBox` 78 + bouton Publier qui remonte).
   static const double _bottomNavShellReserve = 92;
@@ -74,56 +82,102 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    context.read<HomePageBlocM>().add(LoadCategorieDataM());
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final authState = context.read<AuthCubit>().state;
-      if (authState is AuthAuthenticated) {
-        _notificationBloc.setToken(authState.token);
-        _notificationBloc.add(
-          LoadUserNotifications(userId: authState.utilisateur.idutilisateur),
-        );
-        _notificationBloc.add(
-          StartNotificationPolling(authState.utilisateur.idutilisateur),
-        );
-      }
-      _loadHomePreviewData();
+      _reloadHome();
     });
   }
 
-  Future<void> _loadHomePreviewData() async {
+  /// Catégories d'abord, aperçu ensuite. Les notifications partent après,
+  /// pour ne pas saturer le premier appel.
+  Future<void> _reloadHome() {
+    final current = _homeReload;
+    if (current != null) return current;
+    final run = _reloadHomeImpl();
+    _homeReload = run;
+    return run.whenComplete(() {
+      if (identical(_homeReload, run)) _homeReload = null;
+    });
+  }
+
+  Future<void> _reloadHomeImpl() async {
+    final bloc = context.read<HomePageBlocM>();
+    final settled = bloc.stream.firstWhere((state) => !state.isLoading);
+    bloc.add(LoadCategorieDataM());
+    await settled;
+    if (!mounted) return;
+    await _loadHomePreviewData();
+    if (!mounted || _notificationsArmed) return;
+    final authState = context.read<AuthCubit>().state;
+    if (authState is! AuthAuthenticated) return;
+    _notificationsArmed = true;
+    _notificationBloc.setToken(authState.token);
+    _notificationBloc.add(
+      LoadUserNotifications(userId: authState.utilisateur.idutilisateur),
+    );
+    _notificationBloc.add(
+      StartNotificationPolling(authState.utilisateur.idutilisateur),
+    );
+  }
+
+  Future<void> _loadHomePreviewData() {
+    final current = _previewFlight;
+    if (current != null) return current;
+    final run = _loadHomePreviewImpl();
+    _previewFlight = run;
+    return run.whenComplete(() {
+      if (identical(_previewFlight, run)) _previewFlight = null;
+    });
+  }
+
+  Future<void> _loadHomePreviewImpl() async {
     if (widget.previewPrestataires != null) {
       if (!mounted) return;
       setState(() {
         _homePreviewLoadedOnce = true;
+        _previewFailed = false;
+        _previewKeptOnError = false;
+        _previewSaved = false;
         _metiersItems = _buildMetiersItems(widget.previewPrestataires!);
       });
       return;
     }
-    // 10D-2 : seul le carrousel « Professionnels près de vous » est visible.
-    // fetchFreelances, fetchHomeFreelanceServices et fetchArticle ne sont plus
-    // appelés ici : aucun widget initial ne lit ces listes. Pas de nouvelle
-    // requête. Réouverture possible quand Freelance ou É-marché redeviennent
-    // visibles sur l'accueil.
+    final generation = ++_previewGen;
+    final started = Stopwatch()..start();
     try {
-      final prestataires = await _apiClient.fetchPrestataires(
-        forceRefresh: true,
-        page: 1,
-        limit: 20,
+      final withPhoto = await _previewWithOneRetry();
+      if (!mounted || generation != _previewGen) return;
+      debugPrint(
+        'home.preview elapsed=${started.elapsedMilliseconds}ms result=ok count=${withPhoto.length}',
       );
+      setState(() {
+        _homePreviewLoadedOnce = true;
+        _previewFailed = false;
+        _previewKeptOnError = false;
+        _previewSaved = _apiClient.homePreviewServedFromCache;
+        _metiersItems = _buildMetiersItems(withPhoto);
+      });
+    } catch (error) {
+      if (!mounted || generation != _previewGen) return;
+      debugPrint(
+        'home.preview elapsed=${started.elapsedMilliseconds}ms result=error kind=${classifyUserNetworkFailure(error).name}',
+      );
+      setState(() {
+        _homePreviewLoadedOnce = true;
+        _previewFailed = _metiersItems.isEmpty;
+        _previewKeptOnError = _metiersItems.isNotEmpty;
+      });
+    }
+  }
 
-      if (!mounted) return;
-      setState(() {
-        _homePreviewLoadedOnce = true;
-        _metiersItems = _buildMetiersItems(prestataires);
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _homePreviewLoadedOnce = true;
-        _metiersItems = const [];
-      });
+  Future<List<Map<String, dynamic>>> _previewWithOneRetry() async {
+    try {
+      return await _apiClient.fetchHomePreviewPrestataires();
+    } catch (error) {
+      if (!isTransientReadFailure(error)) rethrow;
+      await Future<void>.delayed(const Duration(seconds: 2));
+      return _apiClient.fetchHomePreviewPrestataires();
     }
   }
 
@@ -202,8 +256,9 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
     // Affiche le profil même sans photo : le placeholder reste discret.
     return data
         .map((p) {
-          final utilisateur =
-              p['utilisateur'] as Map<String, dynamic>? ?? const {};
+          final utilisateur = p['utilisateur'] is Map
+              ? Map<String, dynamic>.from(p['utilisateur'] as Map)
+              : const <String, dynamic>{};
           final fullName =
               personNameFromMap(utilisateur, fallback: 'Prestataire');
           final metier = _metierLabelForPrestataire(p);
@@ -318,7 +373,9 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
       );
       return;
     }
-    final utilisateur = p['utilisateur'] as Map<String, dynamic>? ?? const {};
+    final utilisateur = p['utilisateur'] is Map
+        ? Map<String, dynamic>.from(p['utilisateur'] as Map)
+        : const <String, dynamic>{};
     final fullName = personNameFromMap(utilisateur, fallback: 'Prestataire');
     final imageUrl = _pickImageUrl(utilisateur) ?? _pickImageUrl(p);
     try {
@@ -428,10 +485,10 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
                 tooltip: 'Notifications',
                 onPressed: _openNotifications,
                 icon: const Icon(
-              Icons.notifications_none_rounded,
-              size: 24,
-              color: SDColors.primary800,
-            ),
+                  Icons.notifications_none_rounded,
+                  size: 24,
+                  color: SDColors.primary800,
+                ),
               ),
             );
           },
@@ -457,6 +514,7 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
         final listBottomPadding =
             SDSpacing.spaceBlock + systemBottomInset + reserveWhenNavHidden;
         final hasCategoryError = (state.error ?? '').isNotEmpty;
+        final showSaved = state.showingSaved || _previewSaved;
 
         return Scaffold(
           backgroundColor: SDColors.white,
@@ -476,29 +534,50 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
               return false;
             },
             child: RefreshIndicator(
-              onRefresh: () async {
-                context.read<HomePageBlocM>().add(LoadCategorieDataM());
-                await _loadHomePreviewData();
-              },
+              onRefresh: _reloadHome,
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: EdgeInsets.only(bottom: listBottomPadding),
                 children: [
                   if (hasCategoryError) ...[
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(
+                      padding: EdgeInsets.fromLTRB(
                         SDSpacing.clientHorizontalMargin,
-                        SDSpacing.spaceRelated,
+                        mq.padding.top + SDSpacing.spaceSmall,
                         SDSpacing.clientHorizontalMargin,
                         0,
                       ),
-                      child: _buildInlineErrorBanner(state.error!),
+                      child: SDSectionNeedsConnection(
+                        detail:
+                            'Les catégories Métiers ne sont pas enregistrées sur cet appareil.',
+                        onRetry: _reloadHome,
+                      ),
+                    ),
+                    const SizedBox(height: SDSpacing.spaceRelated),
+                  ] else if (showSaved) ...[
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(
+                        SDSpacing.clientHorizontalMargin,
+                        mq.padding.top + SDSpacing.spaceSmall,
+                        SDSpacing.clientHorizontalMargin,
+                        0,
+                      ),
+                      child: const SDOfflineSavedBanner(),
                     ),
                     const SizedBox(height: SDSpacing.spaceRelated),
                   ] else if (state.isLoading && categories.isEmpty) ...[
-                    const LinearProgressIndicator(minHeight: 2),
+                    Padding(
+                      padding: EdgeInsets.only(top: mq.padding.top),
+                      child: const LinearProgressIndicator(minHeight: 2),
+                    ),
                   ],
-                  _buildHero(firstName, categories),
+                  _buildHero(
+                    firstName,
+                    categories,
+                    pinToStatusBar: !hasCategoryError &&
+                        !showSaved &&
+                        !(state.isLoading && categories.isEmpty),
+                  ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(
                       SDSpacing.clientHorizontalMargin,
@@ -524,8 +603,12 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
     );
   }
 
-  Widget _buildHero(String greeting, List<Categorie> categories) {
-    final top = MediaQuery.paddingOf(context).top;
+  Widget _buildHero(
+    String greeting,
+    List<Categorie> categories, {
+    required bool pinToStatusBar,
+  }) {
+    final top = pinToStatusBar ? MediaQuery.paddingOf(context).top : 0.0;
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(
         bottom: Radius.circular(SDSpacing.radiusSheet),
@@ -671,12 +754,33 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Professionnels près de vous',
+          // Aucune coordonnée n'est transmise à l'endpoint home-preview.
+          // "Disponibles" était inexact : aucun filtre de disponibilité réel.
+          'D\u00e9couvrir des professionnels',
           style: SDTypography.sectionTitle.copyWith(color: SDColors.neutral900),
         ),
         const SizedBox(height: SDSpacing.cardInterval),
         if (!_homePreviewLoadedOnce)
-          const SDLoadingInline()
+          SizedBox(
+            height: HomeNearbyCard.heightFor(context),
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: 3,
+              separatorBuilder: (_, __) =>
+                  const SizedBox(width: SDSpacing.cardInterval),
+              itemBuilder: (_, __) => SkeletonWidget.rounded(
+                width: width,
+                height: HomeNearbyCard.heightFor(context),
+                borderRadius: 16,
+              ),
+            ),
+          )
+        else if (_previewFailed && _metiersItems.isEmpty)
+          SDSectionNeedsConnection(
+            detail:
+                'Les professionnels ne sont pas enregistrés sur cet appareil.',
+            onRetry: _loadHomePreviewData,
+          )
         else if (_metiersItems.isEmpty)
           SDEmptyState(
             title: 'Aucun professionnel à afficher',
@@ -690,6 +794,24 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
             ),
           )
         else ...[
+          if (_previewKeptOnError)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: _loadHomePreviewData,
+                style: TextButton.styleFrom(
+                  foregroundColor: SDColors.error600,
+                  minimumSize: const Size(48, SDSpacing.minTouchTarget),
+                ),
+                child: Text(
+                  'Actualisation impossible. Réessayer',
+                  style: SDTypography.body.copyWith(
+                    color: SDColors.error600,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
           SizedBox(
             height: HomeNearbyCard.heightFor(context),
             child: ListView.separated(
@@ -772,55 +894,6 @@ class _HomePageScreenStateM extends State<HomePageScreenM>
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildInlineErrorBanner(String message) {
-    final shortMsg = homeBannerDisplayMessage(message);
-    final offline = homeBannerLooksOffline(shortMsg);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: SDColors.error50,
-        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-        border: Border.all(color: SDColors.error200),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            offline ? Icons.wifi_off_rounded : Icons.cloud_off_rounded,
-            color: SDColors.error600,
-            size: 20,
-          ),
-          SizedBox(width: SDSpacing.xs),
-          Expanded(
-            child: Text(
-              shortMsg,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: SDTypography.bodySmall.copyWith(color: SDColors.error600),
-            ),
-          ),
-          SizedBox(width: SDSpacing.xs),
-          TextButton(
-            onPressed: () =>
-                context.read<HomePageBlocM>().add(LoadCategorieDataM()),
-            style: TextButton.styleFrom(
-              foregroundColor: SDColors.error600,
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-            child: Text(
-              'Réessayer',
-              style: SDTypography.labelSmall.copyWith(
-                color: SDColors.error600,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }

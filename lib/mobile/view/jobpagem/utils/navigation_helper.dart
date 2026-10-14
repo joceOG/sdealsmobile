@@ -13,6 +13,7 @@ class NavigationHelper {
     BuildContext context, {
     required String providerId,
     Map<String, dynamic>? providerData,
+    int initialTabIndex = 0,
   }) {
     Navigator.push(
       context,
@@ -20,6 +21,7 @@ class NavigationHelper {
         builder: (_) => ProviderProfileScreen(
           providerId: providerId,
           providerData: providerData,
+          initialTabIndex: initialTabIndex,
         ),
       ),
     );

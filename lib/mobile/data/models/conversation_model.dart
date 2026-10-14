@@ -20,6 +20,8 @@ class ConversationModel {
   final ConversationType
       type; // Type de conversation (prestataire, vendeur, freelance)
   final bool isOnline; // Si le participant est en ligne
+  /// Sujet affiché après l'univers (ex. « Plomberie », « Création de logo »).
+  final String? contextLabel;
 
   ConversationModel({
     required this.id,
@@ -33,6 +35,7 @@ class ConversationModel {
     this.unreadCount = 0,
     required this.type,
     this.isOnline = false,
+    this.contextLabel,
   });
 
   factory ConversationModel.fromJson(Map<String, dynamic> json) {
@@ -53,6 +56,7 @@ class ConversationModel {
         orElse: () => ConversationType.prestataire,
       ),
       isOnline: json['isOnline'] ?? false,
+      contextLabel: cleanDisplayPart(json['contextLabel']),
     );
   }
 
@@ -120,6 +124,9 @@ class ConversationModel {
       unreadCount: unreadCount,
       type: determineType(interlocuteur),
       isOnline: false,
+      contextLabel: cleanDisplayPart(json['contextLabel'] ??
+          json['sujet'] ??
+          json['serviceLabel']),
     );
   }
 
@@ -136,6 +143,7 @@ class ConversationModel {
       'unreadCount': unreadCount,
       'type': type.toString().split('.').last,
       'isOnline': isOnline,
+      if (contextLabel != null) 'contextLabel': contextLabel,
     };
   }
 
@@ -152,6 +160,7 @@ class ConversationModel {
     int? unreadCount,
     ConversationType? type,
     bool? isOnline,
+    String? contextLabel,
   }) {
     return ConversationModel(
       id: id ?? this.id,
@@ -165,6 +174,7 @@ class ConversationModel {
       unreadCount: unreadCount ?? this.unreadCount,
       type: type ?? this.type,
       isOnline: isOnline ?? this.isOnline,
+      contextLabel: contextLabel ?? this.contextLabel,
     );
   }
 
@@ -181,89 +191,69 @@ class ConversationModel {
   }
 }
 
-// Données de test pour le développement
+/// Données illustratives (maquette) — non injectées en prod ; référence tests / UI.
 List<ConversationModel> mockConversations = [
   ConversationModel(
-    id: 'conv1',
+    id: 'illustr-travaux-1',
     userId: 'currentUser',
     participantId: 'P001',
-    participantName: 'EcoJardin Pro',
+    participantName: 'Kouamé Yao',
     participantImage: 'assets/profil.png',
-    lastMessage: mockMessages.isNotEmpty ? mockMessages.last : null,
-    lastUpdated: DateTime.now().subtract(const Duration(minutes: 20)),
-    unread: false,
-    unreadCount: 0,
-    type: ConversationType.prestataire,
-    isOnline: true,
-  ),
-  ConversationModel(
-    id: 'conv2',
-    userId: 'currentUser',
-    participantId: 'V001',
-    participantName: 'Tech Store',
-    participantImage: 'assets/profil.png',
-    lastMessage:
-        mockVendeurMessages.isNotEmpty ? mockVendeurMessages.last : null,
-    lastUpdated: DateTime.now().subtract(const Duration(days: 2)),
+    lastMessage: MessageModel(
+      id: 'm1',
+      senderId: 'P001',
+      receiverId: 'currentUser',
+      timestamp: DateTime.now().subtract(const Duration(hours: 1)),
+      content: 'Je peux passer demain matin.',
+      type: MessageType.text,
+      status: MessageStatus.delivered,
+    ),
+    lastUpdated: DateTime.now().subtract(const Duration(hours: 1)),
     unread: true,
-    unreadCount: 3,
-    type: ConversationType.vendeur,
-    isOnline: false,
+    unreadCount: 2,
+    type: ConversationType.prestataire,
+    contextLabel: 'Plomberie',
   ),
   ConversationModel(
-    id: 'conv3',
+    id: 'illustr-freelance-1',
     userId: 'currentUser',
     participantId: 'F001',
-    participantName: 'Web Developer Pro',
-    participantImage: 'assets/profil.png',
-    lastMessage:
-        mockFreelanceMessages.isNotEmpty ? mockFreelanceMessages.last : null,
-    lastUpdated: DateTime.now().subtract(const Duration(days: 4, hours: 21)),
-    unread: false,
-    unreadCount: 0,
-    type: ConversationType.freelance,
-    isOnline: false,
-  ),
-  ConversationModel(
-    id: 'conv4',
-    userId: 'currentUser',
-    participantId: 'P002',
-    participantName: 'Electro Services',
+    participantName: 'Aïcha Koné',
     participantImage: 'assets/profil.png',
     lastMessage: MessageModel(
-      id: '20',
-      senderId: 'P002',
+      id: 'm2',
+      senderId: 'F001',
       receiverId: 'currentUser',
-      timestamp: DateTime.now().subtract(const Duration(days: 1, hours: 3)),
-      content: 'Je confirme notre rendez-vous demain à 10h.',
+      timestamp: DateTime.now().subtract(const Duration(hours: 2)),
+      content: 'Voici les deux premières propositions.',
       type: MessageType.text,
-      status: MessageStatus.seen,
+      status: MessageStatus.delivered,
     ),
-    lastUpdated: DateTime.now().subtract(const Duration(days: 1, hours: 3)),
+    lastUpdated: DateTime.now().subtract(const Duration(hours: 2)),
     unread: true,
     unreadCount: 1,
-    type: ConversationType.prestataire,
-    isOnline: false,
+    type: ConversationType.freelance,
+    contextLabel: 'Création de logo',
   ),
   ConversationModel(
-    id: 'conv5',
+    id: 'illustr-produits-1',
     userId: 'currentUser',
-    participantId: 'P003',
-    participantName: 'CleanHome',
+    participantId: 'V001',
+    participantName: 'Boutique Élan',
     participantImage: 'assets/profil.png',
     lastMessage: MessageModel(
-      id: '21',
+      id: 'm3',
       senderId: 'currentUser',
-      receiverId: 'P003',
-      timestamp: DateTime.now().subtract(const Duration(days: 6)),
-      content: 'Merci pour votre excellent service !',
+      receiverId: 'V001',
+      timestamp: DateTime.now().subtract(const Duration(hours: 4)),
+      content: 'La pointure 42 est disponible ?',
       type: MessageType.text,
       status: MessageStatus.seen,
     ),
-    lastUpdated: DateTime.now().subtract(const Duration(days: 6)),
+    lastUpdated: DateTime.now().subtract(const Duration(hours: 4)),
     unread: false,
     unreadCount: 0,
-    type: ConversationType.prestataire,
-    isOnline: true,
+    type: ConversationType.vendeur,
+    contextLabel: 'Chaussures',
   ),
 ];

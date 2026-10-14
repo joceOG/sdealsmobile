@@ -178,10 +178,15 @@ void main() {
       ),
     );
     await tester.pump();
-    expect(find.text('Mes commandes'), findsOneWidget);
-    expect(find.text('Modifier le profil'), findsOneWidget);
+    expect(find.text('Mes demandes de services'), findsOneWidget);
+    expect(find.text('Modifier mon profil'), findsOneWidget);
     expect(find.byType(ClientUniversePictogram), findsOneWidget);
     expect(find.text('Devenir professionnel'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Se déconnecter'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(find.text('Se déconnecter'), findsOneWidget);
     expect(find.text('Supprimer le compte'), findsNothing);
     expect(find.text('Boutique'), findsNothing);
@@ -207,11 +212,11 @@ void main() {
     );
     await tester.tap(find.text('ouvrir'));
     await tester.pumpAndSettle();
-    expect(find.text('Métiers'), findsOneWidget);
-    expect(find.text('Freelance'), findsOneWidget);
+    expect(find.text('MÉTIERS'), findsOneWidget);
+    expect(find.text('FREELANCE'), findsOneWidget);
+    expect(find.text('E-MARCHÉ'), findsOneWidget);
     expect(find.text('Boutique'), findsNothing);
-    expect(find.text('Comment souhaitez-vous proposer vos services ?'),
-        findsOneWidget);
+    expect(find.text('Devenir professionnel'), findsOneWidget);
     expect(find.text('Que souhaitez-vous publier ?'), findsNothing);
   });
 }

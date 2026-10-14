@@ -126,6 +126,7 @@ class EditProfileBloc extends Bloc<EditProfileEvent, EditProfileState> {
     UpdateProfile event,
     Emitter<EditProfileState> emit,
   ) async {
+    if (state is EditProfileLoading) return;
     emit(EditProfileLoading());
     try {
       // Préparer les données à envoyer
@@ -161,13 +162,3 @@ class EditProfileBloc extends Bloc<EditProfileEvent, EditProfileState> {
     emit(EditProfileInitial());
   }
 }
-
-
-
-
-
-
-
-
-
-

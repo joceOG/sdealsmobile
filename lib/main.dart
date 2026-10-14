@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -14,12 +15,15 @@ import 'data/services/fcm_route_policy.dart';
 import 'data/services/fcm_service.dart';
 import 'data/services/protected_action_intent.dart';
 import 'mobile/view/common/auth_completion.dart';
+import 'config/startup_api.dart';
+import 'data/services/startup_trace.dart';
 import 'data/services/token_store.dart';
 import 'data/utils/go_router_refresh_stream.dart';
 import 'mobile/view/locationpagem/locationpageblocm/locationPageBlocM.dart';
 import 'mobile/view/home.dart';
 import 'mobile/view/loginpagem/screens/loginPageScreenM.dart';
 import 'mobile/view/provider_dashboard/screens/provider_main_screen.dart';
+import 'mobile/view/provider_dashboard/screens/provider_mission_detail_screen.dart';
 import 'mobile/view/provider_dashboard/screens/prestataire_finalization_screen.dart';
 import 'mobile/view/onboarding/onboarding_screen.dart';
 import 'mobile/view/registerpagem/registerpageblocm/registerPageBlocM.dart';
@@ -40,15 +44,36 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'package:hive_flutter/hive_flutter.dart';
-
-// Design System
 import 'design_system/design_system.dart';
 
 /// AuthCubit racine — partagé par GoRouter.redirect et MultiBlocProvider.
 late final AuthCubit appAuthCubit;
 
+/// Icônes sombres, sans couleur de barre : Android 15 ignore et signale
+/// setStatusBarColor / setNavigationBarColor / setNavigationBarDividerColor.
+const SystemUiOverlayStyle _lightSystemBars = SystemUiOverlayStyle(
+  statusBarIconBrightness: Brightness.dark,
+  statusBarBrightness: Brightness.light,
+  systemNavigationBarIconBrightness: Brightness.dark,
+  systemNavigationBarContrastEnforced: false,
+  systemStatusBarContrastEnforced: false,
+);
+
 void main() async {
+  StartupTrace.mark('main');
   WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await _startApp();
+  } on StateError {
+    StartupTrace.mark('bootstrap abort StateError');
+    runApp(const _StartupFailureApp());
+  } catch (e) {
+    StartupTrace.mark('bootstrap abort ${e.runtimeType}');
+    runApp(const _StartupFailureApp(configuration: false));
+  }
+}
+
+Future<void> _startApp() async {
 
   // Photo Picker système (Android) — pas de READ_MEDIA_IMAGES / galerie large.
   final imagePickerImplementation = ImagePickerPlatform.instance;
@@ -59,20 +84,8 @@ void main() async {
   // Barre de statut + navigation Android en blanc
   // contrastEnforced: false → obligatoire Android 10+ / edge-to-edge (sinon reste noire)
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.dark,
-      statusBarBrightness: Brightness.light,
-      systemNavigationBarColor: Colors.white,
-      systemNavigationBarDividerColor: Colors.transparent,
-      systemNavigationBarIconBrightness: Brightness.dark,
-      systemNavigationBarContrastEnforced: false,
-      systemStatusBarContrastEnforced: false,
-    ),
-  );
+  SystemChrome.setSystemUIOverlayStyle(_lightSystemBars);
 
-  await Hive.initFlutter();
   const apiUrlDefine = String.fromEnvironment('API_URL');
   const mapsKeyDefine = String.fromEnvironment('GOOGLE_MAPS_API_KEY');
   const legalBaseDefine = String.fromEnvironment('LEGAL_BASE_URL');
@@ -86,57 +99,134 @@ void main() async {
     if (legalBaseDefine.isNotEmpty) 'LEGAL_BASE_URL': legalBaseDefine,
   };
 
-  if (kReleaseMode) {
-    // Fail-closed : API_URL obligatoire via --dart-define au build.
-    if (apiUrlDefine.isEmpty) {
-      throw StateError(
-        'API_URL manquant en release. Build avec '
-        '--dart-define=API_URL=https://…/api',
-      );
-    }
-    dotenv.testLoad(mergeWith: mergeWith);
-  } else {
-    // Debug : init toujours réussie (testLoad). Pas de .env secret en asset.
-    dotenv.testLoad(mergeWith: mergeWith);
-    // URL API / légal publics (pas des secrets) si absents ou placeholders.
-    final api = (dotenv.env['API_URL'] ?? '').trim();
-    if (api.isEmpty ||
-        api.contains('example.com') ||
-        api.contains('votre-api')) {
-      dotenv.env['API_URL'] = 'https://soutralideals-backend.onrender.com/api';
-    }
-    if ((dotenv.env['LEGAL_BASE_URL'] ?? '').trim().isEmpty) {
-      dotenv.env['LEGAL_BASE_URL'] =
-          'https://soutralideals-web-app.onrender.com';
-    }
+  dotenv.testLoad(mergeWith: mergeWith);
+  if ((dotenv.env['LEGAL_BASE_URL'] ?? '').trim().isEmpty) {
+    dotenv.env['LEGAL_BASE_URL'] = publicLegalBaseUrl;
   }
+  dotenv.env['API_URL'] = resolveStartupApiUrl(
+    fromEnvironment: dotenv.env['API_URL'] ?? '',
+    releaseMode: kReleaseMode,
+  );
 
-  final resolvedApi = (dotenv.env['API_URL'] ?? '').trim();
-  if (resolvedApi.isEmpty) {
-    throw StateError('API_URL non configuré');
+  StartupTrace.mark('env ok');
+  try {
+    await TokenStore.hydrate();
+    StartupTrace.mark('token hydrate end');
+  } catch (e) {
+    StartupTrace.mark('token hydrate error ${e.runtimeType}');
   }
-  if (kReleaseMode && !resolvedApi.startsWith('https://')) {
-    throw StateError('API_URL release doit être HTTPS');
-  }
-  if (kReleaseMode &&
-      (resolvedApi.contains('localhost') ||
-          resolvedApi.contains('127.0.0.1') ||
-          resolvedApi.contains('192.168.'))) {
-    throw StateError('API_URL release refuse localhost / LAN');
-  }
-
-  await initializeDateFormatting('fr_FR', null);
-
-  // Firebase + Crashlytics (no-op si non configuré)
-  await CrashlyticsService.initialize();
-  // FCM local (permissions + token) — sans await réseau backend (voir FcmService).
-  await FcmService.instance.initialize();
-
-  // AUTH-REFRESH : hydrater TokenStore avant AuthCubit / premières requêtes.
-  await TokenStore.hydrate();
 
   appAuthCubit = AuthCubit();
+  StartupTrace.mark('before runApp');
   runApp(MyApp());
+}
+
+/// Écran visible si le démarrage release ne peut pas continuer.
+/// Remplace un splash natif laissé affiché par une exception avant runApp.
+class _StartupFailureApp extends StatelessWidget {
+  const _StartupFailureApp({this.configuration = true});
+
+  /// Vrai seulement pour un [StateError] de configuration (URL d’API).
+  /// Un délai ou un service secondaire ne doit pas afficher ce texte.
+  final bool configuration;
+
+  @override
+  Widget build(BuildContext context) {
+    final message = configuration
+        ? 'Soutrali Deals n’a pas pu démarrer.\n'
+            'La configuration du service est incomplète.'
+        : 'Soutrali Deals n’a pas pu démarrer.\n'
+            'Réessayez dans un instant.';
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        backgroundColor: Colors.white,
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                message,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 16,
+                  height: 1.4,
+                  color: Color(0xFF1A1A1A),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+bool _deferredBootstrapStarted = false;
+
+bool _sessionResolverAttached = false;
+
+/// Quand la restauration de session se termine APRÈS l'ouverture de
+/// l'interface : ouvre la destination conservée (session appliquée) ou mène
+/// au login (destination protégée, pas de session). Aucun effet si rien
+/// n'est en attente. Une seule installation.
+void _attachSessionRestoreResolver(GoRouter router) {
+  if (_sessionResolverAttached) return;
+  _sessionResolverAttached = true;
+  void onStatus() {
+    final status = appAuthCubit.restoreStatus.value;
+    final action = FcmRoutePolicy.afterSessionRestore(
+      settled: status != SessionRestoreStatus.restoring,
+      authenticated: appAuthCubit.state is AuthAuthenticated,
+      pending: FcmService.instance.peekPendingDestination(),
+    );
+    switch (action) {
+      case PostRestoreAction.openPending:
+        final dest = FcmService.instance.consumePendingDestination();
+        if (dest != null) router.go(dest);
+      case PostRestoreAction.openLogin:
+        // La destination reste en attente : le login la consomme.
+        router.go('/login');
+      case PostRestoreAction.none:
+        break;
+    }
+  }
+
+  appAuthCubit.restoreStatus.addListener(onStatus);
+}
+
+Future<void> _deferredBootstrap() async {
+  StartupTrace.mark('deferred start');
+  try {
+    await Hive.initFlutter();
+  } catch (e) {
+    if (kDebugMode) debugPrint('[startup] Hive: $e');
+  }
+  try {
+    await initializeDateFormatting('fr_FR', null);
+  } catch (e) {
+    if (kDebugMode) debugPrint('[startup] dates: $e');
+  }
+  await CrashlyticsService.initialize();
+  StartupTrace.mark('fcm deferred start');
+  await FcmService.instance.initialize();
+  StartupTrace.mark('fcm deferred end');
+}
+
+Page<void> _fadeInPage(GoRouterState state, Widget child) {
+  return CustomTransitionPage<void>(
+    key: state.pageKey,
+    opaque: false,
+    child: child,
+    transitionDuration: const Duration(milliseconds: 240),
+    reverseTransitionDuration: const Duration(milliseconds: 180),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      return FadeTransition(
+        opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+        child: child,
+      );
+    },
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -165,27 +255,52 @@ class MyApp extends StatelessWidget {
       }
       final needsAuth =
           _authRequiredPrefixes.any((p) => loc == p || loc.startsWith('$p/'));
-      if (needsAuth && !loggedIn) return '/login';
+      if (needsAuth && !loggedIn) {
+        // Restauration encore en cours : on ne sait pas si c'est un invité.
+        // Pas de /login (l'utilisateur connecté s'y retrouverait bloqué) :
+        // la destination est gardée et rouverte par le résolveur.
+        if (appAuthCubit.restoreStatus.value ==
+            SessionRestoreStatus.restoring) {
+          FcmService.instance.holdDestination(loc);
+          return '/homepage';
+        }
+        return '/login';
+      }
       return null;
     },
     routes: [
       GoRoute(
         path: '/',
-        builder: (context, state) {
-          return BlocProvider(
-            create: (_) =>
-                SplashscreenBlocM(authCubit: appAuthCubit)..add(LoadSplashM()),
-            child: const SplashScreenM(),
+        pageBuilder: (context, state) {
+          return CustomTransitionPage<void>(
+            key: state.pageKey,
+            transitionDuration: Duration.zero,
+            reverseTransitionDuration: Duration.zero,
+            child: BlocProvider(
+              create: (_) => SplashscreenBlocM(authCubit: appAuthCubit)
+                ..add(LoadSplashM()),
+              child: const SplashScreenM(),
+            ),
+            transitionsBuilder:
+                (context, animation, secondaryAnimation, child) {
+              return child;
+            },
           );
         },
       ),
       GoRoute(
         path: '/homepage',
-        builder: (context, state) => const Home(),
+        pageBuilder: (context, state) => _fadeInPage(state, const Home()),
       ),
       GoRoute(
         path: '/onboarding',
-        builder: (context, state) => const OnboardingScreen(),
+        pageBuilder: (context, state) =>
+            _fadeInPage(state, const OnboardingScreen()),
+      ),
+      GoRoute(
+        path: '/login',
+        pageBuilder: (context, state) =>
+            _fadeInPage(state, const LoginPageScreenM()),
       ),
       GoRoute(
         path: '/register',
@@ -195,10 +310,6 @@ class MyApp extends StatelessWidget {
             child: RegisterPageScreenM(),
           );
         },
-      ),
-      GoRoute(
-        path: '/login',
-        builder: (context, state) => const LoginPageScreenM(),
       ),
       GoRoute(
         path: '/serviceProviderWelcome',
@@ -227,9 +338,12 @@ class MyApp extends StatelessWidget {
       GoRoute(
         path: '/providermain',
         name: 'providermain',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final utilisateur = state.extra as Utilisateur?;
-          return ProviderMainScreen(utilisateur: utilisateur);
+          return _fadeInPage(
+            state,
+            ProviderMainScreen(utilisateur: utilisateur),
+          );
         },
       ),
       GoRoute(
@@ -261,45 +375,21 @@ class MyApp extends StatelessWidget {
           return const WalletPageScreenM();
         },
       ),
-      // Deep-link mission → écran d'aiguillage (plus de TODO placeholder)
       GoRoute(
         path: '/mission-details/:missionId',
         name: 'mission-details',
         builder: (context, state) {
           final missionId = state.pathParameters['missionId'] ?? '';
-          return Scaffold(
-            backgroundColor: SDColors.white,
-            appBar: SDWhiteAppBar.appBar(
-              title: 'Mission',
-            ),
-            body: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.assignment,
-                        size: 64, color: SDColors.primary600),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Mission #$missionId',
-                      style: const TextStyle(
-                          fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Ouvrez le tableau prestataire pour gérer cette mission.',
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 24),
-                    FilledButton(
-                      onPressed: () => context.go('/providermain'),
-                      child: const Text('Voir mes missions'),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+          String? prestataireDocId;
+          final extra = state.extra;
+          if (extra is Map) {
+            prestataireDocId = extra['prestataireDocId']?.toString();
+          } else if (extra is String && extra.isNotEmpty) {
+            prestataireDocId = extra;
+          }
+          return ProviderMissionDetailScreen(
+            missionId: missionId,
+            prestataireDocId: prestataireDocId,
           );
         },
       ),
@@ -338,6 +428,14 @@ class MyApp extends StatelessWidget {
         ),
       ],
       child: Builder(builder: (context) {
+        if (!_deferredBootstrapStarted) {
+          _deferredBootstrapStarted = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            StartupTrace.mark('first frame');
+            unawaited(_deferredBootstrap());
+          });
+        }
+        _attachSessionRestoreResolver(mobileRouter);
         // Deep-links FCM → GoRouter
         FcmService.instance.onNavigate = (data) {
           final decision = FcmRoutePolicy.decide(
@@ -363,16 +461,7 @@ class MyApp extends StatelessWidget {
           GoRouter router = mobileRouter;
 
           return AnnotatedRegion<SystemUiOverlayStyle>(
-            value: const SystemUiOverlayStyle(
-              statusBarColor: Colors.transparent,
-              statusBarIconBrightness: Brightness.dark,
-              statusBarBrightness: Brightness.light,
-              systemNavigationBarColor: Colors.white,
-              systemNavigationBarDividerColor: Colors.transparent,
-              systemNavigationBarIconBrightness: Brightness.dark,
-              systemNavigationBarContrastEnforced: false,
-              systemStatusBarContrastEnforced: false,
-            ),
+            value: _lightSystemBars,
             child: MaterialApp.router(
               routerConfig: router,
               title: 'Soutrali Deals',
@@ -427,15 +516,7 @@ class MyApp extends StatelessWidget {
                   centerTitle: false,
                   surfaceTintColor: Colors.transparent,
                   foregroundColor: SDColors.neutral900,
-                  systemOverlayStyle: const SystemUiOverlayStyle(
-                    statusBarColor: Colors.transparent,
-                    statusBarIconBrightness: Brightness.dark,
-                    statusBarBrightness: Brightness.light,
-                    systemNavigationBarColor: Colors.white,
-                    systemNavigationBarIconBrightness: Brightness.dark,
-                    systemNavigationBarContrastEnforced: false,
-                    systemStatusBarContrastEnforced: false,
-                  ),
+                  systemOverlayStyle: _lightSystemBars,
                   titleTextStyle: SDTypography.displayMedium.copyWith(
                     color: SDColors.neutral900,
                     fontWeight: FontWeight.w700,

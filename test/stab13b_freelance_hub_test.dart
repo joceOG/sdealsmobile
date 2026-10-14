@@ -12,19 +12,26 @@ class _HubApi extends ApiClient {
   _HubApi({
     this.categories = const [],
     this.freelances = const [],
+    this.services = const [],
   });
 
   final List<Categorie> categories;
   final List<Map<String, dynamic>> freelances;
+  final List<Service> services;
   int servicesCalls = 0;
 
   @override
-  Future<List<Categorie>> fetchCategorie(String nomGroupe) async => categories;
+  Future<List<Categorie>> fetchCategorie(
+    String nomGroupe, {
+    bool skipCache = false,
+    bool settleLateResponse = false,
+  }) async =>
+      categories;
 
   @override
   Future<List<Service>> fetchServices(String nomGroupe) async {
     servicesCalls++;
-    return [];
+    return services;
   }
 
   @override
@@ -33,6 +40,7 @@ class _HubApi extends ApiClient {
     int limit = 50,
     String sortBy = 'rating',
     String sortOrder = 'desc',
+    String? category,
   }) async =>
       {
         'freelances': freelances,
@@ -45,6 +53,13 @@ Categorie _cat(String id, String name, {String image = ''}) => Categorie(
       nomcategorie: name,
       imagecategorie: image,
       groupe: Groupe(idgroupe: 'g1', nomgroupe: 'Freelance'),
+    );
+
+Service _svc(String id, String name, {String image = ''}) => Service(
+      idservice: id,
+      nomservice: name,
+      imageservice: image,
+      prixmoyen: '0',
     );
 
 Map<String, dynamic> _freelance({
@@ -116,38 +131,44 @@ void main() {
       expect(find.text('Services populaires'), findsNothing);
       expect(find.text('Offres rapides'), findsNothing);
       expect(find.text('Freelance'), findsOneWidget);
-      expect(find.text('Quelle compétence recherchez-vous ?'), findsOneWidget);
-      expect(find.text('Freelances recommandés'), findsOneWidget);
-      expect(api.servicesCalls, 0);
+      expect(find.text('Des talents pour vos projets'), findsOneWidget);
+      expect(find.text('Quel service recherchez-vous ?'), findsOneWidget);
+      expect(find.text('Freelances à découvrir'), findsOneWidget);
+      expect(api.servicesCalls, 1);
     });
 
-    testWidgets('catégories réelles avec imagecategorie backend', (tester) async {
+    testWidgets('services illustrés (imageservice) affichés en priorité',
+        (tester) async {
       final api = _HubApi(
-        categories: [
-          _cat('c1', 'Design',
-              image: 'https://res.cloudinary.com/demo/image/upload/design.jpg'),
-          _cat('c2', 'Développement'),
+        categories: [_cat('c1', 'Design')],
+        services: [
+          _svc('s1', 'Monteur Video YouTube',
+              image:
+                  'https://res.cloudinary.com/demo/image/upload/video.jpg'),
+          _svc('s2', 'Sans photo'),
         ],
         freelances: [_freelance()],
       );
       await _pumpHub(tester, api: api);
 
-      expect(find.text('Design'), findsWidgets);
-      expect(find.text('Développement'), findsOneWidget);
-      // Image dashboard/backend affichée quand URL valide
+      expect(find.text('Trouvez votre service'), findsOneWidget);
+      expect(find.text('Monteur Vidéo'), findsOneWidget);
+      expect(find.text('Sans photo'), findsNothing);
       expect(find.byType(AppImage), findsWidgets);
     });
 
-    testWidgets('catégorie sans image → icône fallback DS', (tester) async {
+    testWidgets('sans imageservice → fallback icône, services quand même listés',
+        (tester) async {
       final api = _HubApi(
-        categories: [_cat('c1', 'Design', image: '')],
+        categories: [_cat('c1', 'Design')],
+        services: [_svc('s1', 'Design', image: '')],
         freelances: [_freelance()],
       );
       await _pumpHub(tester, api: api);
 
       expect(find.text('Design'), findsWidgets);
       expect(find.byType(AppImage), findsNothing);
-      expect(find.byIcon(Icons.palette_outlined), findsOneWidget);
+      expect(find.byIcon(Icons.work_outline_rounded), findsWidgets);
     });
 
     testWidgets('freelance réel affiché', (tester) async {
@@ -209,7 +230,7 @@ void main() {
 
       expect(find.text('Aucun freelance disponible'), findsOneWidget);
       expect(
-        find.text('De nouveaux talents apparaîtront bientôt.'),
+        find.text('Les profils apparaîtront dès leur publication.'),
         findsOneWidget,
       );
       expect(tester.takeException(), isNull);
@@ -225,16 +246,17 @@ void main() {
       );
       await _pumpHub(tester, api: api);
 
-      expect(find.text('Compétences populaires'), findsOneWidget);
+      expect(find.text('Explorer par compétence'), findsOneWidget);
       expect(find.text('Figma'), findsWidgets);
     });
 
-    testWidgets('imagecategorie Cloudinary → AppImage (source dashboard/backend)',
+    testWidgets('imageservice Cloudinary → AppImage (source dashboard/backend)',
         (tester) async {
       const url =
           'https://res.cloudinary.com/demo/image/upload/cat-design.jpg';
       final api = _HubApi(
-        categories: [_cat('c1', 'Design', image: url)],
+        categories: [_cat('c1', 'Design')],
+        services: [_svc('s1', 'Design', image: url)],
         freelances: [_freelance(imagePath: '')],
       );
       await _pumpHub(tester, api: api);

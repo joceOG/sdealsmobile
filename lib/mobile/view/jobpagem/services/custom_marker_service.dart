@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
@@ -711,41 +712,81 @@ class CustomMarkerService {
 
   // ─── Cache mémoire markers (photo+prix / clusters) ───
   static final Map<String, BitmapDescriptor> _bitmapCache = {};
+  static final Map<String, ui.Image> _photoCache = {};
 
-  /// Marker Figma : avatar rond + pilule prix (avec cache mémoire).
+  /// Avatar + pilule prix.
+  ///
+  /// Les cotes ci-dessous sont logiques. Le PNG est rasterisé à
+  /// [devicePixelRatio], puis [BitmapDescriptor.bytes] indique ce ratio
+  /// pour que la carte n’affiche pas les pixels bruts.
   static Future<BitmapDescriptor> createAvatarPriceMarker({
     required String priceLabel,
     required String initials,
     String? photoUrl,
     bool isVerified = false,
+    bool selected = false,
+    double devicePixelRatio = 1,
   }) async {
+    final dpr = devicePixelRatio.isFinite && devicePixelRatio > 0
+        ? devicePixelRatio.clamp(1.0, 4.0)
+        : 1.0;
+    final label = (priceLabel.trim().isEmpty || priceLabel.trim() == '—')
+        ? 'Devis'
+        : priceLabel.trim();
+    final ratioKey = dpr.toStringAsFixed(2);
     final cacheKey =
-        'av|$photoUrl|$priceLabel|$initials|${isVerified ? 1 : 0}';
+        'av3|$photoUrl|$label|$initials|${isVerified ? 1 : 0}|${selected ? 1 : 0}|$ratioKey';
     final cached = _bitmapCache[cacheKey];
     if (cached != null) return cached;
 
-    const double avatarSize = 88.0;
-    const double bubbleH = 34.0;
-    const double gap = 6.0;
-    const double width = 120.0;
-    const double height = avatarSize + gap + bubbleH + 4;
+    const avatarLogical = 40.0;
+    const pillLogical = 28.0;
+    const gapLogical = 4.0;
+    const fontLogical = 14.0;
+    final grow = selected ? 1.08 : 1.0;
+    final s = dpr * grow;
+
+    final priceTp = TextPainter(
+      textDirection: TextDirection.ltr,
+      maxLines: 1,
+    );
+    priceTp.text = TextSpan(
+      text: label,
+      style: TextStyle(
+        color: Colors.white,
+        fontSize: fontLogical * s,
+        fontWeight: FontWeight.w800,
+        height: 1,
+      ),
+    );
+    priceTp.layout();
+
+    final padX = 12 * s;
+    final pillW = priceTp.width + padX * 2;
+    final avatarPx = avatarLogical * s;
+    final gapPx = gapLogical * s;
+    final pillH = math.max(pillLogical * s, priceTp.height + 8 * s);
+    final topPad = 4 * s;
+    final width = math.max(avatarPx + 8 * s, pillW + 4 * s);
+    final height = topPad + avatarPx + gapPx + pillH + 2 * s;
     final avatarCx = width / 2;
-    final avatarCy = avatarSize / 2;
-    final avatarR = avatarSize / 2 - 3;
+    final avatarCy = avatarPx / 2;
+    final avatarR = avatarPx / 2 - 2 * s;
 
     final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder);
+    final canvas = Canvas(recorder)..translate(0, topPad);
 
-    // Ombre légère sous l'avatar
     final shadow = Paint()
       ..color = Colors.black.withValues(alpha: 0.18)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
-    canvas.drawCircle(Offset(avatarCx, avatarCy + 2), avatarR, shadow);
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, 3 * s);
+    canvas.drawCircle(Offset(avatarCx, avatarCy + s), avatarR, shadow);
 
-    // Photo ou placeholder
     ui.Image? photo;
     if (photoUrl != null && photoUrl.startsWith('http')) {
-      photo = await _loadNetworkImage(photoUrl, size: avatarSize.toInt());
+      photo = await _cachedNetworkImage(
+        photoUrl,
+        size: (avatarLogical * 1.08 * dpr).ceil(),
+      );
     }
 
     canvas.save();
@@ -761,8 +802,8 @@ class CustomMarkerService {
         canvas: canvas,
         rect: Rect.fromCenter(
           center: Offset(avatarCx, avatarCy),
-          width: avatarSize,
-          height: avatarSize,
+          width: avatarPx,
+          height: avatarPx,
         ),
         image: photo,
         fit: BoxFit.cover,
@@ -776,9 +817,9 @@ class CustomMarkerService {
       final tp = TextPainter(textDirection: TextDirection.ltr);
       tp.text = TextSpan(
         text: initials.isEmpty ? '?' : initials.toUpperCase(),
-        style: const TextStyle(
-          color: Color(0xFF262626),
-          fontSize: 28,
+        style: TextStyle(
+          color: const Color(0xFF262626),
+          fontSize: avatarPx * 0.32,
           fontWeight: FontWeight.w800,
         ),
       );
@@ -790,27 +831,36 @@ class CustomMarkerService {
     }
     canvas.restore();
 
-    // Bordure verte
+    if (selected) {
+      canvas.drawCircle(
+        Offset(avatarCx, avatarCy),
+        avatarR + 1.5 * s,
+        Paint()
+          ..color = Colors.white
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2 * s,
+      );
+    }
     canvas.drawCircle(
       Offset(avatarCx, avatarCy),
       avatarR,
       Paint()
-        ..color = const Color(0xFF1CBF3F)
+        ..color = selected ? const Color(0xFF0E5A16) : const Color(0xFF1CBF3F)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 4,
+        ..strokeWidth = (selected ? 3.5 : 2.2) * s,
     );
 
-    // Badge vérifié
     if (isVerified) {
-      final badgeC = Offset(avatarCx + avatarR * 0.65, avatarCy + avatarR * 0.65);
-      canvas.drawCircle(badgeC, 11, Paint()..color = Colors.white);
-      canvas.drawCircle(badgeC, 9, Paint()..color = const Color(0xFF1CBF3F));
+      final badgeC = Offset(avatarCx + avatarR * 0.62, avatarCy + avatarR * 0.62);
+      final badgeR = 7 * s;
+      canvas.drawCircle(badgeC, badgeR + s, Paint()..color = Colors.white);
+      canvas.drawCircle(badgeC, badgeR, Paint()..color = const Color(0xFF1CBF3F));
       final check = TextPainter(textDirection: TextDirection.ltr);
       check.text = TextSpan(
         text: String.fromCharCode(Icons.check.codePoint),
-        style: const TextStyle(
+        style: TextStyle(
           fontFamily: 'MaterialIcons',
-          fontSize: 12,
+          fontSize: 9 * s,
           color: Colors.white,
         ),
       );
@@ -821,47 +871,42 @@ class CustomMarkerService {
       );
     }
 
-    // Pilule prix
-    final label = (priceLabel.trim().isEmpty || priceLabel == '—')
-        ? 'Devis'
-        : priceLabel;
-    final priceTp = TextPainter(textDirection: TextDirection.ltr);
-    priceTp.text = TextSpan(
-      text: label,
-      style: const TextStyle(
-        color: Colors.white,
-        fontSize: 13,
-        fontWeight: FontWeight.w800,
-      ),
-    );
-    priceTp.layout();
-    final bubbleW = (priceTp.width + 22).clamp(56.0, width);
-    final bubbleTop = avatarSize + gap;
-    final bubbleLeft = (width - bubbleW) / 2;
+    final bubbleTop = avatarPx + gapPx;
+    final bubbleLeft = (width - pillW) / 2;
     final bubbleRect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(bubbleLeft, bubbleTop, bubbleW, bubbleH),
-      const Radius.circular(18),
+      Rect.fromLTWH(bubbleLeft, bubbleTop, pillW, pillH),
+      Radius.circular(pillH / 2),
     );
-    canvas.drawRRect(bubbleRect, Paint()..color = const Color(0xFF158622));
+    canvas.drawRRect(
+      bubbleRect,
+      Paint()
+        ..color = selected ? const Color(0xFF0B4A12) : const Color(0xFF158622),
+    );
     priceTp.paint(
       canvas,
       Offset(
-        bubbleLeft + (bubbleW - priceTp.width) / 2,
-        bubbleTop + (bubbleH - priceTp.height) / 2,
+        bubbleLeft + (pillW - priceTp.width) / 2,
+        bubbleTop + (pillH - priceTp.height) / 2,
       ),
     );
 
     final image = await recorder.endRecording().toImage(
-          width.toInt(),
-          height.toInt(),
+          width.ceil(),
+          height.ceil(),
         );
     final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
-    final descriptor =
-        BitmapDescriptor.fromBytes(bytes!.buffer.asUint8List());
-    _bitmapCache[cacheKey] = descriptor;
-    // Limite cache mémoire
-    if (_bitmapCache.length > 120) {
-      _bitmapCache.remove(_bitmapCache.keys.first);
+    final descriptor = BitmapDescriptor.bytes(
+      bytes!.buffer.asUint8List(),
+      imagePixelRatio: dpr,
+    );
+    final photoLoaded = photoUrl == null ||
+        !photoUrl.startsWith('http') ||
+        photo != null;
+    if (photoLoaded) {
+      _bitmapCache[cacheKey] = descriptor;
+      if (_bitmapCache.length > 160) {
+        _bitmapCache.remove(_bitmapCache.keys.first);
+      }
     }
     return descriptor;
   }
@@ -911,6 +956,20 @@ class CustomMarkerService {
         BitmapDescriptor.fromBytes(bytes!.buffer.asUint8List());
     _bitmapCache[cacheKey] = descriptor;
     return descriptor;
+  }
+
+  static Future<ui.Image?> _cachedNetworkImage(String url, {required int size}) async {
+    final key = '$size|$url';
+    final cached = _photoCache[key];
+    if (cached != null) return cached;
+    final image = await _loadNetworkImage(url, size: size);
+    if (image != null) {
+      _photoCache[key] = image;
+      if (_photoCache.length > 80) {
+        _photoCache.remove(_photoCache.keys.first);
+      }
+    }
+    return image;
   }
 
   static Future<ui.Image?> _loadNetworkImage(String url,

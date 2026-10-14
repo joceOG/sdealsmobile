@@ -1,53 +1,51 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../../design_system/design_system.dart';
 import '../bloc/notifications_bloc.dart';
 import '../bloc/notifications_event.dart';
 import '../bloc/notifications_state.dart';
 import '../../../../data/services/authCubit.dart';
+import '../utils/provider_notification_destination.dart';
 
-// 🎯 ÉCRAN NOTIFICATIONS PRESTATAIRE MAGNIFIQUE
+/// Liste des notifications prestataire (maquette : Toutes / Non lues, cartes groupées).
 class ProviderNotificationsScreen extends StatefulWidget {
-  const ProviderNotificationsScreen({super.key});
+  const ProviderNotificationsScreen({
+    super.key,
+    this.prestataireDocId,
+    this.onOpenMissions,
+    this.onOpenMessages,
+  });
+
+  final String? prestataireDocId;
+
+  /// Ouvre l’onglet Mes missions (ex. détail indisponible).
+  final VoidCallback? onOpenMissions;
+
+  /// Ouvre l’onglet Messages (conversation sans route directe).
+  final VoidCallback? onOpenMessages;
 
   @override
   State<ProviderNotificationsScreen> createState() =>
       _ProviderNotificationsScreenState();
 }
 
-class _ProviderNotificationsScreenState
-    extends State<ProviderNotificationsScreen> with TickerProviderStateMixin {
-  late TabController _tabController;
-  String? _prestataireId;
-  String _searchQuery = '';
-  final TextEditingController _searchController = TextEditingController();
-  String _selectedFilter =
-      'all'; // 'all', 'unread', 'prestation', 'payment', 'system'
+class _ProviderNotificationsScreenState extends State<ProviderNotificationsScreen> {
+  String? _userId;
+  bool _showUnreadOnly = false;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
-
-    // Récupérer l'ID du prestataire depuis AuthCubit
     final authState = context.read<AuthCubit>().state;
     if (authState is AuthAuthenticated) {
-      _prestataireId = authState.utilisateur.idutilisateur;
-      // Définir le token d'authentification
+      _userId = authState.utilisateur.idutilisateur;
       context.read<NotificationsBloc>().setToken(authState.token);
-      // Charger les notifications du prestataire
       context
           .read<NotificationsBloc>()
-          .add(LoadPrestataireNotifications(_prestataireId!));
+          .add(LoadPrestataireNotifications(_userId!));
     }
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    _searchController.dispose();
-    super.dispose();
   }
 
   @override
@@ -55,517 +53,421 @@ class _ProviderNotificationsScreenState
     return Scaffold(
       backgroundColor: SDColors.white,
       appBar: SDWhiteAppBar.appBar(
-        title: 'Notifications Prestataire',
+        titleWidget: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              'Notifications',
+              style: SDTypography.titleLarge.copyWith(
+                color: SDColors.neutral900,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            Text(
+              'Votre activité professionnelle',
+              style: SDTypography.caption.copyWith(color: SDColors.neutral500),
+            ),
+          ],
+        ),
         actions: [
-          _buildUnreadBadge(),
-          const SizedBox(width: 8),
+          BlocBuilder<NotificationsBloc, NotificationsState>(
+            builder: (context, state) {
+              final unread =
+                  state is NotificationsLoaded ? state.totalUnread : 0;
+              if (unread <= 0 || _userId == null) {
+                return const SizedBox(width: 8);
+              }
+              return TextButton(
+                onPressed: _markAllAsRead,
+                child: Text(
+                  'Tout marquer comme lu',
+                  style: SDTypography.labelMedium.copyWith(
+                    color: SDColors.primary600,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              );
+            },
+          ),
         ],
       ),
       body: BlocBuilder<NotificationsBloc, NotificationsState>(
         builder: (context, state) {
           return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildSearchAndFilters(),
-              _buildTabSelector(),
-              Expanded(
-                child: _buildNotificationsContent(state),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+                child: _buildFilterChips(state),
               ),
+              Expanded(child: _buildBody(state)),
             ],
           );
         },
       ),
-      floatingActionButton: _buildFloatingActionButton(),
     );
   }
 
-  // 🔔 BADGE NOTIFICATIONS NON LUES
-  Widget _buildUnreadBadge() {
-    return BlocBuilder<NotificationsBloc, NotificationsState>(
-      builder: (context, state) {
-        int unreadCount = 0;
-        if (state is NotificationsLoaded) {
-          unreadCount = state.totalUnread;
-        }
+  Widget _buildFilterChips(NotificationsState state) {
+    final unread =
+        state is NotificationsLoaded ? state.totalUnread : 0;
 
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: unreadCount > 0 ? SDColors.error500 : SDColors.neutral100,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: SDColors.neutral200),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.notifications_active_outlined,
-                color: unreadCount > 0 ? SDColors.white : SDColors.neutral700,
-                size: 16,
-              ),
-              if (unreadCount > 0) ...[
-                const SizedBox(width: 4),
-                Text(
-                  '$unreadCount',
-                  style: TextStyle(
-                    color: SDColors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  // 🔍 RECHERCHE ET FILTRES
-  Widget _buildSearchAndFilters() {
-    return Container(
-      margin: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          // Barre de recherche
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(25),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
-                  blurRadius: 10,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: TextField(
-              controller: _searchController,
-              onChanged: (value) {
-                setState(() {
-                  _searchQuery = value;
-                });
-                if (value.isNotEmpty && _prestataireId != null) {
-                  context
-                      .read<NotificationsBloc>()
-                      .add(SearchNotifications(_prestataireId!, value));
-                }
-              },
-              decoration: InputDecoration(
-                hintText: 'Rechercher dans les notifications...',
-                prefixIcon: Icon(Icons.search, color: Colors.grey[600]),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        onPressed: () {
-                          _searchController.clear();
-                          setState(() {
-                            _searchQuery = '';
-                          });
-                        },
-                        icon: Icon(Icons.clear, color: Colors.grey[600]),
-                      )
-                    : null,
-                border: InputBorder.none,
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          // Filtres
-          _buildFilterChips(),
-        ],
-      ),
-    );
-  }
-
-  // 🏷️ CHIPS DE FILTRAGE
-  Widget _buildFilterChips() {
-    final filters = [
-      {'key': 'all', 'label': 'Toutes', 'icon': Icons.all_inclusive},
-      {'key': 'unread', 'label': 'Non lues', 'icon': Icons.mark_email_unread},
-      {'key': 'prestation', 'label': 'Prestations', 'icon': Icons.work},
-      {'key': 'payment', 'label': 'Paiements', 'icon': Icons.payment},
-      {'key': 'system', 'label': 'Système', 'icon': Icons.settings},
-    ];
-
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: filters.map((filter) {
-          final isSelected = _selectedFilter == filter['key'];
-          return Container(
-            margin: const EdgeInsets.only(right: 8),
-            child: FilterChip(
-              selected: isSelected,
-              onSelected: (selected) {
-                setState(() {
-                  _selectedFilter = filter['key'] as String;
-                });
-                _applyFilter();
-              },
-              label: Text(filter['label'] as String),
-              avatar: Icon(
-                filter['icon'] as IconData,
-                size: 16,
-                color: isSelected ? Colors.white : Colors.grey[600],
-              ),
-              selectedColor: Colors.green.shade600,
-              checkmarkColor: Colors.white,
-              labelStyle: TextStyle(
-                color: isSelected ? Colors.white : Colors.grey[700],
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  // 📊 SÉLECTEUR D'ONGlets
-  Widget _buildTabSelector() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(25),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: TabBar(
-        controller: _tabController,
-        indicator: BoxDecoration(
-          color: Colors.green.shade600,
-          borderRadius: BorderRadius.circular(25),
-        ),
-        labelColor: Colors.white,
-        unselectedLabelColor: Colors.grey[600],
-        labelStyle: const TextStyle(fontWeight: FontWeight.w600),
-        onTap: (index) {
-          _handleTabChange(index);
-        },
-        tabs: const [
-          Tab(text: 'Toutes', icon: Icon(Icons.notifications)),
-          Tab(text: 'Non lues', icon: Icon(Icons.mark_email_unread)),
-          Tab(text: 'Prestations', icon: Icon(Icons.work)),
-          Tab(text: 'Système', icon: Icon(Icons.settings)),
-        ],
-      ),
-    );
-  }
-
-  // 📊 CONTENU DES NOTIFICATIONS
-  Widget _buildNotificationsContent(NotificationsState state) {
-    if (state is NotificationsLoading) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
-    }
-
-    if (state is NotificationsError) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
-            const SizedBox(height: 16),
-            Text(
-              'Erreur',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              state.message,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey[600]),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () => _applyFilter(),
-              child: const Text('Réessayer'),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return TabBarView(
-      controller: _tabController,
+    return Row(
       children: [
-        _buildAllNotificationsTab(state),
-        _buildUnreadNotificationsTab(state),
-        _buildPrestationNotificationsTab(state),
-        _buildSystemNotificationsTab(state),
+        _filterChip(
+          label: 'Toutes',
+          selected: !_showUnreadOnly,
+          badge: null,
+          onTap: () {
+            if (_showUnreadOnly) {
+              setState(() => _showUnreadOnly = false);
+              _reloadAll();
+            }
+          },
+        ),
+        const SizedBox(width: 10),
+        _filterChip(
+          label: 'Non lues',
+          selected: _showUnreadOnly,
+          badge: unread > 0 ? unread : null,
+          onTap: () {
+            if (!_showUnreadOnly) {
+              setState(() => _showUnreadOnly = true);
+              _reloadUnread();
+            }
+          },
+        ),
       ],
     );
   }
 
-  // 🔔 ONGLET TOUTES LES NOTIFICATIONS
-  Widget _buildAllNotificationsTab(NotificationsState state) {
-    if (state is NotificationsLoaded) {
-      if (state.notifications.isEmpty) {
-        return _buildEmptyState(
-          icon: Icons.notifications_none,
-          title: 'Aucune notification',
-          subtitle: 'Vous n\'avez pas encore de notifications',
-        );
-      }
-
-      return ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: state.notifications.length,
-        itemBuilder: (context, index) {
-          final notification = state.notifications[index];
-          return _buildNotificationCard(notification);
-        },
-      );
-    }
-
-    return const Center(child: Text('Chargement...'));
+  Widget _filterChip({
+    required String label,
+    required bool selected,
+    required int? badge,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: selected ? SDColors.primary700 : SDColors.white,
+      elevation: 0,
+      borderRadius: BorderRadius.circular(24),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(24),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: selected ? SDColors.primary700 : SDColors.primary600,
+              width: 1.5,
+            ),
+            color: selected ? SDColors.primary700 : SDColors.white,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: SDTypography.labelLarge.copyWith(
+                  color: selected ? SDColors.white : SDColors.primary700,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              if (badge != null) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: selected ? SDColors.white : SDColors.primary700,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '$badge',
+                    style: SDTypography.labelSmall.copyWith(
+                      color:
+                          selected ? SDColors.primary700 : SDColors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
-  // 📨 ONGLET NOTIFICATIONS NON LUES
-  Widget _buildUnreadNotificationsTab(NotificationsState state) {
-    if (state is NotificationsLoaded) {
-      final unreadNotifications =
-          state.notifications.where((n) => n['statut'] == 'NON_LUE').toList();
-
-      if (unreadNotifications.isEmpty) {
-        return _buildEmptyState(
-          icon: Icons.mark_email_read,
-          title: 'Aucune notification non lue',
-          subtitle: 'Vous êtes à jour !',
-        );
-      }
-
-      return ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: unreadNotifications.length,
-        itemBuilder: (context, index) {
-          final notification = unreadNotifications[index];
-          return _buildNotificationCard(notification);
-        },
+  Widget _buildBody(NotificationsState state) {
+    if (state is NotificationsLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (state is NotificationsError) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error_outline, size: 48, color: SDColors.error500),
+              const SizedBox(height: 12),
+              Text(state.message, textAlign: TextAlign.center),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: _showUnreadOnly ? _reloadUnread : _reloadAll,
+                child: const Text('Réessayer'),
+              ),
+            ],
+          ),
+        ),
       );
     }
-
-    return const Center(child: Text('Chargement...'));
-  }
-
-  // 💼 ONGLET NOTIFICATIONS PRESTATIONS
-  Widget _buildPrestationNotificationsTab(NotificationsState state) {
-    if (state is NotificationsLoaded) {
-      final prestationNotifications =
-          state.notifications.where((n) => n['type'] == 'PRESTATION').toList();
-
-      if (prestationNotifications.isEmpty) {
-        return _buildEmptyState(
-          icon: Icons.work_outline,
-          title: 'Aucune notification de prestation',
-          subtitle:
-              'Vous n\'avez pas encore de notifications liées aux prestations',
-        );
-      }
-
-      return ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: prestationNotifications.length,
-        itemBuilder: (context, index) {
-          final notification = prestationNotifications[index];
-          return _buildNotificationCard(notification);
-        },
-      );
+    if (state is! NotificationsLoaded) {
+      return const SizedBox.shrink();
     }
 
-    return const Center(child: Text('Chargement...'));
-  }
-
-  // ⚙️ ONGLET NOTIFICATIONS SYSTÈME
-  Widget _buildSystemNotificationsTab(NotificationsState state) {
-    if (state is NotificationsLoaded) {
-      final systemNotifications =
-          state.notifications.where((n) => n['type'] == 'SYSTEME').toList();
-
-      if (systemNotifications.isEmpty) {
-        return _buildEmptyState(
-          icon: Icons.settings_outlined,
-          title: 'Aucune notification système',
-          subtitle: 'Vous n\'avez pas encore de notifications système',
-        );
-      }
-
-      return ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: systemNotifications.length,
-        itemBuilder: (context, index) {
-          final notification = systemNotifications[index];
-          return _buildNotificationCard(notification);
-        },
-      );
+    var items = state.notifications.cast<Map<String, dynamic>>();
+    if (_showUnreadOnly) {
+      items = items.where((n) => n['statut'] == 'NON_LUE').toList();
     }
 
-    return const Center(child: Text('Chargement...'));
+    if (items.isEmpty) {
+      return _buildEmptyState();
+    }
+
+    final today = <Map<String, dynamic>>[];
+    final older = <Map<String, dynamic>>[];
+    final now = DateTime.now();
+    for (final n in items) {
+      final date = _parseDate(n['createdAt']);
+      if (date != null &&
+          date.year == now.year &&
+          date.month == now.month &&
+          date.day == now.day) {
+        today.add(n);
+      } else {
+        older.add(n);
+      }
+    }
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+      children: [
+        if (today.isNotEmpty) ...[
+          _sectionTitle('Aujourd’hui'),
+          ...today.map(_buildNotificationCard),
+        ],
+        if (older.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          _sectionTitle('Plus anciennes'),
+          ...older.map(_buildNotificationCard),
+        ],
+      ],
+    );
   }
 
-  // 🔔 CARTE DE NOTIFICATION
+  Widget _sectionTitle(String label) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, bottom: 12),
+      child: Text(
+        label,
+        style: SDTypography.titleSmall.copyWith(
+          color: SDColors.neutral700,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+
   Widget _buildNotificationCard(Map<String, dynamic> notification) {
-    final type = notification['type'] ?? 'SYSTEME';
-    final statut = notification['statut'] ?? 'NON_LUE';
-    final priorite = notification['priorite'] ?? 'NORMALE';
-    final titre = notification['titre'] ?? '';
-    final message = notification['message'] ?? '';
-    final createdAt = notification['createdAt'];
-    final isUnread = statut == 'NON_LUE';
+    final isUnread = notification['statut'] == 'NON_LUE';
+    final titre = '${notification['titre'] ?? 'Notification'}';
+    final message = '${notification['message'] ?? ''}';
+    final destination = resolveProviderNotificationDestination(notification);
+    final type = '${notification['type'] ?? 'SYSTEME'}';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: isUnread
-            ? Border.all(color: Colors.green.withOpacity(0.3), width: 2)
-            : null,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        color: isUnread ? SDColors.primary50 : SDColors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: SDColors.neutral200),
       ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.all(16),
-        leading: Stack(
-          children: [
-            Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                color: _getNotificationColor(type).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(25),
-                border: Border.all(
-                  color: _getNotificationColor(type).withOpacity(0.3),
-                  width: 2,
-                ),
-              ),
-              child: Icon(
-                _getNotificationIcon(type),
-                color: _getNotificationColor(type),
-                size: 24,
-              ),
-            ),
-            if (isUnread)
-              Positioned(
-                right: 0,
-                top: 0,
-                child: Container(
-                  width: 12,
-                  height: 12,
-                  decoration: BoxDecoration(
-                    color: Colors.red,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                ),
-              ),
-          ],
-        ),
-        title: Row(
-          children: [
-            Expanded(
-              child: Text(
-                titre,
-                style: TextStyle(
-                  fontWeight: isUnread ? FontWeight.bold : FontWeight.w600,
-                  fontSize: 16,
-                  color: isUnread ? Colors.grey[800] : Colors.grey[700],
-                ),
-              ),
-            ),
-            _buildPriorityBadge(priorite),
-          ],
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 8),
-            Text(
-              message,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: Colors.grey[600],
-                fontSize: 14,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
-                  _getNotificationIcon(type),
-                  size: 12,
-                  color: Colors.grey[500],
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  _getNotificationTypeLabel(type),
-                  style: TextStyle(
-                    color: Colors.grey[500],
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  _formatNotificationTime(createdAt),
-                  style: TextStyle(
-                    color: Colors.grey[500],
-                    fontSize: 12,
+                _iconWell(type),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              titre,
+                              style: SDTypography.bodyLarge.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: isUnread
+                                    ? SDColors.neutral900
+                                    : SDColors.neutral800,
+                              ),
+                            ),
+                          ),
+                          if (isUnread)
+                            Container(
+                              width: 8,
+                              height: 8,
+                              margin: const EdgeInsets.only(left: 8),
+                              decoration: const BoxDecoration(
+                                color: SDColors.primary600,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                        ],
+                      ),
+                      if (message.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          message,
+                          style: SDTypography.bodyMedium.copyWith(
+                            color: SDColors.neutral600,
+                            height: 1.35,
+                          ),
+                        ),
+                      ],
+                      if (destination.detailUnavailable) ...[
+                        const SizedBox(height: 10),
+                        _unavailableBadge(),
+                      ],
+                      const SizedBox(height: 8),
+                      Text(
+                        _formatNotificationTime(notification['createdAt']),
+                        style: SDTypography.caption
+                            .copyWith(color: SDColors.neutral500),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
-          ],
-        ),
-        onTap: () {
-          _handleNotificationTap(notification);
-        },
-        trailing: PopupMenuButton<String>(
-          onSelected: (value) => _handleNotificationAction(value, notification),
-          itemBuilder: (context) => [
-            if (isUnread)
-              const PopupMenuItem(
-                value: 'mark_read',
+          ),
+          if (destination.hasFooterAction)
+            InkWell(
+              onTap: () => _onNotificationAction(notification, destination),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  border: Border(
+                    top: BorderSide(color: SDColors.neutral200),
+                  ),
+                ),
                 child: Row(
                   children: [
-                    Icon(Icons.mark_email_read, size: 16),
-                    SizedBox(width: 8),
-                    Text('Marquer comme lu'),
+                    Expanded(
+                      child: Text(
+                        destination.actionLabel!,
+                        style: SDTypography.labelLarge.copyWith(
+                          color: SDColors.primary700,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    Icon(
+                      Icons.chevron_right,
+                      color: SDColors.primary700,
+                      size: 22,
+                    ),
                   ],
                 ),
               ),
-            const PopupMenuItem(
-              value: 'archive',
-              child: Row(
-                children: [
-                  Icon(Icons.archive, size: 16),
-                  SizedBox(width: 8),
-                  Text('Archiver'),
-                ],
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _iconWell(String type) {
+    return Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        color: SDColors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: SDColors.neutral200),
+      ),
+      child: Icon(
+        _iconForType(type),
+        color: SDColors.primary700,
+        size: 22,
+      ),
+    );
+  }
+
+  Widget _unavailableBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: SDColors.neutral100,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: SDColors.neutral300),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.info_outline, size: 14, color: SDColors.neutral600),
+          const SizedBox(width: 6),
+          Text(
+            'Détail indisponible',
+            style: SDTypography.labelSmall.copyWith(
+              color: SDColors.neutral700,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              _showUnreadOnly
+                  ? Icons.mark_email_read_outlined
+                  : Icons.notifications_none_outlined,
+              size: 56,
+              color: SDColors.neutral400,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _showUnreadOnly
+                  ? 'Aucune notification non lue'
+                  : 'Aucune notification',
+              style: SDTypography.titleMedium.copyWith(
+                fontWeight: FontWeight.w700,
               ),
             ),
-            const PopupMenuItem(
-              value: 'delete',
-              child: Row(
-                children: [
-                  Icon(Icons.delete, size: 16, color: Colors.red),
-                  SizedBox(width: 8),
-                  Text('Supprimer', style: TextStyle(color: Colors.red)),
-                ],
+            const SizedBox(height: 8),
+            Text(
+              'Votre activité apparaîtra ici.',
+              textAlign: TextAlign.center,
+              style: SDTypography.bodyMedium.copyWith(
+                color: SDColors.neutral500,
               ),
             ),
           ],
@@ -574,333 +476,116 @@ class _ProviderNotificationsScreenState
     );
   }
 
-  // 🏷️ BADGE DE PRIORITÉ
-  Widget _buildPriorityBadge(String priority) {
-    Color color;
-    switch (priority) {
-      case 'CRITIQUE':
-        color = Colors.red;
-        break;
-      case 'HAUTE':
-        color = Colors.orange;
-        break;
-      case 'NORMALE':
-        color = Colors.blue;
-        break;
-      case 'BASSE':
-        color = Colors.grey;
-        break;
-      default:
-        color = Colors.blue;
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3)),
-      ),
-      child: Text(
-        priority,
-        style: TextStyle(
-          color: color,
-          fontSize: 10,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
+  void _reloadAll() {
+    if (_userId == null) return;
+    context
+        .read<NotificationsBloc>()
+        .add(LoadPrestataireNotifications(_userId!));
   }
 
-  // 📭 ÉTAT VIDE
-  Widget _buildEmptyState({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-  }) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            icon,
-            size: 64,
-            color: Colors.grey[400],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey[700],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            subtitle,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.grey[600],
-              fontSize: 14,
-            ),
-          ),
-        ],
-      ),
-    );
+  void _reloadUnread() {
+    if (_userId == null) return;
+    context.read<NotificationsBloc>().add(LoadUnreadNotifications(_userId!));
   }
 
-  // ➕ BOUTON D'ACTION FLOTTANT
-  Widget _buildFloatingActionButton() {
-    return FloatingActionButton.extended(
-      heroTag: 'provider_notifications_fab',
-      onPressed: () {
-        _markAllAsRead();
-      },
-      backgroundColor: Colors.green.shade600,
-      icon: const Icon(Icons.mark_email_read, color: Colors.white),
-      label: const Text(
-        'Tout marquer comme lu',
-        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-      ),
-    );
-  }
-
-  // 🔧 MÉTHODES UTILITAIRES
-
-  // 🎨 COULEUR PAR TYPE DE NOTIFICATION
-  Color _getNotificationColor(String type) {
-    switch (type) {
-      case 'PRESTATION':
-        return Colors.blue;
-      case 'PAIEMENT':
-        return Colors.green;
-      case 'COMMANDE':
-        return Colors.orange;
-      case 'VERIFICATION':
-        return Colors.purple;
-      case 'MESSAGE':
-        return Colors.teal;
-      case 'SYSTEME':
-        return Colors.grey;
-      case 'PROMOTION':
-        return Colors.pink;
-      case 'RAPPEL':
-        return Colors.amber;
-      default:
-        return Colors.grey;
+  void _markAsReadIfNeeded(Map<String, dynamic> notification) {
+    final notificationId = notification['_id']?.toString();
+    if (notificationId == null || _userId == null) return;
+    if (notification['statut'] == 'NON_LUE') {
+      context.read<NotificationsBloc>().add(
+            MarkNotificationAsRead(notificationId, _userId!),
+          );
     }
   }
 
-  // 🎯 ICÔNE PAR TYPE DE NOTIFICATION
-  IconData _getNotificationIcon(String type) {
-    switch (type) {
-      case 'PRESTATION':
-        return Icons.work;
-      case 'PAIEMENT':
-        return Icons.payment;
-      case 'COMMANDE':
-        return Icons.shopping_cart;
-      case 'VERIFICATION':
-        return Icons.verified;
-      case 'MESSAGE':
-        return Icons.message;
-      case 'SYSTEME':
-        return Icons.settings;
-      case 'PROMOTION':
-        return Icons.local_offer;
-      case 'RAPPEL':
-        return Icons.schedule;
-      default:
-        return Icons.notifications;
+  void _onNotificationAction(
+    Map<String, dynamic> notification,
+    ProviderNotificationDestination destination,
+  ) {
+    _markAsReadIfNeeded(notification);
+
+    if (destination.detailUnavailable &&
+        destination.kind == ProviderNotificationNavKind.none) {
+      return;
     }
-  }
 
-  // 🏷️ LABEL PAR TYPE DE NOTIFICATION
-  String _getNotificationTypeLabel(String type) {
-    switch (type) {
-      case 'PRESTATION':
-        return 'Prestation';
-      case 'PAIEMENT':
-        return 'Paiement';
-      case 'COMMANDE':
-        return 'Commande';
-      case 'VERIFICATION':
-        return 'Vérification';
-      case 'MESSAGE':
-        return 'Message';
-      case 'SYSTEME':
-        return 'Système';
-      case 'PROMOTION':
-        return 'Promotion';
-      case 'RAPPEL':
-        return 'Rappel';
-      default:
-        return 'Notification';
-    }
-  }
-
-  // 📅 FORMATER L'HEURE DE LA NOTIFICATION
-  String _formatNotificationTime(dynamic createdAt) {
-    if (createdAt == null) return '';
-
-    try {
-      final date = DateTime.parse(createdAt.toString());
-      final now = DateTime.now();
-      final difference = now.difference(date);
-
-      if (difference.inDays > 0) {
-        return DateFormat('dd/MM/yyyy').format(date);
-      } else if (difference.inHours > 0) {
-        return '${difference.inHours}h';
-      } else if (difference.inMinutes > 0) {
-        return '${difference.inMinutes}min';
-      } else {
-        return 'Maintenant';
-      }
-    } catch (e) {
-      return '';
-    }
-  }
-
-  // 🔄 APPLIQUER LE FILTRE
-  void _applyFilter() {
-    if (_prestataireId == null) return;
-
-    switch (_selectedFilter) {
-      case 'all':
-        context
-            .read<NotificationsBloc>()
-            .add(LoadPrestataireNotifications(_prestataireId!));
+    switch (destination.kind) {
+      case ProviderNotificationNavKind.mission:
+        final id = destination.missionId;
+        if (id == null) return;
+        context.push(
+          '/mission-details/$id',
+          extra: widget.prestataireDocId == null
+              ? null
+              : {'prestataireDocId': widget.prestataireDocId},
+        );
         break;
-      case 'unread':
-        context
-            .read<NotificationsBloc>()
-            .add(LoadUnreadNotifications(_prestataireId!));
+      case ProviderNotificationNavKind.conversation:
+        final convId = destination.conversationId;
+        if (convId != null && convId.isNotEmpty) {
+          context.push('/chat/$convId');
+        } else {
+          widget.onOpenMessages?.call();
+          if (context.mounted) Navigator.pop(context);
+        }
         break;
-      case 'prestation':
-        context
-            .read<NotificationsBloc>()
-            .add(LoadNotificationsByType(_prestataireId!, 'PRESTATION'));
+      case ProviderNotificationNavKind.missionsList:
+        Navigator.pop(context);
+        widget.onOpenMissions?.call();
         break;
-      case 'payment':
-        context
-            .read<NotificationsBloc>()
-            .add(LoadNotificationsByType(_prestataireId!, 'PAIEMENT'));
-        break;
-      case 'system':
-        context
-            .read<NotificationsBloc>()
-            .add(LoadNotificationsByType(_prestataireId!, 'SYSTEME'));
+      case ProviderNotificationNavKind.none:
         break;
     }
   }
 
-  // 📊 GÉRER LE CHANGEMENT D'ONGlet
-  void _handleTabChange(int index) {
-    if (_prestataireId == null) return;
-
-    switch (index) {
-      case 0: // Toutes
-        context
-            .read<NotificationsBloc>()
-            .add(LoadPrestataireNotifications(_prestataireId!));
-        break;
-      case 1: // Non lues
-        context
-            .read<NotificationsBloc>()
-            .add(LoadUnreadNotifications(_prestataireId!));
-        break;
-      case 2: // Prestations
-        context
-            .read<NotificationsBloc>()
-            .add(LoadNotificationsByType(_prestataireId!, 'PRESTATION'));
-        break;
-      case 3: // Système
-        context
-            .read<NotificationsBloc>()
-            .add(LoadNotificationsByType(_prestataireId!, 'SYSTEME'));
-        break;
-    }
-  }
-
-  // 🔔 GÉRER LE TAP SUR NOTIFICATION
-  void _handleNotificationTap(Map<String, dynamic> notification) {
-    final notificationId = notification['_id'];
-    if (notificationId != null && _prestataireId != null) {
-      // Marquer comme lue si ce n'est pas déjà fait
-      if (notification['statut'] == 'NON_LUE') {
-        context
-            .read<NotificationsBloc>()
-            .add(MarkNotificationAsRead(notificationId, _prestataireId!));
-      }
-    }
-  }
-
-  // ⚙️ GÉRER L'ACTION SUR NOTIFICATION
-  void _handleNotificationAction(
-      String action, Map<String, dynamic> notification) {
-    final notificationId = notification['_id'];
-    if (notificationId == null || _prestataireId == null) return;
-
-    switch (action) {
-      case 'mark_read':
-        context
-            .read<NotificationsBloc>()
-            .add(MarkNotificationAsRead(notificationId, _prestataireId!));
-        break;
-      case 'archive':
-        context
-            .read<NotificationsBloc>()
-            .add(ArchiveNotification(notificationId, _prestataireId!));
-        break;
-      case 'delete':
-        _showDeleteConfirmation(notificationId);
-        break;
-    }
-  }
-
-  // 🗑️ CONFIRMATION DE SUPPRESSION
-  void _showDeleteConfirmation(String notificationId) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Supprimer la notification'),
-        content: const Text(
-            'Êtes-vous sûr de vouloir supprimer cette notification ?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Annuler'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              if (_prestataireId != null) {
-                context
-                    .read<NotificationsBloc>()
-                    .add(DeleteNotification(notificationId, _prestataireId!));
-              }
-            },
-            child: const Text('Supprimer', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ✅ MARQUER TOUTES COMME LUES
   void _markAllAsRead() {
-    if (_prestataireId != null) {
-      context
-          .read<NotificationsBloc>()
-          .add(MarkAllNotificationsAsRead(_prestataireId!));
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Toutes les notifications ont été marquées comme lues'),
-          backgroundColor: Colors.green,
-        ),
-      );
+    if (_userId == null) return;
+    context
+        .read<NotificationsBloc>()
+        .add(MarkAllNotificationsAsRead(_userId!));
+  }
+
+  DateTime? _parseDate(dynamic raw) {
+    if (raw == null) return null;
+    try {
+      return DateTime.parse(raw.toString());
+    } catch (_) {
+      return null;
     }
+  }
+
+  String _formatNotificationTime(dynamic createdAt) {
+    final date = _parseDate(createdAt);
+    if (date == null) return '';
+
+    final now = DateTime.now();
+    final local = date.toLocal();
+    final sameDay = local.year == now.year &&
+        local.month == now.month &&
+        local.day == now.day;
+
+    if (sameDay) {
+      final diff = now.difference(local);
+      if (diff.inMinutes < 1) return 'À l’instant';
+      if (diff.inHours < 1) {
+        return 'Il y a ${diff.inMinutes} min';
+      }
+      return DateFormat('HH:mm').format(local);
+    }
+
+    return DateFormat('d MMMM', 'fr_FR').format(local);
+  }
+
+  IconData _iconForType(String type) {
+    final t = type.toUpperCase();
+    if (t.contains('MESSAGE')) return Icons.chat_bubble_outline;
+    if (t.contains('PAIEMENT')) return Icons.payments_outlined;
+    if (t.contains('PRESTATION') || t.contains('MISSION')) {
+      return Icons.work_outline;
+    }
+    if (t.contains('RAPPEL') || t.contains('PLAN')) {
+      return Icons.event_outlined;
+    }
+    return Icons.notifications_none_outlined;
   }
 }

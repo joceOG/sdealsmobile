@@ -6,11 +6,13 @@ class HomePageStateM extends Equatable {
   final bool isLoading;
   final List<Categorie>? listItems;
   final String? error;
+  final bool showingSaved;
 
   const HomePageStateM({
     this.isLoading = true,
     this.listItems,
     this.error = '',
+    this.showingSaved = false,
   });
 
   factory HomePageStateM.initial() {
@@ -25,14 +27,16 @@ class HomePageStateM extends Equatable {
     bool? isLoading,
     List<Categorie>? listItems,
     String? error,
+    bool? showingSaved,
   }) {
     return HomePageStateM(
       isLoading: isLoading ?? this.isLoading,
       listItems: listItems ?? this.listItems,
       error: error ?? this.error,
+      showingSaved: showingSaved ?? this.showingSaved,
     );
   }
 
   @override
-  List<Object?> get props => [isLoading, listItems, error];
+  List<Object?> get props => [isLoading, listItems, error, showingSaved];
 }

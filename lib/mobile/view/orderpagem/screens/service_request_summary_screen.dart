@@ -7,7 +7,9 @@ import '../../chatpagem/screens/chatPageScreenM.dart';
 import '../../../data/models/conversation_model.dart';
 import '../../../../data/services/api_client.dart';
 import '../../../../data/services/authCubit.dart';
+import '../../../../data/utils/display_text.dart';
 import '../../../../design_system/design_system.dart';
+import '../../jobpagem/utils/navigation_helper.dart';
 
 class ServiceRequestSummaryScreen extends StatelessWidget {
   final String requestId;
@@ -22,8 +24,18 @@ class ServiceRequestSummaryScreen extends StatelessWidget {
           ServiceRequestCubit()..getById(token: token, id: requestId),
       child: Scaffold(
         backgroundColor: SDColors.neutral50,
-        appBar: SDWhiteAppBar.appBar(
-          title: 'Suivi de commande',
+        appBar: AppBar(
+          backgroundColor: SDColors.primary50,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          foregroundColor: SDColors.neutral900,
+          title: Text(
+            'Ma demande',
+            style: SDTypography.titleMedium.copyWith(
+              color: SDColors.neutral900,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
         ),
         body: BlocBuilder<ServiceRequestCubit, ServiceRequestState>(
           builder: (context, state) {
@@ -36,9 +48,11 @@ class ServiceRequestSummaryScreen extends StatelessWidget {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.error_outline, size: 64, color: SDColors.error500),
+                    Icon(Icons.error_outline,
+                        size: 64, color: SDColors.error500),
                     SizedBox(height: SDSpacing.md),
-                    Text('Erreur: ${state.message}', style: SDTypography.bodyMedium),
+                    Text('Erreur: ${state.message}',
+                        style: SDTypography.bodyMedium),
                   ],
                 ),
               );
@@ -54,234 +68,217 @@ class ServiceRequestSummaryScreen extends StatelessWidget {
   }
 
   Widget _buildContent(BuildContext context, Map<String, dynamic> data) {
-    final status = data['statut']?.toString() ?? 'EN_ATTENTE';
+    final status =
+        (data['statut'] ?? data['status'] ?? 'EN_ATTENTE').toString();
     final adresse = data['adresse']?.toString() ?? '';
     final ville = data['ville']?.toString() ?? '';
     final notes = data['notesClient']?.toString() ?? '';
-    final historiqueStatuts = data['historiqueStatuts'] as List<dynamic>? ?? [];
     final photosAvant = data['photosAvant'] as List<dynamic>? ?? [];
     final photosApres = data['photosApres'] as List<dynamic>? ?? [];
     final prestataire = data['prestataire'];
-    final prestataireId = prestataire?['_id']?.toString();
-    final prestataireName = prestataire?['utilisateur']?['nom']?.toString() ?? 'Prestataire';
-    final utilisateur = data['utilisateur'];
-    final utilisateurId = utilisateur?['_id']?.toString();
-
-    return SingleChildScrollView(
-      padding: EdgeInsets.all(SDSpacing.md),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // En-tête avec statut
-          _buildStatusHeader(status),
-          SizedBox(height: SDSpacing.md),
-          
-          // Timeline visuelle améliorée
-          _buildTimelineSection(historiqueStatuts, status),
-          SizedBox(height: SDSpacing.md),
-          
-          // Informations de la commande
-          _buildInfoSection(adresse, ville, notes),
-          SizedBox(height: SDSpacing.md),
-          
-          // Photos avant
-          if (photosAvant.isNotEmpty) ...[
-            _buildPhotosSection('Photos avant', photosAvant),
-            SizedBox(height: SDSpacing.md),
-          ],
-          
-          // Photos après
-          if (photosApres.isNotEmpty) ...[
-            _buildPhotosSection('Photos après', photosApres),
-            SizedBox(height: SDSpacing.md),
-          ],
-          
-          // Actions rapides
-          _buildActionButtons(context, prestataireId, prestataireName, status),
-          SizedBox(height: SDSpacing.xxl),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatusHeader(String status) {
+    final prestataireId =
+        prestataire is Map ? prestataire['_id']?.toString() : null;
+    final user = prestataire is Map ? prestataire['utilisateur'] : null;
+    final prestataireName = user is Map
+        ? personNameFromMap(Map<String, dynamic>.from(user),
+            fallback: 'Prestataire')
+        : 'Prestataire';
+    final service = data['service'];
+    final title = service is Map
+        ? (service['nomservice'] ?? service['nom'] ?? 'Demande').toString()
+        : (data['serviceName']?.toString().trim().isNotEmpty == true
+            ? data['serviceName'].toString()
+            : 'Demande');
+    final metier = prestataire is Map && prestataire['service'] is Map
+        ? (prestataire['service']['nomservice'] ??
+                prestataire['service']['nom'])
+            ?.toString()
+        : null;
+    final photo = user is Map ? user['photoProfil']?.toString() : null;
+    final sent = data['createdAt'] ?? data['date'];
+    final slot = data['datePrestation']?.toString();
+    final amount = data['montant'];
     final statusInfo = _getStatusInfo(status);
-    return Container(
-      padding: EdgeInsets.all(SDSpacing.md),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [statusInfo['color']!.withOpacity(0.1), SDColors.white],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
-        border: Border.all(color: statusInfo['color']!.withOpacity(0.3), width: 2),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: EdgeInsets.all(SDSpacing.sm),
-            decoration: BoxDecoration(
-              color: statusInfo['color'],
-              shape: BoxShape.circle,
-            ),
-            child: Icon(statusInfo['icon'], color: SDColors.white, size: 24),
-          ),
-          SizedBox(width: SDSpacing.sm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Statut de la commande',
-                  style: SDTypography.bodySmall.copyWith(color: SDColors.neutral600),
+    final pending = status.toUpperCase() == 'EN_ATTENTE' ||
+        status.toUpperCase() == 'PENDING';
+
+    return Column(
+      children: [
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+            children: [
+              Text(
+                title,
+                style: SDTypography.titleLarge.copyWith(
+                  color: SDColors.neutral900,
+                  fontWeight: FontWeight.w800,
                 ),
-                SizedBox(height: SDSpacing.xxxs),
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: _DetailStatusChip(
+                  label: pending
+                      ? 'En attente de réponse'
+                      : statusInfo['label'] as String,
+                  pending: pending,
+                ),
+              ),
+              if (sent != null) ...[
+                const SizedBox(height: 8),
                 Text(
-                  statusInfo['label']!,
-                  style: SDTypography.titleMedium.copyWith(
-                    color: statusInfo['color'],
-                    fontWeight: FontWeight.bold,
-                  ),
+                  'Envoyée le ${_formatSent(sent.toString())}',
+                  style: SDTypography.bodySmall
+                      .copyWith(color: SDColors.neutral500),
                 ),
               ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTimelineSection(List<dynamic> historiqueStatuts, String currentStatus) {
-    final statusSteps = [
-      {'key': 'EN_ATTENTE', 'label': 'En attente', 'icon': Icons.hourglass_empty},
-      {'key': 'ACCEPTEE', 'label': 'Acceptée', 'icon': Icons.check_circle_outline},
-      {'key': 'EN_COURS', 'label': 'En cours', 'icon': Icons.play_circle_outline},
-      {'key': 'TERMINEE', 'label': 'Terminée', 'icon': Icons.done_all},
-    ];
-
-    return Container(
-      padding: EdgeInsets.all(SDSpacing.md),
-      decoration: BoxDecoration(
-        color: SDColors.white,
-        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
-        boxShadow: [
-          BoxShadow(
-            color: SDColors.neutral200.withOpacity(0.5),
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.timeline, color: SDColors.primary600),
-              SizedBox(width: SDSpacing.xs),
+              const SizedBox(height: 16),
+              _providerRow(
+                context,
+                name: prestataireName,
+                metier: metier,
+                photo: photo,
+                providerId: prestataireId,
+                providerData: prestataire is Map
+                    ? Map<String, dynamic>.from(prestataire)
+                    : null,
+              ),
+              const SizedBox(height: 18),
               Text(
-                'Timeline de la commande',
-                style: SDTypography.titleSmall.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: SDColors.neutral900,
+                'Votre besoin',
+                style: SDTypography.titleSmall
+                    .copyWith(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                notes.trim().isEmpty ? 'Aucun détail ajouté.' : notes,
+                style: SDTypography.bodyMedium
+                    .copyWith(color: SDColors.neutral700),
+              ),
+              const SizedBox(height: 16),
+              _fact(
+                Icons.place_outlined,
+                'Lieu d’intervention',
+                [
+                  if (ville.isNotEmpty || adresse.isNotEmpty)
+                    [ville, adresse].where((e) => e.isNotEmpty).join(' · ')
+                  else
+                    'À préciser',
+                ].first,
+              ),
+              _fact(
+                Icons.calendar_today_outlined,
+                'Créneau',
+                slot == null || slot.isEmpty ? 'À convenir' : _formatSent(slot),
+              ),
+              _fact(
+                Icons.payments_outlined,
+                'Tarif',
+                amount == null ? 'À convenir' : '$amount FCFA',
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Suivi de la demande',
+                style: SDTypography.titleSmall
+                    .copyWith(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 10),
+              _followStep(
+                done: true,
+                icon: Icons.check_circle,
+                title: 'Demande envoyée',
+                subtitle: sent == null ? null : _formatSent(sent.toString()),
+              ),
+              _followStep(
+                done: !pending,
+                icon: pending ? Icons.schedule : Icons.check_circle,
+                title: pending
+                    ? 'Réponse du professionnel attendue'
+                    : statusInfo['label'] as String,
+                subtitle: null,
+              ),
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(top: 8),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: SDColors.primary50,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.info_outline,
+                        color: SDColors.primary700, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _followNote(status),
+                        style: SDTypography.bodySmall
+                            .copyWith(color: SDColors.primary800),
+                      ),
+                    ),
+                  ],
                 ),
               ),
+              if (photosAvant.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                _buildPhotosSection('Photos avant', photosAvant),
+              ],
+              if (photosApres.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                _buildPhotosSection('Photos après', photosApres),
+              ],
             ],
           ),
-          SizedBox(height: SDSpacing.md),
-          ...statusSteps.asMap().entries.map((entry) {
-            final index = entry.key;
-            final step = entry.value;
-            final stepKey = step['key'] as String;
-            final isCompleted = _isStatusCompleted(stepKey, currentStatus);
-            final isCurrent = stepKey == currentStatus;
-            final historiqueItem = historiqueStatuts.firstWhere(
-              (h) => h['statut'] == stepKey,
-              orElse: () => null,
-            );
-            final dateStr = historiqueItem?['date']?.toString();
-
-            return _buildTimelineStep(
-              step['label'] as String,
-              step['icon'] as IconData,
-              isCompleted,
-              isCurrent,
-              dateStr,
-              index < statusSteps.length - 1,
-            );
-          }).toList(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTimelineStep(
-    String label,
-    IconData icon,
-    bool isCompleted,
-    bool isCurrent,
-    String? dateStr,
-    bool showLine,
-  ) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Column(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: isCompleted || isCurrent
-                    ? SDColors.primary600
-                    : SDColors.neutral200,
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: isCurrent ? SDColors.primary700 : Colors.transparent,
-                  width: 3,
-                ),
-              ),
-              child: Icon(
-                icon,
-                color: isCompleted || isCurrent ? SDColors.white : SDColors.neutral400,
-                size: 20,
-              ),
-            ),
-            if (showLine)
-              Container(
-                width: 2,
-                height: 40,
-                color: isCompleted ? SDColors.primary600 : SDColors.neutral200,
-                margin: EdgeInsets.symmetric(vertical: SDSpacing.xxxs),
-              ),
-          ],
         ),
-        SizedBox(width: SDSpacing.sm),
-        Expanded(
+        SafeArea(
+          top: false,
           child: Padding(
-            padding: EdgeInsets.only(top: SDSpacing.xs),
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  label,
-                  style: SDTypography.bodyMedium.copyWith(
-                    fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
-                    color: isCompleted || isCurrent
-                        ? SDColors.neutral900
-                        : SDColors.neutral500,
-                  ),
-                ),
-                if (dateStr != null && (isCompleted || isCurrent)) ...[
-                  SizedBox(height: SDSpacing.xxxs),
-                  Text(
-                    _formatDate(dateStr),
-                    style: SDTypography.bodySmall.copyWith(
-                      color: SDColors.neutral600,
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: FilledButton.icon(
+                    onPressed: prestataireId == null
+                        ? null
+                        : () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ChatPageScreenM(
+                                  participantId: prestataireId,
+                                  participantName: prestataireName,
+                                  type: ConversationType.prestataire,
+                                ),
+                              ),
+                            );
+                          },
+                    icon: const Icon(Icons.chat_bubble_outline),
+                    label: const Text('Écrire au professionnel'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: SDColors.primary600,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(28),
+                      ),
                     ),
                   ),
-                ],
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Retour à mes demandes'),
+                ),
+                if (pending)
+                  TextButton(
+                    onPressed: () => _confirmAndCancel(context),
+                    child: Text(
+                      'Annuler la demande',
+                      style: SDTypography.labelMedium
+                          .copyWith(color: SDColors.error500),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -290,69 +287,81 @@ class ServiceRequestSummaryScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoSection(String adresse, String ville, String notes) {
-    return Container(
-      padding: EdgeInsets.all(SDSpacing.md),
-      decoration: BoxDecoration(
-        color: SDColors.white,
-        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusLarge),
-        boxShadow: [
-          BoxShadow(
-            color: SDColors.neutral200.withOpacity(0.5),
-            blurRadius: 8,
-            offset: Offset(0, 2),
+  Widget _providerRow(
+    BuildContext context, {
+    required String name,
+    required String? metier,
+    required String? photo,
+    required String? providerId,
+    required Map<String, dynamic>? providerData,
+  }) {
+    return Row(
+      children: [
+        ClipOval(
+          child: SizedBox(
+            width: 48,
+            height: 48,
+            child: photo != null && photo.startsWith('http')
+                ? Image.network(photo, fit: BoxFit.cover)
+                : ColoredBox(
+                    color: SDColors.neutral100,
+                    child: Icon(Icons.person, color: SDColors.neutral400),
+                  ),
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.info_outline, color: SDColors.primary600),
-              SizedBox(width: SDSpacing.xs),
               Text(
-                'Informations',
-                style: SDTypography.titleSmall.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                name,
+                style: SDTypography.titleSmall
+                    .copyWith(fontWeight: FontWeight.w800),
               ),
+              if (metier != null && metier.isNotEmpty)
+                Text(
+                  metier,
+                  style: SDTypography.bodySmall
+                      .copyWith(color: SDColors.neutral500),
+                ),
             ],
           ),
-          SizedBox(height: SDSpacing.sm),
-          if (adresse.isNotEmpty)
-            _buildInfoRow(Icons.location_on, 'Adresse', adresse),
-          if (ville.isNotEmpty)
-            _buildInfoRow(Icons.location_city, 'Ville', ville),
-          if (notes.isNotEmpty)
-            _buildInfoRow(Icons.note, 'Notes', notes),
-        ],
-      ),
+        ),
+        if (providerId != null)
+          TextButton(
+            onPressed: () => NavigationHelper.navigateToProviderProfile(
+              context,
+              providerId: providerId,
+              providerData: providerData,
+            ),
+            child: const Text('Voir le profil >'),
+          ),
+      ],
     );
   }
 
-  Widget _buildInfoRow(IconData icon, String label, String value) {
+  Widget _fact(IconData icon, String label, String value) {
     return Padding(
-      padding: EdgeInsets.only(bottom: SDSpacing.sm),
+      padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 20, color: SDColors.neutral500),
-          SizedBox(width: SDSpacing.xs),
+          Icon(icon, size: 20, color: SDColors.primary700),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   label,
-                  style: SDTypography.bodySmall.copyWith(color: SDColors.neutral600),
+                  style: SDTypography.labelMedium
+                      .copyWith(fontWeight: FontWeight.w800),
                 ),
-                SizedBox(height: SDSpacing.xxxs),
                 Text(
                   value,
-                  style: SDTypography.bodyMedium.copyWith(
-                    fontWeight: FontWeight.w500,
-                  ),
+                  style: SDTypography.bodySmall
+                      .copyWith(color: SDColors.neutral600),
                 ),
               ],
             ),
@@ -360,6 +369,71 @@ class ServiceRequestSummaryScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Widget _followStep({
+    required bool done,
+    required IconData icon,
+    required String title,
+    required String? subtitle,
+  }) {
+    final color = done ? SDColors.primary700 : SDColors.neutral400;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 22),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    style: SDTypography.bodyMedium
+                        .copyWith(fontWeight: FontWeight.w700)),
+                if (subtitle != null)
+                  Text(
+                    subtitle,
+                    style: SDTypography.bodySmall
+                        .copyWith(color: SDColors.neutral500),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _followNote(String status) {
+    switch (status.toUpperCase()) {
+      case 'ACCEPTEE':
+        return 'Le professionnel a accepté la demande.';
+      case 'EN_COURS':
+      case 'IN_PROGRESS':
+        return 'L’intervention est en cours.';
+      case 'TERMINEE':
+      case 'DONE':
+      case 'COMPLETED':
+        return 'L’intervention est terminée.';
+      case 'ANNULEE':
+      case 'CANCELLED':
+      case 'CANCELED':
+        return 'La demande a été annulée.';
+      case 'REFUSEE':
+        return 'Le professionnel a refusé la demande.';
+      default:
+        return 'L’intervention n’est pas encore confirmée.';
+    }
+  }
+
+  String _formatSent(String raw) {
+    try {
+      final date = DateTime.parse(raw).toLocal();
+      return DateFormat('d MMMM à HH:mm', 'fr_FR').format(date);
+    } catch (_) {
+      return raw;
+    }
   }
 
   Widget _buildPhotosSection(String title, List<dynamic> photos) {
@@ -403,11 +477,13 @@ class ServiceRequestSummaryScreen extends StatelessWidget {
                   width: 120,
                   margin: EdgeInsets.only(right: SDSpacing.xs),
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                    borderRadius:
+                        BorderRadius.circular(SDSpacing.borderRadiusMedium),
                     border: Border.all(color: SDColors.neutral200),
                   ),
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                    borderRadius:
+                        BorderRadius.circular(SDSpacing.borderRadiusMedium),
                     child: CachedNetworkImage(
                       imageUrl: photoUrl,
                       fit: BoxFit.cover,
@@ -432,65 +508,6 @@ class ServiceRequestSummaryScreen extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildActionButtons(
-    BuildContext context,
-    String? prestataireId,
-    String prestataireName,
-    String status,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        ElevatedButton.icon(
-          onPressed: prestataireId != null
-              ? () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ChatPageScreenM(
-                        participantId: prestataireId,
-                        participantName: prestataireName,
-                        type: ConversationType.prestataire,
-                      ),
-                    ),
-                  );
-                }
-              : null,
-          icon: Icon(Icons.chat_bubble_outline, color: SDColors.white),
-          label: Text(
-            'Contacter le prestataire',
-            style: SDTypography.labelMedium.copyWith(color: SDColors.white),
-          ),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: SDColors.primary600,
-            padding: EdgeInsets.symmetric(vertical: SDSpacing.sm),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-            ),
-          ),
-        ),
-        if (status == 'EN_ATTENTE') ...[
-          SizedBox(height: SDSpacing.sm),
-          OutlinedButton.icon(
-            onPressed: () => _confirmAndCancel(context),
-            icon: Icon(Icons.cancel_outlined, color: SDColors.error500),
-            label: Text(
-              'Annuler la commande',
-              style: SDTypography.labelMedium.copyWith(color: SDColors.error500),
-            ),
-            style: OutlinedButton.styleFrom(
-              side: BorderSide(color: SDColors.error500),
-              padding: EdgeInsets.symmetric(vertical: SDSpacing.sm),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-              ),
-            ),
-          ),
-        ],
-      ],
     );
   }
 
@@ -519,8 +536,7 @@ class ServiceRequestSummaryScreen extends StatelessWidget {
     if (confirmed != true || !context.mounted) return;
 
     final auth = context.read<AuthCubit>().state;
-    final authToken =
-        auth is AuthAuthenticated ? auth.token : token;
+    final authToken = auth is AuthAuthenticated ? auth.token : token;
     if (authToken.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -566,70 +582,64 @@ class ServiceRequestSummaryScreen extends StatelessWidget {
   }
 
   Map<String, dynamic> _getStatusInfo(String status) {
-    switch (status) {
+    switch (status.toUpperCase()) {
       case 'EN_ATTENTE':
-        return {
-          'label': 'En attente',
-          'icon': Icons.hourglass_empty,
-          'color': SDColors.warning500,
-        };
+      case 'PENDING':
+        return {'label': 'En attente'};
       case 'ACCEPTEE':
-        return {
-          'label': 'Acceptée',
-          'icon': Icons.check_circle,
-          'color': SDColors.success500,
-        };
+        return {'label': 'Acceptée'};
       case 'REFUSEE':
-        return {
-          'label': 'Refusée',
-          'icon': Icons.cancel,
-          'color': SDColors.error500,
-        };
+        return {'label': 'Refusée'};
       case 'EN_COURS':
-        return {
-          'label': 'En cours',
-          'icon': Icons.play_circle,
-          'color': SDColors.info500,
-        };
+      case 'IN_PROGRESS':
+        return {'label': 'En cours'};
       case 'TERMINEE':
-        return {
-          'label': 'Terminée',
-          'icon': Icons.done_all,
-          'color': SDColors.success500,
-        };
+      case 'DONE':
+      case 'COMPLETED':
+        return {'label': 'Terminée'};
+      case 'ANNULEE':
+      case 'CANCELLED':
+      case 'CANCELED':
+        return {'label': 'Annulée'};
+      case 'LITIGE':
+        return {'label': 'Litige'};
       default:
-        return {
-          'label': status,
-          'icon': Icons.info,
-          'color': SDColors.neutral500,
-        };
+        return {'label': status};
     }
   }
+}
 
-  bool _isStatusCompleted(String stepKey, String currentStatus) {
-    final order = ['EN_ATTENTE', 'ACCEPTEE', 'EN_COURS', 'TERMINEE'];
-    final currentIndex = order.indexOf(currentStatus);
-    final stepIndex = order.indexOf(stepKey);
-    return stepIndex >= 0 && currentIndex >= 0 && stepIndex < currentIndex;
-  }
+class _DetailStatusChip extends StatelessWidget {
+  const _DetailStatusChip({required this.label, required this.pending});
 
-  String _formatDate(String dateString) {
-    try {
-      final date = DateTime.parse(dateString);
-      final now = DateTime.now();
-      final difference = now.difference(date);
+  final String label;
+  final bool pending;
 
-      if (difference.inDays > 0) {
-        return DateFormat('dd/MM/yyyy à HH:mm').format(date);
-      } else if (difference.inHours > 0) {
-        return 'Il y a ${difference.inHours}h';
-      } else if (difference.inMinutes > 0) {
-        return 'Il y a ${difference.inMinutes}min';
-      } else {
-        return 'À l\'instant';
-      }
-    } catch (e) {
-      return dateString;
-    }
+  @override
+  Widget build(BuildContext context) {
+    final bg = pending ? SDColors.warning100 : SDColors.primary50;
+    final fg = pending ? SDColors.warning700 : SDColors.primary700;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(pending ? Icons.schedule : Icons.check_circle,
+              size: 14, color: fg),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: SDTypography.labelSmall.copyWith(
+              color: fg,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

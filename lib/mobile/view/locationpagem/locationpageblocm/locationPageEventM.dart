@@ -1,32 +1,30 @@
 import 'package:equatable/equatable.dart';
 
+import 'locationPageStateM.dart';
+
 abstract class LocationPageEventM extends Equatable {
   const LocationPageEventM();
 
   @override
-  List<Object> get props => [];
+  List<Object?> get props => [];
 }
 
-/// Demander la permission de géolocalisation
 class RequestLocationPermissionM extends LocationPageEventM {
   const RequestLocationPermissionM();
 }
 
-/// Obtenir la position actuelle de l'utilisateur
 class GetCurrentLocationM extends LocationPageEventM {
   const GetCurrentLocationM();
 }
 
-/// Activer/désactiver le service de géolocalisation
 class ToggleLocationServiceM extends LocationPageEventM {
   const ToggleLocationServiceM();
 }
 
-/// Rechercher des services autour de la position
 class SearchNearbyServicesM extends LocationPageEventM {
   final double latitude;
   final double longitude;
-  final double radius; // en kilomètres
+  final double radius;
 
   const SearchNearbyServicesM({
     required this.latitude,
@@ -35,10 +33,9 @@ class SearchNearbyServicesM extends LocationPageEventM {
   });
 
   @override
-  List<Object> get props => [latitude, longitude, radius];
+  List<Object?> get props => [latitude, longitude, radius];
 }
 
-/// Mettre à jour la position de l'utilisateur
 class UpdateUserLocationM extends LocationPageEventM {
   final double latitude;
   final double longitude;
@@ -49,11 +46,36 @@ class UpdateUserLocationM extends LocationPageEventM {
   });
 
   @override
-  List<Object> get props => [latitude, longitude];
+  List<Object?> get props => [latitude, longitude];
 }
 
+class SearchLocationQueryM extends LocationPageEventM {
+  final String query;
 
+  const SearchLocationQueryM(this.query);
 
+  @override
+  List<Object?> get props => [query];
+}
 
+class SelectLocationSuggestionM extends LocationPageEventM {
+  final LocationSuggestion suggestion;
 
+  const SelectLocationSuggestionM(this.suggestion);
 
+  @override
+  List<Object?> get props => [suggestion];
+}
+
+class ReverseGeocodeLocationM extends LocationPageEventM {
+  final double latitude;
+  final double longitude;
+
+  const ReverseGeocodeLocationM({
+    required this.latitude,
+    required this.longitude,
+  });
+
+  @override
+  List<Object?> get props => [latitude, longitude];
+}

@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+
+import '../../../../data/services/authCubit.dart';
+import '../../../../design_system/design_system.dart';
 import '../bloc/provider_statistics_bloc.dart';
 import '../bloc/provider_statistics_event.dart';
 import '../bloc/provider_statistics_state.dart';
-import '../../../../data/services/authCubit.dart';
-import '../../../../design_system/design_system.dart';
+import '../models/provider_statistics_aggregator.dart';
+import '../models/provider_statistics_period.dart';
 
-/// Statistiques prestataire — données réelles `/prestations/stats`.
+/// Statistiques prestataire — agrégation réelle sur la période sélectionnée.
 class ProviderStatisticsScreen extends StatefulWidget {
   final String? prestataireDocId;
   const ProviderStatisticsScreen({super.key, this.prestataireDocId});
@@ -17,196 +20,195 @@ class ProviderStatisticsScreen extends StatefulWidget {
       _ProviderStatisticsScreenState();
 }
 
-class _ProviderStatisticsScreenState extends State<ProviderStatisticsScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _ProviderStatisticsScreenState extends State<ProviderStatisticsScreen> {
   String? _prestataireId;
+  ProviderStatsPeriodPreset _preset = ProviderStatsPeriodPreset.thisMonth;
   final _money = NumberFormat('#,###', 'fr_FR');
-  static const _monthsFr = [
-    '',
-    'Jan',
-    'Fév',
-    'Mar',
-    'Avr',
-    'Mai',
-    'Juin',
-    'Juil',
-    'Aoû',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Déc',
-  ];
+  final _timeFmt = DateFormat('HH:mm', 'fr_FR');
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
-    final authState = context.read<AuthCubit>().state;
-    if (authState is AuthAuthenticated) {
-      _prestataireId =
-          widget.prestataireDocId ?? authState.utilisateur.idutilisateur;
-      context.read<ProviderStatisticsBloc>().setToken(authState.token);
-      if (_prestataireId != null) {
-        context
-            .read<ProviderStatisticsBloc>()
-            .add(LoadProviderStatistics(_prestataireId!));
-      }
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
+  void _load() {
+    final auth = context.read<AuthCubit>().state;
+    if (auth is! AuthAuthenticated) return;
+    _prestataireId = widget.prestataireDocId;
+    if (_prestataireId == null || _prestataireId!.isEmpty) return;
+    context.read<ProviderStatisticsBloc>().setToken(auth.token);
+    context.read<ProviderStatisticsBloc>().add(
+          LoadProviderStatistics(_prestataireId!, periodPreset: _preset),
+        );
+  }
+
+  void _refresh() => _load();
+
+  Future<void> _pickPeriod() async {
+    final chosen = await showModalBottomSheet<ProviderStatsPeriodPreset>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final p in ProviderStatsPeriodPreset.values)
+              ListTile(
+                title: Text(ProviderStatsPeriod.resolve(p).presetLabel),
+                onTap: () => Navigator.pop(ctx, p),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (chosen == null || chosen == _preset) return;
+    setState(() => _preset = chosen);
+    _load();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        backgroundColor: SDColors.white,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        surfaceTintColor: Colors.transparent,
-        foregroundColor: SDColors.neutral900,
-        leading: IconButton(
-          onPressed: () => Navigator.pop(context),
-          icon: const Icon(Icons.arrow_back, color: SDColors.neutral900),
-        ),
-        title: Text(
-          'Mes Statistiques',
-          style: SDTypography.displayMedium.copyWith(
-            color: SDColors.neutral900,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        actions: [
-          IconButton(
-            onPressed: _showExportOptions,
-            icon: const Icon(Icons.download_outlined,
-                color: SDColors.neutral900),
-          ),
-          IconButton(
-            onPressed: _refreshStatistics,
-            icon: const Icon(Icons.refresh, color: SDColors.neutral900),
-          ),
-        ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Container(height: 1, color: SDColors.neutral200),
-        ),
-      ),
+      backgroundColor: SDColors.white,
+      appBar: SDWhiteAppBar.appBar(title: 'Statistiques'),
       body: BlocBuilder<ProviderStatisticsBloc, ProviderStatisticsState>(
         builder: (context, state) {
           if (state is ProviderStatisticsLoading ||
               state is ProviderStatisticsInitial) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(child: CircularProgressIndicator(strokeWidth: 2));
           }
           if (state is ProviderStatisticsError) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
-                    const SizedBox(height: 16),
-                    Text(state.message, textAlign: TextAlign.center),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: _refreshStatistics,
-                      child: const Text('Réessayer'),
-                    ),
-                  ],
-                ),
-              ),
-            );
+            return _errorBody(state.message);
           }
-          if (state is! ProviderStatisticsLoaded) {
-            return const Center(child: Text('Aucune donnée'));
+          if (state is ProviderPeriodStatisticsLoaded) {
+            return _loadedBody(state.data);
           }
-
-          return Column(
-            children: [
-              _buildHeader(state),
-              const SizedBox(height: 8),
-              TabBar(
-                controller: _tabController,
-                labelColor: SDColors.primary700,
-                unselectedLabelColor: SDColors.neutral500,
-                indicatorColor: SDColors.primary600,
-                tabs: const [
-                  Tab(text: 'Revenus'),
-                  Tab(text: 'Missions'),
-                  Tab(text: 'Villes'),
-                ],
-              ),
-              Expanded(
-                child: TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _buildRevenusTab(state),
-                    _buildMissionsTab(state),
-                    _buildVillesTab(state),
-                  ],
-                ),
-              ),
-            ],
-          );
+          return _errorBody('Données indisponibles pour cette vue.');
         },
       ),
     );
   }
 
-  Widget _buildHeader(ProviderStatisticsLoaded state) {
-    final revenue = _asDouble(state.revenus['total']);
-    final total = _asInt(state.missions['total'] ??
-        state.charts['totalPrestations']);
-    final note = _asDouble(state.missions['satisfaction']);
+  Widget _errorBody(String message) {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(24),
+      children: [
+        const SizedBox(height: 48),
+        Icon(Icons.error_outline, size: 56, color: SDColors.neutral400),
+        const SizedBox(height: 16),
+        Text(
+          message,
+          textAlign: TextAlign.center,
+          style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral600),
+        ),
+        const SizedBox(height: 20),
+        Center(child: SDButton(text: 'Réessayer', onPressed: _refresh)),
+      ],
+    );
+  }
 
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: SDColors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: SDColors.neutral200),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _loadedBody(ProviderPeriodStatistics data) {
+    final period = data.period;
+    return RefreshIndicator(
+      onRefresh: () async => _refresh(),
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
           Text(
-            'Vue d\'ensemble',
+            'Comprendre votre activité',
+            style: SDTypography.bodyMedium.copyWith(
+              color: SDColors.neutral600,
+            ),
+          ),
+          const SizedBox(height: 16),
+          _periodSelector(period),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  period.rangeLabelFr,
+                  style: SDTypography.bodySmall.copyWith(
+                    color: SDColors.neutral600,
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: 'Actualiser',
+                onPressed: _refresh,
+                icon: const Icon(Icons.refresh, size: 20),
+                color: SDColors.neutral600,
+              ),
+              Text(
+                'Mis à jour à ${_timeFmt.format(data.loadedAt)}',
+                style: SDTypography.labelSmall.copyWith(
+                  color: SDColors.neutral500,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'Sur la période',
             style: SDTypography.titleSmall.copyWith(
+              fontWeight: FontWeight.w800,
               color: SDColors.neutral900,
-              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 12),
+          _kpiGrid(data),
+          if (data.paiementsRecus.isAvailable) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Paiements reçus : montants encaissés (missions terminées et payées). '
+              'Distinct du solde disponible et du bénéfice.',
+              style: SDTypography.bodySmall.copyWith(
+                color: SDColors.neutral500,
+                height: 1.35,
+              ),
+            ),
+          ],
+          const SizedBox(height: 28),
+          Text(
+            'Demandes reçues',
+            style: SDTypography.titleSmall.copyWith(
+              fontWeight: FontWeight.w800,
+              color: SDColors.neutral900,
             ),
           ),
           const SizedBox(height: 4),
           Text(
-            'Données serveur (toutes périodes disponibles)',
+            'Répartition sur la période (date de réception)',
             style: SDTypography.bodySmall.copyWith(color: SDColors.neutral500),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
+          _demandesSection(data),
+          const SizedBox(height: 28),
+          Text(
+            'Avis reçus',
+            style: SDTypography.titleSmall.copyWith(
+              fontWeight: FontWeight.w800,
+              color: SDColors.neutral900,
+            ),
+          ),
+          const SizedBox(height: 12),
+          _reviewsSection(data.reviews),
+          const SizedBox(height: 20),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _headerStat(
-                'Revenus',
-                '${_money.format(revenue.round())} FCFA',
-                Icons.monetization_on_outlined,
-              ),
-              _headerStat(
-                'Prestations',
-                '$total',
-                Icons.assignment_outlined,
-              ),
-              _headerStat(
-                'Note',
-                note > 0 ? '${note.toStringAsFixed(1)}/5' : '—',
-                Icons.star_outline,
+              const Icon(Icons.info_outline,
+                  size: 16, color: SDColors.neutral500),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Les chiffres correspondent à la période sélectionnée.',
+                  style: SDTypography.bodySmall.copyWith(
+                    color: SDColors.neutral500,
+                    height: 1.35,
+                  ),
+                ),
               ),
             ],
           ),
@@ -215,412 +217,286 @@ class _ProviderStatisticsScreenState extends State<ProviderStatisticsScreen>
     );
   }
 
-  Widget _headerStat(String label, String value, IconData icon) {
-    return Expanded(
-      child: Column(
-        children: [
-          Icon(icon, color: SDColors.neutral700, size: 22),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            textAlign: TextAlign.center,
-            style: SDTypography.labelLarge.copyWith(
-              color: SDColors.neutral900,
-              fontWeight: FontWeight.w700,
-            ),
+  Widget _periodSelector(ProviderStatsPeriod period) {
+    return Material(
+      color: SDColors.neutral50,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: _pickPeriod,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: SDColors.neutral200),
           ),
-          Text(
-            label,
-            style:
-                SDTypography.labelSmall.copyWith(color: SDColors.neutral500),
+          child: Row(
+            children: [
+              const Icon(Icons.calendar_month_outlined,
+                  color: SDColors.neutral600, size: 22),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  period.presetLabel,
+                  style: SDTypography.bodyMedium.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: SDColors.neutral900,
+                  ),
+                ),
+              ),
+              const Icon(Icons.expand_more, color: SDColors.neutral500),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildRevenusTab(ProviderStatisticsLoaded state) {
-    final revenue = _asDouble(state.revenus['total']);
-    final avg = _asDouble(state.revenus['averagePerMission']);
-    final mois = _listOf(state.charts['prestationsParMois']);
+  Widget _kpiGrid(ProviderPeriodStatistics data) {
+    final tiles = <Widget>[
+      _kpiTile(
+        icon: Icons.description_outlined,
+        label: 'Demandes reçues',
+        value: '${data.demandesRecues}',
+      ),
+      _kpiTile(
+        icon: Icons.task_alt_outlined,
+        label: 'Missions terminées',
+        value: '${data.missionsTerminees}',
+      ),
+      _kpiTile(
+        icon: Icons.cancel_outlined,
+        label: 'Annulations',
+        value: '${data.annulations}',
+      ),
+    ];
+    if (data.paiementsRecus.isAvailable) {
+      tiles.add(
+        _kpiTile(
+          icon: Icons.payments_outlined,
+          label: 'Paiements reçus',
+          value:
+              '${_money.format(data.paiementsRecus.amountFcfa!.round())} FCFA',
+        ),
+      );
+    }
 
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: _statCard(
-                'Revenus totaux',
-                '${_money.format(revenue.round())} FCFA',
-                Icons.account_balance_wallet,
-                SDColors.primary600,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _statCard(
-                'Moyenne / mission',
-                '${_money.format(avg.round())} FCFA',
-                Icons.trending_up,
-                Colors.blue,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        _sectionCard(
-          title: 'Prestations par mois',
-          child: mois.isEmpty
-              ? _emptyChart('Aucune donnée mensuelle')
-              : _barList(
-                  mois.reversed.map((raw) {
-                    final m = Map<String, dynamic>.from(raw as Map);
-                    final id = m['_id'];
-                    final year = id is Map ? id['year'] : null;
-                    final month = id is Map ? _asInt(id['month']) : 0;
-                    final label = month >= 1 && month <= 12
-                        ? '${_monthsFr[month]} $year'
-                        : '$year-$month';
-                    return _BarItem(
-                      label: label,
-                      value: _asDouble(m['totalRevenu']),
-                      count: _asInt(m['count']),
-                      valueLabel:
-                          '${_money.format(_asDouble(m['totalRevenu']).round())} FCFA',
-                    );
-                  }).toList(),
-                ),
-        ),
-      ],
+    return GridView.count(
+      crossAxisCount: 2,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisSpacing: 12,
+      mainAxisSpacing: 12,
+      childAspectRatio: 1.15,
+      children: tiles,
     );
   }
 
-  Widget _buildMissionsTab(ProviderStatisticsLoaded state) {
-    final total = _asInt(state.missions['total']);
-    final completed = _asInt(state.missions['completed']);
-    final ongoing = _asInt(state.missions['ongoing']);
-    final rate = _asDouble(state.missions['successRate']);
-    final parStatut = _listOf(state.charts['statsParStatut']);
-    final mois = _listOf(state.charts['prestationsParMois']);
-
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: _statCard(
-                'Total',
-                '$total',
-                Icons.assignment,
-                Colors.blue,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _statCard(
-                'Terminées',
-                '$completed',
-                Icons.check_circle,
-                SDColors.primary600,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _statCard(
-                'En cours / acceptées',
-                '$ongoing',
-                Icons.timelapse,
-                Colors.orange,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _statCard(
-                'Taux terminées',
-                '${(rate * 100).toStringAsFixed(0)}%',
-                Icons.pie_chart,
-                Colors.purple,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        _sectionCard(
-          title: 'Répartition par statut',
-          child: parStatut.isEmpty
-              ? _emptyChart('Aucun statut disponible')
-              : _barList(
-                  parStatut.map((raw) {
-                    final m = Map<String, dynamic>.from(raw as Map);
-                    final count = _asInt(m['count']);
-                    return _BarItem(
-                      label: '${m['_id'] ?? '—'}',
-                      value: count.toDouble(),
-                      count: count,
-                      valueLabel: '$count',
-                    );
-                  }).toList(),
-                ),
-        ),
-        const SizedBox(height: 16),
-        _sectionCard(
-          title: 'Volume par mois',
-          child: mois.isEmpty
-              ? _emptyChart('Aucune donnée mensuelle')
-              : _barList(
-                  mois.reversed.map((raw) {
-                    final m = Map<String, dynamic>.from(raw as Map);
-                    final id = m['_id'];
-                    final year = id is Map ? id['year'] : null;
-                    final month = id is Map ? _asInt(id['month']) : 0;
-                    final label = month >= 1 && month <= 12
-                        ? '${_monthsFr[month]} $year'
-                        : '$year-$month';
-                    final count = _asInt(m['count']);
-                    return _BarItem(
-                      label: label,
-                      value: count.toDouble(),
-                      count: count,
-                      valueLabel: '$count',
-                    );
-                  }).toList(),
-                ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildVillesTab(ProviderStatisticsLoaded state) {
-    final villes = _listOf(state.charts['statsParVille']);
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        _sectionCard(
-          title: 'Prestations par ville',
-          child: villes.isEmpty
-              ? _emptyChart('Aucune donnée par ville')
-              : _barList(
-                  villes.map((raw) {
-                    final m = Map<String, dynamic>.from(raw as Map);
-                    final count = _asInt(m['count']);
-                    final revenu = _asDouble(m['totalRevenu']);
-                    return _BarItem(
-                      label: (m['_id']?.toString().isNotEmpty == true)
-                          ? m['_id'].toString()
-                          : 'Non renseignée',
-                      value: count.toDouble(),
-                      count: count,
-                      valueLabel:
-                          '$count · ${_money.format(revenu.round())} FCFA',
-                    );
-                  }).toList(),
-                ),
-        ),
-      ],
-    );
-  }
-
-  Widget _statCard(String title, String value, IconData icon, Color color) {
+  Widget _kpiTile({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: SDColors.white,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: SDColors.neutral200),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: color, size: 22),
-          const SizedBox(height: 10),
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: SDColors.primary50,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: SDColors.primary700, size: 20),
+          ),
+          const Spacer(),
           Text(
             value,
-            style: const TextStyle(
-              fontSize: 16,
+            style: SDTypography.titleMedium.copyWith(
               fontWeight: FontWeight.w800,
+              color: SDColors.neutral900,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           Text(
-            title,
-            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+            label,
+            style: SDTypography.bodySmall.copyWith(
+              color: SDColors.neutral600,
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _sectionCard({required String title, required Widget child}) {
+  Widget _demandesSection(ProviderPeriodStatistics data) {
+    if (!data.demandesDistributionReliable) {
+      return _infoCard(
+        'Répartition indisponible',
+        'Les dates de réception ne permettent pas une répartition fiable sur la période.',
+      );
+    }
+    if (data.demandesRecues == 0) {
+      return _infoCard(
+        'Aucune demande',
+        'Aucune demande reçue sur cette période.',
+      );
+    }
+
+    final maxCount = data.demandesBuckets.fold<int>(
+      0,
+      (a, b) => a > b.count ? a : b.count,
+    );
+    final maxV = maxCount > 0 ? maxCount.toDouble() : 1.0;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: SDColors.white,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: SDColors.neutral200),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 14),
-          child,
-        ],
-      ),
-    );
-  }
-
-  Widget _emptyChart(String message) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 24),
-      child: Center(
-        child: Text(
-          message,
-          style: TextStyle(color: Colors.grey[600]),
-        ),
-      ),
-    );
-  }
-
-  Widget _barList(List<_BarItem> items) {
-    final maxV = items.fold<double>(
-      1,
-      (a, b) => a > b.value ? a : (b.value > 0 ? b.value : a),
-    );
-    return Column(
-      children: items.map((item) {
-        final ratio = (item.value / maxV).clamp(0.0, 1.0);
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+          ...data.demandesBuckets.map((b) {
+            final ratio = (b.count / maxV).clamp(0.0, 1.0);
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(
                 children: [
-                  Expanded(
+                  SizedBox(
+                    width: 72,
                     child: Text(
-                      item.label,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
+                      b.label,
+                      style: SDTypography.labelSmall.copyWith(
+                        color: SDColors.neutral600,
                       ),
                     ),
                   ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: LinearProgressIndicator(
+                        value: ratio,
+                        minHeight: 10,
+                        backgroundColor: SDColors.primary50,
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                          SDColors.primary600,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   Text(
-                    item.valueLabel,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[700],
-                      fontWeight: FontWeight.w600,
+                    '${b.count}',
+                    style: SDTypography.labelMedium.copyWith(
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 6),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: LinearProgressIndicator(
-                  value: ratio,
-                  minHeight: 8,
-                  backgroundColor: Colors.grey[200],
-                  valueColor:
-                      const AlwaysStoppedAnimation<Color>(SDColors.primary600),
-                ),
-              ),
-            ],
+            );
+          }),
+          const Divider(height: 1, color: SDColors.neutral100),
+          const SizedBox(height: 10),
+          Text(
+            '${data.demandesRecues} demande${data.demandesRecues > 1 ? 's' : ''} au total',
+            style: SDTypography.bodySmall.copyWith(
+              color: SDColors.neutral600,
+              fontWeight: FontWeight.w600,
+            ),
           ),
-        );
-      }).toList(),
-    );
-  }
-
-  void _refreshStatistics() {
-    if (_prestataireId == null) return;
-    final auth = context.read<AuthCubit>().state;
-    if (auth is AuthAuthenticated) {
-      context.read<ProviderStatisticsBloc>().setToken(auth.token);
-    }
-    context
-        .read<ProviderStatisticsBloc>()
-        .add(LoadProviderStatistics(_prestataireId!));
-  }
-
-  void _showExportOptions() {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.picture_as_pdf, color: Colors.red),
-                title: const Text('Exporter en PDF'),
-                onTap: () {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(this.context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Export PDF — non disponible'),
-                    ),
-                  );
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.table_chart, color: Colors.blue),
-                title: const Text('Exporter en Excel'),
-                onTap: () {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(this.context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Export Excel — non disponible'),
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
-        ),
+        ],
       ),
     );
   }
 
-  List<dynamic> _listOf(dynamic v) {
-    if (v is List) return v;
-    return const [];
+  Widget _reviewsSection(ReviewsPeriodSummary reviews) {
+    if (reviews.count == 0) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: SDColors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: SDColors.neutral200),
+        ),
+        child: Column(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: SDColors.primary50,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.star_outline, color: SDColors.primary700),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Aucun avis sur cette période',
+              style: SDTypography.bodyMedium.copyWith(
+                fontWeight: FontWeight.w800,
+                color: SDColors.neutral900,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'La note moyenne apparaîtra après un avis.',
+              textAlign: TextAlign.center,
+              style: SDTypography.bodySmall.copyWith(
+                color: SDColors.neutral500,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final avg = reviews.averageNote != null
+        ? reviews.averageNote!.toStringAsFixed(1)
+        : '—';
+    return _infoCard(
+      '${reviews.count} avis',
+      'Note moyenne sur la période : $avg / 5',
+    );
   }
 
-  int _asInt(dynamic v, {int fallback = 0}) {
-    if (v is int) return v;
-    if (v is num) return v.toInt();
-    return int.tryParse('$v') ?? fallback;
+  Widget _infoCard(String title, String subtitle) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: SDColors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: SDColors.neutral200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: SDTypography.bodyMedium.copyWith(
+              fontWeight: FontWeight.w800,
+              color: SDColors.neutral900,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            style: SDTypography.bodySmall.copyWith(color: SDColors.neutral600),
+          ),
+        ],
+      ),
+    );
   }
-
-  double _asDouble(dynamic v, {double fallback = 0}) {
-    if (v is num) return v.toDouble();
-    return double.tryParse('$v') ?? fallback;
-  }
-}
-
-class _BarItem {
-  final String label;
-  final double value;
-  final int count;
-  final String valueLabel;
-
-  _BarItem({
-    required this.label,
-    required this.value,
-    required this.count,
-    required this.valueLabel,
-  });
 }

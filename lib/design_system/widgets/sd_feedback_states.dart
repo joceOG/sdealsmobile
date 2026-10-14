@@ -81,7 +81,8 @@ class SDErrorState extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.error_outline, color: SDColors.error500, size: 20),
+              const Icon(Icons.error_outline,
+                  color: SDColors.error500, size: 20),
               SDSpacing.horizontalTinyGap,
               Expanded(
                 child: Text(
@@ -117,6 +118,7 @@ class GuestAuthState extends StatelessWidget {
     required this.description,
     this.icon,
     this.illustrationAsset,
+    this.illustration,
     this.illustrationHeight = 160,
     this.onPrimary,
     this.onSecondary,
@@ -124,8 +126,8 @@ class GuestAuthState extends StatelessWidget {
     this.secondaryLabel = 'Créer un compte',
     this.centerVertically = true,
   }) : assert(
-          icon != null || illustrationAsset != null,
-          'Fournir icon ou illustrationAsset',
+          icon != null || illustrationAsset != null || illustration != null,
+          'Fournir icon, illustrationAsset ou illustration',
         );
 
   static const double horizontalPadding = 24;
@@ -135,6 +137,7 @@ class GuestAuthState extends StatelessWidget {
   final String description;
   final IconData? icon;
   final String? illustrationAsset;
+  final Widget? illustration;
   final double illustrationHeight;
   final VoidCallback? onPrimary;
   final VoidCallback? onSecondary;
@@ -154,7 +157,8 @@ class GuestAuthState extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(horizontalPadding, 12, horizontalPadding, 8),
+          padding: const EdgeInsets.fromLTRB(
+              horizontalPadding, 12, horizontalPadding, 8),
           child: Text(
             pageTitle!,
             style: SDTypography.displayMedium.copyWith(
@@ -232,6 +236,8 @@ class GuestAuthState extends StatelessWidget {
     final circleSize =
         (MediaQuery.sizeOf(context).height * 0.22).clamp(80.0, 112.0);
 
+    if (illustration != null) return illustration!;
+
     if (illustrationAsset != null) {
       return SizedBox(
         height: effectiveIllustrationH,
@@ -240,7 +246,16 @@ class GuestAuthState extends StatelessWidget {
           illustrationAsset!,
           fit: BoxFit.contain,
           alignment: Alignment.center,
-          filterQuality: FilterQuality.high,
+          filterQuality: FilterQuality.medium,
+          frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+            if (wasSynchronouslyLoaded) return child;
+            return AnimatedOpacity(
+              opacity: frame == null ? 0 : 1,
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOut,
+              child: child,
+            );
+          },
           errorBuilder: (_, __, ___) => _buildIconVisual(circleSize),
         ),
       );
@@ -300,6 +315,189 @@ class SDLoadingInline extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Contenu enregistré encore consultable, sans actualisation.
+class SDOfflineSavedBanner extends StatelessWidget {
+  const SDOfflineSavedBanner({
+    super.key,
+    this.offline = true,
+    this.limitedExcerpt = false,
+  });
+
+  final bool offline;
+  final bool limitedExcerpt;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: SDColors.neutral50,
+        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+        border: Border.all(color: SDColors.neutral200),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            offline ? Icons.wifi_off_rounded : Icons.cloud_off_rounded,
+            size: 18,
+            color: SDColors.neutral700,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  offline
+                      ? 'Vous êtes hors ligne'
+                      : 'Actualisation impossible',
+                  style: SDTypography.labelLarge.copyWith(
+                    color: SDColors.neutral900,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Informations enregistrées, non actualisées.',
+                  style: SDTypography.bodySmall.copyWith(
+                    color: SDColors.neutral700,
+                  ),
+                ),
+                if (limitedExcerpt) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    'Extrait enregistré, pas le catalogue complet.',
+                    style: SDTypography.bodySmall.copyWith(
+                      color: SDColors.neutral500,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Section sans donnée locale.
+class SDSectionNeedsConnection extends StatelessWidget {
+  const SDSectionNeedsConnection({
+    super.key,
+    required this.detail,
+    this.onRetry,
+  });
+
+  final String detail;
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
+      decoration: BoxDecoration(
+        color: SDColors.white,
+        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+        border: Border.all(color: SDColors.neutral200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.wifi_off_rounded, color: SDColors.neutral700),
+          const SizedBox(height: 8),
+          Text(
+            'Cette section nécessite une connexion',
+            style: SDTypography.titleSmall.copyWith(
+              color: SDColors.neutral900,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            detail,
+            style: SDTypography.bodySmall.copyWith(color: SDColors.neutral600),
+          ),
+          if (onRetry != null)
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: onRetry,
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(48, SDSpacing.minTouchTarget),
+                ),
+                child: const Text('Réessayer'),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Page entière sans contenu local.
+class SDConnectionRequired extends StatelessWidget {
+  const SDConnectionRequired({
+    super.key,
+    this.onRetry,
+    this.onBack,
+  });
+
+  final VoidCallback? onRetry;
+  final VoidCallback? onBack;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.wifi_off_rounded,
+                size: 40, color: SDColors.neutral700),
+            const SizedBox(height: 12),
+            Text(
+              'Connexion nécessaire',
+              textAlign: TextAlign.center,
+              style: SDTypography.titleSmall.copyWith(
+                fontWeight: FontWeight.w800,
+                color: SDColors.neutral900,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Aucune information enregistrée n’est disponible pour cette page.',
+              textAlign: TextAlign.center,
+              style: SDTypography.bodyMedium.copyWith(
+                color: SDColors.neutral600,
+              ),
+            ),
+            const SizedBox(height: 16),
+            if (onRetry != null)
+              SDButton(
+                text: 'Réessayer',
+                size: SDButtonSize.medium,
+                onPressed: onRetry,
+              ),
+            if (onBack != null)
+              TextButton(
+                onPressed: onBack,
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(48, SDSpacing.minTouchTarget),
+                ),
+                child: const Text('Retour'),
+              ),
+          ],
+        ),
       ),
     );
   }

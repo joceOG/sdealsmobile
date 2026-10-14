@@ -87,8 +87,10 @@ android {
                 // Fallback debug uniquement si key.properties absent (jamais pour Play Store)
                 signingConfig = signingConfigs.getByName("debug")
             }
-            isMinifyEnabled = false
-            isShrinkResources = false
+            // Play : obscurcissement DEX. Les règles Flutter sont ajoutées
+            // par le plugin Gradle ; proguard-rules.pro ne garde pas tout le moteur.
+            isMinifyEnabled = true
+            isShrinkResources = true
         }
     }
 }

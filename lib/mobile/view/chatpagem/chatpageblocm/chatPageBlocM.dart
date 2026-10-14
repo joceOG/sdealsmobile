@@ -10,6 +10,7 @@ import '../../../data/models/message_model.dart';
 import 'package:sdealsmobile/data/models/categorie.dart';
 import 'package:sdealsmobile/data/services/api_client.dart';
 import 'package:sdealsmobile/data/services/websocket_service.dart';
+import 'package:sdealsmobile/data/utils/network_user_message.dart';
 import 'package:sdealsmobile/data/services/notification_service.dart';
 import 'package:sdealsmobile/data/utils/conversation_id.dart';
 import 'dart:io';
@@ -43,6 +44,7 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
     on<SelectConversation>(_onSelectConversation);
     on<LoadMessages>(_onLoadMessages);
     on<SendMessage>(_onSendMessage);
+    on<RetrySendMessage>(_onRetrySendMessage);
     on<SendAudioMessage>(_onSendAudioMessage);
     on<MarkMessageAsRead>(_onMarkMessageAsRead);
     on<MarkConversationAsRead>(_onMarkConversationAsRead);
@@ -141,9 +143,13 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
         print('❌ Error loading conversations: $error');
       }
       emit(state.copyWith(
-        status: ChatPageStatus.error,
-        error: error.toString(),
-        conversations: const [],
+        status: state.conversations.isEmpty
+            ? ChatPageStatus.error
+            : ChatPageStatus.loaded,
+        error: () {
+          final message = userFacingNetworkMessage(error);
+          return message.isEmpty ? genericUserMessage : message;
+        }(),
       ));
     }
   }
@@ -348,6 +354,38 @@ class ChatPageBlocM extends Bloc<ChatPageEventM, ChatPageStateM> {
         error: error.toString(),
       ));
     }
+  }
+
+  Future<void> _onRetrySendMessage(
+      RetrySendMessage event, Emitter<ChatPageStateM> emit) async {
+    final messages = state.messagesByConversation[event.conversationId];
+    if (messages == null || state.selectedConversation == null) return;
+
+    MessageModel? failed;
+    for (final m in messages) {
+      if (m.id == event.messageId) {
+        failed = m;
+        break;
+      }
+    }
+    if (failed == null ||
+        failed.status != MessageStatus.failed ||
+        failed.type != MessageType.text) {
+      return;
+    }
+
+    final withoutFailed =
+        messages.where((m) => m.id != event.messageId).toList();
+    final updatedMap =
+        Map<String, List<MessageModel>>.from(state.messagesByConversation);
+    updatedMap[event.conversationId] = withoutFailed;
+    emit(state.copyWith(messagesByConversation: updatedMap));
+
+    add(SendMessage(
+      conversationId: event.conversationId,
+      content: failed.content,
+      type: failed.type,
+    ));
   }
 
   Future<void> _onSendAudioMessage(

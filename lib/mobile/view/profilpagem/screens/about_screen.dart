@@ -10,9 +10,9 @@ class AboutScreen extends StatelessWidget {
 
   static const double _hPad = 20;
 
-  /// Aligné sur `pubspec.yaml`.
-  static const String appVersion = '1.2.2';
-  static const String buildNumber = '8';
+  /// Aligné sur `pubspec.yaml` (`version: 1.2.6+12`).
+  static const String appVersion = '1.2.6';
+  static const String buildNumber = '12';
 
   /// Base marketing (soutrali-deals sur Render), pas www.
   static const String _site = 'https://soutralideals-web.onrender.com';

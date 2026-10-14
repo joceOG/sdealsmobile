@@ -134,6 +134,13 @@ void main() {
       expect(d.resumeAfterAuth, '/mission-details/m1');
     });
 
+    test('FCM prestationId ouvre le détail mission', () {
+      expect(
+        FcmRoutePolicy.mapToAllowedRoute({'prestationId': 'presta1'}),
+        '/mission-details/presta1',
+      );
+    });
+
     test('destination consommée une fois puis logout', () {
       PendingLaunchDestination.hold('/chat/abc');
       expect(PendingLaunchDestination.consume(), '/chat/abc');
@@ -158,6 +165,83 @@ void main() {
       expect(
         FcmRoutePolicy.decide(const {}, loggedIn: true).route,
         '/homepage',
+      );
+    });
+  });
+
+  // Restauration de session lente (> 500 ms au splash, voire > 6 s) : ne jamais
+  // conclure « invité », ne pas perdre la destination, ne pas ouvrir l'espace pro.
+  group('restauration lente', () {
+    test('splash en attente avec destination protégée → accueil, hold gardé',
+        () {
+      final splash = FcmRoutePolicy.resolveSplash(
+        pendingRoute: '/chat/abc',
+        onboardingCompleted: true,
+        loggedIn: false, // non parce qu'invité, mais parce qu'inconnu
+        openProviderHome: false,
+        sessionPending: true,
+      );
+      // Interface neutre, pas /login : un connecté ne doit pas y être bloqué.
+      expect(splash.route, '/homepage');
+      expect(splash.hold, '/chat/abc');
+    });
+
+    test('splash en attente sans destination → accueil', () {
+      final splash = FcmRoutePolicy.resolveSplash(
+        pendingRoute: null,
+        onboardingCompleted: true,
+        loggedIn: false,
+        openProviderHome: false,
+        sessionPending: true,
+      );
+      expect(splash.route, '/homepage');
+      expect(splash.hold, isNull);
+    });
+
+    test('fin de restauration, session appliquée → ouverture de la destination',
+        () {
+      expect(
+        FcmRoutePolicy.afterSessionRestore(
+          settled: true,
+          authenticated: true,
+          pending: '/chat/abc',
+        ),
+        PostRestoreAction.openPending,
+      );
+    });
+
+    test('fin de restauration, invité confirmé, destination protégée → login',
+        () {
+      expect(
+        FcmRoutePolicy.afterSessionRestore(
+          settled: true,
+          authenticated: false,
+          pending: '/chat/abc',
+        ),
+        PostRestoreAction.openLogin,
+      );
+    });
+
+    test('restauration encore en cours → aucune action (destination gardée)',
+        () {
+      expect(
+        FcmRoutePolicy.afterSessionRestore(
+          settled: false,
+          authenticated: false,
+          pending: '/chat/abc',
+        ),
+        PostRestoreAction.none,
+      );
+    });
+
+    test('aucune destination en attente → aucune action', () {
+      expect(
+        FcmRoutePolicy.afterSessionRestore(
+          settled: true,
+          authenticated: false,
+          pending: null,
+        ),
+        PostRestoreAction.none,
       );
     });
   });

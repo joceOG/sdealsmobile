@@ -11,11 +11,8 @@ import '../../../../design_system/design_system.dart';
 const Color _kOnboardingAccent = SDColors.primary600;
 
 const SystemUiOverlayStyle _kOnboardingSystemUi = SystemUiOverlayStyle(
-  statusBarColor: Colors.transparent,
   statusBarIconBrightness: Brightness.dark,
   statusBarBrightness: Brightness.light,
-  systemNavigationBarColor: Colors.white,
-  systemNavigationBarDividerColor: Colors.transparent,
   systemNavigationBarIconBrightness: Brightness.dark,
   systemNavigationBarContrastEnforced: false,
   systemStatusBarContrastEnforced: false,

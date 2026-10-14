@@ -15,7 +15,11 @@ import 'package:sdealsmobile/data/models/categorie.dart';
 
 class _StubShoppingApi extends ApiClient {
   @override
-  Future<List<Categorie>> fetchCategorie(String nomGroupe) async => [];
+  Future<List<Categorie>> fetchCategorie(
+    String nomGroupe, {
+    bool skipCache = false,
+    bool settleLateResponse = false,
+  }) async => [];
 
   @override
   Future<List<Map<String, dynamic>>> fetchVendeurs() async => [];
@@ -325,7 +329,7 @@ void main() {
   });
 
   group('STAB-13 auth login mode', () {
-    testWidgets('toggle Téléphone / Email visible', (tester) async {
+    testWidgets('toggle Téléphone / E-mail visible', (tester) async {
       AuthLoginMode mode = AuthLoginMode.phone;
       await tester.pumpWidget(
         MaterialApp(
@@ -338,8 +342,8 @@ void main() {
         ),
       );
       expect(find.text('Téléphone'), findsOneWidget);
-      expect(find.text('Email'), findsOneWidget);
-      await tester.tap(find.text('Email'));
+      expect(find.text('E-mail'), findsOneWidget);
+      await tester.tap(find.text('E-mail'));
       await tester.pump();
       expect(mode, AuthLoginMode.email);
     });
@@ -358,12 +362,14 @@ void main() {
         ),
       );
       expect(find.textContaining('Conditions d\'utilisation'), findsOneWidget);
-      expect(find.textContaining('Politique de confidentialité'), findsOneWidget);
+      expect(
+          find.textContaining('Politique de confidentialité'), findsOneWidget);
     });
   });
 
   group('STAB-13 GuestAuthState', () {
-    testWidgets('messages invité — auth required, pas empty inbox', (tester) async {
+    testWidgets('messages invité — auth required, pas empty inbox',
+        (tester) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -378,7 +384,8 @@ void main() {
         ),
       );
 
-      expect(find.text('Connectez-vous pour accéder à vos messages'), findsOneWidget);
+      expect(find.text('Connectez-vous pour accéder à vos messages'),
+          findsOneWidget);
       expect(find.text('Pas encore de messages'), findsNothing);
       expect(find.text('Se connecter'), findsOneWidget);
       expect(find.text('Créer un compte'), findsOneWidget);
@@ -417,7 +424,8 @@ void main() {
         ),
       );
 
-      final primary = tester.widget<ElevatedButton>(find.byType(ElevatedButton).first);
+      final primary =
+          tester.widget<ElevatedButton>(find.byType(ElevatedButton).first);
       expect(primary.style?.minimumSize?.resolve({})?.height, 56);
     });
   });

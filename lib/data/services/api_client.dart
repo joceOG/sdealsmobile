@@ -13,6 +13,7 @@ import '../models/groupe.dart';
 import '../models/phone_verification_config.dart';
 import '../models/service.dart';
 import 'cache_service.dart';
+import 'freelance_hub_cache.dart';
 import 'token_store.dart';
 
 export '../errors/api_exception.dart';
@@ -62,6 +63,13 @@ class ApiClient {
   // URL configurable selon la plateforme
 
   var apiUrl = dotenv.env['API_URL'];
+
+  /// Vrai quand la dernière lecture catalogue a servi une copie enregistrée
+  /// après un échec réseau. Remis à faux avant chaque lecture.
+  bool catalogReadStale = false;
+  bool homePreviewServedFromCache = false;
+
+  static const _homePreviewCacheKey = 'home_preview_public';
 
   /// STAB-12D — cache config téléphone (autorité backend).
   static PhoneVerificationConfig? _phoneVerificationConfigCache;
@@ -435,52 +443,66 @@ class ApiClient {
     }
   }
 
-  Future<List<Categorie>> fetchCategorie(String nomGroupe) async {
+  /// Lecture cache seule. N'appelle pas le réseau.
+  Future<List<Categorie>> readCachedCategorie(String nomGroupe) async {
+    final cacheKey = 'categories_${removeDiacritics(nomGroupe).toLowerCase()}';
+    try {
+      final cachedData = await CacheService().getCachedData(cacheKey);
+      if (cachedData == null) return const [];
+      final categoriesJson = cachedData as List;
+      final allCategories = <Categorie>[];
+      for (final json in categoriesJson) {
+        try {
+          final map = Map<String, dynamic>.from(json as Map);
+          final groupeRaw = map['groupe'];
+          if (groupeRaw is Map) {
+            final groupeJson = Map<String, dynamic>.from(groupeRaw);
+            map['groupe'] = {
+              '_id': groupeJson['_id']?.toString() ?? '',
+              'nomgroupe': groupeJson['nomgroupe']?.toString() ?? '',
+            };
+          }
+          allCategories.add(Categorie.fromJson(map));
+        } catch (e) {
+          print('Erreur parsing catégorie cache: $e');
+        }
+      }
+      return allCategories.where((cat) {
+        final groupeNom =
+            removeDiacritics(cat.groupe.nomgroupe.toLowerCase());
+        final targetNom = removeDiacritics(nomGroupe.toLowerCase());
+        return groupeNom == targetNom;
+      }).toList();
+    } catch (e) {
+      print('Erreur cache categories: $e');
+      return const [];
+    }
+  }
+
+  Future<List<Categorie>> fetchCategorie(
+    String nomGroupe, {
+    bool skipCache = false,
+    bool settleLateResponse = false,
+  }) async {
     print('Récupération des catégories pour le groupe: $nomGroupe');
     final cacheKey = 'categories_${removeDiacritics(nomGroupe).toLowerCase()}';
 
-    // 1️⃣ Tentative de récupération depuis le cache
-    try {
-      final cachedData = await CacheService().getCachedData(cacheKey);
-      if (cachedData != null) {
-        print('📦 Données récupérées du cache pour $cacheKey');
-        List<dynamic> categoriesJson = cachedData;
-        List<Categorie> allCategories = [];
-        for (var json in categoriesJson) {
-           try {
-             // Normalise Hive Map<dynamic,dynamic> → Map<String,dynamic>
-             final map = Map<String, dynamic>.from(json as Map);
-             final groupeRaw = map['groupe'];
-             if (groupeRaw is Map) {
-               final groupeJson = Map<String, dynamic>.from(groupeRaw);
-               map['groupe'] = {
-                 '_id': groupeJson['_id']?.toString() ?? '',
-                 'nomgroupe': groupeJson['nomgroupe']?.toString() ?? '',
-               };
-             }
-             allCategories.add(Categorie.fromJson(map));
-           } catch (e) {
-             print('Erreur parsing catégorie cache: $e');
-           }
-        }
-        // Filtrage local (redondant si la clé est spécifique, mais sécurisé)
-        final filteredCategories = allCategories.where((cat) {
-          final groupeNom = removeDiacritics(cat.groupe.nomgroupe.toLowerCase());
-          final targetNom = removeDiacritics(nomGroupe.toLowerCase());
-          return groupeNom == targetNom;
-        }).toList();
-        
-        if (filteredCategories.isNotEmpty) return filteredCategories;
-      }
-    } catch (e) {
-      print('Erreur cache categories: $e');
+    if (!skipCache) {
+      final cached = await readCachedCategorie(nomGroupe);
+      if (cached.isNotEmpty) return cached;
     }
 
     // 2️⃣ Appel API (si cache vide/expiré)
     try {
-      final response = await http
-          .get(Uri.parse('$apiUrl/categorie'))
-          .timeout(const Duration(seconds: 15));
+      final pending = http.get(Uri.parse('$apiUrl/categorie'));
+      // Le timeout de 15 s ne doit pas jeter la réponse déjà en vol :
+      // au premier accès le corps peut arriver juste après.
+      final response = settleLateResponse
+          ? await pending.timeout(
+              const Duration(seconds: 15),
+              onTimeout: () => pending.timeout(const Duration(seconds: 15)),
+            )
+          : await pending.timeout(const Duration(seconds: 15));
       if (response.statusCode == 200) {
         List<dynamic> categoriesJson = decodeJson(response);
         List<Categorie> allCategories = [];
@@ -673,89 +695,110 @@ class ApiClient {
     }
   }
 
+  /// Récupère les services d'un groupe via `GET /api/service?scope=<scope>`.
+  ///
+  /// Le backend (`loadCatalogServicesForScope`) filtre directement en base
+  /// et retourne uniquement les services du groupe demandé — pas besoin de
+  /// récupérer tous les services et filtrer côté client.
+  ///
+  /// [nomGroupe] : ex. "Freelance", "Métiers", "E-marché"
   Future<List<Service>> fetchServices(String nomGroupe) async {
-    print('Récupération des services pour le groupe: $nomGroupe');
-    final cacheKey = 'services_${removeDiacritics(nomGroupe).toLowerCase()}';
+    // Normalise le nom de groupe en scope backend : "Freelance" → "freelance"
+    final scope = removeDiacritics(nomGroupe).toLowerCase().trim();
+    final cacheKey = 'services_$scope';
 
-    // 1️⃣ Cache
+    if (kDebugMode) print('📡 fetchServices scope=$scope');
+
+    // 1️⃣ Cache — les données sont déjà filtrées par scope
     try {
       final cachedData = await CacheService().getCachedData(cacheKey);
       if (cachedData != null) {
-        print('📦 Services récupérés du cache');
-        List<dynamic> servicesJson = cachedData;
-        List<Service> allServices = servicesJson
+        if (kDebugMode) print('📦 Services scope=$scope depuis cache');
+        final cached = (cachedData as List<dynamic>)
             .map((json) {
-              try { return Service.fromJson(json); } catch (e) { return null; }
+              try { return Service.fromJson(json); } catch (_) { return null; }
             })
             .whereType<Service>()
             .toList();
-            
-        List<Service> filteredServices = allServices.where((s) {
-          final cat = s.categorie;
-          final grp = cat == null ? null : cat.groupe;
-          final groupeNom = grp == null ? null : grp.nomgroupe;
-          return groupeNom != null &&
-              groupeNom.toLowerCase() == nomGroupe.toLowerCase();
-        }).toList();
-        
-        if (filteredServices.isNotEmpty) return filteredServices;
+        if (cached.isNotEmpty) return cached;
       }
-    } catch (e) { print('Erreur cache services: $e'); }
+    } catch (e) {
+      if (kDebugMode) print('⚠️  Cache services: $e');
+    }
 
-    // 2️⃣ API
-
+    // 2️⃣ API — endpoint ciblé avec paramètre scope
     try {
-      final response = await http.get(Uri.parse('$apiUrl/service'));
+      final uri = Uri.parse('$apiUrl/service').replace(
+        queryParameters: {'scope': scope},
+      );
+      final response = await http.get(uri);
 
-      print('Status code de la réponse: ${response.statusCode}');
+      if (kDebugMode) {
+        print('fetchServices HTTP ${response.statusCode} — scope=$scope');
+      }
 
       if (response.statusCode == 200) {
-        List<dynamic> servicesJson = decodeJson(response);
-        print('Nombre total de services reçus: ${servicesJson.length}');
-        
-        // 3️⃣ Save Cache
+        final List<dynamic> servicesJson = decodeJson(response);
+        if (kDebugMode) print('fetchServices reçus: ${servicesJson.length}');
+
+        // 3️⃣ Mise en cache
         await CacheService().cacheData(cacheKey, servicesJson);
 
-        List<Service> allServices = servicesJson
+        final services = servicesJson
             .map((json) {
-              try {
-                return Service.fromJson(json);
-              } catch (e) {
-                print('Erreur parsing service: $e pour $json');
+              try { return Service.fromJson(json); } catch (e) {
+                if (kDebugMode) print('Erreur parsing service: $e');
                 return null;
               }
             })
             .whereType<Service>()
-            .toList(); // filtre les null
+            .toList();
 
-        // Afficher les services avec données manquantes pour debug
-        for (var s in allServices) {
-          final cat = s.categorie;
-          final hasMissing = cat == null || cat.groupe.nomgroupe.isEmpty;
-          if (hasMissing) {
-            print('Service avec valeur manquante: ${s.nomservice}');
-          }
-        }
-
-        // Filtrage sûr par groupe
-        List<Service> filteredServices = allServices.where((s) {
-          final cat = s.categorie;
-          final grp = cat == null ? null : cat.groupe;
-          final groupeNom = grp == null ? null : grp.nomgroupe;
-          return groupeNom != null &&
-              groupeNom.toLowerCase() == nomGroupe.toLowerCase();
-        }).toList();
-
-        print('Services filtrés: ${filteredServices.length}');
-        return filteredServices;
+        if (kDebugMode) print('fetchServices parsés: ${services.length}');
+        return services;
       } else {
         throw Exception(
-            'Échec de récupération des services: ${response.statusCode}');
+            'fetchServices: HTTP ${response.statusCode} pour scope=$scope');
       }
     } catch (e) {
-      print('Erreur dans fetchServicesByGroupe: $e');
-      throw Exception('Échec de chargement des services: $e');
+      if (kDebugMode) print('❌ fetchServices scope=$scope: $e');
+      throw Exception('Impossible de charger les services ($scope): $e');
     }
+  }
+
+  Future<List<Service>> fetchServicesByCategorie(String categorieId) async {
+    final response = await http.get(Uri.parse('$apiUrl/service/$categorieId'));
+    if (response.statusCode != 200) {
+      throw ApiException(
+        message: 'Impossible de charger les services de cette catégorie.',
+        statusCode: response.statusCode,
+      );
+    }
+    final decoded = decodeJson(response);
+    final list = decoded is List ? decoded : const [];
+    return list
+        .whereType<Map>()
+        .map((e) => Service.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
+  Future<List<Service>> fetchServiceShortcuts({String scope = 'metiers'}) async {
+    final uri = Uri.parse('$apiUrl/service/shortcuts').replace(
+      queryParameters: {'scope': scope},
+    );
+    final response = await http.get(uri);
+    if (response.statusCode != 200) {
+      throw ApiException(
+        message: 'Impossible de charger les raccourcis.',
+        statusCode: response.statusCode,
+      );
+    }
+    final decoded = decodeJson(response);
+    final list = decoded is List ? decoded : const [];
+    return list
+        .whereType<Map>()
+        .map((e) => Service.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
   }
 
   Future<List<Article>> fetchArticle() async {
@@ -1359,41 +1402,45 @@ class ApiClient {
     int limit = 50,
     String sortBy = 'rating',
     String sortOrder = 'desc',
+    String? category,
   }) async {
-    print('Récupération des freelances depuis le backend (page $page)');
+    if (kDebugMode) {
+      debugPrint('fetchFreelances page=$page limit=$limit category=$category');
+    }
 
     try {
-      final uri = Uri.parse('${dotenv.env['API_URL']}/freelance').replace(
-        queryParameters: {
-          'page': page.toString(),
-          'limit': limit.toString(),
-          'sortBy': sortBy,
-          'sortOrder': sortOrder,
-        },
-      );
+      final qp = <String, String>{
+        'page': page.toString(),
+        'limit': limit.toString(),
+        'sortBy': sortBy,
+        'sortOrder': sortOrder,
+        if (category != null && category.isNotEmpty && category != 'Tous')
+          'category': category,
+      };
+      final uri = Uri.parse('${dotenv.env['API_URL']}/freelance')
+          .replace(queryParameters: qp);
 
-      final response = await http.get(uri).timeout(const Duration(seconds: 15));
+      final response =
+          await http.get(uri).timeout(const Duration(seconds: 25));
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> responseData = decodeJson(response);
 
         // ✅ Gestion de l'ancienne structure (array) et nouvelle (objet avec pagination)
         if (responseData.containsKey('freelances')) {
-          // Nouvelle structure avec pagination
           final List<dynamic> freelancesJson = responseData['freelances'];
-          print(
-              'Freelances récupérés: ${freelancesJson.length} (page ${responseData['pagination']['currentPage']}/${responseData['pagination']['totalPages']})');
-
+          if (kDebugMode) {
+            debugPrint('Freelances récupérés: ${freelancesJson.length}');
+          }
           return {
             'freelances': freelancesJson.cast<Map<String, dynamic>>(),
             'pagination': responseData['pagination'],
           };
         } else {
-          // Ancienne structure (array direct) - pour rétrocompatibilité
           final List<dynamic> freelancesJson = responseData as List<dynamic>;
-          print(
-              'Freelances récupérés: ${freelancesJson.length} (format legacy)');
-
+          if (kDebugMode) {
+            debugPrint('Freelances récupérés: ${freelancesJson.length} (legacy)');
+          }
           return {
             'freelances': freelancesJson.cast<Map<String, dynamic>>(),
             'pagination': null,
@@ -1433,21 +1480,26 @@ class ApiClient {
     bool forceRefresh = false,
     int page = 1,
     int limit = 20,
+    String? serviceId,
+    String? categorieId,
   }) async {
     final safePage = page < 1 ? 1 : page;
     final safeLimit = limit.clamp(1, 50);
     if (kDebugMode) {
-      debugPrint('fetchPrestataires page=$safePage limit=$safeLimit');
+      debugPrint('fetchPrestataires page=$safePage limit=$safeLimit service=$serviceId cat=$categorieId');
     }
-    final cacheKey = 'prestataires_p${safePage}_l$safeLimit';
+    final cacheKey =
+        'prestataires_p${safePage}_l${safeLimit}_s${serviceId ?? ''}_c${categorieId ?? ''}';
+    catalogReadStale = false;
 
     if (!forceRefresh) {
       try {
         final cachedData = await CacheService().getCachedData(cacheKey);
-        if (cachedData != null) {
-          return (cachedData as List).cast<Map<String, dynamic>>();
-        }
-      } catch (_) {}
+        final maps = asStringKeyMaps(cachedData);
+        if (maps.isNotEmpty) return maps;
+      } catch (e) {
+        if (kDebugMode) debugPrint('fetchPrestataires cache: $e');
+      }
     }
 
     try {
@@ -1455,6 +1507,9 @@ class ApiClient {
         queryParameters: {
           'page': safePage.toString(),
           'limit': safeLimit.toString(),
+          if (serviceId != null && serviceId.isNotEmpty) 'service': serviceId,
+          if (categorieId != null && categorieId.isNotEmpty)
+            'categorie': categorieId,
         },
       );
       final response = await http.get(uri, headers: {
@@ -1473,13 +1528,12 @@ class ApiClient {
         } else {
           prestatairesJson = const [];
         }
-        final list = prestatairesJson
-            .whereType<Map>()
-            .map((e) => Map<String, dynamic>.from(e))
-            .toList();
+        final list = asStringKeyMaps(prestatairesJson);
         try {
           await CacheService().cacheData(cacheKey, list);
-        } catch (_) {}
+        } catch (e) {
+          if (kDebugMode) debugPrint('fetchPrestataires cache write: $e');
+        }
         return list;
       }
       throw ApiException(
@@ -1487,18 +1541,76 @@ class ApiClient {
         statusCode: response.statusCode,
       );
     } catch (e) {
-      if (e is ApiException) rethrow;
+      if (e is ApiException &&
+          e.statusCode != null &&
+          e.statusCode! >= 400 &&
+          e.statusCode! < 500) {
+        rethrow;
+      }
       try {
-        final cachedData = await CacheService().getCachedData(cacheKey);
-        if (cachedData != null) {
-          return (cachedData as List).cast<Map<String, dynamic>>();
+        final retained = await CacheService().readRetained(cacheKey);
+        final maps = asStringKeyMaps(retained?.data);
+        if (maps.isNotEmpty) {
+          catalogReadStale = true;
+          return maps;
         }
-      } catch (_) {}
+      } catch (cacheError) {
+        if (kDebugMode) debugPrint('fetchPrestataires retained: $cacheError');
+      }
+      if (e is ApiException) rethrow;
       throwCaughtAsApi(e);
     }
   }
 
   // Données fictives retirées — ne plus présenter de faux prestataires.
+
+  /// Aperçu accueil : prestataires avec photo publique résolue,
+  /// filtrage AVANT la limite de 5 côté serveur.
+  /// Endpoint dédié /prestataire/home-preview — ne modifie pas le catalogue global.
+  Future<List<Map<String, dynamic>>> fetchHomePreviewPrestataires() async {
+    homePreviewServedFromCache = false;
+    try {
+      final uri = Uri.parse(
+          '${dotenv.env['API_URL']}/prestataire/home-preview');
+      final response = await http.get(uri, headers: {
+        'Content-Type': 'application/json',
+      }).timeout(const Duration(seconds: 25));
+
+      if (response.statusCode == 200) {
+        final decoded = decodeJson(response);
+        final list = decoded is List ? asStringKeyMaps(decoded) : const <Map<String, dynamic>>[];
+        try {
+          await CacheService().cacheData(_homePreviewCacheKey, list);
+        } catch (e) {
+          if (kDebugMode) debugPrint('home preview cache write: $e');
+        }
+        return list;
+      }
+      throw ApiException(
+        message: 'Impossible de charger les professionnels.',
+        statusCode: response.statusCode,
+      );
+    } catch (e, st) {
+      if (e is ApiException &&
+          e.statusCode != null &&
+          e.statusCode! >= 400 &&
+          e.statusCode! < 500) {
+        rethrow;
+      }
+      try {
+        final retained = await CacheService().readRetained(_homePreviewCacheKey);
+        final maps = asStringKeyMaps(retained?.data);
+        if (maps.isNotEmpty) {
+          homePreviewServedFromCache = true;
+          return maps;
+        }
+      } catch (cacheError) {
+        if (kDebugMode) debugPrint('home preview cache read: $cacheError');
+      }
+      if (e is ApiException) rethrow;
+      throwCaughtAsApi(e, st);
+    }
+  }
 
   // ✅ NOUVELLE MÉTHODE : Récupérer tous les vendeurs (CORRIGÉ PARSING !)
   Future<List<Map<String, dynamic>>> fetchVendeurs() async {
@@ -1659,7 +1771,9 @@ class ApiClient {
     String query, {
     int? minPrice, 
     int? maxPrice, 
-    String? city
+    String? city,
+    String scope = 'global',
+    bool includeEmarket = true,
   }) async {
     print('🔍 Recherche globale pour: "$query" [Filtres: min=$minPrice, max=$maxPrice, city=$city]');
     try {
@@ -1668,6 +1782,8 @@ class ApiClient {
         if (minPrice != null) 'minPrice': minPrice.toString(),
         if (maxPrice != null) 'maxPrice': maxPrice.toString(),
         if (city != null) 'city': city,
+        if (scope.isNotEmpty) 'scope': scope,
+        if (!includeEmarket) 'includeEmarket': '0',
       };
 
       final uri = Uri.parse('$apiUrl/search/global').replace(queryParameters: queryParams);
@@ -1682,20 +1798,33 @@ class ApiClient {
         print('✅ Résultats trouvés: ${data['counts']}');
         return data;
       } else {
-        print('❌ Erreur recherche: ${response.statusCode}');
-        return {};
+        throw ApiException(
+          message: 'Recherche indisponible (${response.statusCode}).',
+          statusCode: response.statusCode,
+        );
       }
     } catch (e) {
-      print('🔥 Exception recherche: $e');
-      return {};
+      if (e is ApiException) rethrow;
+      throwCaughtAsApi(e);
     }
   }
 
   // ✅ NOUVELLE MÉTHODE : Suggestions de recherche
-  Future<List<String>> getSuggestions(String query) async {
+  Future<List<String>> getSuggestions(
+    String query, {
+    String scope = 'global',
+    bool includeEmarket = true,
+  }) async {
     try {
+      final uri = Uri.parse('$apiUrl/search/suggestions').replace(
+        queryParameters: {
+          'query': query,
+          if (scope.isNotEmpty) 'scope': scope,
+          if (!includeEmarket) 'includeEmarket': '0',
+        },
+      );
       final response = await http.get(
-        Uri.parse('$apiUrl/search/suggestions?query=$query'),
+        uri,
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -1761,14 +1890,18 @@ class ApiClient {
       if (serviceId != null && serviceId.isNotEmpty) {
         queryParams['service'] = serviceId;
       }
-      if (serviceName != null && serviceName.isNotEmpty) {
-        queryParams['serviceName'] = serviceName;
-      }
       if (verified != null) {
         queryParams['verified'] = verified.toString();
       }
       if (limit != null) {
         queryParams['limit'] = limit.toString();
+      }
+
+      if (queryParams['service'] == null) {
+        throw ApiException(
+          message: 'Identifiant de service requis.',
+          statusCode: 400,
+        );
       }
 
       final uri = queryParams.isEmpty
@@ -1780,33 +1913,10 @@ class ApiClient {
         final List<dynamic> jsonList = decodeJson(response);
         return jsonList.cast<Map<String, dynamic>>();
       }
-
-      // Si l'API ne supporte pas encore les query params, fallback client
-      print('Fallback client-side filtering (status ${response.statusCode})');
-      final all = await fetchPrestataires();
-      return all
-          .where((p) {
-            bool ok = true;
-            if (serviceName != null && serviceName.isNotEmpty) {
-              final svc = p['service'];
-              final svcName = (svc is Map<String, dynamic>)
-                  ? (svc['nomservice'] ?? svc['name'] ?? '')
-                  : (svc?.toString() ?? '');
-              ok = ok &&
-                  svcName
-                      .toString()
-                      .toLowerCase()
-                      .contains(serviceName.toLowerCase());
-            }
-            if (verified != null) {
-              final isVerified =
-                  (p['verifier'] == true) || (p['verified'] == true);
-              ok = ok && (verified ? isVerified : true);
-            }
-            return ok;
-          })
-          .take(limit ?? 9999)
-          .toList();
+      throw ApiException(
+        message: 'Impossible de charger les prestataires de ce service.',
+        statusCode: response.statusCode,
+      );
     } catch (e) {
       print('Erreur dans fetchPrestatairesByService: $e');
       throw Exception('Échec de chargement des prestataires par service: $e');
@@ -1963,6 +2073,8 @@ class ApiClient {
       if (response.statusCode == 200) {
         Map<String, dynamic> result = decodeJson(response);
         print('Note mise à jour: ${result['newRating']}');
+        // La note change le tri du hub : plus d'entrée antérieure.
+        await FreelanceHubCache.shared.invalidateScope();
         return result;
       } else {
         throw Exception(
@@ -2080,13 +2192,56 @@ extension ServiceRequestsApi on ApiClient {
         final data = jsonDecode(utf8.decode(res.bodyBytes));
         final list = data is List ? data : (data['prestataires'] ?? []);
         if ((list as List).isEmpty) return null;
-        return list[0] as Map<String, dynamic>;
+        final first = list.first;
+        if (first is! Map) return null;
+        return Map<String, dynamic>.from(first);
       }
-      return null;
+      if (res.statusCode == 404) return null;
+      throw ApiException(
+        message: 'Impossible de charger le profil professionnel.',
+        statusCode: res.statusCode,
+      );
     } catch (e) {
-      print('Erreur getPrestataireByUserId: $e');
-      return null;
+      if (kDebugMode) debugPrint('getPrestataireByUserId: $e');
+      if (e is ApiException) rethrow;
+      ApiClient.throwCaughtAsApi(e);
     }
+  }
+
+  /// Prestations d’un prestataire (propriétaire) — pagination automatique.
+  Future<List<Map<String, dynamic>>> fetchAllPrestationsForPrestataire({
+    required String token,
+    required String prestataireId,
+    int pageSize = 100,
+    int maxPages = 20,
+  }) async {
+    final all = <Map<String, dynamic>>[];
+    for (var page = 1; page <= maxPages; page++) {
+      final res = await get(
+        '/prestations/prestataire/$prestataireId?page=$page&limit=$pageSize',
+        token: token,
+      );
+      if (res.statusCode != 200) {
+        throw Exception('prestations prestataire: ${res.statusCode}');
+      }
+      final data = jsonDecode(utf8.decode(res.bodyBytes));
+      List<dynamic> chunk = const [];
+      if (data is Map && data['prestations'] is List) {
+        chunk = data['prestations'] as List;
+      } else if (data is List) {
+        chunk = data;
+      }
+      if (chunk.isEmpty) break;
+      for (final item in chunk) {
+        if (item is Map) {
+          all.add(Map<String, dynamic>.from(item));
+        }
+      }
+      final totalPages = data is Map ? data['totalPages'] : null;
+      if (totalPages is num && page >= totalPages.toInt()) break;
+      if (chunk.length < pageSize) break;
+    }
+    return all;
   }
 
   // ✅ Récupérer prestations par statut (pour prestataires)
@@ -2125,7 +2280,10 @@ extension ServiceRequestsApi on ApiClient {
     if (res.statusCode == 200) {
       return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
     }
-    throw Exception('Erreur updatePrestationStatus: ${res.statusCode}');
+    ApiClient.throwApiError(
+      res,
+      fallbackMessage: 'Impossible de mettre à jour le statut de la mission.',
+    );
   }
 
   // ✅ Détail prestation
@@ -2137,7 +2295,10 @@ extension ServiceRequestsApi on ApiClient {
     if (res.statusCode == 200) {
       return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
     }
-    throw Exception('Erreur getPrestationById: ${res.statusCode}');
+    ApiClient.throwApiError(
+      res,
+      fallbackMessage: 'Impossible de charger cette mission.',
+    );
   }
 
   // ✅ Récupérer les notifications d'un utilisateur
@@ -2646,19 +2807,23 @@ extension MessagerieApi on ApiClient {
   }
 
   // 📬 Récupérer les messages non lus
-  Future<List<Map<String, dynamic>>> getUnreadMessages(String userId,
-      {int page = 1, int limit = 50}) async {
+  Future<List<Map<String, dynamic>>> getUnreadMessages(
+    String userId, {
+    String? token,
+    int page = 1,
+    int limit = 50,
+  }) async {
     try {
       print('📬 Récupération messages non lus');
 
-      final uri = Uri.parse('$apiUrl/messages/unread/$userId').replace(
-        queryParameters: {
-          'page': page.toString(),
-          'limit': limit.toString(),
-        },
+      final qs = Uri(queryParameters: {
+        'page': page.toString(),
+        'limit': limit.toString(),
+      }).query;
+      final response = await get(
+        '/messages/unread/$userId?$qs',
+        token: token,
       );
-
-      final response = await http.get(uri).timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
         final data = ApiClient.decodeJson(response);

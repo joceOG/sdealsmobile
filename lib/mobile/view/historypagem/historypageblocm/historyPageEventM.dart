@@ -264,6 +264,3 @@ class CleanOldHistoryM extends HistoryPageEventM {
 class RefreshHistoryM extends HistoryPageEventM {
   const RefreshHistoryM();
 }
-
-
-

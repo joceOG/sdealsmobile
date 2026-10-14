@@ -152,6 +152,17 @@ class SDResponsive {
     return max;
   }
 
+  /// Espace à réserver sous un contenu collé au bord bas.
+  ///
+  /// Clavier ouvert : [MediaQuery.viewInsets] (le clavier recouvre la barre
+  /// système, on ne l’ajoute pas en plus).
+  /// Clavier fermé : [systemBottomInset].
+  static double occupiedBottomInset(BuildContext context) {
+    final keyboard = MediaQuery.viewInsetsOf(context).bottom;
+    final system = systemBottomInset(context);
+    return keyboard > system ? keyboard : system;
+  }
+
   // ─── Debug / Instrumentation ─────────────────────────────────────────────
 
   /// Overlay debug [kDebugMode] uniquement — affiche tous les insets système

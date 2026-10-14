@@ -16,11 +16,14 @@ enum RegisterPhase {
 class RegisterPageStateM extends Equatable {
   final RegisterPhase phase;
   final String? errorMessage;
+
   /// STAB-12A : erreurs par champ (telephone, email, password, code…).
   final Map<String, String> fieldErrors;
   final Utilisateur? utilisateur;
+
   /// JWT session après inscription réussie — PAS le phoneVerificationToken.
   final String? token;
+
   /// Éphémère : uniquement entre verify et register. Jamais TokenStore.
   final String? phoneVerificationToken;
   final String? pendingE164Phone;
@@ -29,6 +32,7 @@ class RegisterPageStateM extends Equatable {
   final String? pendingNom;
   final String? pendingEmail;
   final String? pendingPassword;
+
   /// Secondes restantes avant resend (UI). Sécurité réelle = backend.
   final int resendCooldownSeconds;
   final DateTime? otpSentAt;
@@ -91,12 +95,10 @@ class RegisterPageStateM extends Equatable {
   }) {
     return RegisterPageStateM(
       phase: phase ?? this.phase,
-      errorMessage: clearErrorMessage
-          ? null
-          : (errorMessage ?? this.errorMessage),
-      fieldErrors: clearFieldErrors
-          ? const {}
-          : (fieldErrors ?? this.fieldErrors),
+      errorMessage:
+          clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
+      fieldErrors:
+          clearFieldErrors ? const {} : (fieldErrors ?? this.fieldErrors),
       utilisateur: utilisateur ?? this.utilisateur,
       token: token ?? this.token,
       phoneVerificationToken: clearPhoneVerificationToken

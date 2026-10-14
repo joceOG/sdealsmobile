@@ -96,6 +96,10 @@ class SDClientLocationPolicy {
   SDClientLocationPolicy._();
 
   static const fallbackCity = 'Abidjan';
+
+  /// Centre d’Abidjan, utilisé seulement si aucune position n’est encore choisie.
+  static const fallbackLatitude = 5.35995;
+  static const fallbackLongitude = -4.00826;
 }
 
 /// Navigation client validée. Constante seulement : la barre n'est pas modifiée.

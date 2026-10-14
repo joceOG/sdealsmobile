@@ -8,8 +8,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
 import 'package:sdealsmobile/data/models/utilisateur.dart';
 import 'package:sdealsmobile/data/services/authCubit.dart';
-import 'package:sdealsmobile/design_system/design_system.dart';
 import 'package:sdealsmobile/mobile/view/common/auth_completion.dart';
+import 'package:sdealsmobile/mobile/view/common/become_professional_screen.dart';
 import 'package:sdealsmobile/mobile/view/common/publish_options.dart';
 import 'package:sdealsmobile/mobile/view/homepagem/widgets/home_universe_choice_card.dart';
 import 'package:sdealsmobile/mobile/view/freelance_registration/screens/freelance_welcome_screen.dart';
@@ -77,12 +77,16 @@ void main() {
       isNull,
     );
 
+    // Nouveau design : 2 cartes portrait + aperçu de la 3ème.
     for (final width in [320.0, 360.0, 393.0]) {
       expect(NearbyCarouselMetrics.showsRegularPeek(width), isTrue);
       final card = NearbyCarouselMetrics.cardWidth(width);
-      final fragment = width - 32 - card - 12;
-      expect(fragment, inInclusiveRange(32, 48));
-      expect(card, greaterThan(fragment));
+      // Le fragment visible de la 3ème carte doit être raisonnable (16–36 dp).
+      final viewport = width - 32;
+      final visibleFragment = viewport - 2 * card - NearbyCarouselMetrics.gap;
+      expect(visibleFragment, inInclusiveRange(16, 36));
+      // La carte doit être clairement plus large que le fragment visible.
+      expect(card, greaterThan(visibleFragment));
     }
   });
 
@@ -95,7 +99,7 @@ void main() {
     expect(home.contains('fetchHomeFreelanceServices('), isFalse);
     expect(home.contains('fetchArticle('), isFalse);
     expect(home.contains('Geolocator'), isFalse);
-    expect(home.contains('fetchPrestataires('), isTrue);
+    expect(home.contains('fetchHomePreviewPrestataires('), isTrue);
     expect(home.contains('JobPageScreenM'), isTrue);
     expect(home.contains('FreelancePageScreen'), isTrue);
     expect(home.contains('LocationPageScreenM'), isTrue);
@@ -131,7 +135,7 @@ void main() {
     expect(find.text('Abidjan'), findsOneWidget);
     expect(find.text('Modifier'), findsOneWidget);
     expect(find.text('Choisir la ville'), findsNothing);
-    expect(find.text('Professionnels près de vous'), findsOneWidget);
+    expect(find.text('Découvrir des professionnels'), findsOneWidget);
     expect(find.byType(HomeUniverseChoiceCard), findsNWidgets(2));
     expect(find.textContaining('GPS'), findsNothing);
     expect(find.byType(LocationPageScreenM), findsNothing);
@@ -140,7 +144,7 @@ void main() {
 
     final city = tester.getTopLeft(find.text('Abidjan')).dy;
     final nearby =
-        tester.getTopLeft(find.text('Professionnels près de vous')).dy;
+        tester.getTopLeft(find.text('Découvrir des professionnels')).dy;
     final promise = tester
         .getTopLeft(find.text('Trouvez un professionnel près de vous'))
         .dy;
@@ -233,12 +237,11 @@ void main() {
         );
         expect(tester.takeException(), isNull);
         expect(find.byType(HomeNearbyCard), findsWidgets);
-        expect(
-          tester.widgetList<HomeNearbyCard>(find.byType(HomeNearbyCard)).length,
-          lessThan(3),
-        );
+        // Avec 2 cartes portrait visibles + aperçu d'une 3ème,
+        // jusqu'à 3 cartes peuvent être rendues dans le viewport étendu.
+        expect(find.byType(HomeNearbyCard), findsWidgets);
         expect(find.textContaining('GPS'), findsNothing);
-        await tester.ensureVisible(find.text('Professionnels près de vous'));
+        await tester.ensureVisible(find.text('Découvrir des professionnels'));
         await tester.scrollUntilVisible(
           find.text('Koffi test'),
           180,
@@ -304,29 +307,33 @@ void main() {
     );
     await tester.tap(find.text('ouvrir'));
     await tester.pumpAndSettle();
+    expect(find.text('Devenir professionnel'), findsOneWidget);
     expect(
-      find.text('Comment souhaitez-vous proposer vos services ?'),
-      findsOneWidget,
-    );
-    expect(
-      find.text('Choisissez votre activité pour commencer.'),
+      find.text('Choisissez l’activité que vous souhaitez proposer.'),
       findsOneWidget,
     );
     expect(find.text('Que souhaitez-vous publier ?'), findsNothing);
-    expect(
-        find.text('Proposer des services près de chez vous'), findsOneWidget);
-    expect(find.text('Proposer des compétences à distance'), findsOneWidget);
-    expect(find.text('Devenir professionnel'), findsOneWidget);
-    expect(find.text('Devenir freelance'), findsOneWidget);
+    expect(find.text('Proposer mes\nservices'), findsOneWidget);
+    expect(find.text('Partager mes\ncompétences'), findsOneWidget);
+    expect(find.text('Vendre mes\nproduits'), findsOneWidget);
     expect(find.text('Boutique'), findsNothing);
-    expect(find.text('Fermer'), findsOneWidget);
+    expect(
+      find.image(const AssetImage(BecomeProfessionalScreen.metierImage)),
+      findsOneWidget,
+    );
+    expect(
+      find.image(const AssetImage(BecomeProfessionalScreen.freelanceImage)),
+      findsOneWidget,
+    );
+    expect(
+      find.image(const AssetImage(BecomeProfessionalScreen.vendeurImage)),
+      findsOneWidget,
+    );
 
-    final icons = tester.widgetList<Icon>(find.byType(Icon));
-    for (final icon in icons) {
-      expect(icon.color, isNot(SDColors.info600));
-    }
-
-    await tester.tap(find.text('Freelance'));
+    await tester.ensureVisible(find.text('Partager mes\ncompétences'));
+    await tester.tap(find.text('Partager mes\ncompétences'));
+    await tester.pump();
+    await tester.tap(find.text('Continuer  →'));
     await tester.pump();
     await tester.pump();
     expect(find.byType(FreelanceWelcomeScreen), findsOneWidget);

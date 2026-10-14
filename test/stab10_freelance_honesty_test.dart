@@ -20,7 +20,12 @@ class _FakeApiClient extends ApiClient {
   int freelancesCalls = 0;
 
   @override
-  Future<List<Categorie>> fetchCategorie(String nomGroupe) async => [];
+  Future<List<Categorie>> fetchCategorie(
+    String nomGroupe, {
+    bool skipCache = false,
+    bool settleLateResponse = false,
+  }) async =>
+      [];
 
   @override
   Future<List<Service>> fetchServices(String nomGroupe) async => [];
@@ -31,6 +36,7 @@ class _FakeApiClient extends ApiClient {
     int limit = 50,
     String sortBy = 'rating',
     String sortOrder = 'desc',
+    String? category,
   }) async {
     freelancesCalls++;
     if (freelancesDelay > Duration.zero) {
@@ -47,7 +53,11 @@ class _FakeApiClient extends ApiClient {
 
 class _SlowCategoriesClient extends ApiClient {
   @override
-  Future<List<Categorie>> fetchCategorie(String nomGroupe) async {
+  Future<List<Categorie>> fetchCategorie(
+    String nomGroupe, {
+    bool skipCache = false,
+    bool settleLateResponse = false,
+  }) async {
     await Future<void>.delayed(const Duration(seconds: 2));
     return [
       Categorie(
@@ -68,6 +78,7 @@ class _SlowCategoriesClient extends ApiClient {
     int limit = 50,
     String sortBy = 'rating',
     String sortOrder = 'desc',
+    String? category,
   }) async =>
       {
         'freelances': [

@@ -6,6 +6,7 @@ import '../../../../data/errors/api_exception.dart';
 import '../../../../data/models/utilisateur.dart';
 import '../../../../data/services/api_client.dart';
 import '../../../../data/utils/phone_canonicalizer.dart';
+import '../../../../data/utils/phone_otp_code.dart';
 import 'registerPageStateM.dart';
 import 'registerPageEventM.dart';
 
@@ -124,6 +125,19 @@ class RegisterPageBlocM extends Bloc<RegisterPageEventM, RegisterPageStateM> {
       emit(state.copyWith(
         phase: RegisterPhase.error,
         errorMessage: 'Les mots de passe ne correspondent pas',
+        fieldErrors: const {
+          'confirmPassword': 'Les mots de passe ne correspondent pas',
+        },
+      ));
+      return;
+    }
+    if (event.password.length < 6) {
+      emit(state.copyWith(
+        phase: RegisterPhase.error,
+        errorMessage: 'Le mot de passe doit contenir au moins 6 caractères',
+        fieldErrors: const {
+          'password': 'Le mot de passe doit contenir au moins 6 caractères',
+        },
       ));
       return;
     }
@@ -134,7 +148,9 @@ class RegisterPageBlocM extends Bloc<RegisterPageEventM, RegisterPageStateM> {
       emit(state.copyWith(
         phase: RegisterPhase.error,
         errorMessage: 'Le nom doit contenir au moins 2 caractères',
-        fieldErrors: const {'nom': 'Le nom doit contenir au moins 2 caractères'},
+        fieldErrors: const {
+          'nom': 'Le nom doit contenir au moins 2 caractères'
+        },
       ));
       return;
     }
@@ -265,15 +281,13 @@ class RegisterPageBlocM extends Bloc<RegisterPageEventM, RegisterPageStateM> {
     } catch (_) {
       emit(state.copyWith(
         phase: RegisterPhase.error,
-        errorMessage:
-            'Numéro de téléphone invalide pour le pays sélectionné.',
+        errorMessage: 'Numéro de téléphone invalide pour le pays sélectionné.',
       ));
       return;
     }
 
     // Changement de numéro vs pending → drop ancien token
-    if (state.pendingE164Phone != null &&
-        state.pendingE164Phone != e164Phone) {
+    if (state.pendingE164Phone != null && state.pendingE164Phone != e164Phone) {
       emit(state.copyWith(clearPhoneVerificationToken: true));
     }
 
@@ -360,18 +374,18 @@ class RegisterPageBlocM extends Bloc<RegisterPageEventM, RegisterPageStateM> {
     final nom = state.pendingNom;
     final prenom = state.pendingPrenom;
     final password = state.pendingPassword;
-    if (phone == null ||
-        country == null ||
-        nom == null ||
-        password == null) {
+    if (phone == null || country == null || nom == null || password == null) {
       return;
     }
 
     final code = event.code.trim();
-    if (code.length != 6 || int.tryParse(code) == null) {
+    if (!isPhoneOtpCode(code)) {
       emit(state.copyWith(
         phase: RegisterPhase.error,
-        errorMessage: 'Saisissez le code à 6 chiffres.',
+        errorMessage: 'Saisissez le code à $kPhoneOtpCodeLength chiffres.',
+        fieldErrors: {
+          'code': 'Saisissez le code à $kPhoneOtpCodeLength chiffres.',
+        },
       ));
       return;
     }
@@ -390,8 +404,7 @@ class RegisterPageBlocM extends Bloc<RegisterPageEventM, RegisterPageStateM> {
         code: code,
         phoneCountry: country,
       );
-      verificationToken =
-          verified['phoneVerificationToken']?.toString();
+      verificationToken = verified['phoneVerificationToken']?.toString();
       if (verificationToken == null || verificationToken.isEmpty) {
         emit(state.copyWith(
           phase: RegisterPhase.error,

@@ -6,6 +6,9 @@ class Service {
   String imageservice;
   String prixmoyen;
   Categorie? categorie; // nullable
+  List<String> aliases;
+  List<String> needs;
+  int? shortcutRank;
 
   Service({
     required this.idservice,
@@ -13,6 +16,9 @@ class Service {
     required this.imageservice,
     required this.prixmoyen,
     this.categorie,
+    this.aliases = const [],
+    this.needs = const [],
+    this.shortcutRank,
   });
 
   /// Construire depuis JSON / Map (Hive peut renvoyer Map<dynamic, dynamic>).
@@ -26,6 +32,13 @@ class Service {
       prixmoyen:
           map['prixmoyen'] as String? ?? map['prixservice']?.toString() ?? '0',
       categorie: catRaw != null ? Categorie.fromJson(catRaw) : null,
+      aliases: (map['aliases'] as List?)?.map((e) => e.toString()).toList() ??
+          const [],
+      needs:
+          (map['needs'] as List?)?.map((e) => e.toString()).toList() ?? const [],
+      shortcutRank: map['shortcutRank'] is num
+          ? (map['shortcutRank'] as num).toInt()
+          : int.tryParse('${map['shortcutRank'] ?? ''}'),
     );
   }
 

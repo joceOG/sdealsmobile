@@ -27,6 +27,11 @@ class PerformGlobalSearch extends SearchPageEventM {
   List<Object> get props => [query];
 }
 
+/// Conserve la saisie et relance hors du scope courant (ex. Métiers → global).
+class ExpandSearchToGlobal extends SearchPageEventM {
+  const ExpandSearchToGlobal();
+}
+
 // 🟢 Réinitialiser la recherche
 class ClearSearch extends SearchPageEventM {}
 

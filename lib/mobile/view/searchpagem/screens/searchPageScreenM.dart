@@ -12,7 +12,6 @@ import '../../shoppingpagem/shoppingpageblocm/shoppingPageBlocM.dart';
 import '../../shoppingpagem/shoppingpageblocm/shoppingPageStateM.dart'
     as shop_model;
 import '../../../../data/models/vendeur.dart';
-import '../../common/widgets/empty_state_widget.dart';
 import 'package:sdealsmobile/mobile/view/searchpagem/searchpageblocm/searchPageBlocM.dart';
 import 'package:sdealsmobile/mobile/view/searchpagem/searchpageblocm/searchPageEventM.dart';
 import 'package:sdealsmobile/mobile/view/searchpagem/searchpageblocm/searchPageStateM.dart';
@@ -29,19 +28,30 @@ class SearchPageScreenM extends StatelessWidget {
   /// Si renseigné, lance la recherche globale au chargement (ex. depuis Explorer).
   final String? initialQuery;
 
+  /// `metiers` | `freelance` | `emarket` | `global`
+  final String scope;
+
+  /// Suggestions « À découvrir » fournies par l'appelant (termes réels de
+  /// l'univers). Prioritaires sur la liste éditoriale du périmètre.
+  final List<String>? discoveryTerms;
+
   const SearchPageScreenM({
     super.key,
     this.initialIndex = 0,
     this.initialQuery,
+    this.scope = 'global',
+    this.discoveryTerms,
   });
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => SearchPageBlocM(),
+      create: (context) => SearchPageBlocM(scope: scope),
       child: _SearchBody(
         initialIndex: initialIndex,
         initialQuery: initialQuery,
+        scope: scope,
+        discoveryTerms: discoveryTerms,
       ),
     );
   }
@@ -50,8 +60,15 @@ class SearchPageScreenM extends StatelessWidget {
 class _SearchBody extends StatefulWidget {
   final int initialIndex;
   final String? initialQuery;
+  final String scope;
+  final List<String>? discoveryTerms;
 
-  const _SearchBody({this.initialIndex = 0, this.initialQuery});
+  const _SearchBody({
+    this.initialIndex = 0,
+    this.initialQuery,
+    this.scope = 'global',
+    this.discoveryTerms,
+  });
 
   @override
   State<_SearchBody> createState() => _SearchBodyState();
@@ -59,6 +76,13 @@ class _SearchBody extends StatefulWidget {
 
 class _SearchBodyState extends State<_SearchBody>
     with SingleTickerProviderStateMixin {
+  static final TextStyle _searchLineTextStyle =
+      SDTypography.bodyMedium.copyWith(
+    color: SDColors.neutral900,
+    fontSize: 14,
+  );
+
+  /// Liste éditoriale multi-univers (recherche globale uniquement).
   static const _popularSearches = [
     'Plombier',
     'Électricien',
@@ -70,10 +94,56 @@ class _SearchBodyState extends State<_SearchBody>
     'Photographe',
   ];
 
+  /// Liste éditoriale du périmètre Métiers (sans terme Freelance).
+  static const _popularMetiers = [
+    'Plombier',
+    'Électricien',
+    'Coiffeur',
+    'Menuisier',
+    'Maçon',
+    'Couturier',
+    'Photographe',
+  ];
+
+  /// Suggestions cohérentes avec le périmètre. Freelance / E-marché n'ont
+  /// pas de liste éditoriale : seulement des termes réels passés par
+  /// l'appelant, sinon la section est masquée (jamais « Plombier » en
+  /// recherche Freelance).
+  List<String> get _discoveryTerms {
+    final provided = (widget.discoveryTerms ?? const <String>[])
+        .map((t) => t.trim())
+        .where((t) => t.isNotEmpty)
+        .toList();
+    if (provided.isNotEmpty) return provided;
+    switch (widget.scope) {
+      case 'metiers':
+        return _popularMetiers;
+      case 'global':
+        return _popularSearches;
+      default:
+        return const [];
+    }
+  }
+
+  String _discoverySubtitle() {
+    switch (widget.scope) {
+      case 'metiers':
+        return 'Métiers et artisans à Abidjan…';
+      case 'freelance':
+        return 'Freelances et compétences, à distance ou au projet…';
+      default:
+        return ClientFeatureFlags.emarketEnabled
+            ? 'Services, freelances, produits ou boutiques à Abidjan…'
+            : 'Services et freelances à Abidjan…';
+    }
+  }
+
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
   late TabController _tabController;
   Timer? _debounce;
   bool _showSuggestions = false;
+  bool _scheduleSearchFocus = false;
 
   @override
   void initState() {
@@ -91,6 +161,9 @@ class _SearchBodyState extends State<_SearchBody>
       }
     });
 
+    // Focus clavier après la transition de page (évite IME + push en parallèle).
+    _scheduleSearchFocus = widget.initialQuery?.trim().isEmpty ?? true;
+
     // Charger l'historique au démarrage (+ recherche initiale depuis Explorer)
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<SearchPageBlocM>().add(LoadHistory());
@@ -105,8 +178,35 @@ class _SearchBodyState extends State<_SearchBody>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_scheduleSearchFocus) return;
+    _scheduleSearchFocus = false;
+
+    void openKeyboard() {
+      if (!mounted) return;
+      _searchFocusNode.requestFocus();
+    }
+
+    final animation = ModalRoute.of(context)?.animation;
+    if (animation == null || animation.isCompleted) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => openKeyboard());
+      return;
+    }
+
+    void onRouteStatus(AnimationStatus status) {
+      if (status != AnimationStatus.completed) return;
+      animation.removeStatusListener(onRouteStatus);
+      WidgetsBinding.instance.addPostFrameCallback((_) => openKeyboard());
+    }
+
+    animation.addStatusListener(onRouteStatus);
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
+    _searchFocusNode.dispose();
     _tabController.dispose();
     _debounce?.cancel();
     super.dispose();
@@ -160,7 +260,11 @@ class _SearchBodyState extends State<_SearchBody>
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(msg, textAlign: TextAlign.center),
+                    Text(msg,
+                        textAlign: TextAlign.center,
+                        style: SDTypography.bodyMedium.copyWith(
+                          color: SDColors.neutral800,
+                        )),
                     SizedBox(height: SDSpacing.sm),
                     ElevatedButton(
                       onPressed: () {
@@ -191,8 +295,12 @@ class _SearchBodyState extends State<_SearchBody>
             if (typedQuery.isEmpty) {
               return _buildDiscoveryPanel(state.history);
             }
-            if (state.suggestions.isNotEmpty) {
+            if (typedQuery.length >= 1 && state.suggestions.isNotEmpty) {
               return _buildSuggestionsList(state.suggestions, typedQuery);
+            }
+            if (typedQuery.length >= 1) {
+              return _buildDiscoveryPanel(state.history,
+                  filterQuery: typedQuery);
             }
             return _buildDiscoveryPanel(state.history, filterQuery: typedQuery);
           }
@@ -227,7 +335,7 @@ class _SearchBodyState extends State<_SearchBody>
           }
 
           if (state.hasSearched) {
-            return _buildNoResultsState(state.query);
+            return _buildNoResultsState(state.query, scope: state.scope);
           }
 
           return _buildDiscoveryPanel(state.history);
@@ -236,96 +344,119 @@ class _SearchBodyState extends State<_SearchBody>
     );
   }
 
+  String _searchHintText() {
+    if (widget.scope == 'metiers') {
+      return 'Rechercher un métier ou un besoin';
+    }
+    if (widget.scope == 'freelance') {
+      return 'Rechercher une compétence freelance';
+    }
+    return 'Que recherchez-vous\u00a0?';
+  }
+
   PreferredSizeWidget _buildAppBar() {
     final canPop = Navigator.of(context).canPop();
+    final hasQuery = _searchController.text.isNotEmpty;
     return SDWhiteAppBar.appBar(
       automaticallyImplyLeading: false,
+      toolbarHeight: 56,
       leading: canPop
           ? IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+              tooltip: 'Retour',
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+              icon: const Icon(Icons.arrow_back, size: 22),
               onPressed: () => Navigator.of(context).maybePop(),
             )
-          : SizedBox(width: SDSpacing.sm),
+          : const SizedBox(width: 8),
       titleWidget: Row(
         children: [
+          Expanded(child: _buildAppBarSearchField(hasQuery: hasQuery)),
+          IconButton(
+            tooltip: 'Filtres',
+            visualDensity: VisualDensity.compact,
+            padding: const EdgeInsets.only(left: 4),
+            constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+            icon: const Icon(Icons.tune_outlined, size: 22),
+            color: SDColors.neutral700,
+            onPressed: () => _showFilterModal(context),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Barre unique (Explorer) : blanc, bordure neutre fine, sans contour vert au focus.
+  Widget _buildAppBarSearchField({required bool hasQuery}) {
+    return Container(
+      constraints: const BoxConstraints(minHeight: 44),
+      decoration: BoxDecoration(
+        color: SDColors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: SDColors.neutral200),
+      ),
+      padding: const EdgeInsets.only(left: 10, right: 2),
+      child: Row(
+        children: [
+          const Icon(Icons.search, color: SDColors.neutral600, size: 22),
           Expanded(
-            child: Container(
-              height: 40,
-              decoration: BoxDecoration(
-                color: SDColors.neutral50,
-                borderRadius:
-                    BorderRadius.circular(SDSpacing.borderRadiusLarge),
-                border: Border.all(color: SDColors.primary100),
-              ),
-              alignment: Alignment.centerLeft,
-              child: TextField(
-                controller: _searchController,
-                onChanged: (value) {
-                  if (value.trim().isEmpty) {
-                    context.read<SearchPageBlocM>().add(ClearSearch());
-                    context.read<SearchPageBlocM>().add(LoadHistory());
-                    setState(() => _showSuggestions = true);
-                  } else {
-                    setState(() => _showSuggestions = true);
-                  }
-                  _onSearchChanged(value);
-                },
-                onSubmitted: _onSubmit,
-                onTap: () {
+            child: TextField(
+              controller: _searchController,
+              focusNode: _searchFocusNode,
+              onChanged: (value) {
+                if (value.trim().isEmpty) {
+                  context.read<SearchPageBlocM>().add(ClearSearch());
+                  context.read<SearchPageBlocM>().add(LoadHistory());
                   setState(() => _showSuggestions = true);
-                  _onSearchChanged(_searchController.text);
-                },
-                decoration: InputDecoration(
-                  hintText: ClientFeatureFlags.emarketEnabled
-                      ? 'Rechercher services, produits...'
-                      : 'Rechercher un service ou une compétence',
-                  hintStyle: SDTypography.bodyMedium
-                      .copyWith(color: SDColors.neutral400),
-                  prefixIcon:
-                      Icon(Icons.search, color: SDColors.primary600, size: 20),
-                  suffixIcon: _searchController.text.isNotEmpty
-                      ? IconButton(
-                          icon: Icon(Icons.close,
-                              color: SDColors.neutral500, size: 18),
-                          onPressed: () {
-                            _searchController.clear();
-                            context.read<SearchPageBlocM>().add(ClearSearch());
-                            context.read<SearchPageBlocM>().add(LoadHistory());
-                            setState(() => _showSuggestions = true);
-                            _onSearchChanged('');
-                          },
-                        )
-                      : null,
-                  isDense: true,
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(
-                    horizontal: SDSpacing.xs,
-                    vertical: SDSpacing.xs,
-                  ),
+                } else {
+                  setState(() => _showSuggestions = true);
+                }
+                _onSearchChanged(value);
+              },
+              onSubmitted: _onSubmit,
+              onTap: () {
+                setState(() => _showSuggestions = true);
+                _onSearchChanged(_searchController.text);
+              },
+              decoration: InputDecoration(
+                hintText: _searchHintText(),
+                hintStyle: SDTypography.bodyMedium.copyWith(
+                  color: SDColors.neutral500,
+                  fontSize: 14,
                 ),
-                style: SDTypography.bodyMedium,
-                textInputAction: TextInputAction.search,
+                isDense: true,
+                filled: false,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                disabledBorder: InputBorder.none,
+                errorBorder: InputBorder.none,
+                focusedErrorBorder: InputBorder.none,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
               ),
+              style: _searchLineTextStyle,
+              cursorColor: SDColors.primary600,
+              textInputAction: TextInputAction.search,
             ),
           ),
-          SizedBox(width: SDSpacing.xs),
-          GestureDetector(
-            onTap: () => _showFilterModal(context),
-            child: Container(
-              padding: EdgeInsets.all(SDSpacing.xs),
-              decoration: BoxDecoration(
-                color: SDColors.white,
-                shape: BoxShape.circle,
-                border: Border.all(color: SDColors.neutral200),
-                boxShadow: [
-                  BoxShadow(
-                      color: SDColors.neutral900.withOpacity(0.08),
-                      blurRadius: 4),
-                ],
-              ),
-              child: Icon(Icons.tune, color: SDColors.primary600, size: 20),
+          if (hasQuery)
+            IconButton(
+              tooltip: 'Effacer',
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+              icon: const Icon(Icons.close, size: 18),
+              color: SDColors.neutral500,
+              onPressed: () {
+                _searchController.clear();
+                context.read<SearchPageBlocM>().add(ClearSearch());
+                context.read<SearchPageBlocM>().add(LoadHistory());
+                setState(() => _showSuggestions = true);
+                _onSearchChanged('');
+              },
             ),
-          ),
         ],
       ),
     );
@@ -543,19 +674,77 @@ class _SearchBodyState extends State<_SearchBody>
     );
   }
 
+  List<String> _validHistoryEntries(List<String> history) {
+    final seen = <String>{};
+    final out = <String>[];
+    for (final item in history) {
+      final q = cleanDisplayPart(item);
+      if (q == null) continue;
+      final key = q.toLowerCase();
+      if (seen.contains(key)) continue;
+      seen.add(key);
+      out.add(q);
+    }
+    return out;
+  }
+
+  Widget _compactSearchListRow({
+    required Widget leading,
+    required Widget label,
+    Widget? trailing,
+    VoidCallback? onTap,
+    bool showDivider = false,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (showDivider)
+          Divider(height: 1, indent: 52, color: SDColors.neutral200),
+        Material(
+          color: SDColors.white,
+          child: InkWell(
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: SDSpacing.md,
+                vertical: 12,
+              ),
+              child: Row(
+                children: [
+                  leading,
+                  const SizedBox(width: 12),
+                  Expanded(child: label),
+                  if (trailing != null) trailing,
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildDiscoveryPanel(List<String> history, {String filterQuery = ''}) {
-    final cleaned =
-        history.map((h) => h.trim()).where((h) => h.isNotEmpty).toList();
+    final cleaned = _validHistoryEntries(history);
     final filteredHistory = filterQuery.isEmpty
         ? cleaned
         : cleaned
             .where((h) => h.toLowerCase().contains(filterQuery.toLowerCase()))
             .toList();
 
+    final discoveryTerms = _discoveryTerms;
+
     return Container(
       color: SDColors.white,
       child: ListView(
-        padding: EdgeInsets.only(bottom: SDSpacing.lg),
+        // Le Scaffold (resizeToAvoidBottomInset) réduit déjà le corps au-dessus
+        // du clavier. Ajouter viewInsets ici (lu sur le contexte de l'état,
+        // au-dessus du Scaffold) doublait l'inset clavier et faisait varier
+        // ce padding à chaque image de l'animation du clavier. L'inset système
+        // reste stable clavier ouvert ou fermé.
+        padding: EdgeInsets.only(
+          bottom: SDResponsive.systemBottomInset(context) + SDSpacing.lg,
+        ),
         children: [
           Padding(
             padding: EdgeInsets.fromLTRB(
@@ -569,9 +758,7 @@ class _SearchBodyState extends State<_SearchBody>
           Padding(
             padding: EdgeInsets.symmetric(horizontal: SDSpacing.md),
             child: Text(
-              ClientFeatureFlags.emarketEnabled
-                  ? 'Services, freelances, produits ou boutiques à Abidjan…'
-                  : 'Services et freelances à Abidjan…',
+              _discoverySubtitle(),
               style:
                   SDTypography.bodySmall.copyWith(color: SDColors.neutral600),
             ),
@@ -602,12 +789,19 @@ class _SearchBodyState extends State<_SearchBody>
                 ],
               ),
             ),
-            ...filteredHistory.map((item) {
-              return ListTile(
+            ...filteredHistory.asMap().entries.map((entry) {
+              final item = entry.value;
+              return _compactSearchListRow(
+                showDivider: entry.key > 0,
                 leading:
                     Icon(Icons.history, color: SDColors.neutral500, size: 20),
-                title: Text(item, style: SDTypography.bodyMedium),
+                label: Text(item, style: _searchLineTextStyle, maxLines: 2),
                 trailing: IconButton(
+                  tooltip: 'Retirer',
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints:
+                      const BoxConstraints(minWidth: 32, minHeight: 32),
                   icon: Icon(Icons.close, size: 18, color: SDColors.neutral400),
                   onPressed: () => context
                       .read<SearchPageBlocM>()
@@ -617,106 +811,223 @@ class _SearchBodyState extends State<_SearchBody>
               );
             }),
           ],
-          Padding(
-            padding: EdgeInsets.fromLTRB(
-                SDSpacing.md, SDSpacing.md, SDSpacing.md, SDSpacing.sm),
-            child: Row(
-              children: [
-                Icon(Icons.trending_up, size: 18, color: SDColors.primary600),
-                SizedBox(width: SDSpacing.xxs),
-                Text(
-                  'Populaires',
-                  style: SDTypography.titleSmall.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: SDColors.neutral700,
+          if (discoveryTerms.isNotEmpty) ...[
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                  SDSpacing.md, SDSpacing.md, SDSpacing.md, SDSpacing.sm),
+              child: Row(
+                children: [
+                  Text(
+                    'À découvrir',
+                    style: SDTypography.titleSmall.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: SDColors.neutral700,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: SDSpacing.md),
-            child: Wrap(
-              spacing: SDSpacing.xs,
-              runSpacing: SDSpacing.xs,
-              children: _popularSearches.map((term) {
-                return ActionChip(
-                  label: Text(term, style: SDTypography.labelMedium),
-                  backgroundColor: SDColors.primary50,
-                  side: BorderSide(color: SDColors.primary100),
-                  onPressed: () => _onSuggestionTap(term),
-                );
-              }).toList(),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: SDSpacing.md),
+              child: Wrap(
+                spacing: SDSpacing.xs,
+                runSpacing: SDSpacing.xs,
+                children: discoveryTerms.map((term) {
+                  return ActionChip(
+                    label: Text(term, style: SDTypography.labelMedium),
+                    backgroundColor: SDColors.primary50,
+                    side: BorderSide(color: SDColors.primary100),
+                    onPressed: () => _onSuggestionTap(term),
+                  );
+                }).toList(),
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );
   }
 
   Widget _buildHighlightedText(String text, String query) {
-    if (query.isEmpty) {
-      return Text(text, style: SDTypography.bodyMedium);
+    final display = cleanDisplayPart(text) ?? text.trim();
+    if (display.isEmpty) {
+      return Text('', style: _searchLineTextStyle);
     }
-    final lower = text.toLowerCase();
+    if (query.isEmpty) {
+      return Text(display, style: _searchLineTextStyle);
+    }
+    final lower = display.toLowerCase();
     final q = query.toLowerCase();
     final idx = lower.indexOf(q);
     if (idx < 0) {
-      return Text(text, style: SDTypography.bodyMedium);
+      return Text(display, style: _searchLineTextStyle);
     }
+    final base = _searchLineTextStyle;
+    final matchStyle = base.copyWith(
+      fontWeight: FontWeight.w700,
+      color: SDColors.primary800,
+    );
     return Text.rich(
       TextSpan(
+        style: base,
         children: [
+          TextSpan(text: display.substring(0, idx)),
           TextSpan(
-            text: text.substring(0, idx),
-            style: SDTypography.bodyMedium,
+            text: display.substring(idx, idx + q.length),
+            style: matchStyle,
           ),
-          TextSpan(
-            text: text.substring(idx, idx + query.length),
-            style: SDTypography.bodyMedium.copyWith(
-              fontWeight: FontWeight.w800,
-              color: SDColors.primary700,
+          TextSpan(text: display.substring(idx + q.length)),
+        ],
+      ),
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+    );
+  }
+
+  Widget _buildSuggestionsList(List<String> suggestions, String query) {
+    final trimmed = query.trim();
+    final visible = suggestions
+        .map((s) => cleanDisplayPart(s))
+        .whereType<String>()
+        .toList();
+    if (visible.isEmpty && trimmed.isNotEmpty) {
+      return Container(
+        color: SDColors.white,
+        padding: EdgeInsets.all(SDSpacing.md),
+        child: Text(
+          'Aucune suggestion pour « $trimmed »',
+          style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral600),
+        ),
+      );
+    }
+    return Container(
+      color: SDColors.white,
+      child: ListView(
+        // Même règle que le panneau découverte : pas de second inset clavier.
+        padding: EdgeInsets.only(
+          bottom: SDResponsive.systemBottomInset(context),
+        ),
+        children: [
+          if (trimmed.isNotEmpty)
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                SDSpacing.md,
+                SDSpacing.md,
+                SDSpacing.md,
+                SDSpacing.xs,
+              ),
+              child: Text(
+                'Suggestions pour « $trimmed »',
+                style: SDTypography.titleSmall.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: SDColors.neutral900,
+                ),
+              ),
             ),
-          ),
-          TextSpan(
-            text: text.substring(idx + query.length),
-            style: SDTypography.bodyMedium,
-          ),
+          ...List.generate(visible.length, (index) {
+            final suggestion = visible[index];
+            return _compactSearchListRow(
+              showDivider: index > 0,
+              leading: Icon(Icons.search, color: SDColors.neutral600, size: 20),
+              label: _buildHighlightedText(suggestion, trimmed),
+              trailing:
+                  Icon(Icons.north_west, size: 16, color: SDColors.neutral400),
+              onTap: () => _onSuggestionTap(suggestion),
+            );
+          }),
         ],
       ),
     );
   }
 
-  Widget _buildSuggestionsList(List<String> suggestions, String query) {
-    return Container(
-      color: SDColors.white,
-      child: ListView.separated(
-        itemCount: suggestions.length,
-        separatorBuilder: (_, __) => Divider(
-            height: 1, indent: SDSpacing.sm, color: SDColors.neutral200),
-        itemBuilder: (context, index) {
-          final suggestion = suggestions[index];
-          return ListTile(
-            leading: Icon(Icons.search, color: SDColors.primary700, size: 20),
-            title: _buildHighlightedText(suggestion, query),
-            trailing:
-                Icon(Icons.north_west, size: 16, color: SDColors.neutral400),
-            onTap: () => _onSuggestionTap(suggestion),
-          );
-        },
-      ),
+  Widget _buildNoResultsState(String query, {String scope = 'global'}) {
+    final trimmed = query.trim();
+    final message = trimmed.isEmpty
+        ? 'Essayez avec d\'autres mots-clés ou filtres'
+        : scope != 'global'
+            ? 'Rien pour « $trimmed » dans ce contexte.'
+            : 'Rien pour « $trimmed ». Essayez un autre mot ou changez d\'onglet.';
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (trimmed.isNotEmpty) ...[
+                      const SDIllustration(
+                        asset: SDIllustrations.searchEmpty,
+                      ),
+                      const SizedBox(height: 24),
+                    ],
+                    const Text(
+                      'Aucun résultat',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      message,
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: Colors.grey.shade600,
+                        height: 1.5,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    if (scope != 'global' && trimmed.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 16),
+                        child: OutlinedButton(
+                          onPressed: () {
+                            context
+                                .read<SearchPageBlocM>()
+                                .add(const ExpandSearchToGlobal());
+                          },
+                          child: const Text(
+                            'Rechercher dans les autres univers',
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildNoResultsState(String query) {
-    return EmptyStateWidget(
-      imagePath: 'assets/recherche_vide.png',
-      title: 'Aucun résultat',
-      message: query.isEmpty
-          ? 'Essayez avec d\'autres mots-clés ou filtres'
-          : 'Rien pour « $query ». Essayez un autre mot ou changez d\'onglet.',
-      imageSize: 180,
-    );
+  bool _allTabHasHiddenResults(SearchPageStateM state) {
+    if ((state.counts['services'] ?? 0) > 3) return true;
+    if ((state.counts['freelances'] ?? 0) > 5) return true;
+    if ((state.counts['prestataires'] ?? 0) > 5) return true;
+    if (ClientFeatureFlags.emarketEnabled) {
+      if ((state.counts['articles'] ?? 0) > 2) return true;
+      if ((state.counts['vendeurs'] ?? 0) > 3) return true;
+    }
+    return false;
+  }
+
+  int _firstTabWithOverflow(SearchPageStateM state) {
+    if ((state.counts['services'] ?? 0) > 3) return 1;
+    if ((state.counts['freelances'] ?? 0) > 5) return 2;
+    if ((state.counts['prestataires'] ?? 0) > 5) return 3;
+    if (ClientFeatureFlags.emarketEnabled) {
+      if ((state.counts['articles'] ?? 0) > 2) return 4;
+      if ((state.counts['vendeurs'] ?? 0) > 3) return 5;
+    }
+    return 1;
   }
 
   // --- TAB: TOUT (Summary) ---
@@ -724,9 +1035,25 @@ class _SearchBodyState extends State<_SearchBody>
     return ListView(
       padding: EdgeInsets.all(SDSpacing.sm),
       children: [
+        if (state.query.trim().isNotEmpty) _buildSearchIntentBanner(state),
         if (state.services.isNotEmpty) ...[
-          _buildSectionHeader('Services', 1, state.counts['services'] ?? 0),
-          ...state.services.take(2).map((s) => _buildServiceCard(s)).toList(),
+          _buildScopedSectionHeader(
+            title: 'Services',
+            scopeLabel: 'Métiers',
+            tabIndex: 1,
+            count: state.counts['services'] ?? 0,
+          ),
+          ...state.services.take(3).map((s) => _buildServiceCard(s)).toList(),
+          SizedBox(height: SDSpacing.sm),
+        ],
+        if (ClientFeatureFlags.emarketEnabled && state.articles.isNotEmpty) ...[
+          _buildScopedSectionHeader(
+            title: 'Produits',
+            scopeLabel: 'E-marché',
+            tabIndex: 4,
+            count: state.counts['articles'] ?? 0,
+          ),
+          _buildArticleGrid(state.articles.take(2).toList()),
           SizedBox(height: SDSpacing.sm),
         ],
         if (state.freelances.isNotEmpty) ...[
@@ -750,16 +1077,148 @@ class _SearchBodyState extends State<_SearchBody>
           ),
           SizedBox(height: SDSpacing.sm),
         ],
-        if (ClientFeatureFlags.emarketEnabled && state.articles.isNotEmpty) ...[
-          _buildSectionHeader('Boutique', 4, state.counts['articles'] ?? 0),
-          _buildArticleGrid(state.articles.take(2).toList()),
-          SizedBox(height: SDSpacing.sm),
-        ],
         if (ClientFeatureFlags.emarketEnabled && state.vendeurs.isNotEmpty) ...[
           _buildSectionHeader('Boutiques', 5, state.counts['vendeurs'] ?? 0),
           ...state.vendeurs.take(3).map(_buildVendorCard),
         ],
+        if (state.hasSearched &&
+            state.query.trim().length >= 2 &&
+            _allTabHasHiddenResults(state))
+          Padding(
+            padding: EdgeInsets.only(top: SDSpacing.sm),
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  _tabController.animateTo(_firstTabWithOverflow(state));
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: SDColors.primary600,
+                  foregroundColor: SDColors.white,
+                  padding: EdgeInsets.symmetric(vertical: SDSpacing.sm),
+                  shape: RoundedRectangleBorder(
+                    borderRadius:
+                        BorderRadius.circular(SDSpacing.borderRadiusMedium),
+                  ),
+                ),
+                child: Text(
+                  'Voir tous les résultats →',
+                  style: SDTypography.labelMedium.copyWith(
+                    color: SDColors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+          ),
       ],
+    );
+  }
+
+  /// Carte d’intention : besoin métier (ex. robinet → plombier), pas un achat produit.
+  Widget _buildSearchIntentBanner(SearchPageStateM state) {
+    final query = state.query.trim();
+    if (query.isEmpty || state.services.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    final top = state.services.first;
+    if (top is! Map) return const SizedBox.shrink();
+    final kind = top['matchKind']?.toString() ?? '';
+    final isNeedMatch = kind.contains('need');
+    if (!isNeedMatch) return const SizedBox.shrink();
+
+    final serviceName = top['nomservice']?.toString() ?? 'un professionnel';
+    final buyHint = ClientFeatureFlags.emarketEnabled &&
+        (state.articles.isNotEmpty || state.vendeurs.isNotEmpty);
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: SDSpacing.sm),
+      child: Material(
+        color: SDColors.primary50,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () {
+            final sid = top['_id']?.toString() ?? top['idservice']?.toString();
+            final img = top['imageservice']?.toString() ?? '';
+            if (sid == null || sid.isEmpty) return;
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => DetailPage(
+                  title: serviceName,
+                  image: img,
+                  serviceId: sid,
+                ),
+              ),
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: SDColors.white,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.build_outlined,
+                      color: SDColors.primary600),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    buyHint
+                        ? 'Besoin lié à « $query » ? Trouvez un $serviceName ou parcourez les produits ci-dessous.'
+                        : 'Besoin lié à « $query » ? Explorez les services de $serviceName.',
+                    style: SDTypography.bodySmall.copyWith(
+                      color: SDColors.neutral800,
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+                const Icon(Icons.chevron_right_rounded,
+                    color: SDColors.neutral400),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildScopedSectionHeader({
+    required String title,
+    required String scopeLabel,
+    required int tabIndex,
+    required int count,
+  }) {
+    if (count == 0) return const SizedBox.shrink();
+    return Padding(
+      padding: EdgeInsets.only(bottom: SDSpacing.xs),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              title,
+              style: SDTypography.titleMedium
+                  .copyWith(fontWeight: FontWeight.bold),
+            ),
+          ),
+          GestureDetector(
+            onTap: () => _tabController.animateTo(tabIndex),
+            child: Text(
+              scopeLabel,
+              style: SDTypography.labelMedium.copyWith(
+                color: SDColors.primary700,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -953,27 +1412,12 @@ class _SearchBodyState extends State<_SearchBody>
   // --- CARDS ---
 
   Widget _buildServiceCard(dynamic service) {
-    final String name = service['nomservice']?.toString() ?? 'Service';
+    final String name = displayOrFallback(service['nomservice'], 'Service');
     final String image = service['imageservice']?.toString() ?? '';
     final cat = service['categorie'];
     final String categoryName = cat is Map
-        ? (cat['nomcategorie']?.toString() ?? '')
-        : (service['nomcategorie']?.toString() ?? '');
-    final priceRaw = service['prixmoyen'] ?? service['prixprestataire'];
-    final priceLabel = formatOptionalPrice(priceRaw, suffix: 'FCFA');
-    final prestataire = service['prestataire'];
-    String? providerHint;
-    if (prestataire is Map) {
-      final u = prestataire['utilisateur'];
-      if (u is Map) {
-        providerHint = joinPersonName(
-          prenom: u['prenom'],
-          nom: u['nom'],
-          fallback: '',
-        );
-        if (providerHint.isEmpty) providerHint = null;
-      }
-    }
+        ? (cleanDisplayPart(cat['nomcategorie']) ?? '')
+        : (cleanDisplayPart(service['nomcategorie']) ?? '');
     final String? sid = () {
       final a = service['_id']?.toString().trim();
       final b = service['idservice']?.toString().trim();
@@ -990,45 +1434,10 @@ class _SearchBodyState extends State<_SearchBody>
           BoxShadow(color: SDColors.neutral900.withOpacity(0.05), blurRadius: 4)
         ],
       ),
-      child: ListTile(
-        contentPadding: EdgeInsets.all(SDSpacing.xs),
-        leading: ClipRRect(
-          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusSmall),
-          child: AppImage(
-            imageUrl: image,
-            width: 60,
-            height: 60,
-            fit: BoxFit.cover,
-          ),
-        ),
-        title: Text(name, style: SDTypography.titleSmall),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (categoryName.isNotEmpty)
-              Text(
-                categoryName,
-                style: SDTypography.labelSmall
-                    .copyWith(color: SDColors.neutral500),
-              ),
-            if (priceLabel != null)
-              Text(
-                priceLabel,
-                style:
-                    SDTypography.bodySmall.copyWith(color: SDColors.primary700),
-              ),
-            if (providerHint != null)
-              Text(
-                providerHint,
-                style: SDTypography.labelSmall
-                    .copyWith(color: SDColors.neutral600),
-              ),
-          ],
-        ),
-        isThreeLine: true,
-        trailing:
-            Icon(Icons.arrow_forward_ios, size: 14, color: SDColors.neutral500),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
         onTap: () {
+          if (sid == null) return;
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -1040,6 +1449,60 @@ class _SearchBodyState extends State<_SearchBody>
             ),
           );
         },
+        child: Padding(
+          padding: EdgeInsets.all(SDSpacing.sm),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              ClipRRect(
+                borderRadius:
+                    BorderRadius.circular(SDSpacing.borderRadiusSmall),
+                child: AppImage(
+                  imageUrl: image,
+                  width: 56,
+                  height: 56,
+                  fit: BoxFit.cover,
+                ),
+              ),
+              SizedBox(width: SDSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: SDTypography.titleSmall.copyWith(
+                        color: SDColors.neutral900,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    if (categoryName.isNotEmpty) ...[
+                      SizedBox(height: 2),
+                      Text(
+                        categoryName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: SDTypography.labelSmall
+                            .copyWith(color: SDColors.neutral500),
+                      ),
+                    ],
+                    SizedBox(height: 4),
+                    Text(
+                      'Trouver un professionnel',
+                      style: SDTypography.labelSmall.copyWith(
+                        color: SDColors.primary700,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right, size: 20, color: SDColors.neutral400),
+            ],
+          ),
+        ),
       ),
     );
   }

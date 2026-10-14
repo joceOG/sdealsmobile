@@ -169,6 +169,3 @@ class HistorySearchedM extends HistoryPageStateM {
   @override
   List<Object?> get props => [searchResults, query];
 }
-
-
-

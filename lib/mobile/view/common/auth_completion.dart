@@ -37,6 +37,26 @@ class ClientShellSelection {
   }
 }
 
+/// Onglet Profil du shell client (index 3).
+class ClientShellProfileTab {
+  static final List<VoidCallback> _listeners = [];
+
+  static void bind(VoidCallback listener) {
+    if (_listeners.contains(listener)) return;
+    _listeners.add(listener);
+  }
+
+  static void unbind(VoidCallback listener) {
+    _listeners.remove(listener);
+  }
+
+  static void show() {
+    for (final listener in List<VoidCallback>.from(_listeners)) {
+      listener();
+    }
+  }
+}
+
 /// Décision unique, partagée par le redirect et le succès d'auth.
 /// Une fiche ouverte par Navigator.push laisse `router.location` sur
 /// `/homepage` : ne pas s'en servir pour juger qu'aucune auth n'est ouverte.
@@ -117,15 +137,19 @@ class AuthCompletion {
 /// du shell existant, sans recréer l'application ni doubler la navigation.
 void exitToGuestHome(BuildContext context) {
   ClientShellSelection.showHome();
-  final router = GoRouter.of(context);
-  final nav = Navigator.of(context, rootNavigator: true);
-  if (nav.canPop()) {
-    nav.popUntil((route) => route.isFirst);
-  }
-  final loc = router.location.split('?').first;
-  if (loc != '/homepage') {
-    router.go('/homepage');
-  }
+  try {
+    final nav = Navigator.of(context, rootNavigator: true);
+    if (nav.canPop()) {
+      nav.popUntil((route) => route.isFirst);
+    }
+  } catch (_) {}
+  try {
+    final router = GoRouter.of(context);
+    final loc = router.location.split('?').first;
+    if (loc != '/homepage') {
+      router.go('/homepage');
+    }
+  } catch (_) {}
 }
 
 Future<bool> ensureAuthenticatedForAction({

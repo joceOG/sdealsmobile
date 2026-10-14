@@ -3,9 +3,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../morepageblocm/morePageBlocM.dart';
 import '../../../../data/services/authCubit.dart';
 import '../../../../data/services/auth_professional_access.dart';
-import 'package:go_router/go_router.dart';
 import '../../searchpagem/screens/searchPageScreenM.dart';
 import '../../common/widgets/standard_screen_header.dart';
+import '../../common/role_shell_navigation.dart';
 
 // ✅ Design System
 import '../../../../design_system/design_system.dart';
@@ -189,16 +189,13 @@ class _MorePagePageScreenStateM extends State<MorePageScreenM> {
   }
 
   // 🔄 SWITCH VERS MODE PRESTATAIRE
+  // go (pas push) : le shell pro remplace le shell client.
   void _switchToPrestataireMode(BuildContext context) {
-    try {
-      context.read<AuthCubit>().switchActiveRole('PRESTATAIRE');
-      Future.delayed(const Duration(milliseconds: 100), () {
-        context.push('/providermain');
-      });
-    } catch (e) {
-      print('Erreur lors du switch vers prestataire: $e');
-      context.push('/providermain');
-    }
+    final auth = context.read<AuthCubit>().state;
+    goToProviderShell(
+      context,
+      utilisateur: auth is AuthAuthenticated ? auth.utilisateur : null,
+    );
   }
 }
 

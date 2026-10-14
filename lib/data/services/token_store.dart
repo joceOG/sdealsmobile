@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -33,6 +34,22 @@ class TokenStore {
   static AuthCredentials? _cache;
   static bool _hydrated = false;
   static Future<void>? _hydrateFuture;
+
+  /// Lecture Keystore trop longue : on n'authentifie pas avec un stockage muet.
+  static bool _storageAbandoned = false;
+
+  /// Vrai si la lecture Keystore a dépassé le délai : l'absence de jeton
+  /// signifie alors « illisible », pas « aucune session ».
+  static bool get storageAbandoned => _storageAbandoned;
+
+  static const Duration _defaultHydrateTimeout = Duration(seconds: 4);
+
+  @visibleForTesting
+  static Duration hydrateTimeout = _defaultHydrateTimeout;
+
+  /// Remplace la lecture Keystore (tests de blocage).
+  @visibleForTesting
+  static Future<String?> Function(String key)? debugReadOverride;
 
   /// Mode mémoire pure (pas de Secure Storage) — tests unitaires simples.
   static bool _useMemoryOnly = false;
@@ -76,6 +93,9 @@ class TokenStore {
     _useMemoryOnly = false;
     debugSecureMap = null;
     debugSecureWriteHook = null;
+    debugReadOverride = null;
+    hydrateTimeout = _defaultHydrateTimeout;
+    _storageAbandoned = false;
     _cache = null;
     _hydrated = false;
     _hydrateFuture = null;
@@ -83,26 +103,40 @@ class TokenStore {
 
   /// Charge SecureStorage → cache **avant** toute lecture métier.
   /// Idempotent ; safe à appeler plusieurs fois.
+  /// Au-delà de [hydrateTimeout], la session n'est pas restaurée.
   static Future<void> hydrate() {
-    return _hydrateFuture ??= _hydrateImpl();
+    return _hydrateFuture ??= _hydrateBounded();
+  }
+
+  static Future<void> _hydrateBounded() async {
+    try {
+      await _hydrateImpl().timeout(hydrateTimeout);
+    } on TimeoutException {
+      _storageAbandoned = true;
+      _cache = null;
+      _hydrated = true;
+    }
   }
 
   static Future<void> _hydrateImpl() async {
     try {
       await getCredentials();
     } finally {
-      _hydrated = true;
+      if (!_storageAbandoned) _hydrated = true;
     }
   }
 
   static Future<AuthCredentials?> getCredentials() async {
+    if (_storageAbandoned) return null;
     if (_cache != null) return _cache;
 
     if (_useMemoryOnly) return null;
 
     await _migrateFromLegacyIfNeeded();
+    if (_storageAbandoned) return null;
 
     final raw = await _readKey(bundleKey);
+    if (_storageAbandoned) return null;
     if (raw == null || raw.isEmpty) {
       _hydrated = true;
       return null;
@@ -117,6 +151,7 @@ class TokenStore {
         accessToken: access,
         refreshToken: (refresh != null && refresh.isNotEmpty) ? refresh : null,
       );
+      if (_storageAbandoned) return null;
       _cache = creds;
       _hydrated = true;
       return creds;
@@ -224,6 +259,7 @@ class TokenStore {
     try {
       await _writeKey(bundleKey, encoded);
       await _deleteLegacyKeys();
+      if (_storageAbandoned) return;
       _cache = bundle;
     } catch (_) {
       // Ne pas publier un cache nouveau si le bundle n'est pas persisté.
@@ -259,7 +295,10 @@ class TokenStore {
   }
 
   static Future<String?> _readKey(String key) async {
+    if (_storageAbandoned) return null;
     if (debugSecureMap != null) return debugSecureMap![key];
+    final override = debugReadOverride;
+    if (override != null) return override(key);
     return _storage.read(key: key);
   }
 

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../data/models/utilisateur.dart';
@@ -17,10 +16,18 @@ import '../../common/auth_completion.dart';
 import '../../../../design_system/design_system.dart';
 import '../../common/utils/app_snackbar.dart';
 import '../../common/widgets/auth_form_widgets.dart';
+import '../../common/widgets/auth_phone_otp_form.dart';
 import '../../common/widgets/phone_country_field.dart';
 
 class RegisterPageScreenM extends StatefulWidget {
   const RegisterPageScreenM({super.key});
+
+  /// Évite l’appel réseau dans les tests widget.
+  @visibleForTesting
+  static PhoneVerificationConfig? debugPhoneConfig;
+
+  @visibleForTesting
+  static void debugReset() => debugPhoneConfig = null;
 
   @override
   State<RegisterPageScreenM> createState() => _RegisterPageScreenMState();
@@ -41,13 +48,19 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM> {
   PhoneCountryOption _selectedPhoneCountry = kDefaultPhoneCountries.first;
   String? _lastCanonicalPhone;
   PhoneVerificationConfig? _phoneConfig;
+  bool _showRequirements = false;
 
   @override
   void initState() {
     super.initState();
-    ApiClient().fetchPhoneVerificationConfig().then((cfg) {
-      if (mounted) setState(() => _phoneConfig = cfg);
-    });
+    final debugCfg = RegisterPageScreenM.debugPhoneConfig;
+    if (debugCfg != null) {
+      _phoneConfig = debugCfg;
+    } else {
+      ApiClient().fetchPhoneVerificationConfig().then((cfg) {
+        if (mounted) setState(() => _phoneConfig = cfg);
+      });
+    }
     _prenomController = TextEditingController();
     _nomController = TextEditingController();
     _emailController = TextEditingController();
@@ -73,6 +86,9 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM> {
     });
     _passwordController.addListener(syncCanSubmit);
     _confirmPasswordController.addListener(syncCanSubmit);
+    _otpController.addListener(() {
+      if (mounted) setState(() {});
+    });
   }
 
   void _notifyPhoneChanged() {
@@ -117,9 +133,31 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM> {
         _nomController.text.trim().length >= 2 &&
         emailOk &&
         phoneOk &&
-        _passwordController.text.isNotEmpty &&
+        _passwordController.text.length >= 6 &&
         _confirmPasswordController.text.isNotEmpty &&
         _passwordController.text == _confirmPasswordController.text;
+  }
+
+  String? _requirementsHint() {
+    if (!agreeToTerms) {
+      return 'Acceptez les conditions pour créer votre compte.';
+    }
+    if (_nomController.text.trim().length < 2) {
+      return 'Le nom doit contenir au moins 2 caractères.';
+    }
+    if (_isDeferredSignup && !_emailController.text.trim().contains('@')) {
+      return 'Saisissez une adresse e-mail valide.';
+    }
+    if (!_isDeferredSignup && _phoneController.text.trim().isEmpty) {
+      return 'Saisissez votre numéro de téléphone.';
+    }
+    if (_passwordController.text.length < 6) {
+      return 'Le mot de passe doit contenir au moins 6 caractères.';
+    }
+    if (_passwordController.text != _confirmPasswordController.text) {
+      return 'Les mots de passe ne correspondent pas.';
+    }
+    return null;
   }
 
   void _handleBack() {
@@ -259,206 +297,277 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM> {
       },
       child: Scaffold(
         backgroundColor: SDColors.white,
-        appBar: SDAppBar(
-          title: '',
-          useGradient: false,
-          backgroundColor: SDColors.white,
-          centerTitle: false,
-          leading: AuthBackButton(onPressed: _handleBack),
-        ),
-        body: BlocConsumer<RegisterPageBlocM, RegisterPageStateM>(
-          listenWhen: (prev, curr) =>
-              prev.phase != curr.phase ||
-              prev.errorMessage != curr.errorMessage,
-          listener: (context, state) {
-            if (state.isSuccess) {
-              if (state.utilisateur != null && state.token != null) {
-                context.read<AuthCubit>().setAuthenticated(
-                      token: state.token!,
-                      utilisateur: state.utilisateur!,
-                      roles: [state.utilisateur!.role],
-                      activeRole: state.utilisateur!.role,
-                    );
+        resizeToAvoidBottomInset: true,
+        body: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              AuthCompactBrandBar(onBack: _handleBack),
+              Expanded(
+                child: BlocConsumer<RegisterPageBlocM, RegisterPageStateM>(
+                  listenWhen: (prev, curr) =>
+                      prev.phase != curr.phase ||
+                      prev.errorMessage != curr.errorMessage,
+                  listener: (context, state) {
+                    if (state.isSuccess) {
+                      if (state.utilisateur != null && state.token != null) {
+                        context.read<AuthCubit>().setAuthenticated(
+                              token: state.token!,
+                              utilisateur: state.utilisateur!,
+                              roles: [state.utilisateur!.role],
+                              activeRole: state.utilisateur!.role,
+                            );
 
-                AppSnackBar.success(
-                  context,
-                  'Inscription réussie',
-                  subtitle: 'Vous êtes maintenant connecté.',
-                );
-              } else {
-                AppSnackBar.success(context, 'Inscription réussie');
-              }
-              _returnAfterAuth(context);
-            }
-            if (state.errorMessage != null &&
-                state.phase == RegisterPhase.error) {
-              AppSnackBar.error(context, state.errorMessage!);
-            }
-          },
-          builder: (context, state) {
-            final mq = MediaQuery.of(context);
-            return SingleChildScrollView(
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(
-                  SDSpacing.md,
-                  0,
-                  SDSpacing.md,
-                  SDSpacing.lg + mq.viewPadding.bottom + mq.viewInsets.bottom,
+                        AppSnackBar.success(
+                          context,
+                          'Inscription réussie',
+                          subtitle: 'Vous êtes maintenant connecté.',
+                        );
+                      } else {
+                        AppSnackBar.success(context, 'Inscription réussie');
+                      }
+                      _returnAfterAuth(context);
+                    }
+                    if (state.errorMessage != null &&
+                        state.phase == RegisterPhase.error &&
+                        state.showOtpStep) {
+                      AppSnackBar.error(context, state.errorMessage!);
+                    }
+                  },
+                  builder: (context, state) {
+                    final mq = MediaQuery.of(context);
+                    return SingleChildScrollView(
+                      keyboardDismissBehavior:
+                          ScrollViewKeyboardDismissBehavior.onDrag,
+                      child: Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          SDSpacing.md,
+                          SDSpacing.xs,
+                          SDSpacing.md,
+                          SDSpacing.md +
+                              mq.viewPadding.bottom +
+                              mq.viewInsets.bottom,
+                        ),
+                        child: state.showOtpStep
+                            ? _buildOtpStep(context, state)
+                            : _buildFormStep(context, state),
+                      ),
+                    );
+                  },
                 ),
-                // OTP = même route /register : le marqueur extra reste sur la pile.
-                child: state.showOtpStep
-                    ? _buildOtpStep(context, state)
-                    : _buildFormStep(context, state),
               ),
-            );
-          },
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildFormStep(BuildContext context, RegisterPageStateM state) {
-    final phoneLabel = _isDeferredSignup
-        ? 'Numéro de téléphone (facultatif)'
-        : 'Numéro de téléphone';
+    final phoneOptional = _isDeferredSignup;
+    final phoneLabel = phoneOptional ? 'Téléphone (facultatif)' : 'Téléphone';
     final phoneHelper =
-        _isDeferredSignup ? 'Vous pourrez le vérifier plus tard.' : null;
+        phoneOptional ? 'Vous pourrez le vérifier plus tard.' : null;
+    final apiError = (!state.showOtpStep &&
+            state.phase == RegisterPhase.error &&
+            (state.errorMessage ?? '').trim().isNotEmpty)
+        ? state.errorMessage!.trim()
+        : '';
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const AuthCompactHeader(
-          title: 'Créer un compte',
-          subtitle: 'Rejoignez Soutrali Deals',
-          logoHeight: 88,
-        ),
-        const AuthFieldGap(large: true),
-        SDInput(
-          label: 'Prénom',
-          hint: 'Ex. Aïcha',
-          prefixIcon: Icons.person_outline,
-          controller: _prenomController,
-          errorText: _fieldError(state, const ['prenom']),
-        ),
-        const AuthFieldGap(),
-        SDInput(
-          label: 'Nom',
-          hint: 'Ex. Koné',
-          prefixIcon: Icons.badge_outlined,
-          controller: _nomController,
-          errorText: _fieldError(state, const ['nom']),
-        ),
-        const AuthFieldGap(),
-        SDInput(
-          label: 'Email',
-          hint: 'nom@exemple.com',
-          keyboardType: TextInputType.emailAddress,
-          prefixIcon: Icons.email_outlined,
-          controller: _emailController,
-          errorText: _fieldError(state, const ['email']),
-        ),
-        const AuthFieldGap(),
-        PhoneCountryField(
-          controller: _phoneController,
-          selectedCountry: _selectedPhoneCountry,
-          label: phoneLabel,
-          helperText: phoneHelper,
-          hint: '07 00 00 00 00',
-          errorText: _fieldError(state, const ['telephone', 'phone']),
-          onCountryChanged: (c) {
-            setState(() {
-              _selectedPhoneCountry = c;
-              _canSubmitNotifier.value = _computeCanSubmit();
-            });
-            _notifyPhoneChanged();
-          },
-        ),
-        const AuthFieldGap(),
-        SDInput(
-          label: 'Mot de passe',
-          hint: 'Créez un mot de passe',
-          helperText: '6 caractères minimum',
-          obscureText: true,
-          prefixIcon: Icons.lock_outline,
-          controller: _passwordController,
-          errorText: _fieldError(state, const ['password']),
-        ),
-        const AuthFieldGap(),
-        SDInput(
-          label: 'Confirmer le mot de passe',
-          hint: 'Répétez le mot de passe',
-          obscureText: true,
-          prefixIcon: Icons.lock_reset,
-          controller: _confirmPasswordController,
-          errorText: _fieldError(state, const ['confirmPassword', 'password']),
-        ),
-        const AuthFieldGap(large: true),
-        AuthTermsAcceptance(
-          value: agreeToTerms,
-          onChanged: (value) {
-            setState(() => agreeToTerms = value);
-            final v = _computeCanSubmit();
-            if (_canSubmitNotifier.value != v) {
-              _canSubmitNotifier.value = v;
-            }
-          },
-        ),
-        const AuthFieldGap(large: true),
-        ValueListenableBuilder<bool>(
-          valueListenable: _canSubmitNotifier,
-          builder: (context, canSubmit, _) {
-            return SDButton(
-              text: 'Créer mon compte',
-              fullWidth: true,
-              isLoading: state.isBusy,
-              onPressed:
-                  state.isBusy || !canSubmit ? null : () => _submit(context),
-            );
-          },
-        ),
-        const AuthFieldGap(large: true),
-        const AuthOrDivider(label: 'ou'),
-        const AuthFieldGap(),
-        SDGoogleSignInButton(
-          isLoading: state.isBusy,
-          onPressed: state.isBusy ? null : () => _signInWithGoogle(context),
-        ),
-        const AuthFieldGap(),
-        Wrap(
-          alignment: WrapAlignment.center,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            Text(
-              'Vous avez déjà un compte ?',
-              style: SDTypography.bodyMedium.copyWith(
-                color: SDColors.neutral800,
-              ),
+    return AutofillGroup(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Créer un compte',
+            style: SDTypography.displayMedium.copyWith(
+              color: SDColors.neutral900,
+              fontWeight: FontWeight.w700,
             ),
-            TextButton(
-              onPressed: () => _goLoginKeepingEntry(context),
-              style: TextButton.styleFrom(
-                padding: EdgeInsets.symmetric(
-                  horizontal: SDSpacing.xxs,
-                  vertical: SDSpacing.xxxs,
-                ),
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-              child: Text(
-                'Connectez-vous',
-                style: SDTypography.labelLarge.copyWith(
-                  color: SDColors.primary600,
-                  fontWeight: FontWeight.w600,
-                  decoration: TextDecoration.underline,
-                  decorationColor: SDColors.primary600,
-                ),
+          ),
+          const SizedBox(height: SDSpacing.xxs),
+          Text(
+            'Vos échanges et vos demandes, au même endroit.',
+            style: SDTypography.bodyLarge.copyWith(
+              color: SDColors.neutral600,
+            ),
+          ),
+          const SizedBox(height: SDSpacing.md),
+          SDInput(
+            label: 'Prénom',
+            hint: 'Votre prénom',
+            labelAbove: true,
+            controller: _prenomController,
+            textCapitalization: TextCapitalization.words,
+            textInputAction: TextInputAction.next,
+            autofillHints: const [AutofillHints.givenName],
+            keyboardType: TextInputType.name,
+            errorText: _fieldError(state, const ['prenom']),
+          ),
+          const SizedBox(height: SDSpacing.sm),
+          SDInput(
+            label: 'Nom',
+            hint: 'Votre nom',
+            labelAbove: true,
+            controller: _nomController,
+            textCapitalization: TextCapitalization.words,
+            textInputAction: TextInputAction.next,
+            autofillHints: const [AutofillHints.familyName],
+            keyboardType: TextInputType.name,
+            errorText: _fieldError(state, const ['nom']),
+          ),
+          const SizedBox(height: SDSpacing.sm),
+          SDInput(
+            label: 'Adresse e-mail',
+            hint: 'vous@exemple.com',
+            labelAbove: true,
+            keyboardType: TextInputType.emailAddress,
+            textInputAction: TextInputAction.next,
+            autofillHints: const [AutofillHints.email],
+            controller: _emailController,
+            errorText: _fieldError(state, const ['email']),
+          ),
+          const SizedBox(height: SDSpacing.sm),
+          PhoneCountryField(
+            controller: _phoneController,
+            selectedCountry: _selectedPhoneCountry,
+            label: phoneLabel,
+            helperText: phoneHelper,
+            hint: '07 00 00 00 00',
+            errorText: _fieldError(state, const ['telephone', 'phone']),
+            onCountryChanged: (c) {
+              setState(() {
+                _selectedPhoneCountry = c;
+                _canSubmitNotifier.value = _computeCanSubmit();
+              });
+              _notifyPhoneChanged();
+            },
+          ),
+          const SizedBox(height: SDSpacing.sm),
+          SDInput(
+            label: 'Mot de passe',
+            hint: 'Votre mot de passe',
+            helperText: '6 caractères minimum',
+            labelAbove: true,
+            obscureText: true,
+            controller: _passwordController,
+            textInputAction: TextInputAction.next,
+            autofillHints: const [AutofillHints.newPassword],
+            errorText: _fieldError(state, const ['password']),
+          ),
+          const SizedBox(height: SDSpacing.sm),
+          SDInput(
+            label: 'Confirmer le mot de passe',
+            hint: 'Saisissez à nouveau votre mot de passe',
+            labelAbove: true,
+            obscureText: true,
+            controller: _confirmPasswordController,
+            textInputAction: TextInputAction.done,
+            autofillHints: const [AutofillHints.newPassword],
+            errorText: _fieldError(state, const ['confirmPassword']),
+          ),
+          const SizedBox(height: SDSpacing.sm),
+          AuthTermsAcceptance(
+            value: agreeToTerms,
+            onChanged: (value) {
+              setState(() => agreeToTerms = value);
+              final v = _computeCanSubmit();
+              if (_canSubmitNotifier.value != v) {
+                _canSubmitNotifier.value = v;
+              }
+            },
+          ),
+          if (apiError.isNotEmpty) ...[
+            const SizedBox(height: SDSpacing.sm),
+            Text(
+              apiError,
+              style: SDTypography.bodyMedium.copyWith(
+                color: SDColors.error500,
               ),
             ),
           ],
-        ),
-        SizedBox(height: SDSpacing.sm),
-      ],
+          const SizedBox(height: SDSpacing.sm),
+          ValueListenableBuilder<bool>(
+            valueListenable: _canSubmitNotifier,
+            builder: (context, canSubmit, _) {
+              final hint = _showRequirements ? _requirementsHint() : null;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: state.isBusy || canSubmit
+                        ? null
+                        : () => setState(() => _showRequirements = true),
+                    child: IgnorePointer(
+                      ignoring: !canSubmit || state.isBusy,
+                      child: SDButton(
+                        text: state.phase == RegisterPhase.registering
+                            ? 'Création du compte…'
+                            : 'Créer mon compte',
+                        fullWidth: true,
+                        isLoading: state.isBusy,
+                        onPressed: state.isBusy || !canSubmit
+                            ? null
+                            : () => _submit(context),
+                      ),
+                    ),
+                  ),
+                  if (hint != null) ...[
+                    const SizedBox(height: SDSpacing.xs),
+                    Text(
+                      hint,
+                      style: SDTypography.bodySmall.copyWith(
+                        color: SDColors.neutral600,
+                      ),
+                    ),
+                  ],
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: SDSpacing.sm),
+          const AuthOrDivider(label: 'ou'),
+          const SizedBox(height: SDSpacing.sm),
+          SDGoogleSignInButton(
+            isLoading: state.isBusy,
+            onPressed: state.isBusy ? null : () => _signInWithGoogle(context),
+          ),
+          const SizedBox(height: SDSpacing.md),
+          Wrap(
+            alignment: WrapAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(
+                'Vous avez déjà un compte ?',
+                style: SDTypography.bodyMedium.copyWith(
+                  color: SDColors.neutral800,
+                ),
+              ),
+              TextButton(
+                onPressed:
+                    state.isBusy ? null : () => _goLoginKeepingEntry(context),
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: SDSpacing.xxs,
+                    vertical: SDSpacing.xxxs,
+                  ),
+                  minimumSize: const Size(48, 44),
+                  tapTargetSize: MaterialTapTargetSize.padded,
+                ),
+                child: Text(
+                  'Se connecter',
+                  style: SDTypography.labelLarge.copyWith(
+                    color: SDColors.primary600,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: SDSpacing.sm),
+        ],
+      ),
     );
   }
 
@@ -467,94 +576,26 @@ class _RegisterPageScreenMState extends State<RegisterPageScreenM> {
     final cooldown = state.resendCooldownSeconds;
     final canResend = cooldown <= 0 && !state.isBusy;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SDSpacing.verticalLargeGap,
-        Text(
-          'Vérifiez votre téléphone',
-          textAlign: TextAlign.center,
-          style: SDTypography.displayMedium.copyWith(
-            color: SDColors.neutral900,
-          ),
-        ),
-        SDSpacing.verticalTinyGap,
-        Text(
-          phone.isEmpty
-              ? 'Entrez le code reçu par SMS'
-              : 'Code envoyé au $phone',
-          textAlign: TextAlign.center,
-          style: SDTypography.bodyLarge.copyWith(
-            color: SDColors.neutral600,
-          ),
-        ),
-        SDSpacing.verticalLargeGap,
-        TextField(
-          controller: _otpController,
-          keyboardType: TextInputType.number,
-          maxLength: 6,
-          inputFormatters: [
-            FilteringTextInputFormatter.digitsOnly,
-            LengthLimitingTextInputFormatter(6),
-          ],
-          style: SDTypography.bodyLarge.copyWith(color: SDColors.neutral900),
-          decoration: InputDecoration(
-            labelText: 'Code à 6 chiffres',
-            hintText: '••••••',
-            counterText: '',
-            prefixIcon: const Icon(Icons.sms_outlined),
-            errorText: _fieldError(state, const ['code', 'otp']),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        ),
-        SDSpacing.verticalMediumGap,
-        SDButton(
-          text: state.phase == RegisterPhase.registering
-              ? 'Création du compte…'
-              : 'Vérifier et créer mon compte',
-          fullWidth: true,
-          isLoading: state.phase == RegisterPhase.verifyingOtp ||
-              state.phase == RegisterPhase.registering ||
-              state.phase == RegisterPhase.sendingOtp,
-          onPressed: state.isBusy ? null : () => _submitOtp(context),
-        ),
-        SDSpacing.verticalMediumGap,
-        TextButton(
-          onPressed: canResend
-              ? () => context
-                  .read<RegisterPageBlocM>()
-                  .add(const OtpResendRequested())
-              : null,
-          child: Text(
-            canResend
-                ? 'Renvoyer le code'
-                : 'Vous pourrez demander un nouveau code dans ${cooldown}s',
-            style: SDTypography.labelLarge.copyWith(
-              color: canResend ? SDColors.primary600 : SDColors.neutral500,
-            ),
-          ),
-        ),
-        SDSpacing.verticalSmallGap,
-        TextButton(
-          onPressed: state.isBusy
-              ? null
-              : () {
-                  context
-                      .read<RegisterPageBlocM>()
-                      .add(const RegisterOtpStepCancelled());
-                  _otpController.clear();
-                },
-          child: Text(
-            'Modifier le numéro',
-            style: SDTypography.bodyMedium.copyWith(
-              color: SDColors.neutral700,
-              decoration: TextDecoration.underline,
-            ),
-          ),
-        ),
-      ],
+    return AuthPhoneOtpForm(
+      e164Phone: phone,
+      codeController: _otpController,
+      errorText: _fieldError(state, const ['code', 'otp']),
+      isBusy: state.isBusy,
+      isVerifying: state.phase == RegisterPhase.verifyingOtp ||
+          state.phase == RegisterPhase.registering,
+      canResend: canResend,
+      resendCooldownSeconds: cooldown,
+      verifyLabel: state.phase == RegisterPhase.registering
+          ? 'Création du compte…'
+          : 'Vérifier et créer mon compte',
+      onCodeChanged: (_) => setState(() {}),
+      onVerify: () => _submitOtp(context),
+      onResend: () =>
+          context.read<RegisterPageBlocM>().add(const OtpResendRequested()),
+      onChangeNumber: () {
+        context.read<RegisterPageBlocM>().add(const RegisterOtpStepCancelled());
+        _otpController.clear();
+      },
     );
   }
 

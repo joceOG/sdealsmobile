@@ -22,7 +22,11 @@ class _ShopHubApi extends ApiClient {
   final List<Map<String, dynamic>> vendeurs;
 
   @override
-  Future<List<Categorie>> fetchCategorie(String nomGroupe) async => categories;
+  Future<List<Categorie>> fetchCategorie(
+    String nomGroupe, {
+    bool skipCache = false,
+    bool settleLateResponse = false,
+  }) async => categories;
 
   @override
   Future<List<Article>> fetchArticle() async => articles;

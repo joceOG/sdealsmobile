@@ -9,17 +9,28 @@ abstract class FreelancePageEventM extends Equatable {
 
 class LoadCategorieDataM extends FreelancePageEventM {}
 
-class LoadFreelancersEvent extends FreelancePageEventM {}
+class LoadFreelancersEvent extends FreelancePageEventM {
+  /// `true` : ignore le cache (Réessayer, tirer pour actualiser, mutation).
+  final bool force;
+
+  LoadFreelancersEvent({this.force = false});
+
+  @override
+  List<Object> get props => [force];
+}
 
 class LoadServicesEvent extends FreelancePageEventM {}
 
 class FilterByCategoryEvent extends FreelancePageEventM {
   final String? category;
 
-  const FilterByCategoryEvent(this.category);
+  /// `true` : ignore le cache (Réessayer après un échec).
+  final bool force;
+
+  const FilterByCategoryEvent(this.category, {this.force = false});
 
   @override
-  List<Object> get props => [category ?? ''];
+  List<Object> get props => [category ?? '', force];
 }
 
 class SearchFreelancerEvent extends FreelancePageEventM {

@@ -228,7 +228,7 @@ class ProviderMessagesScreenState extends State<ProviderMessagesScreen> {
       list = list.where((c) {
         final other = _otherParticipant(c);
         final name = personNameFromMap(other, fallback: '').toLowerCase();
-        final mission = _missionTitle(c).toLowerCase();
+        final mission = (_missionContextLabel(c) ?? '').toLowerCase();
         final content =
             '${_lastMessage(c)?['contenu'] ?? ''}'.toLowerCase();
         return name.contains(q) || mission.contains(q) || content.contains(q);
@@ -287,25 +287,26 @@ class ProviderMessagesScreenState extends State<ProviderMessagesScreen> {
     return joinPersonName(prenom: prenom, nom: nom, fallback: 'Client');
   }
 
-  String _missionTitle(Map<String, dynamic> c) {
+  /// Libellé mission uniquement si rattachement prestation réel + titre connu.
+  String? _missionContextLabel(Map<String, dynamic> c) {
     final dm = _lastMessage(c);
-    final candidates = [
-      c['titreMission'],
-      c['titre'],
-      c['prestationTitre'],
+    final typeMsg = '${dm?['typeMessage'] ?? ''}'.toUpperCase();
+    final refType = '${dm?['referenceType'] ?? ''}'.toLowerCase();
+    final refId = cleanDisplayPart(dm?['referenceId']);
+    final linked = typeMsg == 'PRESTATION' ||
+        (refType == 'prestation' && refId != null);
+    if (!linked) return null;
+
+    for (final v in [
       dm?['titre'],
-      dm?['referenceType'],
-      dm?['typeMessage'],
-    ];
-    for (final v in candidates) {
-      final s = '$v'.trim();
-      if (s.isEmpty || s == 'null') continue;
-      if (s == 'PRESTATION') return 'Mission / prestation';
-      if (s == 'SUPPORT') return 'Support';
-      if (s == 'COMMANDE') return 'Commande';
-      return s;
+      c['titreMission'],
+      c['prestationTitre'],
+      c['titre'],
+    ]) {
+      final label = cleanDisplayPart(v);
+      if (label != null) return label;
     }
-    return 'Conversation';
+    return null;
   }
 
   bool _isOnline(Map<String, dynamic>? p) {
@@ -347,9 +348,9 @@ class ProviderMessagesScreenState extends State<ProviderMessagesScreen> {
           final totalCount = state is ConversationsLoaded
               ? state.conversations.length
               : raw.length;
-          final unreadTotal = state is ConversationsLoaded
-              ? state.totalUnread
-              : raw.fold<int>(0, (s, c) => s + _unreadCount(c));
+          final unreadConversations = raw
+              .where((c) => _unreadCount(c) > 0)
+              .length;
 
           return RefreshIndicator(
             onRefresh: () async {
@@ -379,7 +380,7 @@ class ProviderMessagesScreenState extends State<ProviderMessagesScreen> {
                           _buildSearchField(),
                         ],
                         const SizedBox(height: 16),
-                        _buildChips(totalCount, unreadTotal),
+                        _buildChips(totalCount, unreadConversations),
                         const SizedBox(height: 8),
                       ],
                     ),
@@ -412,7 +413,7 @@ class ProviderMessagesScreenState extends State<ProviderMessagesScreen> {
                           return _ConversationRow(
                             conversation: conversation,
                             name: _displayName(_otherParticipant(conversation)),
-                            mission: _missionTitle(conversation),
+                            mission: _missionContextLabel(conversation),
                             snippet:
                                 '${_lastMessage(conversation)?['contenu'] ?? 'Aucun message'}',
                             time: _formatListTime(
@@ -458,7 +459,7 @@ class ProviderMessagesScreenState extends State<ProviderMessagesScreen> {
       onChanged: _onSearchChanged,
       style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral900),
       decoration: InputDecoration(
-        hintText: 'Rechercher un client, une mission…',
+        hintText: 'Rechercher une conversation…',
         hintStyle: SDTypography.bodyMedium.copyWith(color: SDColors.neutral400),
         prefixIcon:
             const Icon(Icons.search_rounded, color: SDColors.neutral900),
@@ -732,7 +733,7 @@ class _ChipPill extends StatelessWidget {
 class _ConversationRow extends StatelessWidget {
   final Map<String, dynamic> conversation;
   final String name;
-  final String mission;
+  final String? mission;
   final String snippet;
   final String time;
   final int unread;
@@ -830,16 +831,18 @@ class _ConversationRow extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      mission,
-                      style: SDTypography.bodySmall.copyWith(
-                        color: SDColors.neutral800,
-                        fontWeight: FontWeight.w600,
+                    if (mission != null && mission!.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        mission!,
+                        style: SDTypography.bodySmall.copyWith(
+                          color: SDColors.neutral800,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                    ],
                     const SizedBox(height: 2),
                     Row(
                       children: [

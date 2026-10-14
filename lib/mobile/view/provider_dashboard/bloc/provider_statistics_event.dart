@@ -1,10 +1,16 @@
+import '../models/provider_statistics_period.dart';
+
 // 🎯 ÉVÉNEMENTS POUR LE BLoC STATISTIQUES PRESTATAIRE
 abstract class ProviderStatisticsEvent {}
 
 // 📊 CHARGER LES STATISTIQUES DU PRESTATAIRE
 class LoadProviderStatistics extends ProviderStatisticsEvent {
   final String prestataireId;
-  LoadProviderStatistics(this.prestataireId);
+  final ProviderStatsPeriodPreset periodPreset;
+  LoadProviderStatistics(
+    this.prestataireId, {
+    this.periodPreset = ProviderStatsPeriodPreset.thisMonth,
+  });
 }
 
 // 📊 CHARGER LES STATISTIQUES PAR PÉRIODE

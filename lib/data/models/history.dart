@@ -65,10 +65,14 @@ class History {
 
   factory History.fromJson(Map<String, dynamic> json) {
     return History(
-      id: json['_id'],
-      utilisateur: json['utilisateur']?['_id'] ?? json['utilisateur'] ?? '',
+      id: json['_id']?.toString(),
+      utilisateur: () {
+        final u = json['utilisateur'];
+        if (u is Map) return u['_id']?.toString() ?? '';
+        return u?.toString() ?? '';
+      }(),
       objetType: json['objetType'] ?? '',
-      objetId: json['objetId'],
+      objetId: json['objetId']?.toString(),
       titre: json['titre'] ?? '',
       description: json['description'],
       image: json['image'],
@@ -326,6 +330,3 @@ class DeviceInfo {
     };
   }
 }
-
-
-

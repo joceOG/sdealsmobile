@@ -75,6 +75,20 @@ String userFacingNetworkMessage(Object error, {bool? deviceOnline}) {
   }
 }
 
+/// Timeout, coupure ou 5xx : une lecture peut être rejouée une fois.
+/// 401/403 et les autres erreurs (validation, 4xx) ne sont pas rejouées.
+bool isTransientReadFailure(Object error) {
+  switch (classifyUserNetworkFailure(error)) {
+    case UserNetworkKind.timeout:
+    case UserNetworkKind.server:
+    case UserNetworkKind.offline:
+      return true;
+    case UserNetworkKind.auth:
+    case UserNetworkKind.other:
+      return false;
+  }
+}
+
 /// La bannière d'accueil affiche le message déjà classé, sans le réécrire en hors-ligne.
 String homeBannerDisplayMessage(String message) => message;
 

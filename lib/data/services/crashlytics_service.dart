@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
+import 'package:sdealsmobile/data/services/fcm_token_errors.dart';
 
 /// Initialise Firebase (si besoin) + Crashlytics.
 /// No-op gracieux si `google-services.json` est absent.
@@ -28,6 +29,12 @@ class CrashlyticsService {
       };
 
       PlatformDispatcher.instance.onError = (error, stack) {
+        if (isTransientFcmTokenError(error)) {
+          if (kDebugMode) {
+            print('[Crashlytics] FCM transitoire ignoré: $error');
+          }
+          return true;
+        }
         FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
         return true;
       };

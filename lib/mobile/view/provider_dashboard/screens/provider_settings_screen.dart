@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:sdealsmobile/data/utils/legal_urls.dart';
 import '../../../../data/services/api_client.dart';
 import '../../../../data/services/authCubit.dart';
 import '../../../../design_system/design_system.dart';
+import '../../profilpagem/screens/about_screen.dart';
+import '../../profilpagem/screens/help_support_screen.dart';
+import '../../common/role_shell_navigation.dart';
 import '../bloc/provider_profile_bloc.dart';
 import '../bloc/provider_profile_event.dart';
 import '../bloc/provider_profile_state.dart';
+import 'provider_profile_screen.dart';
 
 // ⚙️ ÉCRAN PARAMÈTRES PRESTATAIRE
 class ProviderSettingsScreen extends StatefulWidget {
@@ -201,18 +206,34 @@ class _ProviderSettingsScreenState extends State<ProviderSettingsScreen> {
         child: BlocBuilder<ProviderProfileBloc, ProviderProfileState>(
           builder: (context, state) {
             return SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _buildAccountSection(),
-                  const SizedBox(height: 20),
-                  _buildNotificationSection(),
-                  const SizedBox(height: 20),
+                  Text(
+                    'Votre espace professionnel',
+                    style: SDTypography.bodyMedium.copyWith(
+                      color: SDColors.neutral500,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildMonEspaceSection(),
+                  const SizedBox(height: 16),
+                  _buildPhoneNotificationsSection(),
+                  const SizedBox(height: 16),
+                  _buildNotificationPrefsSection(),
+                  const SizedBox(height: 16),
+                  _buildHelpSection(),
+                  const SizedBox(height: 16),
+                  _buildUnavailableOptionsSection(),
+                  const SizedBox(height: 16),
                   _buildPrivacySection(),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 16),
                   _buildSecuritySection(),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 16),
                   _buildDangerZone(),
+                  const SizedBox(height: 24),
+                  _buildLogoutButton(),
                 ],
               ),
             );
@@ -225,92 +246,349 @@ class _ProviderSettingsScreenState extends State<ProviderSettingsScreen> {
   PreferredSizeWidget _buildSettingsAppBar() {
     return SDWhiteAppBar.appBar(
       title: 'Paramètres',
+      titleStyle: SDTypography.titleLarge,
     );
   }
 
-  Widget _buildAccountSection() {
+  Widget _sectionCard({required String title, required List<Widget> children}) {
     return Container(
-      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: SDColors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        border: Border.all(color: SDColors.neutral200),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
+            child: Text(
+              title,
+              style: SDTypography.labelLarge.copyWith(
+                color: SDColors.neutral600,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          ...children,
+        ],
+      ),
+    );
+  }
+
+  Widget _iconWell(IconData icon, {bool disabled = false}) {
+    return Container(
+      width: 40,
+      height: 40,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: disabled ? SDColors.neutral100 : SDColors.primary50,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Icon(
+        icon,
+        size: 22,
+        color: disabled ? SDColors.neutral500 : SDColors.primary700,
+      ),
+    );
+  }
+
+  Widget _navRow({
+    required IconData icon,
+    required String title,
+    String? subtitle,
+    VoidCallback? onTap,
+    Widget? trailing,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: [
+            _iconWell(icon),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: SDTypography.bodyLarge.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: SDColors.neutral900,
+                    ),
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: SDTypography.caption
+                          .copyWith(color: SDColors.neutral500),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            trailing ??
+                (onTap != null
+                    ? const Icon(Icons.chevron_right,
+                        color: SDColors.neutral400, size: 22)
+                    : const SizedBox.shrink()),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _unavailableBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: SDColors.neutral300),
+      ),
+      child: Text(
+        'Indisponible',
+        style: SDTypography.labelSmall.copyWith(
+          color: SDColors.neutral600,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMonEspaceSection() {
+    return _sectionCard(
+      title: 'Mon espace',
+      children: [
+        _navRow(
+          icon: Icons.person_outline,
+          title: 'Mon profil professionnel',
+          subtitle: 'Présentation, service et zone',
+          onTap: _openProfessionalProfile,
+        ),
+        Divider(height: 1, color: SDColors.neutral200),
+        _navRow(
+          icon: Icons.home_work_outlined,
+          title: 'Retour à l’espace client',
+          subtitle: 'Conserver ma connexion',
+          onTap: _switchToClientMode,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPhoneNotificationsSection() {
+    return _sectionCard(
+      title: 'Notifications',
+      children: [
+        _navRow(
+          icon: Icons.notifications_none_outlined,
+          title: 'Notifications de l’application',
+          subtitle: 'Gérer les autorisations du téléphone',
+          trailing: const Icon(Icons.open_in_new,
+              color: SDColors.primary700, size: 20),
+          onTap: _openAppNotificationSettings,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHelpSection() {
+    return _sectionCard(
+      title: 'Aide et informations',
+      children: [
+        _navRow(
+          icon: Icons.help_outline,
+          title: 'Aide et support',
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const HelpSupportScreen()),
+            );
+          },
+        ),
+        Divider(height: 1, color: SDColors.neutral200),
+        _navRow(
+          icon: Icons.info_outline,
+          title: 'À propos de Soutrali Deals',
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const AboutScreen()),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildUnavailableOptionsSection() {
+    return _sectionCard(
+      title: 'Options indisponibles',
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          child: Text(
+            'Ces réglages ne sont pas encore modifiables.',
+            style: SDTypography.caption.copyWith(color: SDColors.neutral500),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
             children: [
-              Icon(Icons.account_circle,
-                  color: Colors.green.shade600, size: 24),
-              const SizedBox(width: 8),
-              Text(
-                'Compte',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[800],
+              _iconWell(Icons.language, disabled: true),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Langue',
+                      style: SDTypography.bodyLarge.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: SDColors.neutral700,
+                      ),
+                    ),
+                    Text(
+                      'Français',
+                      style: SDTypography.caption
+                          .copyWith(color: SDColors.neutral500),
+                    ),
+                  ],
                 ),
               ),
+              _unavailableBadge(),
             ],
           ),
-          const SizedBox(height: 16),
-          _buildSettingItem(
-            'Modifier le profil',
-            'Informations personnelles et professionnelles',
-            Icons.edit,
-            () => _showEditProfile(),
+        ),
+        Divider(height: 1, color: SDColors.neutral200),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              _iconWell(Icons.privacy_tip_outlined, disabled: true),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Préférences de confidentialité',
+                  style: SDTypography.bodyLarge.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: SDColors.neutral700,
+                  ),
+                ),
+              ),
+              _unavailableBadge(),
+            ],
           ),
-          _buildSettingItem(
-            'Changer le mot de passe',
-            'Sécurité du compte',
-            Icons.lock,
-            () => _showPasswordDialog(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLogoutButton() {
+    return InkWell(
+      onTap: _confirmLogout,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Row(
+          children: [
+            Icon(Icons.logout, color: SDColors.error600, size: 22),
+            const SizedBox(width: 10),
+            Text(
+              'Se déconnecter',
+              style: SDTypography.bodyLarge.copyWith(
+                color: SDColors.error600,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // go (pas pop + push) : remplace toute la pile pro par le shell client.
+  void _switchToClientMode() {
+    goToClientShell(context);
+  }
+
+  Future<void> _openAppNotificationSettings() async {
+    final opened = await openAppSettings();
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Impossible d’ouvrir les réglages du téléphone. '
+            'Ouvrez-les manuellement pour les notifications.',
           ),
-          _buildSettingItem(
-            'Vérification d\'identité',
-            'Documents et pièces justificatives',
-            Icons.verified_user,
-            () => _showIdentityVerification(),
+        ),
+      );
+    }
+  }
+
+  void _openProfessionalProfile() {
+    final auth = context.read<AuthCubit>().state;
+    final token = auth is AuthAuthenticated ? auth.token : null;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => BlocProvider<ProviderProfileBloc>(
+          create: (context) {
+            final bloc = ProviderProfileBloc();
+            if (token != null) bloc.setToken(token);
+            return bloc;
+          },
+          child: ProviderProfileScreen(prestataireDocId: widget.prestataireDocId),
+        ),
+      ),
+    );
+  }
+
+  void _confirmLogout() {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Déconnexion'),
+        content: const Text('Êtes-vous sûr de vouloir vous déconnecter ?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              context.read<AuthCubit>().logout();
+              context.go('/login');
+            },
+            child: const Text('Déconnexion'),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildNotificationSection() {
+  Widget _buildNotificationPrefsSection() {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: SDColors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        border: Border.all(color: SDColors.neutral200),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.notifications, color: Colors.green.shade600, size: 24),
+              Icon(Icons.tune, color: SDColors.primary700, size: 24),
               const SizedBox(width: 8),
               Text(
-                'Notifications',
-                style: TextStyle(
-                  fontSize: 18,
+                'Préférences de notification',
+                style: SDTypography.titleSmall.copyWith(
                   fontWeight: FontWeight.bold,
-                  color: Colors.grey[800],
+                  color: SDColors.neutral800,
                 ),
               ),
               if (_notifLoading || _notifSaving) ...[
@@ -366,106 +644,57 @@ class _ProviderSettingsScreenState extends State<ProviderSettingsScreen> {
   }
 
   Widget _buildPrivacySection() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.privacy_tip, color: Colors.green.shade600, size: 24),
-              const SizedBox(width: 8),
-              Text(
-                'Confidentialité',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[800],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _buildSettingItem(
-            'Gérer les données',
-            'Télécharger ou supprimer vos données',
-            Icons.data_usage,
-            () => openLegalUrl(context, LegalUrls.confidentialite),
-          ),
-          _buildSettingItem(
-            'Politique de confidentialité',
-            'Lire notre politique de confidentialité',
-            Icons.policy,
-            () => openLegalUrl(context, LegalUrls.confidentialite),
-          ),
-          _buildSettingItem(
-            'Conditions d\'utilisation',
-            'Lire nos conditions d\'utilisation',
-            Icons.description,
-            () => openLegalUrl(context, LegalUrls.cgu),
-          ),
-        ],
-      ),
+    return _sectionCard(
+      title: 'Confidentialité et données',
+      children: [
+        _navRow(
+          icon: Icons.data_usage,
+          title: 'Gérer les données',
+          subtitle: 'Télécharger ou supprimer vos données',
+          onTap: () => openLegalUrl(context, LegalUrls.confidentialite),
+        ),
+        Divider(height: 1, color: SDColors.neutral200),
+        _navRow(
+          icon: Icons.policy_outlined,
+          title: 'Politique de confidentialité',
+          subtitle: 'Lire notre politique',
+          onTap: () => openLegalUrl(context, LegalUrls.confidentialite),
+        ),
+        Divider(height: 1, color: SDColors.neutral200),
+        _navRow(
+          icon: Icons.description_outlined,
+          title: 'Conditions d’utilisation',
+          subtitle: 'Lire nos conditions',
+          onTap: () => openLegalUrl(context, LegalUrls.cgu),
+        ),
+      ],
     );
   }
 
   Widget _buildSecuritySection() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.security, color: Colors.green.shade600, size: 24),
-              const SizedBox(width: 8),
-              Text(
-                'Sécurité',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[800],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _buildSettingItem(
-            'Sessions actives',
-            'Gérer les appareils connectés',
-            Icons.devices,
-            () => _showUnavailable('Sessions actives'),
-          ),
-          _buildSettingItem(
-            'Historique de connexion',
-            'Voir l\'historique des connexions',
-            Icons.history,
-            () => _showUnavailable('Historique de connexion'),
-          ),
-        ],
-      ),
+    return _sectionCard(
+      title: 'Sécurité du compte',
+      children: [
+        _navRow(
+          icon: Icons.lock_outline,
+          title: 'Changer le mot de passe',
+          subtitle: 'Protection de votre compte',
+          onTap: _showPasswordDialog,
+        ),
+        Divider(height: 1, color: SDColors.neutral200),
+        _navRow(
+          icon: Icons.devices,
+          title: 'Sessions actives',
+          subtitle: 'Gérer les appareils connectés',
+          onTap: () => _showUnavailable('Sessions actives'),
+        ),
+        Divider(height: 1, color: SDColors.neutral200),
+        _navRow(
+          icon: Icons.history,
+          title: 'Historique de connexion',
+          onTap: () => _showUnavailable('Historique de connexion'),
+        ),
+      ],
     );
   }
 
@@ -511,31 +740,6 @@ class _ProviderSettingsScreenState extends State<ProviderSettingsScreen> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildSettingItem(
-      String title, String subtitle, IconData icon, VoidCallback onTap) {
-    return ListTile(
-      leading: Icon(icon, color: Colors.green.shade600),
-      title: Text(
-        title,
-        style: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
-          color: Colors.grey[800],
-        ),
-      ),
-      subtitle: Text(
-        subtitle,
-        style: TextStyle(
-          fontSize: 14,
-          color: Colors.grey[600],
-        ),
-      ),
-      trailing:
-          Icon(Icons.arrow_forward_ios, color: Colors.grey[400], size: 16),
-      onTap: onTap,
     );
   }
 
@@ -588,19 +792,6 @@ class _ProviderSettingsScreenState extends State<ProviderSettingsScreen> {
           color: color.withOpacity(0.7), size: 16),
       onTap: onTap,
     );
-  }
-
-  void _showEditProfile() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-            'Utilisez l\'onglet Profil pour modifier bio et description'),
-      ),
-    );
-  }
-
-  void _showIdentityVerification() {
-    _showUnavailable('Vérification d\'identité');
   }
 
   void _showUnavailable(String feature) {

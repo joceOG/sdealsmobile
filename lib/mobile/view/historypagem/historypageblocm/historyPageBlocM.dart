@@ -1,14 +1,24 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:http/http.dart' as http;
 import '../../../../data/services/api_client.dart';
 import 'historyPageEventM.dart';
 import 'historyPageStateM.dart';
 import '../../../../data/models/history.dart';
 
 class HistoryPageBlocM extends Bloc<HistoryPageEventM, HistoryPageStateM> {
-  final ApiClient _apiClient = ApiClient();
+  final ApiClient _apiClient;
 
-  HistoryPageBlocM() : super(const HistoryPageInitialM()) {
+  @visibleForTesting
+  static Future<http.Response> Function(String endpoint)? debugGet;
+
+  @visibleForTesting
+  static void debugReset() => debugGet = null;
+
+  HistoryPageBlocM({ApiClient? apiClient})
+      : _apiClient = apiClient ?? ApiClient(),
+        super(const HistoryPageInitialM()) {
     // 📋 CHARGER L'HISTORIQUE
     on<LoadHistoryDataM>(_onLoadHistoryDataM);
 
@@ -72,13 +82,19 @@ class HistoryPageBlocM extends Bloc<HistoryPageEventM, HistoryPageStateM> {
             .join('&');
         url += '?$queryString';
       }
-      final response = await _apiClient.get(url);
+      final response =
+          debugGet != null ? await debugGet!(url) : await _apiClient.get(url);
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
-        final List<History> history = (responseData['history'] as List)
-            .map((item) => History.fromJson(item))
-            .toList();
+        final raw = responseData is Map ? responseData['history'] : null;
+        final List<History> history = raw is List
+            ? raw
+                .whereType<Map>()
+                .map(
+                    (item) => History.fromJson(Map<String, dynamic>.from(item)))
+                .toList()
+            : <History>[];
 
         emit(HistoryPageLoadedM(
           history: history,

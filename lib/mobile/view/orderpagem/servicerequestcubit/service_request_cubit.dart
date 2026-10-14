@@ -31,6 +31,15 @@ class ServiceRequestDetailLoaded extends ServiceRequestState {
 
 class ServiceRequestCubit extends Cubit<ServiceRequestState> {
   final ApiClient api;
+
+  /// Remplace le GET prestations dans les tests. Le chemin production reste
+  /// `api.getMyPrestations` lorsque ce crochet est nul.
+  @visibleForTesting
+  static Future<List<Map<String, dynamic>>> Function()? debugFetchMine;
+
+  @visibleForTesting
+  static void debugReset() => debugFetchMine = null;
+
   ServiceRequestCubit({ApiClient? apiClient})
       : api = apiClient ?? ApiClient(),
         super(ServiceRequestInitial());
@@ -74,11 +83,13 @@ class ServiceRequestCubit extends Cubit<ServiceRequestState> {
   }) async {
     emit(ServiceRequestLoading());
     try {
-      final items = await api.getMyPrestations(
-        token: token,
-        utilisateurId: utilisateurId,
-        status: status,
-      );
+      final items = debugFetchMine != null
+          ? await debugFetchMine!()
+          : await api.getMyPrestations(
+              token: token,
+              utilisateurId: utilisateurId,
+              status: status,
+            );
       emit(ServiceRequestListLoaded(items));
     } catch (e) {
       emit(ServiceRequestError(e.toString()));

@@ -635,6 +635,3 @@ class HistoryDetailScreenM extends StatelessWidget {
     );
   }
 }
-
-
-

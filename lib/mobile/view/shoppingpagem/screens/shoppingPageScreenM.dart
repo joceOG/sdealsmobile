@@ -14,6 +14,7 @@ import '../utils/cart_navigation.dart';
 import '../widgets/filter_bottom_sheet.dart';
 import '../../common/widgets/app_image.dart';
 import '../../common/widgets/skeleton_loader.dart';
+import '../../common/widgets/universe_hub_header.dart';
 
 // Design System
 import '../../../../design_system/colors.dart';
@@ -268,168 +269,46 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
     return List<Categorie>.from(raw);
   }
 
-  Widget _buildMarketplaceHeader(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Expanded(
-          child: Text(
-            'É-marché',
-            textAlign: TextAlign.start,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: SDTypography.displayMedium.copyWith(
+  Widget _buildCartAction() {
+    return BlocBuilder<ShoppingPageBlocM, bloc_model.ShoppingPageStateM>(
+      builder: (context, state) {
+        final cartCount = state.cart?.totalItems ?? 0;
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            IconButton(
+              onPressed: () => openShoppingCart(context),
+              icon: const Icon(Icons.shopping_cart_outlined),
               color: SDColors.neutral900,
-              fontWeight: FontWeight.w700,
+              tooltip: 'Panier',
             ),
-          ),
-        ),
-        BlocBuilder<ShoppingPageBlocM, bloc_model.ShoppingPageStateM>(
-          builder: (context, state) {
-            final cartCount = state.cart?.totalItems ?? 0;
-            return Stack(
-              clipBehavior: Clip.none,
-              children: [
-                IconButton(
-                  onPressed: () => openShoppingCart(context),
-                  icon: const Icon(Icons.shopping_cart_outlined),
-                  color: SDColors.neutral900,
-                  tooltip: 'Panier',
-                ),
-                if (cartCount > 0)
-                  Positioned(
-                    right: 6,
-                    top: 6,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 5, vertical: 2),
-                      constraints:
-                          const BoxConstraints(minWidth: 18, minHeight: 18),
-                      decoration: BoxDecoration(
-                        color: SDColors.primary600,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        cartCount > 99 ? '99+' : '$cartCount',
-                        textAlign: TextAlign.center,
-                        style: SDTypography.labelSmall.copyWith(
-                          color: SDColors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
+            if (cartCount > 0)
+              Positioned(
+                right: 6,
+                top: 6,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                  constraints:
+                      const BoxConstraints(minWidth: 18, minHeight: 18),
+                  decoration: BoxDecoration(
+                    color: SDColors.primary600,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    cartCount > 99 ? '99+' : '$cartCount',
+                    textAlign: TextAlign.center,
+                    style: SDTypography.labelSmall.copyWith(
+                      color: SDColors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-              ],
-            );
-          },
-        ),
-        BlocBuilder<AuthCubit, AuthState>(
-          builder: (context, authState) {
-            if (authState is AuthAuthenticated) {
-              final u = authState.utilisateur;
-              final url = u.photoProfil;
-              return Padding(
-                padding: const EdgeInsets.only(left: 4),
-                child: CircleAvatar(
-                  radius: 18,
-                  backgroundColor: SDColors.primary50,
-                  backgroundImage: (url != null &&
-                          url.isNotEmpty &&
-                          (url.startsWith('http://') ||
-                              url.startsWith('https://')))
-                      ? NetworkImage(url)
-                      : null,
-                  child: (url == null ||
-                          url.isEmpty ||
-                          (!url.startsWith('http://') &&
-                              !url.startsWith('https://')))
-                      ? Icon(Icons.person, color: SDColors.primary600, size: 20)
-                      : null,
-                ),
-              );
-            }
-            return const SizedBox.shrink();
-          },
-        ),
-        Container(
-          margin: const EdgeInsets.only(left: 4),
-          decoration: BoxDecoration(
-            color: SDColors.white,
-            shape: BoxShape.circle,
-            border: Border.all(color: SDColors.neutral200),
-          ),
-          child: IconButton(
-            onPressed: () => Navigator.of(context).maybePop(),
-            icon: const Icon(Icons.close, color: SDColors.neutral900),
-            tooltip: 'Fermer',
-            visualDensity: VisualDensity.compact,
-          ),
-        ),
-      ],
-    );
-  }
-
-  /// Barre recherche — même style que Métiers / Freelance.
-  Widget _buildSearchField(BuildContext context) {
-    void openSearch() {
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => const SearchPageScreenM(initialIndex: 4),
-        ),
-      );
-    }
-
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: SDSpacing.sm,
-        vertical: SDSpacing.xs,
-      ),
-      decoration: BoxDecoration(
-        color: SDColors.white,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: SDColors.primary100, width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: SDColors.neutral900.withOpacity(0.05),
-            blurRadius: 6,
-            offset: const Offset(0, 1),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.search, color: SDColors.primary600, size: 20),
-          SizedBox(width: SDSpacing.xs),
-          Expanded(
-            child: GestureDetector(
-              onTap: openSearch,
-              behavior: HitTestBehavior.opaque,
-              child: Text(
-                'Que recherchez-vous ?',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: SDTypography.bodyMedium.copyWith(
-                  color: SDColors.neutral400,
-                  fontSize: 13,
                 ),
               ),
-            ),
-          ),
-          GestureDetector(
-            onTap: () => _showAdvancedFilterDialog(context),
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: SDColors.primary600,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(Icons.tune, color: SDColors.white, size: 17),
-            ),
-          ),
-        ],
-      ),
+          ],
+        );
+      },
     );
   }
 
@@ -610,10 +489,22 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: SDColors.white,
-      body: SafeArea(
-        top: true,
-        bottom: false,
-        child: BlocBuilder<ShoppingPageBlocM, bloc_model.ShoppingPageStateM>(
+      body: Column(
+        children: [
+          UniverseHubHeader(
+            copy: UniverseHubCopy.emarket,
+            onSearch: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const SearchPageScreenM(initialIndex: 4),
+                ),
+              );
+            },
+            onFilter: () => FilterBottomSheet.show(context),
+            actions: [_buildCartAction()],
+          ),
+          Expanded(
+            child: BlocBuilder<ShoppingPageBlocM, bloc_model.ShoppingPageStateM>(
           builder: (context, state) {
             if ((state.isLoading == true) &&
                 (state.products == null || state.products!.isEmpty) &&
@@ -664,10 +555,7 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
                           ),
                           SizedBox(height: SDSpacing.md),
                         ],
-                        _buildMarketplaceHeader(context),
-                        SizedBox(height: SDSpacing.md),
-                        _buildSearchField(context),
-                        SizedBox(height: SDSpacing.xl),
+                        SizedBox(height: SDSpacing.sm),
                         _buildSectionTitleOnly(
                           leadingIcon: Icons.grid_view_rounded,
                           title: 'Catégories',
@@ -697,7 +585,9 @@ class _ShoppingPageScreenMState extends State<ShoppingPageScreenM> {
               ],
             );
           },
-        ),
+            ),
+          ),
+        ],
       ),
     );
   }

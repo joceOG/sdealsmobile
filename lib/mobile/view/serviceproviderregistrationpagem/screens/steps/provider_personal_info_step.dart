@@ -5,6 +5,8 @@ import '../../../../../design_system/design_system.dart';
 import '../../../../../data/services/api_client.dart';
 import '../../../../../data/models/categorie.dart';
 import '../../../../../data/models/service.dart';
+import '../widgets/provider_category_picker_sheet.dart';
+import '../widgets/provider_service_picker_sheet.dart';
 
 /// Étape 1 Figma — identité + catégorie / service (sans zones / GPS).
 class ProviderPersonalInfoStep extends StatefulWidget {
@@ -38,6 +40,8 @@ class _ProviderPersonalInfoStepState extends State<ProviderPersonalInfoStep> {
   List<Service> _services = [];
   bool _isLoadingCategories = false;
   bool _isLoadingServices = false;
+  String? _categoriesError;
+  String? _servicesError;
   final ApiClient _apiClient = ApiClient();
 
   @override
@@ -47,45 +51,150 @@ class _ProviderPersonalInfoStepState extends State<ProviderPersonalInfoStep> {
     _loadCategories();
   }
 
+  Future<List<Categorie>> _fetchCategoriesFromApi() async {
+    return _apiClient.fetchCategorie('Métiers');
+  }
+
   Future<void> _loadCategories() async {
-    setState(() => _isLoadingCategories = true);
+    setState(() {
+      _isLoadingCategories = true;
+      _categoriesError = null;
+    });
     try {
-      final categories = await _apiClient.fetchCategorie('Métiers');
+      final categories = await _fetchCategoriesFromApi();
+      if (!mounted) return;
       setState(() {
         _categories = categories;
         _isLoadingCategories = false;
       });
       final cat = widget.formData['category'] as String?;
       if (cat != null && cat.isNotEmpty) {
-        await _loadServicesForCategory(cat);
+        await _loadServicesForCategory(cat, resetService: false);
       }
     } catch (_) {
-      setState(() => _isLoadingCategories = false);
+      if (!mounted) return;
+      setState(() {
+        _isLoadingCategories = false;
+        _categoriesError = 'Impossible de charger les catégories.';
+      });
     }
   }
 
-  Future<void> _loadServicesForCategory(String categoryId) async {
+  Future<List<Service>> _fetchServicesForCategoryApi(String categoryId) async {
+    final services = await _apiClient.fetchServices('Métiers');
+    return services
+        .where((s) => s.categorie?.idcategorie == categoryId)
+        .toList();
+  }
+
+  Future<void> _loadServicesForCategory(
+    String categoryId, {
+    bool resetService = true,
+  }) async {
+    final keepServiceId = resetService ? null : _selectedService;
     setState(() {
       _isLoadingServices = true;
-      _selectedService = null;
+      _servicesError = null;
+      if (resetService) _selectedService = null;
     });
     try {
-      final services = await _apiClient.fetchServices('Métiers');
-      final filtered = services
-          .where((s) => s.categorie?.idcategorie == categoryId)
-          .toList();
+      final filtered = await _fetchServicesForCategoryApi(categoryId);
+      if (!mounted) return;
       setState(() {
         _services = filtered;
         _isLoadingServices = false;
-        final prev = widget.formData['service'] as String?;
-        if (prev != null && filtered.any((s) => s.idservice == prev)) {
-          _selectedService = prev;
+        if (keepServiceId != null &&
+            filtered.any((s) => s.idservice == keepServiceId)) {
+          _selectedService = keepServiceId;
+        } else if (resetService) {
+          _selectedService = null;
+        } else {
+          final prev = widget.formData['service'] as String?;
+          if (prev != null && filtered.any((s) => s.idservice == prev)) {
+            _selectedService = prev;
+          }
         }
       });
       _updateFormData();
     } catch (_) {
-      setState(() => _isLoadingServices = false);
+      if (!mounted) return;
+      setState(() {
+        _isLoadingServices = false;
+        _servicesError = 'Impossible de charger les services.';
+      });
     }
+  }
+
+  Future<void> _openServicePicker() async {
+    final categoryId = _selectedCategory;
+    if (categoryId == null || categoryId.isEmpty) return;
+
+    final chosen = await ProviderServicePickerSheet.show(
+      context,
+      categoryId: categoryId,
+      categoryLabel: _categoryDisplayLabel() ?? '',
+      initialSelectedId: _selectedService,
+      seedServices: _services,
+      loadServices: () => _fetchServicesForCategoryApi(categoryId),
+    );
+    if (chosen == null || !mounted) return;
+
+    if (chosen == _selectedService) {
+      if (_services.isEmpty) {
+        await _loadServicesForCategory(categoryId, resetService: false);
+      }
+      return;
+    }
+
+    setState(() => _selectedService = chosen);
+    if (_services.isEmpty) {
+      await _loadServicesForCategory(categoryId, resetService: false);
+      if (mounted) setState(() => _selectedService = chosen);
+    }
+    _updateFormData();
+  }
+
+  String? _serviceDisplayLabel() {
+    if (_selectedService != null) {
+      for (final s in _services) {
+        if (s.idservice == _selectedService) return s.nomservice;
+      }
+    }
+    final name = widget.formData['serviceName']?.toString().trim();
+    if (name != null && name.isNotEmpty) return name;
+    return null;
+  }
+
+  Future<void> _openCategoryPicker() async {
+    final chosen = await ProviderCategoryPickerSheet.show(
+      context,
+      initialSelectedId: _selectedCategory,
+      seedCategories: _categories,
+      loadCategories: _fetchCategoriesFromApi,
+    );
+    if (chosen == null || !mounted) return;
+
+    if (chosen == _selectedCategory) {
+      if (_categories.isEmpty) await _loadCategories();
+      return;
+    }
+
+    setState(() => _selectedCategory = chosen);
+    if (_categories.isEmpty) {
+      await _loadCategories();
+    }
+    await _loadServicesForCategory(chosen, resetService: true);
+  }
+
+  String? _categoryDisplayLabel() {
+    if (_selectedCategory != null) {
+      for (final c in _categories) {
+        if (c.idcategorie == _selectedCategory) return c.nomcategorie;
+      }
+    }
+    final name = widget.formData['categoryName']?.toString().trim();
+    if (name != null && name.isNotEmpty) return name;
+    return null;
   }
 
   void _initializeFormValues() {
@@ -291,55 +400,9 @@ class _ProviderPersonalInfoStepState extends State<ProviderPersonalInfoStep> {
           ),
         ),
         SizedBox(height: SDSpacing.sm),
-        _buildDropdownField(
-          label: 'Catégorie *',
-          icon: Icons.category_outlined,
-          isLoading: _isLoadingCategories,
-          loadingLabel: 'Chargement des catégories...',
-          value: _selectedCategory,
-          items: _categories
-              .map((c) => DropdownMenuItem(
-                    value: c.idcategorie,
-                    child: Text(c.nomcategorie),
-                  ))
-              .toList(),
-          onChanged: (value) {
-            setState(() {
-              _selectedCategory = value;
-              _selectedService = null;
-              _services = [];
-            });
-            if (value != null) _loadServicesForCategory(value);
-            _updateFormData();
-          },
-          hint: 'Sélectionnez une catégorie',
-        ),
+        _buildCategoryPickerField(),
         SizedBox(height: SDSpacing.sm),
-        _buildDropdownField(
-          label: 'Service *',
-          icon: Icons.build_outlined,
-          isLoading: _isLoadingServices,
-          loadingLabel: _selectedCategory == null
-              ? 'Sélectionnez d’abord une catégorie'
-              : 'Chargement des services...',
-          value: _selectedService != null &&
-                  _services.any((s) => s.idservice == _selectedService)
-              ? _selectedService
-              : null,
-          items: _services
-              .map((s) => DropdownMenuItem(
-                    value: s.idservice,
-                    child: Text(s.nomservice),
-                  ))
-              .toList(),
-          onChanged: _selectedCategory == null
-              ? null
-              : (value) {
-                  setState(() => _selectedService = value);
-                  _updateFormData();
-                },
-          hint: 'Sélectionnez un service',
-        ),
+        _buildServicePickerField(),
         SizedBox(height: SDSpacing.sm),
         _InfoBanner(
           icon: Icons.filter_alt_outlined,
@@ -350,55 +413,186 @@ class _ProviderPersonalInfoStepState extends State<ProviderPersonalInfoStep> {
     );
   }
 
-  Widget _buildDropdownField({
-    required String label,
-    required IconData icon,
-    required bool isLoading,
-    required String loadingLabel,
-    required String? value,
-    required List<DropdownMenuItem<String>> items,
-    required ValueChanged<String?>? onChanged,
-    required String hint,
-  }) {
+  Widget _buildCategoryPickerField() {
+    final label = _categoryDisplayLabel();
+    final loading = _isLoadingCategories && _categories.isEmpty;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label,
-            style: SDTypography.labelLarge.copyWith(
-                color: SDColors.neutral700, fontWeight: FontWeight.w600)),
-        SizedBox(height: SDSpacing.xxs),
-        Container(
-          decoration: BoxDecoration(
-            border: Border.all(color: SDColors.neutral200),
-            borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
-            color: SDColors.white,
-          ),
-          child: DropdownButtonFormField<String>(
-            decoration: InputDecoration(
-              border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(
-                  horizontal: SDSpacing.sm, vertical: SDSpacing.xs),
-              prefixIcon: Icon(icon, color: SDColors.neutral500, size: 20),
-            ),
-            value: (!isLoading &&
-                    value != null &&
-                    items.any((item) => item.value == value))
-                ? value
-                : null,
-            hint: Text(isLoading ? loadingLabel : hint,
-                style: SDTypography.bodyMedium
-                    .copyWith(color: SDColors.neutral400)),
-            items: isLoading ? [] : items,
-            onChanged: isLoading ? null : onChanged,
-            isExpanded: true,
-            icon: isLoading
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2))
-                : const Icon(Icons.keyboard_arrow_down),
+        Text(
+          'Catégorie *',
+          style: SDTypography.labelLarge.copyWith(
+            color: SDColors.neutral700,
+            fontWeight: FontWeight.w600,
           ),
         ),
+        SizedBox(height: SDSpacing.xxs),
+        Material(
+          color: SDColors.white,
+          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+          child: InkWell(
+            onTap: loading ? null : _openCategoryPicker,
+            borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+            child: Container(
+              constraints: const BoxConstraints(minHeight: 52),
+              decoration: BoxDecoration(
+                border: Border.all(color: SDColors.neutral200),
+                borderRadius:
+                    BorderRadius.circular(SDSpacing.borderRadiusMedium),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Row(
+                children: [
+                  const Icon(Icons.category_outlined,
+                      color: SDColors.neutral500, size: 20),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      loading
+                          ? 'Chargement des catégories...'
+                          : (label ?? 'Sélectionnez une catégorie'),
+                      style: SDTypography.bodyLarge.copyWith(
+                        fontSize: 16,
+                        color: label != null && !loading
+                            ? SDColors.neutral900
+                            : SDColors.neutral400,
+                      ),
+                      maxLines: 3,
+                      overflow: TextOverflow.visible,
+                    ),
+                  ),
+                  if (loading)
+                    const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  else
+                    const Icon(Icons.keyboard_arrow_down,
+                        color: SDColors.neutral500),
+                ],
+              ),
+            ),
+          ),
+        ),
+        if (_categoriesError != null && _categories.isEmpty) ...[
+          const SizedBox(height: 6),
+          Text(
+            _categoriesError!,
+            style: SDTypography.bodySmall.copyWith(color: SDColors.error500),
+          ),
+          TextButton(
+            onPressed: _loadCategories,
+            child: Text(
+              'Réessayer',
+              style: SDTypography.labelLarge.copyWith(
+                color: SDColors.primary700,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildServicePickerField() {
+    final label = _serviceDisplayLabel();
+    final noCategory =
+        _selectedCategory == null || _selectedCategory!.isEmpty;
+    final loading = _isLoadingServices && _services.isEmpty && !noCategory;
+
+    String placeholder;
+    if (noCategory) {
+      placeholder = 'Sélectionnez d’abord une catégorie';
+    } else if (loading) {
+      placeholder = 'Chargement des services...';
+    } else {
+      placeholder = 'Sélectionnez un service';
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Service *',
+          style: SDTypography.labelLarge.copyWith(
+            color: SDColors.neutral700,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        SizedBox(height: SDSpacing.xxs),
+        Material(
+          color: SDColors.white,
+          borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+          child: InkWell(
+            onTap: (noCategory || loading) ? null : _openServicePicker,
+            borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium),
+            child: Container(
+              constraints: const BoxConstraints(minHeight: 52),
+              decoration: BoxDecoration(
+                border: Border.all(color: SDColors.neutral200),
+                borderRadius:
+                    BorderRadius.circular(SDSpacing.borderRadiusMedium),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Row(
+                children: [
+                  const Icon(Icons.build_outlined,
+                      color: SDColors.neutral500, size: 20),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      label ?? placeholder,
+                      style: SDTypography.bodyLarge.copyWith(
+                        fontSize: 16,
+                        color: label != null && !loading && !noCategory
+                            ? SDColors.neutral900
+                            : SDColors.neutral400,
+                      ),
+                      maxLines: 3,
+                      overflow: TextOverflow.visible,
+                    ),
+                  ),
+                  if (loading)
+                    const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  else
+                    const Icon(Icons.keyboard_arrow_down,
+                        color: SDColors.neutral500),
+                ],
+              ),
+            ),
+          ),
+        ),
+        if (_servicesError != null &&
+            _services.isEmpty &&
+            !noCategory) ...[
+          const SizedBox(height: 6),
+          Text(
+            _servicesError!,
+            style: SDTypography.bodySmall.copyWith(color: SDColors.error500),
+          ),
+          TextButton(
+            onPressed: () {
+              final cat = _selectedCategory;
+              if (cat != null) {
+                _loadServicesForCategory(cat, resetService: false);
+              }
+            },
+            child: Text(
+              'Réessayer',
+              style: SDTypography.labelLarge.copyWith(
+                color: SDColors.primary700,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }

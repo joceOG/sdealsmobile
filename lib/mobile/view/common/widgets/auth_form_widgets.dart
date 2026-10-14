@@ -72,6 +72,72 @@ class AuthBackButton extends StatelessWidget {
   }
 }
 
+/// Barre compacte : retour + SOUTRALI DEALS.
+class AuthCompactBrandBar extends StatelessWidget {
+  const AuthCompactBrandBar({super.key, required this.onBack});
+
+  final VoidCallback onBack;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 4, 8, 0),
+      child: Row(
+        children: [
+          AuthBackButton(onPressed: onBack),
+          Expanded(
+            child: Text(
+              'SOUTRALI DEALS',
+              style: SDTypography.titleSmall.copyWith(
+                color: SDColors.primary700,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.4,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Icône décorative sur fond menthe (pas un indicateur d’état).
+class AuthMintIcon extends StatelessWidget {
+  const AuthMintIcon({
+    super.key,
+    required this.icon,
+    this.size = 60,
+    this.iconSize = 28,
+  });
+
+  final IconData icon;
+  final double size;
+  final double iconSize;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: SDColors.primary50,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Icon(icon, color: SDColors.primary600, size: iconSize),
+    );
+  }
+}
+
+/// Masque un E.164 pour l’affichage (jamais un numéro illustratif figé).
+String maskPhoneForDisplay(String e164) {
+  final t = e164.trim();
+  if (t.length < 8) return t;
+  final last = t.substring(t.length - 2);
+  final headLen = t.startsWith('+') ? 6 : 4;
+  final safeHead = headLen > t.length - 2 ? t.length - 2 : headLen;
+  return '${t.substring(0, safeHead)} •• •• •• $last';
+}
+
 enum AuthLoginMode { phone, email }
 
 /// Segmented Téléphone | Email pour la connexion.
@@ -104,7 +170,7 @@ class AuthLoginModeToggle extends StatelessWidget {
           ),
           Expanded(
             child: _Segment(
-              label: 'Email',
+              label: 'E-mail',
               selected: mode == AuthLoginMode.email,
               onTap: () => onChanged(AuthLoginMode.email),
             ),
@@ -129,12 +195,13 @@ class _Segment extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: selected ? SDColors.white : Colors.transparent,
+      color: selected ? SDColors.primary50 : Colors.transparent,
       borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium - 2),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(SDSpacing.borderRadiusMedium - 2),
         child: Container(
+          constraints: const BoxConstraints(minHeight: 44),
           padding: const EdgeInsets.symmetric(vertical: 10),
           alignment: Alignment.center,
           child: Text(
@@ -152,7 +219,8 @@ class _Segment extends StatelessWidget {
 
 /// Séparateur « ou … » entre Google et formulaire classique.
 class AuthOrDivider extends StatelessWidget {
-  const AuthOrDivider({super.key, this.label = 'ou continuer avec email/téléphone'});
+  const AuthOrDivider(
+      {super.key, this.label = 'ou continuer avec email/téléphone'});
 
   final String label;
 

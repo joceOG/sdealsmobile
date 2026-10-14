@@ -8,6 +8,7 @@ import '../bloc/notification_event.dart';
 import '../bloc/notification_state.dart';
 import '../../../../data/services/authCubit.dart';
 import '../../common/widgets/unauthenticated_banner.dart';
+import '../../provider_dashboard/models/provider_mission.dart';
 
 // 🎯 ÉCRAN NOTIFICATIONS CLIENT MAGNIFIQUE
 class NotificationScreen extends StatefulWidget {
@@ -703,15 +704,22 @@ class _NotificationScreenState extends State<NotificationScreen>
     final type = notification['type']?.toString() ?? '';
     
     if (type.contains('MISSION')) {
-      final missionId = notification['donnees']?['missionId']?.toString();
+      final missionId = missionIdFromNotification(notification);
       if (missionId != null) {
-        // ✅ Navigation vers MissionDetailsScreen
         context.push('/mission-details/$missionId');
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('ID de mission manquant', style: SDTypography.bodyMedium.copyWith(color: SDColors.white)),
+            content: Text(
+              'Cette notification ne permet pas d’ouvrir le détail de la mission.',
+              style: SDTypography.bodyMedium.copyWith(color: SDColors.white),
+            ),
             backgroundColor: SDColors.warning500,
+            action: SnackBarAction(
+              label: 'Accueil',
+              textColor: SDColors.white,
+              onPressed: () => context.go('/homepage'),
+            ),
           ),
         );
       }

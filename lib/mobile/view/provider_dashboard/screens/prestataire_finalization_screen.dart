@@ -1,271 +1,244 @@
-import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:go_router/go_router.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'dart:io';
-import '../bloc/prestataire_finalization_bloc.dart';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
+
 import '../../../../data/services/authCubit.dart';
 import '../../../../design_system/design_system.dart';
+import '../bloc/prestataire_finalization_bloc.dart';
 
-import 'package:geolocator/geolocator.dart';
-
+/// Finalisation du dossier professionnel (KYC) — sans exposition publique des pièces.
 class PrestataireFinalizationScreen extends StatefulWidget {
   final String? prestataireId;
 
-  const PrestataireFinalizationScreen({Key? key, this.prestataireId})
-      : super(key: key);
+  const PrestataireFinalizationScreen({super.key, this.prestataireId});
 
   @override
-  _PrestataireFinalizationScreenState createState() =>
+  State<PrestataireFinalizationScreen> createState() =>
       _PrestataireFinalizationScreenState();
 }
 
 class _PrestataireFinalizationScreenState
     extends State<PrestataireFinalizationScreen> {
-  final PageController _pageController = PageController();
-  int _currentStep = 0;
   final ImagePicker _picker = ImagePicker();
-
-  // 🎯 DONNÉES DU FORMULAIRE
-  final Map<String, dynamic> _formData = {
-    // Documents obligatoires
-    'cniRecto': null,
-    'cniVerso': null,
-    'selfie': null,
-    'location': null,
-    'address': '',
-
-    // Documents optionnels
-    'certificates': <File>[],
-    'insurance': null,
-    'portfolio': <File>[],
-  };
-
-  // 🎯 ÉTAPES DE FINALISATION
-  final List<Map<String, dynamic>> _steps = [
-    {
-      'title': 'Documents d\'identité',
-      'subtitle': 'Optionnel — pour le badge Vérifié',
-      'required': false,
-    },
-    {
-      'title': 'Zone d\'intervention',
-      'subtitle': 'Obligatoire pour être visible',
-      'required': true,
-    },
-    {
-      'title': 'Confirmation',
-      'subtitle': 'Vérifiez avant de soumettre',
-      'required': false,
-    },
-  ];
+  String? _pendingLocationLabel;
+  Map<String, dynamic>? _pendingLocationMaps;
+  bool _locating = false;
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => PrestataireFinalizationBloc(),
-      child: BlocListener<PrestataireFinalizationBloc,
+      create: (ctx) {
+        final bloc = PrestataireFinalizationBloc();
+        final auth = ctx.read<AuthCubit>().state;
+        final id = widget.prestataireId;
+        if (auth is AuthAuthenticated && id != null && id.isNotEmpty) {
+          bloc.add(
+            LoadDossierEvent(prestataireId: id, authToken: auth.token),
+          );
+        }
+        return bloc;
+      },
+      child: BlocConsumer<PrestataireFinalizationBloc,
           PrestataireFinalizationState>(
         listener: (context, state) {
-          if (state is PrestataireFinalizationLoading) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Finalisation en cours...')),
-            );
-          } else if (state is PrestataireFinalizationSuccess) {
+          if (state is PrestataireFinalizationSuccess) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(state.message),
-                backgroundColor: Colors.green,
+                backgroundColor: SDColors.primary600,
               ),
             );
-            // Rediriger vers le dashboard
-            context.push('/homepage');
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/homepage');
+            }
           } else if (state is PrestataireFinalizationFailure) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(state.error),
-                backgroundColor: Colors.red,
+                backgroundColor: SDColors.error500,
               ),
+            );
+          } else if (state is DocumentUploadFailure) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(state.error)),
             );
           }
         },
-        child: Scaffold(
-          backgroundColor: SDColors.white,
-          appBar: SDWhiteAppBar.appBar(
-            title: 'Finalisation du profil',
-          ),
-          body: Column(
-            children: [
-              // 🎯 BARRE DE PROGRESSION
-              _buildProgressBar(),
+        builder: (context, state) {
+          final dossier = state is DossierLoaded ? state : _lastDossier(state);
 
-              // 🎯 CONTENU DES ÉTAPES
-              Expanded(
-                child: PageView(
-                  controller: _pageController,
-                  onPageChanged: (index) {
-                    setState(() {
-                      _currentStep = index;
-                    });
-                  },
-                  children: [
-                    _buildIdentityStep(),
-                    _buildLocationStep(),
-                    _buildConfirmationStep(),
-                  ],
-                ),
-              ),
-
-              // 🎯 BOUTONS DE NAVIGATION
-              _buildNavigationButtons(),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // 🎯 BARRE DE PROGRESSION
-  Widget _buildProgressBar() {
-    return Container(
-      padding: EdgeInsets.all(20),
-      child: Column(
-        children: [
-          Row(
-            children: List.generate(_steps.length, (index) {
-              final isActive = index <= _currentStep;
-              final isCompleted = index < _currentStep;
-
-              return Expanded(
-                child: Row(
-                  children: [
-                    Container(
-                      width: 30,
-                      height: 30,
-                      decoration: BoxDecoration(
-                        color: isCompleted
-                            ? Colors.green
-                            : isActive
-                                ? Colors.green.shade600
-                                : Colors.grey[300],
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        isCompleted ? Icons.check : Icons.circle,
-                        color: Colors.white,
-                        size: 16,
-                      ),
-                    ),
-                    if (index < _steps.length - 1)
-                      Expanded(
-                        child: Container(
-                          height: 2,
-                          color: isCompleted ? Colors.green : Colors.grey[300],
+          return Scaffold(
+            backgroundColor: SDColors.white,
+            appBar: SDWhiteAppBar.appBar(
+              title: 'Finaliser mon dossier',
+              titleStyle: SDTypography.titleLarge,
+            ),
+            body: state is PrestataireFinalizationLoading && dossier == null
+                ? const Center(child: CircularProgressIndicator())
+                : SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Complétez les éléments de vérification.',
+                          style: SDTypography.bodyMedium
+                              .copyWith(color: SDColors.neutral500),
                         ),
-                      ),
-                  ],
-                ),
-              );
-            }),
-          ),
-          SizedBox(height: 12),
-          Text(
-            _steps[_currentStep]['title'],
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Colors.green.shade700,
-            ),
-          ),
-          Text(
-            _steps[_currentStep]['subtitle'],
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[600],
-            ),
-          ),
-        ],
+                        const SizedBox(height: 16),
+                        _statusBanner(dossier),
+                        const SizedBox(height: 20),
+                        _sectionTitle('Pièce d’identité'),
+                        const SizedBox(height: 10),
+                        _docTile(
+                          dossier: dossier,
+                          fieldKey: 'cni_recto',
+                          title: 'CNI — recto',
+                          subtitleProvided: 'Document enregistré',
+                          subtitleMissing: 'Photo lisible du document',
+                          icon: Icons.badge_outlined,
+                          onAdd: () => _pickAndUpload(
+                            documentType: 'cni_recto',
+                            source: ImageSource.gallery,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        _docTile(
+                          dossier: dossier,
+                          fieldKey: 'cni_verso',
+                          title: 'CNI — verso',
+                          subtitleProvided: 'Document enregistré',
+                          subtitleMissing: 'Photo lisible du document',
+                          icon: Icons.badge_outlined,
+                          onAdd: () => _pickAndUpload(
+                            documentType: 'cni_verso',
+                            source: ImageSource.gallery,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        _sectionTitle('Selfie de vérification'),
+                        const SizedBox(height: 10),
+                        _docTile(
+                          dossier: dossier,
+                          fieldKey: 'selfie',
+                          title: 'Photo de vérification',
+                          subtitleProvided: 'Selfie enregistré',
+                          subtitleMissing:
+                              'Suivez les instructions de prise de photo.',
+                          icon: Icons.face_outlined,
+                          actionLabel: 'Prendre un selfie',
+                          onAdd: () => _pickAndUpload(
+                            documentType: 'selfie',
+                            source: ImageSource.camera,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Ce selfie ne remplace pas votre photo de profil.',
+                          style: SDTypography.caption
+                              .copyWith(color: SDColors.neutral500),
+                        ),
+                        const SizedBox(height: 20),
+                        _sectionTitle('Localisation du dossier'),
+                        const SizedBox(height: 10),
+                        _locationTile(dossier),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Distincte de votre zone d’intervention.',
+                          style: SDTypography.caption
+                              .copyWith(color: SDColors.neutral500),
+                        ),
+                        const SizedBox(height: 24),
+                        Text(
+                          _missingSummary(dossier),
+                          style: SDTypography.bodySmall
+                              .copyWith(color: SDColors.neutral600),
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton(
+                            onPressed: _canSubmit(dossier)
+                                ? () => _finalize(dossier)
+                                : null,
+                            style: FilledButton.styleFrom(
+                              backgroundColor: SDColors.primary700,
+                              disabledBackgroundColor: SDColors.neutral300,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                            ),
+                            child: const Text('Finaliser mon dossier'),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          _canSubmit(dossier)
+                              ? '« Fourni » indique un document enregistré, pas une validation par l’équipe.'
+                              : 'Complétez les éléments requis pour continuer.',
+                          textAlign: TextAlign.center,
+                          style: SDTypography.caption
+                              .copyWith(color: SDColors.neutral500),
+                        ),
+                      ],
+                    ),
+                  ),
+          );
+        },
       ),
     );
   }
 
-  // 🎯 ÉTAPE 1: DOCUMENTS D'IDENTITÉ
-  Widget _buildIdentityStep() {
-    return SingleChildScrollView(
-      padding: EdgeInsets.all(20),
-      child: Column(
+  DossierLoaded? _lastDossier(PrestataireFinalizationState state) {
+    if (state is DossierLoaded) return state;
+    return null;
+  }
+
+  Widget _statusBanner(DossierLoaded? dossier) {
+    final complete = dossier?.canFinalize ?? false;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: SDColors.primary50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: SDColors.primary200),
+      ),
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // CNI Recto
-          _buildDocumentCard(
-            title: 'CNI Recto',
-            subtitle: 'Photo du recto de votre carte d\'identité',
-            icon: Icons.credit_card,
-            isRequired: false,
-            image: _formData['cniRecto'],
-            onTap: () => _pickImage('cniRecto'),
-          ),
-
-          SizedBox(height: 16),
-
-          // CNI Verso
-          _buildDocumentCard(
-            title: 'CNI Verso',
-            subtitle: 'Photo du verso de votre carte d\'identité',
-            icon: Icons.credit_card,
-            isRequired: false,
-            image: _formData['cniVerso'],
-            onTap: () => _pickImage('cniVerso'),
-          ),
-
-          SizedBox(height: 16),
-
-          // Selfie
-          _buildDocumentCard(
-            title: 'Photo Selfie',
-            subtitle: 'Photo de vous-même pour vérification',
-            icon: Icons.face,
-            isRequired: false,
-            image: _formData['selfie'],
-            onTap: () => _pickImage('selfie'),
-          ),
-
-          SizedBox(height: 24),
-
-          // Badge expliqué
-          Container(
-            padding: EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.green.shade50,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.green.shade200),
-            ),
+          const Icon(Icons.fact_check_outlined, color: SDColors.primary700),
+          const SizedBox(width: 12),
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Icon(Icons.verified_user, color: Colors.green.shade600),
-                    SizedBox(width: 8),
-                    Text(
-                      'Badge "Identité vérifiée"',
-                      style: TextStyle(
-                        color: Colors.green.shade800,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: SDColors.white,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    complete ? 'Prêt à envoyer' : 'À compléter',
+                    style: SDTypography.labelSmall.copyWith(
+                      color: SDColors.primary700,
+                      fontWeight: FontWeight.w700,
                     ),
-                  ],
+                  ),
                 ),
-                SizedBox(height: 8),
+                const SizedBox(height: 6),
                 Text(
-                  'Ces documents sont optionnels. Si vous les fournissez, votre profil affichera le badge "Vérifié" et les clients vous feront plus confiance.',
-                  style: TextStyle(color: Colors.green.shade700, fontSize: 13),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  'Sans documents, votre profil sera publié normalement, sans badge.',
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                  complete
+                      ? 'Vous pouvez soumettre votre dossier. La vérification reste distincte.'
+                      : 'Ajoutez les éléments manquants avant de finaliser.',
+                  style: SDTypography.bodySmall
+                      .copyWith(color: SDColors.neutral700),
                 ),
               ],
             ),
@@ -275,514 +248,324 @@ class _PrestataireFinalizationScreenState
     );
   }
 
-  // 🎯 ÉTAPE 2: LOCALISATION
-  Widget _buildLocationStep() {
-    return SingleChildScrollView(
-      padding: EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Zone d\'intervention',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.green.shade700,
-            ),
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Définissez votre zone d\'intervention pour recevoir des missions',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[600],
-            ),
-          ),
-
-          SizedBox(height: 24),
-
-          // Bouton de localisation
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.green.shade50,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.green.shade200),
-            ),
-            child: Column(
-              children: [
-                Icon(
-                  Icons.location_on,
-                  color: Colors.green.shade600,
-                  size: 48,
-                ),
-                SizedBox(height: 12),
-                Text(
-                  'Activer la localisation',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.green.shade700,
-                  ),
-                ),
-                SizedBox(height: 8),
-                Text(
-                  'Nous avons besoin de votre position pour vous proposer des missions dans votre zone',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                SizedBox(height: 16),
-                ElevatedButton.icon(
-                  onPressed: _getCurrentLocation,
-                  icon: Icon(Icons.my_location),
-                  label: Text('Obtenir ma position'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green.shade600,
-                    foregroundColor: Colors.white,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          SizedBox(height: 24),
-
-          // Adresse manuelle
-          TextField(
-            decoration: InputDecoration(
-              labelText: 'Adresse (optionnel)',
-              hintText: 'Ex: Rue 123, Quartier ABC, Ville XYZ',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              prefixIcon: Icon(Icons.home),
-            ),
-            onChanged: (value) {
-              setState(() {
-                _formData['address'] = value;
-              });
-            },
-          ),
-        ],
+  Widget _sectionTitle(String text) {
+    return Text(
+      text,
+      style: SDTypography.titleSmall.copyWith(
+        fontWeight: FontWeight.w800,
+        color: SDColors.neutral900,
       ),
     );
   }
 
-  // 🎯 ÉTAPE 3: CONFIRMATION
-  Widget _buildConfirmationStep() {
-    final hasIdentity = _formData['cniRecto'] != null &&
-        _formData['cniVerso'] != null &&
-        _formData['selfie'] != null;
-    final hasLocation = _formData['location'] != null;
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Récapitulatif',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 20),
-
-          // Localisation
-          _buildSummaryRow(
-            icon: hasLocation ? Icons.check_circle : Icons.cancel,
-            iconColor: hasLocation ? Colors.green : Colors.red,
-            label: hasLocation
-                ? 'Zone d\'intervention définie'
-                : 'Zone non définie — retournez à l\'étape 2',
-            isOk: hasLocation,
-          ),
-
-          const SizedBox(height: 12),
-
-          // Identité / Badge
-          _buildSummaryRow(
-            icon: hasIdentity ? Icons.verified_user : Icons.info_outline,
-            iconColor: hasIdentity ? Colors.green : Colors.grey,
-            label: hasIdentity
-                ? 'Documents d\'identité fournis → badge Vérifié'
-                : 'Pas de CNI — profil sans badge (vous pourrez l\'ajouter plus tard)',
-            isOk: hasIdentity,
-          ),
-
-          const SizedBox(height: 28),
-
-          // Avertissement si pas de localisation
-          if (!hasLocation)
-            Container(
-              padding: const EdgeInsets.all(14),
-              margin: const EdgeInsets.only(bottom: 16),
-              decoration: BoxDecoration(
-                color: Colors.red.shade50,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.red.shade200),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.warning, color: Colors.red.shade600),
-                  const SizedBox(width: 10),
-                  const Expanded(
-                    child: Text(
-                      'La localisation est obligatoire pour publier votre profil. Revenez à l\'étape précédente.',
-                      style: TextStyle(fontSize: 13),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-          // Info si pas d'identité
-          if (!hasIdentity)
-            Container(
-              padding: const EdgeInsets.all(14),
-              margin: const EdgeInsets.only(bottom: 16),
-              decoration: BoxDecoration(
-                color: Colors.blue.shade50,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.blue.shade100),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.info_outline, color: Colors.blue.shade600),
-                  const SizedBox(width: 10),
-                  const Expanded(
-                    child: Text(
-                      'Vous pourrez ajouter votre CNI depuis votre tableau de bord pour obtenir le badge Vérifié.',
-                      style: TextStyle(fontSize: 13),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-        ],
-      ),
-    );
+  bool _isProvided(DossierLoaded? dossier, String fieldKey) {
+    if (dossier == null) return false;
+    switch (fieldKey) {
+      case 'cni_recto':
+        return dossier.hasCniRecto;
+      case 'cni_verso':
+        return dossier.hasCniVerso;
+      case 'selfie':
+        return dossier.hasSelfie;
+      default:
+        return false;
+    }
   }
 
-  Widget _buildSummaryRow({
+  bool _isUploading(DossierLoaded? dossier, String fieldKey) {
+    return dossier?.uploadingFields.contains(fieldKey) ?? false;
+  }
+
+  bool _isSelectedLocal(DossierLoaded? dossier, String fieldKey) {
+    return dossier?.pendingLocalFiles.containsKey(fieldKey) ?? false;
+  }
+
+  Widget _docTile({
+    required DossierLoaded? dossier,
+    required String fieldKey,
+    required String title,
+    required String subtitleProvided,
+    required String subtitleMissing,
     required IconData icon,
-    required Color iconColor,
-    required String label,
-    required bool isOk,
+    required VoidCallback onAdd,
+    String actionLabel = 'Ajouter',
   }) {
+    final provided = _isProvided(dossier, fieldKey);
+    final uploading = _isUploading(dossier, fieldKey);
+    final selected = _isSelectedLocal(dossier, fieldKey);
+
+    String subtitle;
+    if (uploading) {
+      subtitle = 'Transfert en cours…';
+    } else if (selected && !provided) {
+      subtitle = 'Fichier sélectionné — en attente d’envoi';
+    } else if (provided) {
+      subtitle = subtitleProvided;
+    } else {
+      subtitle = subtitleMissing;
+    }
+
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: isOk ? Colors.green.shade50 : Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: isOk ? Colors.green.shade200 : Colors.grey.shade200,
-        ),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: SDColors.neutral200),
       ),
       child: Row(
         children: [
-          Icon(icon, color: iconColor, size: 22),
+          Container(
+            width: 44,
+            height: 44,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: provided ? SDColors.primary50 : SDColors.neutral100,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              icon,
+              color: provided ? SDColors.primary700 : SDColors.neutral600,
+            ),
+          ),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 14,
-                color: isOk ? Colors.green.shade800 : Colors.grey.shade700,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: SDTypography.bodyLarge.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: SDTypography.caption
+                      .copyWith(color: SDColors.neutral500),
+                ),
+              ],
             ),
           ),
+          if (uploading)
+            const SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          else if (provided)
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.check_circle,
+                    color: SDColors.primary600, size: 20),
+                const SizedBox(width: 4),
+                Text(
+                  'Fourni',
+                  style: SDTypography.labelMedium.copyWith(
+                    color: SDColors.primary700,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            )
+          else
+            OutlinedButton(
+              onPressed: onAdd,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: SDColors.primary700,
+                side: const BorderSide(color: SDColors.primary600),
+              ),
+              child: Text(actionLabel),
+            ),
         ],
       ),
     );
   }
 
-  // 🎯 CARTE DE DOCUMENT
-  Widget _buildDocumentCard({
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required bool isRequired,
-    required dynamic image,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: image != null ? Colors.green.shade50 : Colors.grey.shade50,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: image != null ? Colors.green.shade300 : Colors.grey.shade300,
-            width: 2,
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                color: image != null
-                    ? Colors.green.shade100
-                    : Colors.grey.shade200,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: image != null
-                  ? Icon(Icons.check_circle, color: Colors.green.shade600)
-                  : Icon(icon, color: Colors.grey.shade600),
-            ),
-            SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          title,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: image != null
-                                ? Colors.green.shade700
-                                : Colors.grey.shade700,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      if (isRequired) ...[
-                        SizedBox(width: 8),
-                        Container(
-                          padding:
-                              EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.red.shade100,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            'OBLIGATOIRE',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.red.shade700,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                  SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Icon(
-              Icons.arrow_forward_ios,
-              color: Colors.grey.shade400,
-              size: 16,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  Widget _locationTile(DossierLoaded? dossier) {
+    final hasServer = dossier?.hasDossierLocation ?? false;
+    final hasPending = _pendingLocationMaps != null;
+    final provided = hasServer || hasPending;
+    final label = _pendingLocationLabel ??
+        (dossier?.locationLabel.isNotEmpty == true
+            ? dossier!.locationLabel
+            : '');
 
-  // 🎯 BOUTONS DE NAVIGATION
-  Widget _buildNavigationButtons() {
     return Container(
-      padding: EdgeInsets.all(20),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: SDColors.neutral200),
+      ),
       child: Row(
         children: [
-          if (_currentStep > 0)
-            Expanded(
-              child: OutlinedButton(
-                onPressed: _previousStep,
-                child: Text('Précédent'),
-                style: OutlinedButton.styleFrom(
-                  padding: EdgeInsets.symmetric(vertical: 16),
-                ),
-              ),
+          Container(
+            width: 44,
+            height: 44,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: provided ? SDColors.primary50 : SDColors.neutral100,
+              borderRadius: BorderRadius.circular(10),
             ),
-          if (_currentStep > 0) SizedBox(width: 16),
+            child: const Icon(Icons.place_outlined,
+                color: SDColors.primary700),
+          ),
+          const SizedBox(width: 12),
           Expanded(
-            child: ElevatedButton(
-              onPressed:
-                  _currentStep < _steps.length - 1 ? _nextStep : _submitForm,
-              child: Text(
-                  _currentStep < _steps.length - 1 ? 'Suivant' : 'Finaliser'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green.shade600,
-                foregroundColor: Colors.white,
-                padding: EdgeInsets.symmetric(vertical: 16),
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  provided ? 'Position renseignée' : 'Position du dossier',
+                  style: SDTypography.bodyLarge.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  _locating
+                      ? 'Localisation en cours…'
+                      : (provided && label.isNotEmpty
+                          ? label
+                          : 'Indiquez où se situe votre dossier'),
+                  style: SDTypography.caption
+                      .copyWith(color: SDColors.neutral500),
+                ),
+              ],
             ),
           ),
+          if (_locating)
+            const SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          else if (provided)
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.check_circle,
+                    color: SDColors.primary600, size: 20),
+                const SizedBox(width: 4),
+                Text(
+                  'Fourni',
+                  style: SDTypography.labelMedium.copyWith(
+                    color: SDColors.primary700,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            )
+          else
+            OutlinedButton(
+              onPressed: _captureDossierLocation,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: SDColors.primary700,
+                side: const BorderSide(color: SDColors.primary600),
+              ),
+              child: const Text('Localiser'),
+            ),
         ],
       ),
     );
   }
 
-  // 🎯 MÉTHODES
-  void _nextStep() {
-    // Étape 2 (index 1) = localisation obligatoire avant de continuer
-    if (_currentStep == 1 && _formData['location'] == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Activez votre localisation pour continuer.'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
+  String _missingSummary(DossierLoaded? dossier) {
+    if (!(dossier?.hasDossierLocation ?? false) &&
+        _pendingLocationMaps == null) {
+      return 'À ajouter : localisation du dossier.';
     }
-    if (_currentStep < _steps.length - 1) {
-      _pageController.nextPage(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
-    }
-  }
-
-  void _previousStep() {
-    if (_currentStep > 0) {
-      _pageController.previousPage(
-        duration: Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
-    }
-  }
-
-  Future<void> _pickImage(String field) async {
-    try {
-      final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
-      if (image != null) {
-        setState(() {
-          _formData[field] = File(image.path);
-        });
+    if (dossier != null && !dossier.canGetBadge) {
+      final opt = <String>[];
+      if (!dossier.hasCniRecto) opt.add('CNI recto');
+      if (!dossier.hasCniVerso) opt.add('CNI verso');
+      if (!dossier.hasSelfie) opt.add('selfie');
+      if (opt.isNotEmpty) {
+        return 'Pour le badge vérifié (optionnel) : ${opt.join(' et ')}.';
       }
+    }
+    return 'Éléments obligatoires renseignés.';
+  }
+
+  bool _canSubmit(DossierLoaded? dossier) {
+    final hasLoc =
+        (dossier?.hasDossierLocation ?? false) || _pendingLocationMaps != null;
+    final uploading = dossier?.uploadingFields.isNotEmpty ?? false;
+    return hasLoc && !uploading && !_locating;
+  }
+
+  Future<void> _pickAndUpload({
+    required String documentType,
+    required ImageSource source,
+  }) async {
+    final auth = context.read<AuthCubit>().state;
+    final id = widget.prestataireId;
+    if (auth is! AuthAuthenticated || id == null) return;
+
+    try {
+      final file = await _picker.pickImage(
+        source: source,
+        imageQuality: 85,
+      );
+      if (file == null) return;
+      context.read<PrestataireFinalizationBloc>().add(
+            UploadDocumentEvent(
+              documentType: documentType,
+              file: File(file.path),
+              prestataireId: id,
+              authToken: auth.token,
+            ),
+          );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur lors de la sélection: $e')),
+        SnackBar(content: Text('Sélection impossible: $e')),
       );
     }
   }
 
-  Future<void> _pickMultipleImages(String field) async {
+  Future<void> _captureDossierLocation() async {
+    setState(() => _locating = true);
     try {
-      final List<XFile> images = await _picker.pickMultiImage();
-      if (images.isNotEmpty) {
-        setState(() {
-          _formData[field] = images.map((image) => File(image.path)).toList();
-        });
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur lors de la sélection: $e')),
-      );
-    }
-  }
-
-  Future<void> _getCurrentLocation() async {
-    try {
-      LocationPermission permission = await Geolocator.checkPermission();
+      var permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Permission de localisation refusée')),
-          );
-          return;
-        }
       }
-      if (permission == LocationPermission.deniedForever) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Activez la localisation dans les paramètres'),
-          ),
-        );
-        return;
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        throw Exception('Permission de localisation refusée');
       }
-
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
-
       setState(() {
-        _formData['location'] = {
+        _pendingLocationMaps = {
           'latitude': position.latitude,
           'longitude': position.longitude,
         };
-        _formData['address'] =
+        _pendingLocationLabel =
             'Lat ${position.latitude.toStringAsFixed(4)}, Lng ${position.longitude.toStringAsFixed(4)}';
       });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Position GPS enregistrée'),
-          backgroundColor: Colors.green,
-        ),
-      );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur géolocalisation: $e'),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text('$e')),
       );
+    } finally {
+      if (mounted) setState(() => _locating = false);
     }
   }
 
-  void _submitForm() {
-    // Garde : localisation obligatoire
-    if (_formData['location'] == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('La localisation est obligatoire pour soumettre votre profil.'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      _pageController.animateToPage(
-        1,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
-      return;
-    }
-
+  void _finalize(DossierLoaded? dossier) {
     final auth = context.read<AuthCubit>().state;
-    String? prestataireId = widget.prestataireId;
-    String? authToken;
+    final id = widget.prestataireId;
+    if (auth is! AuthAuthenticated || id == null) return;
 
-    if (auth is AuthAuthenticated) {
-      authToken = auth.token;
-    }
-
-    if (prestataireId == null || authToken == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Erreur: ID prestataire non trouvé')),
-      );
-      return;
-    }
-
-    // 🎯 PRÉPARER LES DONNÉES
-    final formData = Map<String, dynamic>.from(_formData);
-    formData['prestataireId'] = prestataireId;
-    formData['authToken'] = authToken;
-
-    // 🎯 SOUMETTRE AU BLOC
     context.read<PrestataireFinalizationBloc>().add(
-          SubmitFinalizationEvent(formData: formData),
+          FinalizeDossierEvent(
+            prestataireId: id,
+            authToken: auth.token,
+            locationMaps: _pendingLocationMaps,
+            locationLabel: _pendingLocationLabel,
+          ),
         );
   }
 }

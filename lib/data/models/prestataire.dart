@@ -139,7 +139,7 @@ class Prestataire {
   }
 
   factory Prestataire.fromJson(dynamic json) {
-    final map = json as Map<String, dynamic>;
+    final map = Map<String, dynamic>.from(json as Map);
     final userRaw = map['utilisateur'];
     final serviceRaw = map['service'];
     return Prestataire(
@@ -232,7 +232,7 @@ class LocalisationMaps {
   LocalisationMaps({required this.latitude, required this.longitude});
 
   factory LocalisationMaps.fromJson(dynamic json) {
-    final map = json as Map<String, dynamic>;
+    final map = Map<String, dynamic>.from(json as Map);
     return LocalisationMaps(
       latitude: (map['latitude'] as num).toDouble(),
       longitude: (map['longitude'] as num).toDouble(),

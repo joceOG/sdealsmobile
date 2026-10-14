@@ -1,18 +1,35 @@
 import 'package:bloc/bloc.dart';
+import 'package:flutter/foundation.dart';
+import 'package:sdealsmobile/data/config/client_feature_flags.dart';
 import 'package:sdealsmobile/data/services/api_client.dart';
 import 'package:sdealsmobile/data/services/local_storage_service.dart';
 import 'package:sdealsmobile/mobile/view/searchpagem/searchpageblocm/searchPageEventM.dart';
 import 'package:sdealsmobile/mobile/view/searchpagem/searchpageblocm/searchPageStateM.dart';
 
 class SearchPageBlocM extends Bloc<SearchPageEventM, SearchPageStateM> {
-  final ApiClient _apiClient = ApiClient();
-  final LocalStorageService _localStorageService = LocalStorageService();
+  final ApiClient _apiClient;
+  final LocalStorageService _localStorageService;
+
+  /// Remplace `searchGlobal` dans les tests. Le chemin production reste
+  /// `_apiClient.searchGlobal` lorsque ce crochet est nul.
+  @visibleForTesting
+  static Future<Map<String, dynamic>> Function(String query)? debugSearch;
+
+  @visibleForTesting
+  static void debugReset() => debugSearch = null;
   int _suggestionRequestId = 0;
   int _searchRequestId = 0;
 
-  SearchPageBlocM() : super(SearchPageStateM.initial()) {
+  SearchPageBlocM({
+    String scope = 'global',
+    ApiClient? apiClient,
+    LocalStorageService? localStorageService,
+  })  : _apiClient = apiClient ?? ApiClient(),
+        _localStorageService = localStorageService ?? LocalStorageService(),
+        super(SearchPageStateM.initial().copyWith(scope: scope)) {
     on<FetchSuggestions>(_onFetchSuggestions);
     on<PerformGlobalSearch>(_onPerformGlobalSearch);
+    on<ExpandSearchToGlobal>(_onExpandSearchToGlobal);
     on<ClearSearch>(_onClearSearch);
     on<LoadHistory>(_onLoadHistory);
     on<AddToHistory>(_onAddToHistory);
@@ -36,7 +53,10 @@ class SearchPageBlocM extends Bloc<SearchPageEventM, SearchPageStateM> {
     AddToHistory event,
     Emitter<SearchPageStateM> emit,
   ) async {
-    await _localStorageService.addToHistory(event.query);
+    await _localStorageService.addToHistory(
+      event.query,
+      scope: state.scope,
+    );
     add(LoadHistory());
   }
 
@@ -67,7 +87,7 @@ class SearchPageBlocM extends Bloc<SearchPageEventM, SearchPageStateM> {
       return;
     }
 
-    if (event.query.trim().length < 2) {
+    if (event.query.trim().length < 1) {
       emit(state.copyWith(suggestions: []));
       return;
     }
@@ -75,7 +95,11 @@ class SearchPageBlocM extends Bloc<SearchPageEventM, SearchPageStateM> {
     final requestQuery = event.query.trim();
     final requestId = ++_suggestionRequestId;
     try {
-      final suggestions = await _apiClient.getSuggestions(requestQuery);
+      final suggestions = await _apiClient.getSuggestions(
+        requestQuery,
+        scope: state.scope,
+        includeEmarket: ClientFeatureFlags.emarketEnabled,
+      );
       if (requestId != _suggestionRequestId) return;
       emit(state.copyWith(suggestions: suggestions));
     } catch (e) {
@@ -100,7 +124,7 @@ class SearchPageBlocM extends Bloc<SearchPageEventM, SearchPageStateM> {
       return;
     }
 
-    await _localStorageService.addToHistory(query);
+    await _localStorageService.addToHistory(query, scope: state.scope);
     final history = await _localStorageService.getSearchHistory();
     final requestId = ++_searchRequestId;
     emit(state.copyWith(
@@ -111,16 +135,28 @@ class SearchPageBlocM extends Bloc<SearchPageEventM, SearchPageStateM> {
     ));
 
     try {
-      final result = await _apiClient.searchGlobal(
-        query,
-        minPrice: state.minPrice != 0 ? state.minPrice.toInt() : null,
-        maxPrice: state.maxPrice != 1000000 ? state.maxPrice.toInt() : null,
-        city: state.city.isNotEmpty ? state.city : null,
-      );
+      final result = debugSearch != null
+          ? await debugSearch!(query)
+          : await _apiClient.searchGlobal(
+              query,
+              minPrice: state.minPrice != 0 ? state.minPrice.toInt() : null,
+              maxPrice:
+                  state.maxPrice != 1000000 ? state.maxPrice.toInt() : null,
+              city: state.city.isNotEmpty ? state.city : null,
+              scope: state.scope,
+              includeEmarket: ClientFeatureFlags.emarketEnabled,
+            );
       if (requestId != _searchRequestId) return;
 
-      final results = result['results'] ?? {};
-      final counts = result['counts'] ?? {};
+      final results = Map<String, dynamic>.from(result['results'] ?? {});
+      final counts = Map<String, dynamic>.from(result['counts'] ?? {});
+
+      if (!ClientFeatureFlags.emarketEnabled) {
+        results['articles'] = [];
+        results['vendeurs'] = [];
+        counts['articles'] = 0;
+        counts['vendeurs'] = 0;
+      }
 
       emit(state.copyWith(
         isLoading: false,
@@ -152,9 +188,23 @@ class SearchPageBlocM extends Bloc<SearchPageEventM, SearchPageStateM> {
     ));
   }
 
+  Future<void> _onExpandSearchToGlobal(
+    ExpandSearchToGlobal event,
+    Emitter<SearchPageStateM> emit,
+  ) async {
+    final q = state.query.trim();
+    emit(state.copyWith(scope: 'global'));
+    if (q.length >= 2) {
+      await _onPerformGlobalSearch(PerformGlobalSearch(q), emit);
+    }
+  }
+
   void _onClearSearch(ClearSearch event, Emitter<SearchPageStateM> emit) {
     _suggestionRequestId++;
     _searchRequestId++;
-    emit(SearchPageStateM.initial().copyWith(history: state.history));
+    emit(SearchPageStateM.initial().copyWith(
+      history: state.history,
+      scope: state.scope,
+    ));
   }
 }

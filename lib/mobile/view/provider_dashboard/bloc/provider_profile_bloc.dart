@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:sdealsmobile/data/services/api_client.dart';
 import 'package:sdealsmobile/data/utils/display_text.dart';
@@ -27,12 +28,14 @@ class ProviderProfileBloc
   ProviderProfileBloc() : super(ProviderProfileInitial()) {
     // 👤 CHARGER LE PROFIL DU PRESTATAIRE
     on<LoadProviderProfile>((event, emit) async {
-      emit(ProviderProfileLoading());
+      final previous = state;
+      if (previous is! ProviderProfileLoaded) {
+        emit(ProviderProfileLoading());
+      }
       try {
-        // Appel API réel
-        final response = await _apiClient.get(
-          '/prestataire/${event.prestataireId}',
-        );
+        final response = await _apiClient
+            .get('/prestataire/${event.prestataireId}')
+            .timeout(const Duration(seconds: 15));
 
         Map<String, dynamic> profile;
         Map<String, dynamic> stats;
@@ -40,10 +43,14 @@ class ProviderProfileBloc
         Map<String, dynamic> serviceZone;
 
         if (response.statusCode == 200) {
-          final data = jsonDecode(response.body) as Map<String, dynamic>;
+          final decoded = jsonDecode(response.body);
+          if (decoded is! Map) {
+            throw const FormatException('profil');
+          }
+          final data = Map<String, dynamic>.from(decoded);
           final utilisateurRaw = data['utilisateur'];
-          final utilisateur = utilisateurRaw is Map<String, dynamic>
-              ? utilisateurRaw
+          final utilisateur = utilisateurRaw is Map
+              ? Map<String, dynamic>.from(utilisateurRaw)
               : <String, dynamic>{};
 
           final fullName = personNameFromMap(
@@ -53,6 +60,13 @@ class ProviderProfileBloc
 
           services = _extractServices(data);
           final locationLabel = _extractLocation(data);
+          final serviceName = _serviceNameFromData(data);
+          final categoryLabel = _categoryFromData(data, serviceName);
+          final serviceId = _serviceIdFromData(data);
+          final categoryId = _categoryIdFromData(data);
+          final metierLabel = serviceName ??
+              (services.isNotEmpty ? services.first : null) ??
+              _cleanLabel(data['metier']);
 
           profile = {
             'id': data['_id'] ?? event.prestataireId,
@@ -65,10 +79,14 @@ class ProviderProfileBloc
                 utilisateur['photoProfil'] ?? data['photoProfil'],
             'bio': data['description'] ?? data['bio'] ?? '',
             'location': locationLabel,
-            'metier': services.isNotEmpty
-                ? services.first
-                : (data['metier']?.toString() ?? ''),
-            'serviceRadius': _asDouble(data['rayonIntervention'], fallback: 10),
+            'serviceName': serviceName ?? '',
+            'serviceId': serviceId ?? '',
+            'categoryLabel': categoryLabel ?? '',
+            'categoryId': categoryId ?? '',
+            'metier': metierLabel.isNotEmpty ? metierLabel : 'Prestataire',
+            'serviceRadius': data['rayonIntervention'] != null
+                ? _asDouble(data['rayonIntervention'])
+                : null,
             'disponible': data['disponible'] != false,
             'note': _asDouble(data['note']),
             'nbMission': data['nbMission'] ?? 0,
@@ -101,25 +119,13 @@ class ProviderProfileBloc
                     ? data['localisationmaps']['longitude']
                     : null,
                 fallback: -4.0083),
-            'radius': _asDouble(data['rayonIntervention'], fallback: 10),
+            'radius': data['rayonIntervention'] != null
+                ? _asDouble(data['rayonIntervention'])
+                : null,
             'coverage': 'Zone d\'intervention',
           };
         } else {
-          // Fallback avec données vides
-          profile = {
-            'id': event.prestataireId,
-            'fullName': '',
-            'status': 'unknown',
-            'nbAvis': 0,
-          };
-          stats = {
-            'missionsCompleted': 0,
-            'averageRating': 0.0,
-            'monthlyEarnings': 0.0,
-            'totalReviews': 0,
-          };
-          services = <String>[];
-          serviceZone = {'address': 'Abidjan', 'radius': 10.0};
+          throw FormatException('profil ${response.statusCode}');
         }
 
         // Activité récente (placeholder — pas d'API dédiée)
@@ -163,7 +169,12 @@ class ProviderProfileBloc
           documents: documents,
         ));
       } catch (e) {
-        emit(ProviderProfileError('Erreur lors du chargement du profil: $e'));
+        if (kDebugMode) debugPrint('provider profile load failed');
+        if (previous is ProviderProfileLoaded) {
+          emit(previous);
+          return;
+        }
+        emit(ProviderProfileError('Impossible de charger le profil'));
       }
     });
 
@@ -403,6 +414,72 @@ class ProviderProfileBloc
       s = s.substring(1, s.length - 1).trim();
     }
     return s;
+  }
+
+  String? _serviceIdFromData(Map<String, dynamic> data) {
+    final service = data['service'];
+    if (service is Map) {
+      return cleanDisplayPart(service['_id'] ?? service['idservice']);
+    }
+    if (service is String && service.isNotEmpty) return service;
+    return null;
+  }
+
+  String? _categoryIdFromData(Map<String, dynamic> data) {
+    final service = data['service'];
+    if (service is Map) {
+      final cat = service['categorie'];
+      if (cat is Map) {
+        return cleanDisplayPart(cat['_id'] ?? cat['idcategorie']);
+      }
+    }
+    return null;
+  }
+
+  String? _serviceNameFromData(Map<String, dynamic> data) {
+    final service = data['service'];
+    if (service is Map) {
+      return cleanDisplayPart(
+        service['nomservice'] ?? service['nom'] ?? service['name'],
+      );
+    }
+    return null;
+  }
+
+  String? _categoryFromData(Map<String, dynamic> data, String? serviceName) {
+    final service = data['service'];
+    if (service is Map) {
+      final cat = service['categorie'];
+      if (cat is Map) {
+        final label = cleanDisplayPart(
+          cat['nomcategorie'] ?? cat['nom'] ?? cat['name'],
+        );
+        if (label != null) return label;
+      } else {
+        final label = cleanDisplayPart(cat);
+        if (label != null) return label;
+      }
+    }
+    final spec = data['specialite'];
+    if (spec is List) {
+      for (final e in spec) {
+        final label = _cleanLabel(e);
+        if (label.isNotEmpty &&
+            (serviceName == null ||
+                label.toLowerCase() != serviceName.toLowerCase())) {
+          return label;
+        }
+      }
+    } else if (spec != null) {
+      final label = _cleanLabel(spec);
+      if (label.isNotEmpty &&
+          (serviceName == null ||
+              label.toLowerCase() != serviceName.toLowerCase())) {
+        return label;
+      }
+    }
+    final catField = cleanDisplayPart(data['category'] ?? data['categorie']);
+    return catField;
   }
 
   List<String> _extractServices(Map<String, dynamic> data) {

@@ -1,5 +1,9 @@
-import 'authCubit.dart';
+import 'package:flutter/widgets.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+
+import '../errors/api_exception.dart';
 import '../models/professional_capabilities.dart';
+import 'authCubit.dart';
 
 extension AuthProfessionalAccess on AuthState {
   UserProfessionalCapabilities? get professionalCaps {
@@ -26,4 +30,14 @@ extension AuthProfessionalAccess on AuthState {
 
   bool get hasVendeurProfile =>
       professionalCaps?.hasProfile('Vendeur') ?? false;
+}
+
+/// Après un refus métier lié au dossier pro, resynchroniser `capabilities` en session.
+Future<void> refreshProfessionalCapabilitiesAfterBlock(
+  BuildContext context,
+  Object error,
+) async {
+  if (error is! ApiException) return;
+  if (error.code != 'PROFESSIONAL_PROFILE_NOT_OPERATIONAL') return;
+  await context.read<AuthCubit>().refreshRoles();
 }

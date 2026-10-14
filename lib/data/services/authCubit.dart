@@ -9,6 +9,8 @@ import 'api_client.dart';
 import 'token_store.dart';
 import 'fcm_service.dart';
 import 'protected_action_intent.dart';
+import 'freelance_hub_cache.dart';
+import 'cache_service.dart';
 import 'websocket_service.dart';
 
 abstract class AuthState {}
@@ -42,7 +44,76 @@ class AuthError extends AuthState {
   AuthError(this.message);
 }
 
+/// État de la lecture locale de la session au démarrage.
+///
+/// [AuthInitial] ne suffit pas : il vaut aussi bien « restauration en cours »
+/// qu'« aucune session ». Confondre les deux faisait traiter un utilisateur
+/// connecté comme invité dès que la restauration dépassait le délai du splash.
+enum SessionRestoreStatus {
+  /// Lecture du stockage en cours : on ne sait pas encore.
+  restoring,
+
+  /// Session locale lue et appliquée ([AuthAuthenticated]).
+  restored,
+
+  /// Lecture terminée, aucune session enregistrée : invité.
+  absent,
+
+  /// Lecture en erreur ou trop longue : session non appliquée, mais NON
+  /// supprimée (elle peut être restaurée plus tard). Jamais un accès pro.
+  failed,
+}
+
 class AuthCubit extends Cubit<AuthState> {
+  /// Plafond d'attente quand l'interface est déjà affichée alors que la
+  /// restauration n'est pas finie. Au-delà : [SessionRestoreStatus.failed].
+  /// (Aucun minuteur dans le cas courant : restauration terminée avant l'UI.)
+  @visibleForTesting
+  static Duration restoreHardCap = const Duration(seconds: 6);
+
+  /// Observable par les écrans invités et le routeur.
+  final ValueNotifier<SessionRestoreStatus> restoreStatus =
+      ValueNotifier<SessionRestoreStatus>(SessionRestoreStatus.restoring);
+
+  bool _interfaceShownBeforeRestore = false;
+  Timer? _pendingCap;
+
+  /// Vrai si l'interface a été ouverte avant la fin de la restauration
+  /// (le splash a dépassé son délai). Seul cas où les murs « invité » doivent
+  /// patienter : sinon la restauration est finie avant tout écran.
+  bool get interfaceShownBeforeRestore => _interfaceShownBeforeRestore;
+
+  /// Appelé par le splash quand il ouvre l'interface alors que la
+  /// restauration est encore en cours. Borne l'attente (pas de spinner infini).
+  void markInterfaceShownBeforeRestore() {
+    if (restoreStatus.value != SessionRestoreStatus.restoring ||
+        _interfaceShownBeforeRestore) {
+      return;
+    }
+    _interfaceShownBeforeRestore = true;
+    _pendingCap = Timer(restoreHardCap, () {
+      _pendingCap = null;
+      if (restoreStatus.value == SessionRestoreStatus.restoring) {
+        _setRestoreStatus(SessionRestoreStatus.failed);
+      }
+    });
+  }
+
+  void _setRestoreStatus(SessionRestoreStatus status) {
+    if (status != SessionRestoreStatus.restoring) {
+      _pendingCap?.cancel();
+      _pendingCap = null;
+    }
+    if (restoreStatus.value != status) restoreStatus.value = status;
+  }
+
+  @override
+  Future<void> close() {
+    _pendingCap?.cancel();
+    _pendingCap = null;
+    return super.close();
+  }
+
   AuthCubit() : super(AuthInitial()) {
     ApiClient.onUnauthorized = () {
       logout();
@@ -67,7 +138,22 @@ class AuthCubit extends Cubit<AuthState> {
     _loadAuthFromStorage();
   }
 
+  final Completer<void> _sessionRestore = Completer<void>();
+
+  /// Terminé quand la lecture locale de session est finie : connecté,
+  /// invité (aucune session) ou erreur. Le splash l'attend au lieu de sonder
+  /// l'état : un invité reste [AuthInitial] et payait tout le délai de sondage.
+  Future<void> get sessionRestored => _sessionRestore.future;
+
   Future<void> _loadAuthFromStorage() async {
+    try {
+      await _restoreFromStorage();
+    } finally {
+      if (!_sessionRestore.isCompleted) _sessionRestore.complete();
+    }
+  }
+
+  Future<void> _restoreFromStorage() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = await TokenStore.getAccessToken();
@@ -86,19 +172,6 @@ class AuthCubit extends Cubit<AuthState> {
       }
 
       if (token != null && userJson != null) {
-        try {
-          // Vérif session via ApiClient (AUTH-REFRESH unique).
-          await ApiClient()
-              .get('/utilisateur/profile')
-              .timeout(const Duration(seconds: 5));
-        } on UnauthorizedException {
-          await _clearAuthFromStorage();
-          emit(AuthInitial());
-          return;
-        } catch (_) {
-          // Offline / timeout : accepter le token local
-        }
-
         final rawUser = Map<String, dynamic>.from(jsonDecode(userJson) as Map);
         final hadSecrets = rawUser.containsKey('password') ||
             rawUser.containsKey('token') ||
@@ -121,13 +194,35 @@ class AuthCubit extends Cubit<AuthState> {
           professional: restoredCaps,
           refreshToken: refreshToken,
         ));
-        // Met à jour PRESTATAIRE / FREELANCE / VENDEUR si le doc existe
+        _setRestoreStatus(SessionRestoreStatus.restored);
+        // Réseau hors chemin splash : invalide la session seulement si 401.
+        unawaited(_confirmStoredSession());
         unawaited(refreshRoles());
+      } else {
+        // Keystore abandonné (trop lent) ≠ aucune session enregistrée.
+        _setRestoreStatus(TokenStore.storageAbandoned
+            ? SessionRestoreStatus.failed
+            : SessionRestoreStatus.absent);
       }
     } catch (e) {
+      _setRestoreStatus(SessionRestoreStatus.failed);
       if (kDebugMode) {
         print('Erreur lors du chargement de l\'authentification: $e');
       }
+    }
+  }
+
+  Future<void> _confirmStoredSession() async {
+    try {
+      await ApiClient()
+          .get('/utilisateur/profile')
+          .timeout(const Duration(seconds: 5));
+    } on UnauthorizedException {
+      await _clearAuthFromStorage();
+      if (state is AuthAuthenticated) emit(AuthInitial());
+      _setRestoreStatus(SessionRestoreStatus.absent);
+    } catch (_) {
+      // Hors-ligne / timeout : la session locale reste valide.
     }
   }
 
@@ -158,6 +253,7 @@ class AuthCubit extends Cubit<AuthState> {
       professional: professional,
       refreshToken: refreshToken,
     ));
+    _setRestoreStatus(SessionRestoreStatus.restored);
 
     // Enregistrer le token FCM maintenant que la session est active
     Future.microtask(() => FcmService.instance.syncTokenWithBackend());
@@ -330,6 +426,7 @@ class AuthCubit extends Cubit<AuthState> {
     SessionExit.clearPending();
     await _clearAuthFromStorage();
     emit(AuthInitial());
+    _setRestoreStatus(SessionRestoreStatus.absent);
   }
 
   Future<void> _clearAuthFromStorage() async {
@@ -341,6 +438,9 @@ class AuthCubit extends Cubit<AuthState> {
       await prefs.remove('auth_active_role');
       await prefs.remove('auth_professional_caps');
       await TokenStore.clear();
+      // Plus aucune donnée de listing associée à ce compte.
+      await FreelanceHubCache.shared.clearAll();
+      await CacheService().removeByPrefix('private_');
     } catch (e) {
       if (kDebugMode) {
         print('Erreur lors de la suppression de l\'authentification: $e');

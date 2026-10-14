@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:intl/intl.dart';
 import '../../../data/models/commande_model.dart';
 import '../orderpageblocm/commande_bloc.dart';
 import '../orderpageblocm/commande_event.dart';
 import '../orderpageblocm/commande_state.dart';
-import '../../common/widgets/empty_state_widget.dart';
 import '../widgets/commande_card.dart';
 import 'commande_details_screen.dart';
 import '../../common/widgets/standard_screen_header.dart';
@@ -81,7 +79,8 @@ class _OrderPageScreenMState extends State<OrderPageScreenM>
         appBarTitle: 'Mes commandes',
         icon: Icons.shopping_bag_outlined,
         title: 'Suivez vos commandes',
-        description: 'Connectez-vous pour retrouver l\'historique de vos commandes et suivre leur statut en temps réel.',
+        description:
+            'Connectez-vous pour retrouver l\'historique de vos commandes et suivre leur statut en temps réel.',
       );
     }
 
@@ -152,8 +151,8 @@ class _OrderPageScreenMState extends State<OrderPageScreenM>
                       Container(
                         decoration: BoxDecoration(
                           color: SDColors.neutral100,
-                          borderRadius:
-                              BorderRadius.circular(SDSpacing.borderRadiusLarge),
+                          borderRadius: BorderRadius.circular(
+                              SDSpacing.borderRadiusLarge),
                         ),
                         child: TabBar(
                           controller: _tabController,
@@ -168,8 +167,8 @@ class _OrderPageScreenMState extends State<OrderPageScreenM>
                           dividerColor: Colors.transparent,
                           labelColor: SDColors.white,
                           unselectedLabelColor: SDColors.neutral600,
-                          labelPadding: EdgeInsets.symmetric(
-                              horizontal: SDSpacing.sm),
+                          labelPadding:
+                              EdgeInsets.symmetric(horizontal: SDSpacing.sm),
                           labelStyle: SDTypography.labelSmall.copyWith(
                             fontWeight: FontWeight.w800,
                           ),
@@ -227,7 +226,8 @@ class _OrderPageScreenMState extends State<OrderPageScreenM>
           if (count > 0) ...[
             SizedBox(width: SDSpacing.xxxs),
             Container(
-              padding: EdgeInsets.symmetric(horizontal: SDSpacing.xxxs, vertical: 1),
+              padding:
+                  EdgeInsets.symmetric(horizontal: SDSpacing.xxxs, vertical: 1),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: _tabController.index == _getTabIndexFromLabel(label)
@@ -295,7 +295,8 @@ class _OrderPageScreenMState extends State<OrderPageScreenM>
               child: Text(
                 state.error!,
                 textAlign: TextAlign.center,
-                style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral700),
+                style: SDTypography.bodyMedium
+                    .copyWith(color: SDColors.neutral700),
               ),
             ),
             SizedBox(height: SDSpacing.lg),
@@ -315,13 +316,8 @@ class _OrderPageScreenMState extends State<OrderPageScreenM>
       );
     }
 
-    if (state.isEmpty) {
-      return EmptyStateWidget(
-        imagePath: 'assets/commandes_vides.png',
-        title: 'Aucune commande',
-        message: 'Vous n\'avez pas encore passé de commande.\nCommencez vos achats dès maintenant !',
-        imageSize: 200,
-      );
+    if (state.commandes.isEmpty) {
+      return const _EmptyAllOrders();
     }
 
     return TabBarView(
@@ -342,6 +338,20 @@ class _OrderPageScreenMState extends State<OrderPageScreenM>
   }
 
   Widget _buildCommandesList(List<CommandeModel> commandes) {
+    if (commandes.isEmpty) {
+      final status = context.read<CommandeBloc>().state.filtreStatus;
+      return Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: SDSpacing.xxxl),
+          child: Text(
+            _getEmptyStateMessage(status),
+            textAlign: TextAlign.center,
+            style: SDTypography.bodyMedium.copyWith(color: SDColors.neutral700),
+          ),
+        ),
+      );
+    }
+
     return ListView.builder(
       padding: EdgeInsets.only(top: SDSpacing.md, bottom: SDSpacing.xxxl),
       itemCount: commandes.length,
@@ -486,6 +496,56 @@ class _OrderPageScreenMState extends State<OrderPageScreenM>
           child: const Text('Envoyer'),
         ),
       ],
+    );
+  }
+}
+
+class _EmptyAllOrders extends StatelessWidget {
+  const _EmptyAllOrders();
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: const Center(
+              child: Padding(
+                padding: EdgeInsets.all(32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SDIllustration(
+                      asset: SDIllustrations.ordersEmptyConnected,
+                    ),
+                    SizedBox(height: 24),
+                    Text(
+                      'Aucune commande',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    SizedBox(height: 12),
+                    Text(
+                      'Vous n\'avez pas encore passé de commande.\nCommencez vos achats dès maintenant !',
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: Color(0xFF757575),
+                        height: 1.5,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

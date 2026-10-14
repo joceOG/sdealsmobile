@@ -17,7 +17,24 @@ import 'package:sdealsmobile/data/models/prestataire.dart';
 import '../../../../data/models/service.dart';
 
 class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
-  JobPageBlocM() : super(JobPageStateM.initial()) {
+  JobPageBlocM({
+    ApiClient? apiClient,
+    Future<List<Map<String, dynamic>>> Function({
+      bool forceRefresh,
+      int page,
+      int limit,
+      String? serviceId,
+      String? categorieId,
+    })? fetchPrestataires,
+    Future<List<Service>> Function(String nomGroupe)? fetchServices,
+    Future<List<Service>> Function({String scope})? fetchShortcuts,
+    Future<List<Categorie>> Function(String nomgroupe)? fetchCategories,
+  })  : _apiClient = apiClient,
+        _fetchPrestataires = fetchPrestataires,
+        _fetchServices = fetchServices,
+        _fetchShortcuts = fetchShortcuts,
+        _fetchCategories = fetchCategories,
+        super(JobPageStateM.initial()) {
     on<LoadCategorieDataJobM>(_onLoadCategorieDataJobM);
     on<LoadServiceDataJobM>(_onLoadServiceDataJobM);
     on<LoadPriceEstimationM>(_onLoadPriceEstimationM);
@@ -37,7 +54,51 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
     });
   }
 
+  final ApiClient? _apiClient;
+  final Future<List<Map<String, dynamic>>> Function({
+    bool forceRefresh,
+    int page,
+    int limit,
+    String? serviceId,
+    String? categorieId,
+  })? _fetchPrestataires;
+  final Future<List<Service>> Function(String nomGroupe)? _fetchServices;
+  final Future<List<Service>> Function({String scope})? _fetchShortcuts;
+  final Future<List<Categorie>> Function(String nomgroupe)? _fetchCategories;
+
   static const int _pageLimit = 20;
+  int _providersRequestId = 0;
+
+  ApiClient? _ownedApi;
+  ApiClient get _api => _apiClient ?? (_ownedApi ??= ApiClient());
+
+  String _savedNotice() =>
+      _api.catalogReadStale ? offlineUserMessage : '';
+
+  Future<List<Map<String, dynamic>>> _loadPrestataires({
+    bool forceRefresh = false,
+    int page = 1,
+    int limit = _pageLimit,
+    String? serviceId,
+    String? categorieId,
+  }) {
+    if (_fetchPrestataires != null) {
+      return _fetchPrestataires(
+        forceRefresh: forceRefresh,
+        page: page,
+        limit: limit,
+        serviceId: serviceId,
+        categorieId: categorieId,
+      );
+    }
+    return _api.fetchPrestataires(
+      forceRefresh: forceRefresh,
+      page: page,
+      limit: limit,
+      serviceId: serviceId,
+      categorieId: categorieId,
+    );
+  }
 
   List<Prestataire> _mapPrestataires(List<Map<String, dynamic>> data) {
     final out = <Prestataire>[];
@@ -69,11 +130,11 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
     // emit(state.copyWith3(isLoading2: true));
     emit(state.copyWith(isLoading: true, error: ''));
 
-    ApiClient apiClient = ApiClient();
     try {
       var nomgroupe = "Métiers";
-      List<Categorie> list_categorie =
-          await apiClient.fetchCategorie(nomgroupe);
+      final list_categorie = _fetchCategories != null
+          ? await _fetchCategories(nomgroupe)
+          : await _api.fetchCategorie(nomgroupe);
       emit(state.copyWith(
         listItems: list_categorie,
         isLoading: false,
@@ -91,16 +152,29 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
     LoadServiceDataJobM event,
     Emitter<JobPageStateM> emit,
   ) async {
-    emit(state.copyWith(isLoading2: true, error2: ''));
+    emit(state.copyWith(isLoading2: true, error2: '', shortcutsError: ''));
 
-    ApiClient apiClient = ApiClient();
     try {
       var nomGroupe = "Métiers";
-      List<Service> listService = await apiClient.fetchServices(nomGroupe);
+      final listService = _fetchServices != null
+          ? await _fetchServices(nomGroupe)
+          : await _api.fetchServices(nomGroupe);
+      List<Service> shortcuts = const [];
+      var shortcutsError = '';
+      try {
+        shortcuts = _fetchShortcuts != null
+            ? await _fetchShortcuts(scope: 'metiers')
+            : await _api.fetchServiceShortcuts(scope: 'metiers');
+      } catch (_) {
+        shortcutsError =
+            'Impossible de charger les raccourcis. Les catégories restent disponibles.';
+      }
       emit(state.copyWith(
         listItems2: listService,
+        shortcuts: shortcuts,
         isLoading2: false,
         error2: '',
+        shortcutsError: shortcutsError,
       ));
     } catch (error) {
       emit(state.copyWith(
@@ -136,30 +210,32 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
   // ✅ NOUVEAU : Chargement réel des prestataires depuis le backend
   Future<void> _onLoadProviderMatchingM(
       LoadProviderMatchingM event, Emitter<JobPageStateM> emit) async {
-    emit(state.copyWith(isMatchingLoading: true, matchError: ''));
+    final requestId = ++_providersRequestId;
+    emit(state.copyWith(
+      isMatchingLoading: true,
+      matchError: '',
+      selectedService: event.serviceType,
+      selectedServiceId: event.serviceId ?? '',
+      selectedCategoryId: event.categoryId ?? '',
+    ));
 
     try {
-      // 🚀 Charger les prestataires depuis le backend
-      ApiClient apiClient = ApiClient();
-      final List<Map<String, dynamic>> prestatairesData = await apiClient
-          .fetchPrestataires(forceRefresh: true, page: 1, limit: _pageLimit);
+      final List<Map<String, dynamic>> prestatairesData =
+          await _loadPrestataires(
+        forceRefresh: true,
+        page: 1,
+        limit: _pageLimit,
+        serviceId: event.serviceId,
+        categorieId: event.categoryId,
+      );
+      // Un appel nearby/byCategory a pris le relais → libère le spinner
+      if (requestId != _providersRequestId) {
+        emit(state.copyWith(isMatchingLoading: false));
+        return;
+      }
 
       List<Prestataire> providers = _mapPrestataires(prestatairesData);
       final hasMore = prestatairesData.length >= _pageLimit;
-
-      // 🔍 Filtrer par type de service si spécifié
-      if (event.serviceType.isNotEmpty) {
-        providers = providers
-            .where((p) =>
-                p.service.nomservice
-                    .toLowerCase()
-                    .contains(event.serviceType.toLowerCase()) ||
-                (p.specialite?.any((s) => s
-                        .toLowerCase()
-                        .contains(event.serviceType.toLowerCase())) ??
-                    false))
-            .toList();
-      }
 
       // 📍 Filtrer par localisation si spécifié
       if (event.location.isNotEmpty) {
@@ -241,18 +317,26 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
         providerStrengths: providerStrengths,
       );
 
+      if (requestId != _providersRequestId) {
+        emit(state.copyWith(isMatchingLoading: false));
+        return;
+      }
       emit(state.copyWith(
         matchedProviders: providers,
         matchExplanation: explanation,
         isMatchingLoading: false,
         providersPage: 1,
         providersHasMore: hasMore,
+        selectedServiceId: event.serviceId ?? '',
+        selectedCategoryId: event.categoryId ?? '',
+        matchError: _savedNotice(),
       ));
     } catch (error) {
+      if (requestId != _providersRequestId) return;
       if (kDebugMode) debugPrint('matching providers load failed');
       emit(state.copyWith(
         isMatchingLoading: false,
-        matchedProviders: const [],
+        // Pas de matchedProviders: const [] — préserve les fiches déjà chargées
         matchError: 'Impossible de charger les prestataires. Réessayez.',
       ));
     }
@@ -261,56 +345,44 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
   // ✅ NOUVEAU : Chargement des prestataires à proximité
   Future<void> _onLoadNearbyProvidersM(
       LoadNearbyProvidersM event, Emitter<JobPageStateM> emit) async {
+    final requestId = ++_providersRequestId;
     emit(state.copyWith(
       isNearbyLoading: true,
+      // Annule le spinner de matching si un appel nearby le supplante
+      isMatchingLoading: false,
       nearbyError: '',
       userLatitude: event.latitude,
       userLongitude: event.longitude,
       searchRadius: event.radius,
       selectedCategory: event.category ?? '',
+      selectedCategoryId: event.categoryId ?? '',
       selectedService: event.service ?? '',
+      selectedServiceId: event.serviceId ?? '',
       providersPage: 1,
       providersHasMore: true,
       isLoadingMore: false,
     ));
 
     try {
-      ApiClient apiClient = ApiClient();
-      final List<Map<String, dynamic>> prestatairesData = await apiClient
-          .fetchPrestataires(forceRefresh: true, page: 1, limit: _pageLimit);
+      final List<Map<String, dynamic>> prestatairesData =
+          await _loadPrestataires(
+        forceRefresh: true,
+        page: 1,
+        limit: _pageLimit,
+        serviceId: event.serviceId,
+        categorieId: event.categoryId,
+      );
+      if (requestId != _providersRequestId) return;
       List<Prestataire> allProviders = _mapPrestataires(prestatairesData);
       final hasMore = prestatairesData.length >= _pageLimit;
 
-      // Filtrer par catégorie si spécifiée
-      if (event.category != null && event.category!.isNotEmpty) {
-        allProviders = allProviders
-            .where((p) =>
-                p.service.categorie?.nomcategorie
-                    .toLowerCase()
-                    .contains(event.category!.toLowerCase()) ??
-                false)
-            .toList();
-      }
-
-      // Filtrer par service si spécifié
-      if (event.service != null && event.service!.isNotEmpty) {
-        allProviders = allProviders
-            .where((p) => p.service.nomservice
-                .toLowerCase()
-                .contains(event.service!.toLowerCase()))
-            .toList();
-      }
-
-      final filtered = await _filterByDistance(
+      final distances = _distancesOnly(
         allProviders,
         event.latitude,
         event.longitude,
-        event.radius,
       );
-      List<Prestataire> nearbyProviders = filtered.providers;
-      final distances = filtered.distances;
 
-      nearbyProviders.sort((a, b) {
+      allProviders.sort((a, b) {
         final da = distances[a.idprestataire] ?? 9999;
         final db = distances[b.idprestataire] ?? 9999;
         final cmp = da.compareTo(db);
@@ -320,19 +392,24 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
         return 0;
       });
 
+      if (requestId != _providersRequestId) return;
       emit(state.copyWith(
-        nearbyProviders: nearbyProviders,
+        nearbyProviders: allProviders,
         providerDistances: distances,
         isNearbyLoading: false,
         providersPage: 1,
         providersHasMore: hasMore,
         isLoadingMore: false,
+        nearbyError: _savedNotice(),
       ));
     } catch (error) {
+      if (requestId != _providersRequestId) return;
       if (kDebugMode) debugPrint('nearby providers load failed');
       emit(state.copyWith(
         isNearbyLoading: false,
-        nearbyError: error.toString(),
+        nearbyError: userFacingNetworkMessage(error).isEmpty
+            ? genericUserMessage
+            : userFacingNetworkMessage(error),
       ));
     }
   }
@@ -345,42 +422,29 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
       return;
     }
     emit(state.copyWith(isLoadingMore: true, nearbyError: ''));
+    final requestId = _providersRequestId;
     try {
       final nextPage = state.providersPage + 1;
-      final apiClient = ApiClient();
-      final batch = await apiClient.fetchPrestataires(
+      final batch = await _loadPrestataires(
         page: nextPage,
         limit: _pageLimit,
+        serviceId: state.selectedServiceId.isEmpty ? null : state.selectedServiceId,
+        categorieId:
+            state.selectedCategoryId.isEmpty ? null : state.selectedCategoryId,
       );
+      if (requestId != _providersRequestId) return;
       var providers = _mapPrestataires(batch);
-
-      if (state.selectedCategory.isNotEmpty) {
-        providers = providers
-            .where((p) =>
-                p.service.categorie?.nomcategorie
-                    .toLowerCase()
-                    .contains(state.selectedCategory.toLowerCase()) ??
-                false)
-            .toList();
-      }
-      if (state.selectedService.isNotEmpty) {
-        providers = providers
-            .where((p) => p.service.nomservice
-                .toLowerCase()
-                .contains(state.selectedService.toLowerCase()))
-            .toList();
-      }
 
       var distances = Map<String, double>.from(state.providerDistances);
       if (state.userLatitude != null && state.userLongitude != null) {
-        final filtered = await _filterByDistance(
-          providers,
-          state.userLatitude!,
-          state.userLongitude!,
-          state.searchRadius,
-        );
-        providers = filtered.providers;
-        distances = {...distances, ...filtered.distances};
+        distances = {
+          ...distances,
+          ..._distancesOnly(
+            providers,
+            state.userLatitude!,
+            state.userLongitude!,
+          ),
+        };
       }
 
       final merged = _mergeUnique(state.nearbyProviders, providers);
@@ -402,48 +466,37 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
   // ✅ NOUVEAU : Chargement par catégorie
   Future<void> _onLoadProvidersByCategoryM(
       LoadProvidersByCategoryM event, Emitter<JobPageStateM> emit) async {
+    final requestId = ++_providersRequestId;
     emit(state.copyWith(
       isNearbyLoading: true,
+      // Idem : annule le spinner matching si byCategory le supplante
+      isMatchingLoading: false,
       nearbyError: '',
       selectedCategory: event.category,
+      selectedCategoryId: event.categoryId,
+      selectedService: '',
+      selectedServiceId: '',
     ));
 
     try {
-      ApiClient apiClient = ApiClient();
-      print("🏷️ Chargement prestataires pour catégorie: ${event.category}");
+      final List<Map<String, dynamic>> prestatairesData =
+          await _loadPrestataires(
+        forceRefresh: true,
+        page: 1,
+        limit: _pageLimit,
+        categorieId: event.categoryId.isEmpty ? null : event.categoryId,
+      );
+      if (requestId != _providersRequestId) return;
 
-      final List<Map<String, dynamic>> prestatairesData = await apiClient
-          .fetchPrestataires(forceRefresh: true, page: 1, limit: _pageLimit);
+      List<Prestataire> providers = _mapPrestataires(prestatairesData);
 
-      List<Prestataire> providers = [];
-      for (final data in prestatairesData) {
-        try {
-          providers.add(Prestataire.fromBackend(data));
-        } catch (e) {
-          if (kDebugMode) debugPrint('prestataire mapping skipped');
-        }
-      }
-
-      // Filtrer par catégorie
-      providers = providers
-          .where((p) =>
-              p.service.categorie?.nomcategorie
-                  .toLowerCase()
-                  .contains(event.category.toLowerCase()) ??
-              false)
-          .toList();
-
-      // ✅ Filtrer par distance si position disponible
       Map<String, double> distances = {};
       if (event.latitude != null && event.longitude != null) {
-        final filtered = await _filterByDistance(
+        distances = _distancesOnly(
           providers,
           event.latitude!,
           event.longitude!,
-          event.radius,
         );
-        providers = filtered.providers;
-        distances = filtered.distances;
       }
 
       // Trier par note (conversion sécurisée)
@@ -457,19 +510,26 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
         return 0;
       });
 
-      print("✅ Prestataires pour ${event.category}: ${providers.length}");
-
+      if (requestId != _providersRequestId) return;
       emit(state.copyWith(
         nearbyProviders: providers,
         providerDistances: distances,
         selectedCategory: event.category,
+        selectedCategoryId: event.categoryId,
+        providersPage: 1,
+        providersHasMore: prestatairesData.length >= _pageLimit,
         isNearbyLoading: false,
+        isLoadingMore: false,
+        nearbyError: _savedNotice(),
       ));
     } catch (error) {
-      print("❌ Erreur chargement par catégorie: $error");
+      if (requestId != _providersRequestId) return;
+      if (kDebugMode) debugPrint('category providers load failed');
       emit(state.copyWith(
         isNearbyLoading: false,
-        nearbyError: error.toString(),
+        nearbyError: userFacingNetworkMessage(error).isEmpty
+            ? genericUserMessage
+            : userFacingNetworkMessage(error),
       ));
     }
   }
@@ -483,7 +543,7 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
     ));
 
     try {
-      ApiClient apiClient = ApiClient();
+      ApiClient apiClient = _api;
       print("🚨 Chargement prestataires d'urgence...");
 
       final List<Map<String, dynamic>> prestatairesData = await apiClient
@@ -535,17 +595,36 @@ class JobPageBlocM extends Bloc<JobPageEventM, JobPageStateM> {
         nearbyProviders: providers,
         providerDistances: distances,
         isNearbyLoading: false,
+        nearbyError: _savedNotice(),
       ));
     } catch (error) {
-      print("❌ Erreur chargement prestataires d'urgence: $error");
+      if (kDebugMode) debugPrint('urgent providers load failed');
       emit(state.copyWith(
         isNearbyLoading: false,
-        nearbyError: error.toString(),
+        nearbyError: userFacingNetworkMessage(error).isEmpty
+            ? genericUserMessage
+            : userFacingNetworkMessage(error),
       ));
     }
   }
 
   // ✅ Filtre distance + map id → km
+  Map<String, double> _distancesOnly(
+    List<Prestataire> providers,
+    double userLat,
+    double userLng,
+  ) {
+    final distances = <String, double>{};
+    for (final provider in providers) {
+      final lat = provider.localisationMaps?.latitude;
+      final lng = provider.localisationMaps?.longitude;
+      if (lat == null || lng == null || lat == 0.0 || lng == 0.0) continue;
+      distances[provider.idprestataire] =
+          _calculateLocalDistance(userLat, userLng, lat, lng);
+    }
+    return distances;
+  }
+
   Future<({List<Prestataire> providers, Map<String, double> distances})>
       _filterByDistance(
     List<Prestataire> providers,

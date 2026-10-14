@@ -225,6 +225,43 @@ void main() {
       await bloc.close();
     });
 
+    test('Modifier le numéro conserve la session deferred', () async {
+      final bloc = LoginPageBlocM(apiClient: _FakeLoginApi());
+      bloc.add(
+        StartDeferredPhoneVerifyM(
+          token: 'sess',
+          utilisateur: {'_id': 'u1', 'telephoneVerified': false},
+          rememberMe: false,
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+      bloc.add(GooglePhoneSubmittedM(phone: '20113786', phoneCountry: 'TN'));
+      await expectLater(
+        bloc.stream,
+        emitsThrough(
+          predicate<LoginPageStateM>(
+            (s) =>
+                s is LoginGooglePhoneRequiredM &&
+                s.phase == GooglePhonePhase.otpSent,
+          ),
+        ),
+      );
+      bloc.add(GooglePhoneChangedM(phone: '20113786', phoneCountry: 'TN'));
+      await expectLater(
+        bloc.stream,
+        emitsThrough(
+          predicate<LoginPageStateM>(
+            (s) =>
+                s is LoginGooglePhoneRequiredM &&
+                s.phase == GooglePhonePhase.collectPhone &&
+                s.isDeferredOptional &&
+                s.pendingToken == 'sess',
+          ),
+        ),
+      );
+      await bloc.close();
+    });
+
     test('Plus tard → session sans blocage', () async {
       final bloc = LoginPageBlocM(apiClient: _FakeLoginApi());
       bloc.add(

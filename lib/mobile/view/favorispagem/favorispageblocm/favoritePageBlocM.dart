@@ -1,12 +1,22 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:http/http.dart' as http;
 import 'package:sdealsmobile/mobile/view/favorispagem/favorispageblocm/favoritePageEventM.dart';
 import 'package:sdealsmobile/mobile/view/favorispagem/favorispageblocm/favoritePageStateM.dart';
 import 'package:sdealsmobile/data/models/favorite.dart';
 import 'package:sdealsmobile/data/services/api_client.dart';
-import 'package:bloc/bloc.dart';
 
 class FavoritePageBlocM extends Bloc<FavoritePageEventM, FavoritePageStateM> {
   final ApiClient _apiClient = ApiClient();
+
+  /// Remplace le GET favoris dans les tests. Le chemin production reste
+  /// `_apiClient.get` lorsque ce crochet est nul.
+  @visibleForTesting
+  static Future<http.Response> Function(String endpoint)? debugGet;
+
+  @visibleForTesting
+  static void debugReset() => debugGet = null;
 
   FavoritePageBlocM() : super(FavoritePageStateM.initial()) {
     // 📋 ÉVÉNEMENTS DE CHARGEMENT
@@ -54,8 +64,10 @@ class FavoritePageBlocM extends Bloc<FavoritePageEventM, FavoritePageStateM> {
       if (event.sortOrder != null) queryParams['sortOrder'] = event.sortOrder!;
 
       // Appel API
-      final response = await _apiClient
-          .get('/favorites?${Uri(queryParameters: queryParams).query}');
+      final endpoint = '/favorites?${Uri(queryParameters: queryParams).query}';
+      final response = debugGet != null
+          ? await debugGet!(endpoint)
+          : await _apiClient.get(endpoint);
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
@@ -73,6 +85,7 @@ class FavoritePageBlocM extends Bloc<FavoritePageEventM, FavoritePageStateM> {
         emit(state.copyWith(
           favorites: favorites,
           isLoading: false,
+          error: '',
           totalFavorites: totalFavorites,
           currentPage: currentPage,
           totalPages: totalPages,

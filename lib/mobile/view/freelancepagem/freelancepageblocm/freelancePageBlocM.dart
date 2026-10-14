@@ -12,6 +12,7 @@ import 'dart:convert';
 import 'package:sdealsmobile/data/models/categorie.dart';
 import 'package:sdealsmobile/data/models/service.dart';
 import 'package:sdealsmobile/data/services/api_client.dart';
+import 'package:sdealsmobile/data/services/freelance_hub_cache.dart';
 import 'package:sdealsmobile/data/utils/display_text.dart';
 
 /// Timeout réseau Freelance — évite un Loading indéfini.
@@ -30,7 +31,12 @@ class FreelancePageBlocM
   FreelancePageBlocM({
     ApiClient? apiClient,
     this.requestTimeout = _kFreelanceTimeout,
+
+    /// Cache « afficher puis actualiser ». `null` = aucun cache (tests unitaires
+    /// du BLoC) ; les écrans passent [FreelanceHubCache.shared].
+    FreelanceHubCache? cache,
   })  : _apiClient = apiClient ?? ApiClient(),
+        _cache = cache,
         super(FreelancePageStateM.initial()) {
     on<LoadCategorieDataM>(_onLoadCategorieDataM);
     on<LoadFreelancersEvent>(_onLoadFreelancers);
@@ -42,7 +48,14 @@ class FreelancePageBlocM
   }
 
   final ApiClient _apiClient;
+  final FreelanceHubCache? _cache;
   final Duration requestTimeout;
+  int _filterRequestId = 0; // anti-race : catégorie changée avant réponse
+
+  /// Chargement complet (LoadFreelancersEvent) en cours. `isLoadingFreelancers`
+  /// est partagé avec le filtre catégorie : ce drapeau évite qu'un filtre
+  /// annulé ou terminé n'éteigne le chargement initial (ou l'inverse).
+  bool _freelancersLoadInFlight = false;
 
   Future<void> _onLoadCategorieDataM(
     LoadCategorieDataM event,
@@ -64,10 +77,8 @@ class FreelancePageBlocM
         isLoading: false,
         error: null,
       ));
-
-      // STAB-13B Phase 2 : freelances uniquement (Services populaires hors hub V1).
-      // LoadServicesEvent reste disponible mais n'est plus déclenché ici.
-      add(LoadFreelancersEvent());
+      // Les freelancers sont chargés directement depuis FreelancePageScreen
+      // via LoadFreelancersEvent au démarrage — pas besoin d'un second déclenchement ici.
     } on TimeoutException {
       emit(state.copyWith(
         isLoading: false,
@@ -84,10 +95,97 @@ class FreelancePageBlocM
     }
   }
 
+  /// Convertit les maps backend en modèles (une entrée invalide est ignorée).
+  List<FreelanceModel> _parseFreelancers(List<Map<String, dynamic>> raw) {
+    final out = <FreelanceModel>[];
+    for (final data in raw) {
+      try {
+        out.add(FreelanceModel.fromBackend(data));
+      } catch (e) {
+        if (kDebugMode) {
+          print('Erreur conversion freelance (ID: ${data['_id']}): $e');
+        }
+      }
+    }
+    return out;
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchFreelanceMaps({
+    String? category,
+  }) async {
+    final Map<String, dynamic> response = await _apiClient
+        .fetchFreelances(
+          page: 1,
+          limit: 50,
+          sortBy: 'rating',
+          category: category,
+        )
+        .timeout(requestTimeout);
+    return (response['freelances'] as List<dynamic>? ?? const [])
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+  }
+
+  /// Clé = périmètre + type + paramètres (catégorie, tri, pagination).
+  String? _cacheKey({String? category}) {
+    final cache = _cache;
+    if (cache == null) return null;
+    final cat = (category == null || category.trim().isEmpty)
+        ? 'all'
+        : 'cat=${category.trim().toLowerCase()}';
+    return cache.key(
+      kind: 'freelancers',
+      params: 'p1_l50_rating_desc_$cat',
+    );
+  }
+
   Future<void> _onLoadFreelancers(
     LoadFreelancersEvent event,
     Emitter<FreelancePageStateM> emit,
   ) async {
+    final cache = _cache;
+    final key = _cacheKey();
+
+    // 1) Données encore valides : affichées tout de suite, sans spinner.
+    if (cache != null && key != null && !event.force) {
+      final cached = await cache.read(key);
+      if (cached != null) {
+        final fromCache = _parseFreelancers(cached.items);
+        // Un filtre catégorie actif garde sa liste filtrée.
+        final keepFilter = state.selectedCategory != null &&
+            state.selectedCategory != 'Tous';
+        emit(state.copyWith(
+          freelancers: fromCache,
+          filteredFreelancers:
+              keepFilter ? state.filteredFreelancers : fromCache,
+          isLoadingFreelancers: false,
+          freelancersLoaded: true,
+          freelancersError: null,
+        ));
+        if (cache.isFresh(cached)) return;
+        // 2) Actualisation silencieuse : en cas d'échec, les données
+        // affichées restent (pas de spinner, pas de liste vidée).
+        try {
+          final raw = await _fetchFreelanceMaps();
+          await cache.write(key, raw);
+          final fresh = _parseFreelancers(raw);
+          final keep = state.selectedCategory != null &&
+              state.selectedCategory != 'Tous';
+          emit(state.copyWith(
+            freelancers: fresh,
+            filteredFreelancers: keep ? state.filteredFreelancers : fresh,
+            freelancersError: null,
+          ));
+        } catch (e) {
+          if (kDebugMode) print('Actualisation freelances ignorée: $e');
+        }
+        return;
+      }
+    }
+
+    // 3) Pas de donnée valide : chargement bloquant (spinner si liste vide).
+    _freelancersLoadInFlight = true;
     emit(state.copyWith(
       isLoadingFreelancers: true,
       freelancersError: null,
@@ -98,30 +196,12 @@ class FreelancePageBlocM
         print('Chargement des freelances depuis le backend...');
       }
 
-      final Map<String, dynamic> response = await _apiClient
-          .fetchFreelances(
-            page: 1,
-            limit: 50,
-            sortBy: 'rating',
-          )
-          .timeout(requestTimeout);
-
-      final List<Map<String, dynamic>> freelancesData =
-          (response['freelances'] as List<dynamic>? ?? const [])
-              .cast<Map<String, dynamic>>();
-
-      final List<FreelanceModel> freelancers = [];
-      for (final data in freelancesData) {
-        try {
-          freelancers.add(FreelanceModel.fromBackend(data));
-        } catch (e) {
-          if (kDebugMode) {
-            print('Erreur conversion freelance (ID: ${data['_id']}): $e');
-          }
-        }
-      }
+      final raw = await _fetchFreelanceMaps();
+      final freelancers = _parseFreelancers(raw);
+      if (cache != null && key != null) await cache.write(key, raw);
 
       // 200 + vide -> Empty. Jamais de mock en production.
+      _freelancersLoadInFlight = false;
       emit(state.copyWith(
         freelancers: freelancers,
         filteredFreelancers: freelancers,
@@ -130,6 +210,7 @@ class FreelancePageBlocM
         freelancersError: null,
       ));
     } on TimeoutException {
+      _freelancersLoadInFlight = false;
       emit(state.copyWith(
         freelancers: const [],
         filteredFreelancers: const [],
@@ -138,6 +219,7 @@ class FreelancePageBlocM
         freelancersError: 'Impossible de charger les freelances. Réessayez.',
       ));
     } catch (error, stackTrace) {
+      _freelancersLoadInFlight = false;
       if (kDebugMode) {
         print('Erreur backend freelances (aucun mock): $error');
         print(stackTrace);
@@ -151,7 +233,6 @@ class FreelancePageBlocM
       ));
     }
   }
-
   Future<void> _onLoadServices(
     LoadServicesEvent event,
     Emitter<FreelancePageStateM> emit,
@@ -186,25 +267,93 @@ class FreelancePageBlocM
   void _onFilterByCategory(
     FilterByCategoryEvent event,
     Emitter<FreelancePageStateM> emit,
-  ) {
+  ) async {
     final category = event.category;
 
+    // Catégorie effacée → réaffiche la liste complète déjà chargée.
     if (category == null || category == 'Tous') {
       emit(state.copyWith(
         selectedCategory: category,
+        filterError: null,
         filteredFreelancers: _applySearch(state.freelancers, state.searchQuery),
       ));
-    } else {
-      final filtered = state.freelancers
-          .where((freelancer) => freelancer.category == category)
-          .toList();
+      return;
+    }
+
+    // Anti-race : si l'utilisateur change de catégorie rapidement, seule
+    // la dernière réponse met à jour l'état.
+    final requestId = ++_filterRequestId;
+    final cache = _cache;
+    final key = _cacheKey(category: category);
+
+    // Liste de cette catégorie encore valide : affichée sans spinner.
+    var shownFromCache = false;
+    if (cache != null && key != null && !event.force) {
+      final cached = await cache.read(key);
+      if (requestId != _filterRequestId) return;
+      if (cached != null) {
+        shownFromCache = true;
+        emit(state.copyWith(
+          selectedCategory: category,
+          filteredFreelancers:
+              _applySearch(_parseFreelancers(cached.items), state.searchQuery),
+          isLoadingFreelancers: _freelancersLoadInFlight,
+          filterError: null,
+        ));
+        if (cache.isFresh(cached)) return;
+      }
+    }
+
+    if (!shownFromCache) {
       emit(state.copyWith(
         selectedCategory: category,
-        filteredFreelancers: _applySearch(filtered, state.searchQuery),
+        isLoadingFreelancers: true,
+        filterError: null,
+      ));
+    }
+
+    try {
+      final raw = await _fetchFreelanceMaps(category: category);
+
+      // Réponse périmée : une autre catégorie a été sélectionnée entre-temps.
+      if (requestId != _filterRequestId) return;
+
+      if (cache != null && key != null) await cache.write(key, raw);
+      final freelancers = _parseFreelancers(raw);
+
+      emit(state.copyWith(
+        filteredFreelancers: _applySearch(freelancers, state.searchQuery),
+        isLoadingFreelancers: _freelancersLoadInFlight,
+        filterError: null,
+      ));
+    } on TimeoutException {
+      if (requestId != _filterRequestId) return;
+      // Actualisation silencieuse d'une liste déjà affichée : on la garde.
+      if (shownFromCache) {
+        emit(state.copyWith(isLoadingFreelancers: _freelancersLoadInFlight));
+        return;
+      }
+      // Conserve les données existantes + signale l'échec : pas de repli
+      // silencieux sur une liste partielle présentée comme complète.
+      emit(state.copyWith(
+        isLoadingFreelancers: _freelancersLoadInFlight,
+        filterError:
+            'Les résultats de la catégorie n\'ont pas pu être actualisés. Réessayez.',
+        // filteredFreelancers inchangé → données précédentes restent visibles
+      ));
+    } catch (_) {
+      if (requestId != _filterRequestId) return;
+      if (shownFromCache) {
+        emit(state.copyWith(isLoadingFreelancers: _freelancersLoadInFlight));
+        return;
+      }
+      emit(state.copyWith(
+        isLoadingFreelancers: _freelancersLoadInFlight,
+        filterError:
+            'Impossible de filtrer par catégorie. Réessayez.',
       ));
     }
   }
-
   void _onSearchFreelancer(
     SearchFreelancerEvent event,
     Emitter<FreelancePageStateM> emit,
@@ -233,10 +382,17 @@ class FreelancePageBlocM
     ClearFiltersEvent event,
     Emitter<FreelancePageStateM> emit,
   ) {
+    // Retour depuis une page catégorie/service : la requête de filtre encore
+    // en vol est périmée. Sans ça, `isLoadingFreelancers` restait vrai (le hub
+    // réaffichait un chargement sur des freelances déjà chargés) puis la
+    // réponse tardive écrasait `filteredFreelancers` avec la catégorie quittée.
+    _filterRequestId++;
     emit(state.copyWith(
       selectedCategory: null,
       searchQuery: '',
       filteredFreelancers: state.freelancers,
+      isLoadingFreelancers: _freelancersLoadInFlight,
+      filterError: null,
     ));
   }
 
@@ -291,8 +447,9 @@ class FreelancePageBlocM
 
       if (freelanceResponse.statusCode == 201 ||
           freelanceResponse.statusCode == 200) {
-        // Recharger la liste des freelances pour inclure le nouveau
-        add(LoadFreelancersEvent());
+        // Mutation : le hub ne doit plus servir d'entrées antérieures.
+        await _cache?.invalidateScope();
+        add(LoadFreelancersEvent(force: true));
 
         emit(state.copyWith(
           isRegistrationLoading: false,

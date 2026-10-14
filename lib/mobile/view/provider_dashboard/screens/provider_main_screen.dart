@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:sdealsmobile/data/models/utilisateur.dart';
-import 'package:sdealsmobile/data/services/authCubit.dart';
 import 'package:sdealsmobile/data/services/api_client.dart';
+import 'package:sdealsmobile/data/services/authCubit.dart';
+import 'package:sdealsmobile/data/services/cache_service.dart';
 import 'package:sdealsmobile/data/services/websocket_service.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -18,12 +20,17 @@ import 'package:sdealsmobile/mobile/view/provider_dashboard/screens/provider_pla
 import 'package:sdealsmobile/mobile/view/provider_dashboard/screens/provider_messages_screen.dart';
 import 'package:sdealsmobile/mobile/view/provider_dashboard/screens/provider_notifications_screen.dart';
 import 'package:sdealsmobile/mobile/view/provider_dashboard/screens/provider_profile_screen.dart';
+import 'package:sdealsmobile/mobile/view/provider_dashboard/screens/provider_edit_service_tariff_screen.dart';
+import 'package:sdealsmobile/mobile/view/provider_dashboard/models/provider_mission.dart';
 import 'package:sdealsmobile/mobile/view/provider_dashboard/bloc/provider_profile_bloc.dart';
 import 'package:sdealsmobile/mobile/view/provider_dashboard/screens/provider_settings_screen.dart';
 import 'package:sdealsmobile/mobile/view/provider_dashboard/screens/provider_statistics_screen.dart';
 import 'package:sdealsmobile/mobile/view/provider_dashboard/bloc/provider_statistics_bloc.dart';
 import 'package:sdealsmobile/mobile/view/provider_dashboard/widgets/provider_home_dashboard.dart';
 import 'package:sdealsmobile/data/utils/media_url.dart';
+import 'package:sdealsmobile/data/utils/display_text.dart';
+import 'package:sdealsmobile/mobile/view/common/widgets/professional_dossier_status.dart';
+import 'package:sdealsmobile/mobile/view/common/role_shell_navigation.dart';
 
 class ProviderMainScreen extends StatefulWidget {
   final Utilisateur? utilisateur; // ⚡ reçoit le prestataire (nullable)
@@ -44,10 +51,14 @@ class _ProviderMainScreenState extends State<ProviderMainScreen>
   int _ongoingMissionsCount = 0;
   double _monthlyRevenue = 0.0;
   bool _isLoadingStats = true;
+  bool _statsKnown = false;
+  bool _docLookupDone = false;
+  bool _docUnavailable = false;
+  bool _docStale = false;
 
   // 🆔 ID du document prestataire (différent de l'ID utilisateur)
   String? _prestataireDocId;
-  String _prestataireStatus = 'incomplete'; // 'incomplete', 'pending', 'active'
+  String _prestataireStatus = '';
   int _unreadNotificationsCount = 0;
   int _unreadMessagesCount = 0;
   Timer? _notifPollTimer;
@@ -58,6 +69,9 @@ class _ProviderMainScreenState extends State<ProviderMainScreen>
   Map<String, dynamic>? _prestataireDoc;
   bool _isAvailable = true;
   List<Map<String, dynamic>> _recentMissions = [];
+  List<Map<String, dynamic>> _pendingToProcess = [];
+  Map<String, dynamic>? _nextIntervention;
+  int _missionsEnCoursCount = 0;
   List<Map<String, dynamic>> _recentReviews = [];
   List<int> _weeklyActivity = List.filled(7, 0);
   double _soldeDisponible = 0;
@@ -159,8 +173,25 @@ class _ProviderMainScreenState extends State<ProviderMainScreen>
         await _loadDashboardStats();
       }
     } catch (e) {
-      print('Erreur refresh statut prestataire: $e');
+      if (kDebugMode) debugPrint('refresh statut prestataire échoué');
     }
+  }
+
+  void _applyPrestataireDoc(Map<String, dynamic> doc, {required bool stale}) {
+    _prestataireDoc = doc;
+    _prestataireDocId = doc['_id']?.toString();
+    _prestataireStatus = (doc['status']?.toString() ?? '').toLowerCase();
+    if (doc['verifier'] == true || doc['verified'] == true) {
+      _prestataireStatus = 'active';
+    }
+    _isAvailable = doc['disponible'] != false &&
+        doc['disponibilite']?.toString().toLowerCase() != 'indisponible';
+    _rating = _asDouble(doc['note']);
+    final reviews = doc['nbAvis'] ?? doc['nombreAvis'];
+    _reviewCount = reviews is int ? reviews : int.tryParse('$reviews') ?? _reviewCount;
+    _docLookupDone = true;
+    _docUnavailable = false;
+    _docStale = stale;
   }
 
   // 🆔 Initialiser les données prestataire (id réel + stats)
@@ -174,35 +205,65 @@ class _ProviderMainScreenState extends State<ProviderMainScreen>
 
     // Récupérer le document prestataire par userId
     try {
-      final prestataireDoc = await _apiClient.getPrestataireByUserId(userId!, token);
-      if (prestataireDoc != null && mounted) {
-        setState(() {
-          _prestataireDoc = prestataireDoc;
-          _prestataireDocId = prestataireDoc['_id']?.toString();
-          _prestataireStatus =
-              (prestataireDoc['status']?.toString() ?? 'pending').toLowerCase();
-          if (prestataireDoc['verifier'] == true ||
-              prestataireDoc['verified'] == true) {
-            _prestataireStatus = 'active';
-          }
-          _isAvailable = prestataireDoc['disponible'] != false &&
-              prestataireDoc['disponibilite']?.toString().toLowerCase() !=
-                  'indisponible';
-          _rating = _asDouble(prestataireDoc['note']);
-          _reviewCount = (prestataireDoc['nbAvis'] ??
-                  prestataireDoc['nombreAvis'] ??
-                  prestataireDoc['nbMission'] ??
-                  0) is int
-              ? (prestataireDoc['nbAvis'] ??
-                      prestataireDoc['nombreAvis'] ??
-                      prestataireDoc['nbMission'] ??
-                      0) as int
-              : int.tryParse('${prestataireDoc['nbAvis'] ?? 0}') ?? 0;
-        });
+      var prestataireDoc =
+          await _apiClient.getPrestataireByUserId(userId, token);
+      if (prestataireDoc != null) {
+        final docId = prestataireDoc['_id']?.toString();
+        if (docId != null && docId.isNotEmpty) {
+          try {
+            final detail = await _apiClient.get(
+              '/prestataire/$docId',
+              token: token,
+            );
+            if (detail.statusCode == 200) {
+              final decoded = jsonDecode(detail.body);
+              if (decoded is Map) {
+                prestataireDoc = Map<String, dynamic>.from(decoded);
+              }
+            }
+          } catch (_) {}
+        }
+      }
+      final doc = prestataireDoc;
+      if (!mounted) return;
+      if (doc != null) {
+        try {
+          await CacheService().cacheData('private_prestataire_$userId', doc);
+        } catch (_) {}
+        setState(() => _applyPrestataireDoc(doc, stale: false));
         _syncStatusPolling();
+      } else {
+        setState(() {
+          _docLookupDone = true;
+          _docUnavailable = false;
+          if (_prestataireDoc == null) _docStale = false;
+        });
       }
     } catch (e) {
-      print('Erreur récupération prestataire doc: $e');
+      if (kDebugMode) debugPrint('prestataire doc indisponible');
+      Map<String, dynamic>? saved;
+      try {
+        final retained =
+            await CacheService().readRetained('private_prestataire_$userId');
+        final data = retained?.data;
+        if (data is Map) saved = Map<String, dynamic>.from(data);
+      } catch (_) {}
+      if (!mounted) return;
+      if (saved != null) {
+        setState(() => _applyPrestataireDoc(saved!, stale: true));
+        _syncStatusPolling();
+      } else if (_prestataireDoc != null) {
+        setState(() {
+          _docLookupDone = true;
+          _docStale = true;
+        });
+      } else {
+        setState(() {
+          _docLookupDone = true;
+          _docUnavailable = true;
+          _docStale = false;
+        });
+      }
     }
 
     if (!mounted) return;
@@ -333,7 +394,11 @@ class _ProviderMainScreenState extends State<ProviderMainScreen>
       return;
     }
     try {
-      final messages = await _apiClient.getUnreadMessages(userId, limit: 50);
+      final messages = await _apiClient.getUnreadMessages(
+        userId,
+        token: auth.token,
+        limit: 50,
+      );
       if (!mounted) return;
       setState(() => _unreadMessagesCount = messages.length);
     } catch (e) {
@@ -463,10 +528,19 @@ class _ProviderMainScreenState extends State<ProviderMainScreen>
                 .toInt()
             : pendingMissions.length + ongoingMissions.length + accepted.length;
         
+        final nextIntervention = _pickNextIntervention([
+          ...accepted,
+          ...ongoingMissions,
+        ]);
+
         if (mounted) {
           setState(() {
             _pendingMissionsCount = pendingMissions.length;
             _ongoingMissionsCount = ongoingMissions.length;
+            _missionsEnCoursCount =
+                accepted.length + ongoingMissions.length;
+            _pendingToProcess = pendingMissions;
+            _nextIntervention = nextIntervention;
             _monthlyRevenue = (stats['revenueTotal'] ??
                     stats['revenus'] ??
                     _prestataireDoc?['revenus'] ??
@@ -482,6 +556,7 @@ class _ProviderMainScreenState extends State<ProviderMainScreen>
             );
             _soldeEnAttente = _asDouble(stats['soldeEnAttente'] ?? 0);
             _isLoadingStats = false;
+            _statsKnown = true;
           });
         }
       }
@@ -495,6 +570,49 @@ class _ProviderMainScreenState extends State<ProviderMainScreen>
     if (v == null) return fallback;
     if (v is num) return v.toDouble();
     return double.tryParse(v.toString()) ?? fallback;
+  }
+
+  Map<String, dynamic>? _pickNextIntervention(
+    List<Map<String, dynamic>> missions,
+  ) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    Map<String, dynamic>? best;
+    DateTime? bestMoment;
+
+    for (final m in missions) {
+      final statut =
+          (m['statut'] ?? m['status'] ?? '').toString().toUpperCase();
+      if (statut != 'ACCEPTEE' &&
+          statut != 'EN_COURS' &&
+          statut != 'CONFIRMEE') {
+        continue;
+      }
+      final raw = m['datePrestation'] ?? m['date'];
+      final day = DateTime.tryParse('$raw')?.toLocal();
+      if (day == null) continue;
+      final dayOnly = DateTime(day.year, day.month, day.day);
+      if (dayOnly.isBefore(today) && statut != 'EN_COURS') continue;
+
+      final start = _parsePrestationTime(day, m['heureDebut']);
+      final moment = start ?? dayOnly;
+      if (bestMoment == null || moment.isBefore(bestMoment)) {
+        bestMoment = moment;
+        best = m;
+      }
+    }
+    return best;
+  }
+
+  DateTime? _parsePrestationTime(DateTime day, dynamic heureDebut) {
+    if (heureDebut == null) return null;
+    final s = heureDebut.toString().trim();
+    final parts = s.split(':');
+    if (parts.length < 2) return null;
+    final h = int.tryParse(parts[0]);
+    final min = int.tryParse(parts[1]);
+    if (h == null || min == null) return null;
+    return DateTime(day.year, day.month, day.day, h, min);
   }
 
   String _cleanMetierLabel(dynamic raw) {
@@ -530,6 +648,18 @@ class _ProviderMainScreenState extends State<ProviderMainScreen>
 
   // ✅ DASHBOARD AVEC VÉRIFICATION DU STATUT
   Widget _buildSimpleDashboard() {
+    if (!_docLookupDone && _prestataireDoc == null) {
+      return const Center(
+        child: CircularProgressIndicator(strokeWidth: 2),
+      );
+    }
+    if (_prestataireDoc == null && _docUnavailable) {
+      return SDConnectionRequired(onRetry: _initPrestataireData);
+    }
+    if (_prestataireDoc == null) {
+      return _buildIncompleteProfileDashboard();
+    }
+
     final prestataireStatus = _resolveDashboardStatus();
 
     if (prestataireStatus == 'incomplete') {
@@ -576,85 +706,14 @@ class _ProviderMainScreenState extends State<ProviderMainScreen>
             children: [
               _buildBoutiqueHomeHeader(showActions: true),
               SizedBox(height: SDSpacing.lg),
-              Container(
-                width: double.infinity,
-                padding: EdgeInsets.all(SDSpacing.md),
-                decoration: BoxDecoration(
-                  color: SDColors.neutral900,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Inscription incomplète',
-                      style: SDTypography.titleMedium.copyWith(
-                        color: SDColors.white,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    SizedBox(height: SDSpacing.xs),
-                    Text(
-                      'Finalisez votre profil (CNI, selfie, localisation) pour recevoir des missions.',
-                      style: SDTypography.bodyMedium.copyWith(
-                        color: SDColors.neutral300,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              SizedBox(height: SDSpacing.md),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    context.push('/prestataire-finalization', extra: _prestataireDocId);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: SDColors.primary600,
-                    foregroundColor: SDColors.white,
-                    padding: EdgeInsets.symmetric(vertical: SDSpacing.md),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(28),
-                    ),
-                    elevation: 0,
-                  ),
-                  child: Text(
-                    'Finaliser mon profil',
-                    style: SDTypography.labelLarge.copyWith(
-                      color: SDColors.white,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ),
-              SizedBox(height: SDSpacing.md),
-              Container(
-                width: double.infinity,
-                padding: EdgeInsets.all(SDSpacing.md),
-                decoration: BoxDecoration(
-                  color: SDColors.neutral100,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Column(
-                  children: [
-                    Icon(Icons.lock_outline, color: SDColors.neutral500, size: 40),
-                    SizedBox(height: SDSpacing.xs),
-                    Text(
-                      'Fonctionnalités verrouillées',
-                      style: SDTypography.titleSmall.copyWith(
-                        color: SDColors.neutral800,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    SizedBox(height: SDSpacing.xxs),
-                    Text(
-                      'Le tableau de bord s’ouvrira après validation de votre dossier.',
-                      textAlign: TextAlign.center,
-                      style: SDTypography.bodySmall.copyWith(color: SDColors.neutral500),
-                    ),
-                  ],
-                ),
+              IncompleteProviderDossier(
+                items: missingProviderCompletionItems(_prestataireDoc),
+                onComplete: () {
+                  context.push(
+                    '/prestataire-finalization',
+                    extra: _prestataireDocId,
+                  );
+                },
               ),
             ],
           ),
@@ -666,10 +725,11 @@ class _ProviderMainScreenState extends State<ProviderMainScreen>
   // 🚫 Compte rejeté / suspendu — UI dédiée (pas le dashboard actif)
   Widget _buildBlockedDashboard(String status) {
     final isSuspended = status == 'suspended';
-    final title = isSuspended ? 'Compte suspendu' : 'Dossier refusé';
-    final message = isSuspended
-        ? 'Votre compte prestataire est suspendu. Contactez le support pour plus d\'informations.'
-        : 'Votre dossier prestataire a été refusé. Vous pouvez finaliser à nouveau vos documents ou contacter le support.';
+    final motif = _prestataireDoc?['motifRejet']?.toString();
+    final copy = ProfessionalDossierCopy.resolve(
+      status: status,
+      motif: motif,
+    )!;
 
     return ColoredBox(
       color: SDColors.neutral50,
@@ -687,78 +747,22 @@ class _ProviderMainScreenState extends State<ProviderMainScreen>
               children: [
                 _buildBoutiqueHomeHeader(showActions: true),
                 SizedBox(height: SDSpacing.lg),
-                Container(
-                  width: double.infinity,
-                  padding: EdgeInsets.all(SDSpacing.md),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF7F1D1D),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.block,
-                              color: SDColors.white, size: 22),
-                          SizedBox(width: SDSpacing.xs),
-                          Expanded(
-                            child: Text(
-                              title,
-                              style: SDTypography.titleMedium.copyWith(
-                                color: SDColors.white,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: SDSpacing.xs),
-                      Text(
-                        message,
-                        style: SDTypography.bodyMedium.copyWith(
-                          color: SDColors.neutral300,
-                        ),
-                      ),
-                    ],
-                  ),
+                ProfessionalDossierCard(
+                  copy: copy,
+                  onAction: isSuspended
+                      ? null
+                      : () {
+                          context.push(
+                            '/prestataire-finalization',
+                            extra: _prestataireDocId,
+                          );
+                        },
                 ),
                 SizedBox(height: SDSpacing.md),
-                if (!isSuspended)
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        context.push('/prestataire-finalization',
-                            extra: _prestataireDocId);
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: SDColors.primary600,
-                        foregroundColor: SDColors.white,
-                        padding:
-                            EdgeInsets.symmetric(vertical: SDSpacing.md),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(28),
-                        ),
-                        elevation: 0,
-                      ),
-                      child: Text(
-                        'Mettre à jour mon dossier',
-                        style: SDTypography.labelLarge.copyWith(
-                          color: SDColors.white,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ),
-                if (!isSuspended) SizedBox(height: SDSpacing.sm),
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton(
-                    onPressed: () {
-                      context.read<AuthCubit>().switchActiveRole('CLIENT');
-                      context.push('/homepage');
-                    },
+                    onPressed: () => goToClientShell(context),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: SDColors.neutral900,
                       side: BorderSide(color: SDColors.neutral300),
@@ -801,41 +805,14 @@ class _ProviderMainScreenState extends State<ProviderMainScreen>
               children: [
                 _buildBoutiqueHomeHeader(showActions: true),
                 SizedBox(height: SDSpacing.lg),
-                Container(
-                  width: double.infinity,
-                  padding: EdgeInsets.all(SDSpacing.md),
-                  decoration: BoxDecoration(
-                    color: SDColors.neutral900,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Validation en cours',
-                        style: SDTypography.titleMedium.copyWith(
-                          color: SDColors.white,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      SizedBox(height: SDSpacing.xs),
-                      Text(
-                        'Notre équipe vérifie vos documents. Vous serez notifié dès que votre compte sera activé.',
-                        style: SDTypography.bodyMedium.copyWith(
-                          color: SDColors.neutral300,
-                        ),
-                      ),
-                    ],
-                  ),
+                ProfessionalDossierCard(
+                  copy: ProfessionalDossierCopy.resolve(status: 'pending')!,
                 ),
                 SizedBox(height: SDSpacing.md),
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton(
-                    onPressed: () {
-                      context.read<AuthCubit>().switchActiveRole('CLIENT');
-                      context.push('/homepage');
-                    },
+                    onPressed: () => goToClientShell(context),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: SDColors.neutral900,
                       side: BorderSide(color: SDColors.neutral300),
@@ -871,15 +848,7 @@ class _ProviderMainScreenState extends State<ProviderMainScreen>
       user?.nom ?? authUser?.nom,
     ].where((e) => e != null && e.toString().trim().isNotEmpty).join(' ');
 
-    final specialite = _prestataireDoc?['specialite'];
-    String metier = 'Prestataire';
-    if (specialite is List && specialite.isNotEmpty) {
-      metier = _cleanMetierLabel(specialite.first);
-    } else if (specialite != null && specialite.toString().isNotEmpty) {
-      metier = _cleanMetierLabel(specialite);
-    } else if (_prestataireDoc?['metier'] != null) {
-      metier = _cleanMetierLabel(_prestataireDoc!['metier']);
-    }
+    final metier = prestataireMetierLabel(_prestataireDoc);
 
     String location = 'Abidjan';
     final loc = _prestataireDoc?['localisation'];
@@ -902,44 +871,47 @@ class _ProviderMainScreenState extends State<ProviderMainScreen>
         _prestataireStatus == 'active' ||
         _prestataireStatus == 'VALIDE';
 
-    return ProviderHomeDashboard(
+    final demandesRecues = _totalDemandesMois > 0
+        ? _totalDemandesMois
+        : _pendingMissionsCount + _missionsEnCoursCount;
+
+    return Column(
+      children: [
+        if (_docStale)
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: SDOfflineSavedBanner(),
+          ),
+        Expanded(
+          child: ProviderHomeDashboard(
       fullName: displayName.isEmpty ? 'Prestataire' : displayName,
       photoUrl: photo,
       metier: metier,
       location: location,
-      rating: _rating,
-      reviewCount: _reviewCount,
       isVerified: verified,
       isAvailable: _isAvailable,
       availabilityLocalOnly: false,
       onAvailabilityChanged: _setAvailability,
-      demandesRecues: _totalDemandesMois > 0
-          ? _totalDemandesMois
-          : (_pendingMissionsCount + _ongoingMissionsCount),
-      commandesEnCours: _ongoingMissionsCount,
-      enAttente: _pendingMissionsCount,
-      revenusMois: _monthlyRevenue,
-      isLoadingStats: _isLoadingStats,
-      weeklyActivity: _weeklyActivity,
-      recentMissions: _recentMissions,
-      recentReviews: _recentReviews,
-      soldeDisponible: _soldeDisponible,
-      soldeEnAttente: _soldeEnAttente,
+      pendingMissions: _pendingToProcess,
+      nextIntervention: _nextIntervention,
+      demandesRecues: demandesRecues,
+      missionsEnCours: _missionsEnCoursCount,
+      isLoadingStats: _isLoadingStats || !_statsKnown,
       unreadMessages: _unreadMessagesCount,
       unreadNotifications: _unreadNotificationsCount,
       onRefresh: _initPrestataireData,
       onOpenStats: _showProviderStatistics,
-      onOpenServices: () => setState(() => _currentIndex = 4),
+      onOpenServices: _openServiceTariff,
       onOpenMessages: () => setState(() => _currentIndex = 3),
-      onOpenPayments: _showSoutraPayScreen,
-      onOpenCalendar: () => setState(() => _currentIndex = 2),
+      onOpenPlanning: () => setState(() => _currentIndex = 2),
+      onOpenProfile: () => setState(() => _currentIndex = 4),
       onOpenMissions: () => setState(() => _currentIndex = 1),
-      onWithdraw: _showSoutraPayScreen,
-      onSwitchToClient: () {
-        context.read<AuthCubit>().switchActiveRole('CLIENT');
-        context.push('/homepage');
-      },
+      onOpenMission: _openMissionDetail,
+      expertMenuAction: _buildExpertMenu(context, circle: true),
       onOpenNotifications: _showNotificationsScreen,
+          ),
+        ),
+      ],
     );
   }
 
@@ -987,10 +959,7 @@ class _ProviderMainScreenState extends State<ProviderMainScreen>
           SizedBox(width: SDSpacing.xs),
           _buildRoundIconButton(
             icon: Icons.close,
-            onTap: () {
-              context.read<AuthCubit>().switchActiveRole('CLIENT');
-              context.push('/homepage');
-            },
+            onTap: () => goToClientShell(context),
           ),
         ],
       ],
@@ -1059,8 +1028,9 @@ class _ProviderMainScreenState extends State<ProviderMainScreen>
       child: ProviderMessagesScreen(key: _messagesKey),
     );
 
-    if (_missionsTab != null && _tabsBoundDocId == _prestataireDocId) return;
-    _tabsBoundDocId = _prestataireDocId;
+    final bind = '$_prestataireDocId|$_docLookupDone';
+    if (_missionsTab != null && _tabsBoundDocId == bind) return;
+    _tabsBoundDocId = bind;
 
     _missionsTab = BlocProvider(
       create: (_) {
@@ -1097,6 +1067,7 @@ class _ProviderMainScreenState extends State<ProviderMainScreen>
       child: ProviderProfileScreen(
         key: _profileKey,
         prestataireDocId: _prestataireDocId,
+        lookupSettled: _docLookupDone,
         embeddedInTab: true,
       ),
     );
@@ -1178,7 +1149,7 @@ class _ProviderMainScreenState extends State<ProviderMainScreen>
           ),
           onPressed: _showNotificationsScreen,
         ),
-        _buildExpertMenu(context),
+        _buildExpertMenu(context, circle: false),
         const SizedBox(width: 4),
       ],
       bottom: PreferredSize(
@@ -1192,197 +1163,148 @@ class _ProviderMainScreenState extends State<ProviderMainScreen>
   Widget build(BuildContext context) {
     _ensureTabScreens();
 
-    return Scaffold(
-      backgroundColor: SDColors.neutral50,
-      // Accueil a son propre header (style boutique) → pas d'AppBar parent
-      appBar: _currentIndex == 0 ? null : _buildProAppBar(context),
-      body: IndexedStack(
-        index: _currentIndex,
-        children: [
-          _buildSimpleDashboard(),
-          _missionsTab!,
-          _planningTab!,
-          _messagesTab!,
-          _profileTab!,
-        ],
+    // Retour Android : un onglet pro autre qu'Accueil revient à l'Accueil
+    // pro (jamais vers le shell client). Les sous-écrans poussés au-dessus
+    // gardent leur propre pop. Sur l'Accueil pro : sortie normale.
+    return PopScope(
+      canPop: _currentIndex == 0,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop || !mounted || _currentIndex == 0) return;
+        _selectProTab(0);
+      },
+      child: Scaffold(
+        backgroundColor: SDColors.neutral50,
+        // Accueil a son propre header (style boutique) → pas d'AppBar parent
+        appBar: _currentIndex == 0 ? null : _buildProAppBar(context),
+        body: IndexedStack(
+          index: _currentIndex,
+          children: [
+            _buildSimpleDashboard(),
+            _missionsTab!,
+            _planningTab!,
+            _messagesTab!,
+            _profileTab!,
+          ],
+        ),
+        bottomNavigationBar: _buildProBottomNavBar(),
       ),
-      bottomNavigationBar: _buildProBottomNavBar(),
     );
+  }
+
+  void _selectProTab(int index) {
+    final wasHome = _currentIndex == 0;
+    setState(() => _currentIndex = index);
+    if (index == 0 && !wasHome) {
+      _refreshPrestataireStatusOnly();
+    }
   }
 
   Widget _buildProBottomNavBar() {
-    return Container(
-      decoration: BoxDecoration(
-        color: SDColors.white,
-        border: Border(top: BorderSide(color: SDColors.neutral200)),
-      ),
-      child: Builder(
-        builder: (context) {
-          // Politique safe-bottom unifiée — SafeArea inopérant sur EMUI.
-          final double sysBottom = SDResponsive.systemBottomInset(context);
-          return Padding(
-            padding: EdgeInsets.fromLTRB(
-                SDSpacing.xs, 6, SDSpacing.xs, 6 + sysBottom),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildProNavItem(0, Icons.home_outlined, Icons.home_rounded, 'Accueil'),
-              _buildProNavItem(
-                  1, Icons.work_outline_rounded, Icons.work_rounded, 'Missions'),
-              _buildProNavItem(2, Icons.calendar_month_outlined,
-                  Icons.calendar_month_rounded, 'Planning'),
-              _buildProNavItem(3, Icons.chat_bubble_outline_rounded,
-                  Icons.chat_bubble_rounded, 'Messages'),
-              _buildProNavItem(4, Icons.person_outline_rounded,
-                  Icons.person_rounded, 'Profil'),
-            ],
-          ),
-          );
-        },
-      ),
+    return ProviderBottomNavigation(
+      currentIndex: _currentIndex,
+      onTap: _selectProTab,
     );
   }
 
-  Widget _buildProNavItem(
-    int index,
-    IconData outlineIcon,
-    IconData filledIcon,
-    String label,
-  ) {
-    final isActive = _currentIndex == index;
-    final color = isActive ? SDColors.neutral900 : SDColors.neutral900.withOpacity(0.45);
+  void _onExpertMenuSelected(BuildContext context, String value) {
+    switch (value) {
+      case 'profil':
+        _showProviderProfile();
+        break;
+      case 'parametres':
+        _showProviderSettings();
+        break;
+      case 'statistiques':
+        _showProviderStatistics();
+        break;
+      case 'retour_client':
+        _switchToClientMode(context);
+        break;
+      case 'deconnexion':
+        _logout(context);
+        break;
+    }
+  }
 
-    return InkWell(
-      onTap: () {
-        final wasHome = _currentIndex == 0;
-        setState(() => _currentIndex = index);
-        if (index == 0 && !wasHome) {
-          _refreshPrestataireStatusOnly();
-        }
-      },
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+  List<PopupMenuEntry<String>> _expertMenuItems() {
+    return [
+      PopupMenuItem<String>(
+        value: 'profil',
+        child: Row(
           children: [
-            Icon(isActive ? filledIcon : outlineIcon, color: color, size: 22),
-            const SizedBox(height: 3),
-            Text(
-              label,
-              style: SDTypography.labelSmall.copyWith(
-                color: color,
-                fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-                fontSize: 11,
-              ),
-            ),
-            const SizedBox(height: 3),
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              height: 3,
-              width: isActive ? 16 : 0,
-              decoration: BoxDecoration(
-                color: SDColors.neutral900,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
+            Icon(Icons.person_outline_rounded, color: SDColors.neutral900),
+            const SizedBox(width: 12),
+            const Text('Mon Profil'),
           ],
         ),
       ),
-    );
+      PopupMenuItem<String>(
+        value: 'parametres',
+        child: Row(
+          children: [
+            Icon(Icons.settings_outlined, color: SDColors.neutral900),
+            const SizedBox(width: 12),
+            const Text('Paramètres'),
+          ],
+        ),
+      ),
+      PopupMenuItem<String>(
+        value: 'statistiques',
+        child: Row(
+          children: [
+            Icon(Icons.bar_chart_outlined, color: SDColors.neutral900),
+            const SizedBox(width: 12),
+            const Text('Statistiques'),
+          ],
+        ),
+      ),
+      const PopupMenuDivider(),
+      PopupMenuItem<String>(
+        value: 'retour_client',
+        child: Row(
+          children: [
+            Icon(Icons.home_outlined, color: SDColors.neutral900),
+            const SizedBox(width: 12),
+            const Text('Retour Client'),
+          ],
+        ),
+      ),
+      PopupMenuItem<String>(
+        value: 'deconnexion',
+        child: Row(
+          children: [
+            Icon(Icons.logout_rounded, color: SDColors.error600),
+            const SizedBox(width: 12),
+            Text('Déconnexion', style: TextStyle(color: SDColors.error600)),
+          ],
+        ),
+      ),
+    ];
   }
 
-  Widget _buildExpertMenu(BuildContext context) {
+  Widget _buildExpertMenu(BuildContext context, {required bool circle}) {
+    final icon = const Icon(Icons.more_vert, color: SDColors.neutral900, size: 22);
     return PopupMenuButton<String>(
       offset: const Offset(0, 44),
-      icon: const Icon(Icons.more_vert, color: SDColors.neutral900, size: 22),
-      onSelected: (value) {
-        switch (value) {
-          case 'profil':
-            _showProviderProfile();
-            break;
-          case 'parametres':
-            _showProviderSettings();
-            break;
-          case 'statistiques':
-            _showProviderStatistics();
-            break;
-          case 'retour_client':
-            _switchToClientMode(context);
-            break;
-          case 'deconnexion':
-            _logout(context);
-            break;
-        }
-      },
-      itemBuilder: (BuildContext context) => [
-        PopupMenuItem<String>(
-          value: 'profil',
-          child: Row(
-            children: [
-              Icon(Icons.person_outline_rounded, color: SDColors.neutral900),
-              const SizedBox(width: 12),
-              const Text('Mon Profil'),
-            ],
-          ),
-        ),
-        PopupMenuItem<String>(
-          value: 'parametres',
-          child: Row(
-            children: [
-              Icon(Icons.settings_outlined, color: SDColors.neutral900),
-              const SizedBox(width: 12),
-              const Text('Paramètres'),
-            ],
-          ),
-        ),
-        PopupMenuItem<String>(
-          value: 'statistiques',
-          child: Row(
-            children: [
-              Icon(Icons.bar_chart_outlined, color: SDColors.neutral900),
-              const SizedBox(width: 12),
-              const Text('Statistiques'),
-            ],
-          ),
-        ),
-        const PopupMenuDivider(),
-        PopupMenuItem<String>(
-          value: 'retour_client',
-          child: Row(
-            children: [
-              Icon(Icons.home_outlined, color: SDColors.neutral900),
-              const SizedBox(width: 12),
-              const Text('Retour Client'),
-            ],
-          ),
-        ),
-        PopupMenuItem<String>(
-          value: 'deconnexion',
-          child: Row(
-            children: [
-              Icon(Icons.logout_rounded, color: SDColors.error600),
-              const SizedBox(width: 12),
-              Text('Déconnexion',
-                  style: TextStyle(color: SDColors.error600)),
-            ],
-          ),
-        ),
-      ],
+      padding: circle ? EdgeInsets.zero : const EdgeInsets.symmetric(horizontal: 8),
+      tooltip: 'Plus d’options',
+      onSelected: (value) => _onExpertMenuSelected(context, value),
+      itemBuilder: (BuildContext context) => _expertMenuItems(),
+      child: circle
+          ? Material(
+              color: SDColors.neutral50,
+              shape: const CircleBorder(),
+              child: SizedBox(width: 40, height: 40, child: icon),
+            )
+          : icon,
     );
   }
 
   // 🔄 SWITCH VERS MODE CLIENT
+  // go (pas push) : le shell client remplace le shell pro, sans pile croisée.
   void _switchToClientMode(BuildContext context) {
-    try {
-      context.read<AuthCubit>().switchActiveRole('CLIENT');
-      Future.delayed(const Duration(milliseconds: 100), () {
-        context.push('/homepage');
-      });
-    } catch (e) {
-      print('Erreur lors du switch de rôle: $e');
-      context.push('/homepage');
-    }
+    if (!mounted) return;
+    goToClientShell(this.context);
   }
 
   // 🚪 DÉCONNEXION
@@ -1425,10 +1347,94 @@ class _ProviderMainScreenState extends State<ProviderMainScreen>
             if (token != null) bloc.setToken(token);
             return bloc;
           },
-          child: const ProviderNotificationsScreen(),
+          child: ProviderNotificationsScreen(
+            prestataireDocId: _prestataireDocId,
+            onOpenMissions: () {
+              if (mounted) setState(() => _currentIndex = 1);
+            },
+            onOpenMessages: () {
+              if (mounted) setState(() => _currentIndex = 3);
+            },
+          ),
         ),
       ),
     ).then((_) => _loadUnreadNotificationsCount());
+  }
+
+  Future<void> _openMissionDetail(Map<String, dynamic> mission) async {
+    final id = prestationIdOf(mission);
+    if (id == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Mission introuvable')),
+      );
+      return;
+    }
+    final changed = await context.push<bool>(
+      '/mission-details/$id',
+      extra: _prestataireDocId == null
+          ? null
+          : {'prestataireDocId': _prestataireDocId},
+    );
+    if (changed == true && mounted) {
+      _initPrestataireData();
+      _missionsKey.currentState?.reload();
+    }
+  }
+
+  Future<void> _openServiceTariff() async {
+    final id = _prestataireDocId;
+    if (id == null || id.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profil prestataire non chargé')),
+      );
+      return;
+    }
+    final doc = _prestataireDoc ?? {};
+    final service = doc['service'];
+    var serviceName = prestataireMetierLabel(doc);
+    String? serviceId;
+    String? categoryLabel;
+    String? categoryId;
+    if (service is Map) {
+      serviceId = service['_id']?.toString();
+      serviceName =
+          cleanDisplayPart(service['nomservice'] ?? service['nom']) ??
+              serviceName;
+      final cat = service['categorie'];
+      if (cat is Map) {
+        categoryId = cat['_id']?.toString();
+        categoryLabel = cleanDisplayPart(
+          cat['nomcategorie'] ?? cat['nom'],
+        );
+      }
+    }
+    final rate = doc['prixprestataire'];
+    double? dailyRate;
+    if (rate is num) dailyRate = rate.toDouble();
+
+    final auth = context.read<AuthCubit>().state;
+    final token = auth is AuthAuthenticated ? auth.token : null;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BlocProvider(
+          create: (_) {
+            final bloc = ProviderProfileBloc();
+            if (token != null) bloc.setToken(token);
+            return bloc;
+          },
+          child: ProviderEditServiceTariffScreen(
+            prestataireId: id,
+            serviceName: serviceName,
+            serviceId: serviceId,
+            categoryLabel: categoryLabel,
+            categoryId: categoryId,
+            initialDailyRate: dailyRate,
+          ),
+        ),
+      ),
+    );
+    if (mounted) _initPrestataireData();
   }
 
   // SoutraPay V1 : pas de simulation financière (Random / fake balance).
@@ -1511,4 +1517,109 @@ class _ProviderMainScreenState extends State<ProviderMainScreen>
 
   // 🎯 MÉTHODE POUR VÉRIFIER LE STATUT DU PRESTATAIRE
   String _getPrestataireStatus() => _resolveDashboardStatus();
+}
+
+/// Barre d’onglets prestataire. La marge système est hors du contenu
+/// (pas de hauteur fixe partagée avec l’inset Android).
+class ProviderBottomNavigation extends StatelessWidget {
+  const ProviderBottomNavigation({
+    super.key,
+    required this.currentIndex,
+    required this.onTap,
+  });
+
+  final int currentIndex;
+  final ValueChanged<int> onTap;
+
+  static const _items = <(IconData, IconData, String)>[
+    (Icons.home_outlined, Icons.home_rounded, 'Accueil'),
+    (Icons.work_outline_rounded, Icons.work_rounded, 'Missions'),
+    (Icons.calendar_month_outlined, Icons.calendar_month_rounded, 'Planning'),
+    (Icons.chat_bubble_outline_rounded, Icons.chat_bubble_rounded, 'Messages'),
+    (Icons.person_outline_rounded, Icons.person_rounded, 'Profil'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final sysBottom = SDResponsive.systemBottomInset(context);
+    return Container(
+      decoration: const BoxDecoration(
+        color: SDColors.white,
+        border: Border(top: BorderSide(color: SDColors.neutral200)),
+      ),
+      padding: EdgeInsets.fromLTRB(4, 6, 4, 6 + sysBottom),
+      child: Row(
+        children: [
+          for (var i = 0; i < _items.length; i++)
+            Expanded(
+              child: _NavItem(
+                selected: currentIndex == i,
+                outline: _items[i].$1,
+                filled: _items[i].$2,
+                label: _items[i].$3,
+                onTap: () => onTap(i),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NavItem extends StatelessWidget {
+  const _NavItem({
+    required this.selected,
+    required this.outline,
+    required this.filled,
+    required this.label,
+    required this.onTap,
+  });
+
+  final bool selected;
+  final IconData outline;
+  final IconData filled;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color =
+        selected ? SDColors.neutral900 : SDColors.neutral900.withOpacity(0.45);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(selected ? filled : outline, color: color, size: 22),
+            const SizedBox(height: 3),
+            Text(
+              label,
+              maxLines: 2,
+              textAlign: TextAlign.center,
+              style: SDTypography.labelSmall.copyWith(
+                color: color,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                fontSize: 11,
+                height: 1.15,
+                letterSpacing: 0,
+              ),
+            ),
+            const SizedBox(height: 3),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              height: 3,
+              width: selected ? 16 : 0,
+              decoration: BoxDecoration(
+                color: SDColors.neutral900,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

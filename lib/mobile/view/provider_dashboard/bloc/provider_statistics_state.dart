@@ -1,3 +1,5 @@
+import '../models/provider_statistics_aggregator.dart';
+
 // 🎯 ÉTATS POUR LE BLoC STATISTIQUES PRESTATAIRE
 abstract class ProviderStatisticsState {}
 
@@ -7,7 +9,14 @@ class ProviderStatisticsInitial extends ProviderStatisticsState {}
 // 📊 CHARGEMENT EN COURS
 class ProviderStatisticsLoading extends ProviderStatisticsState {}
 
-// 📊 STATISTIQUES CHARGÉES
+// 📊 Statistiques période (prestations prestataire)
+class ProviderPeriodStatisticsLoaded extends ProviderStatisticsState {
+  final ProviderPeriodStatistics data;
+
+  ProviderPeriodStatisticsLoaded(this.data);
+}
+
+// 📊 STATISTIQUES CHARGÉES (legacy agrégat admin)
 class ProviderStatisticsLoaded extends ProviderStatisticsState {
   final Map<String, dynamic> revenus;
   final Map<String, dynamic> missions;

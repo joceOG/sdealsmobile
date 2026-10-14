@@ -1,13 +1,15 @@
+import '../../../../data/config/client_feature_flags.dart';
+import '../../../../data/models/professional_capabilities.dart';
 import '../../../../data/services/authCubit.dart';
-import '../../../../data/services/auth_professional_access.dart';
 import '../../../../data/utils/display_text.dart';
 import '../../../../design_system/design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import '../../common/auth_completion.dart';
 import '../../common/publish_options.dart';
+import '../../common/widgets/session_guest_gate.dart';
 import '../../common/widgets/client_universe_pictograms.dart';
+import '../../common/widgets/logout_confirm_dialog.dart';
 import '../../orderpagem/screens/service_requests_list_screen.dart';
 import '../profilpageblocm/profilPageBlocM.dart';
 import 'edit_profile_screen.dart';
@@ -33,6 +35,7 @@ class ProfilPageScreenM extends StatefulWidget {
 }
 
 class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
+  /// Secours tant que le JSON Lottie n'est pas déposé dans les assets.
   static const String _guestProfilIllustration = 'assets/profil_vide.png';
 
   static const double _hPad = 20;
@@ -48,57 +51,6 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
     });
   }
 
-  void _showSoutraPayTarificationSheet(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => _SoutraPayBottomSheet(ctx),
-    );
-  }
-
-  Widget _buildTarificationRow(
-    String title,
-    String price,
-    String description,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 14),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: SDTypography.bodyLarge.copyWith(
-                    color: SDColors.neutral900,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  description,
-                  style: SDTypography.bodySmall
-                      .copyWith(color: SDColors.neutral500),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          Text(
-            price,
-            style: SDTypography.labelMedium.copyWith(
-              color: SDColors.neutral900,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -107,37 +59,50 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
         child: BlocBuilder<AuthCubit, AuthState>(
           builder: (context, authState) {
             if (authState is! AuthAuthenticated) {
-              return GuestAuthState(
-                pageTitle: 'Profil',
-                title: 'Connectez-vous à votre profil',
-                description:
-                    'Gérez vos informations, favoris, demandes et votre activité Soutrali Deals.',
-                illustrationAsset: _guestProfilIllustration,
-                onPrimary: () => context.push('/login'),
-                onSecondary: () => context.push('/register'),
+              return SessionGuestGate(
+                guestBuilder: (context) => GuestAuthState(
+                  pageTitle: 'Profil',
+                  title: 'Retrouvez tout au même endroit',
+                  description:
+                      'Vos favoris, vos échanges et le suivi de vos demandes.',
+                  illustration: SDIllustration(
+                    asset: SDIllustrations.profileGuest,
+                    fallback: Image.asset(
+                      _guestProfilIllustration,
+                      fit: BoxFit.contain,
+                      alignment: Alignment.center,
+                      filterQuality: FilterQuality.medium,
+                    ),
+                  ),
+                  onPrimary: () => context.push('/login'),
+                  onSecondary: () => context.push('/register'),
+                ),
               );
             }
 
             return ListView(
-              padding: const EdgeInsets.only(bottom: 24),
+              padding: const EdgeInsets.only(bottom: 88),
               children: [
                 _buildPageTitle('Profil'),
-                _buildProfileHeader(context),
+                _buildProfileHeader(context, authState),
                 const SizedBox(height: 8),
-                _buildSectionLabel('Activité'),
+                _buildSectionLabel('Mes activités'),
                 _profileGroup([
                   MenuItem(
-                    icon: Icons.shopping_bag_outlined,
-                    title: 'Mes commandes',
+                    icon: Icons.assignment_outlined,
+                    title: 'Mes demandes de services',
+                    subtitle: 'Interventions et prestations',
                     padding: _groupPadding,
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const ServiceRequestsListScreen(),
-                        ),
-                      );
-                    },
+                    onTap: () => _openOrders(context),
                   ),
+                  if (ClientFeatureFlags.emarketEnabled)
+                    MenuItem(
+                      icon: Icons.shopping_bag_outlined,
+                      title: 'Mes achats E-marché',
+                      subtitle: 'Articles et commandes',
+                      padding: _groupPadding,
+                      onTap: () => _openOrders(context, achats: true),
+                    ),
                   MenuItem(
                     icon: Icons.favorite_border,
                     title: 'Favoris',
@@ -183,6 +148,10 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
                       );
                     },
                   ),
+                ]),
+                ..._professionalSection(context, authState),
+                _buildSectionLabel('Mon compte'),
+                _profileGroup([
                   MenuItem(
                     icon: Icons.notifications_none_rounded,
                     title: 'Notifications',
@@ -198,28 +167,6 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
                       );
                     },
                   ),
-                ]),
-                _buildPrestataireModeSection(),
-                _buildSectionLabel('Professionnel'),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: _hPad),
-                  child: Material(
-                    color: SDColors.primary50,
-                    borderRadius: BorderRadius.circular(SDSpacing.radiusCard),
-                    clipBehavior: Clip.antiAlias,
-                    child: MenuItem(
-                      icon: Icons.handyman_outlined,
-                      leading: const ClientUniversePictogram.metiers(size: 32),
-                      title: SDClientNav.becomeProfessional,
-                      subtitle: 'Proposer vos services sur Soutrali Deals',
-                      titleFontWeight: FontWeight.w600,
-                      padding: _groupPadding,
-                      onTap: () => showPublishOptions(context),
-                    ),
-                  ),
-                ),
-                _buildSectionLabel('Compte'),
-                _profileGroup([
                   MenuItem(
                     icon: Icons.settings_outlined,
                     title: 'Paramètres',
@@ -274,7 +221,7 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
                 ]),
                 const SizedBox(height: 8),
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: _hPad),
                   child: MenuItem(
                     icon: Icons.logout,
                     title: 'Se déconnecter',
@@ -342,15 +289,16 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
     );
   }
 
-  Widget _buildProfileHeader(BuildContext context) {
-    final authState = context.read<AuthCubit>().state;
-    final String rawName =
-        authState is AuthAuthenticated ? authState.utilisateur.fullName : '';
-    final String userName = rawName.isEmpty ? 'Utilisateur' : rawName;
-    final String? userPhoto = authState is AuthAuthenticated
-        ? safeImageUrl(authState.utilisateur.photoProfil)
-        : null;
-    final hasNetworkPhoto = userPhoto != null;
+  Widget _buildProfileHeader(
+    BuildContext context,
+    AuthAuthenticated authState,
+  ) {
+    final user = authState.utilisateur;
+    final userName =
+        user.fullName.trim().isEmpty ? 'Utilisateur' : user.fullName.trim();
+    final userPhoto = safeImageUrl(user.photoProfil);
+    final hasNetworkPhoto = userPhoto != null &&
+        (userPhoto.startsWith('http://') || userPhoto.startsWith('https://'));
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(_hPad, 4, _hPad, 8),
@@ -368,19 +316,17 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
               child: Row(
                 children: [
                   CircleAvatar(
-                    radius: 24,
-                    backgroundColor: SDColors.primary500,
+                    radius: 28,
+                    backgroundColor: SDColors.primary100,
                     backgroundImage: hasNetworkPhoto
                         ? NetworkImage(userPhoto) as ImageProvider
                         : null,
                     child: !hasNetworkPhoto
                         ? Text(
-                            userName.isNotEmpty
-                                ? userName.characters.first.toUpperCase()
-                                : '?',
+                            _initialsFor(user.prenom, user.nom),
                             style: SDTypography.cardTitle.copyWith(
-                              color: SDColors.white,
-                              fontWeight: FontWeight.w700,
+                              color: SDColors.primary700,
+                              fontWeight: FontWeight.w800,
                             ),
                           )
                         : null,
@@ -410,7 +356,7 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
                             const SizedBox(width: 4),
                             Flexible(
                               child: Text(
-                                'Modifier le profil',
+                                'Modifier mon profil',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: SDTypography.caption.copyWith(
@@ -459,8 +405,7 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
             'email': utilisateur.email ?? '',
             'genre': utilisateur.genre ?? '',
             'datedenaissance': utilisateur.dateNaissance ?? '',
-            'photoProfil':
-                utilisateur.photoProfil ?? 'assets/profile_picture.jpg',
+            'photoProfil': utilisateur.photoProfil,
           },
         ),
       ),
@@ -472,151 +417,180 @@ class _ProfilPageScreenStateM extends State<ProfilPageScreenM> {
   }
 
   void _showLogoutDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          backgroundColor: SDColors.white,
-          title: const Text('Se déconnecter'),
-          content: const Text('Êtes-vous sûr de vouloir vous déconnecter ?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: Text(
-                'Annuler',
-                style: SDTypography.labelLarge
-                    .copyWith(color: SDColors.neutral900),
-              ),
-            ),
-            TextButton(
-              onPressed: () async {
-                Navigator.pop(dialogContext);
-                await context.read<AuthCubit>().logout();
-                if (!context.mounted) return;
-                exitToGuestHome(context);
-              },
-              child: Text(
-                'Se déconnecter',
-                style: SDTypography.labelLarge.copyWith(color: SDColors.error),
-              ),
-            ),
-          ],
-        );
-      },
+    LogoutConfirmDialog.show(context);
+  }
+
+  void _openOrders(BuildContext context, {bool achats = false}) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ServiceRequestsListScreen(initialAchats: achats),
+      ),
     );
   }
 
-  Widget _buildPrestataireModeSection() {
-    return BlocBuilder<AuthCubit, AuthState>(
-      builder: (context, state) {
-        if (state is! AuthAuthenticated || !state.canOperatePrestataire) {
-          return const SizedBox.shrink();
-        }
+  String _initialsFor(String? prenom, String nom) {
+    final first = cleanDisplayPart(prenom);
+    final last = cleanDisplayPart(nom);
+    String letter(String? value) {
+      if (value == null || value.isEmpty) return '';
+      return value.characters.first.toUpperCase();
+    }
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildSectionLabel('Mes espaces'),
-            _profileGroup([
-              MenuItem(
-                icon: Icons.handyman_outlined,
-                title: 'Espace Métiers',
-                padding: _groupPadding,
-                onTap: () => _switchToPrestataireMode(context),
-              ),
-            ]),
-          ],
-        );
-      },
-    );
+    final combo = '${letter(first)}${letter(last)}';
+    if (combo.isNotEmpty) return combo;
+    return '?';
   }
 
-  void _switchToPrestataireMode(BuildContext context) {
-    try {
-      context.read<AuthCubit>().switchActiveRole('PRESTATAIRE');
-      Future.delayed(const Duration(milliseconds: 100), () {
-        context.push('/providermain');
-      });
-    } catch (e) {
-      context.push('/providermain');
+  String? _statusLabel(String? status) {
+    switch (status?.toLowerCase()) {
+      case 'pending':
+        return 'En attente';
+      case 'active':
+        return 'Actif';
+      case 'rejected':
+        return 'Refusé';
+      case 'suspended':
+        return 'Suspendu';
+      default:
+        return null;
     }
   }
-}
 
-// ─── Bottom sheet SoutraPay ───────────────────────────────────────────────────
-
-class _SoutraPayBottomSheet extends StatelessWidget {
-  const _SoutraPayBottomSheet(BuildContext context);
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _statusChip(String label) {
+    Color bg = SDColors.neutral100;
+    Color fg = SDColors.neutral700;
+    switch (label) {
+      case 'En attente':
+        bg = SDColors.warning100;
+        fg = SDColors.warning700;
+      case 'Actif':
+        bg = SDColors.primary50;
+        fg = SDColors.primary700;
+      case 'Refusé':
+      case 'Suspendu':
+        bg = SDColors.error50;
+        fg = SDColors.error600;
+    }
     return Container(
-      decoration: const BoxDecoration(
-        color: SDColors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(20),
       ),
-      padding: EdgeInsets.fromLTRB(
-        24,
-        20,
-        24,
-        24 + MediaQuery.paddingOf(context).bottom,
+      child: Text(
+        label,
+        style: SDTypography.labelSmall.copyWith(
+          color: fg,
+          fontWeight: FontWeight.w700,
+        ),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: SDColors.neutral200,
-                borderRadius: BorderRadius.circular(2),
-              ),
+    );
+  }
+
+  List<Widget> _professionalSection(
+    BuildContext context,
+    AuthAuthenticated auth,
+  ) {
+    final caps = auth.professional;
+    final spaces = <Widget>[];
+    if (caps != null) {
+      if (caps.prestataire.exists) {
+        spaces.add(
+          _spaceRow(
+            context,
+            icon: Icons.handyman_outlined,
+            leading: const ClientUniversePictogram.metiers(size: 28),
+            title: 'Espace Métiers',
+            snapshot: caps.prestataire,
+            onTap: () => openProviderPublishFlow(context),
+          ),
+        );
+      }
+      if (caps.freelance.exists) {
+        spaces.add(
+          _spaceRow(
+            context,
+            icon: Icons.laptop_mac_outlined,
+            leading: const ClientUniversePictogram.freelance(size: 28),
+            title: 'Espace Freelance',
+            snapshot: caps.freelance,
+          ),
+        );
+      }
+      if (caps.vendeur.exists) {
+        spaces.add(
+          _spaceRow(
+            context,
+            icon: Icons.storefront_outlined,
+            title: 'Espace E-marché',
+            snapshot: caps.vendeur,
+          ),
+        );
+      }
+    }
+
+    final missing = <bool>[
+      !(caps?.prestataire.exists ?? false),
+      !(caps?.freelance.exists ?? false),
+      !(caps?.vendeur.exists ?? false),
+    ];
+    final canAdd = missing.any((m) => m);
+    final noneExist = spaces.isEmpty;
+
+    return [
+      _buildSectionLabel('Espaces professionnels'),
+      if (spaces.isNotEmpty) _profileGroup(spaces),
+      if (canAdd) ...[
+        if (spaces.isNotEmpty) const SizedBox(height: 8),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: _hPad),
+          child: Material(
+            color: SDColors.primary50,
+            borderRadius: BorderRadius.circular(SDSpacing.radiusCard),
+            clipBehavior: Clip.antiAlias,
+            child: MenuItem(
+              icon: Icons.work_outline,
+              leading: noneExist
+                  ? const ClientUniversePictogram.metiers(size: 32)
+                  : const Icon(
+                      Icons.add_circle_outline,
+                      color: SDColors.primary700,
+                      size: 28,
+                    ),
+              title: noneExist
+                  ? SDClientNav.becomeProfessional
+                  : 'Ajouter une autre activité',
+              subtitle: 'Métiers, Freelance ou E-marché',
+              titleFontWeight: FontWeight.w600,
+              padding: _groupPadding,
+              onTap: () => showPublishOptions(context),
             ),
           ),
-          const SizedBox(height: 20),
-          Center(
-            child: Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                color: SDColors.primary50,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: const Icon(
-                Icons.payments_rounded,
-                color: SDColors.primary600,
-                size: 28,
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'SoutraPay arrive bientôt',
-            textAlign: TextAlign.center,
-            style: SDTypography.titleLarge.copyWith(
-              color: SDColors.neutral900,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Les paiements SoutraPay ne sont pas encore disponibles dans cette version.',
-            textAlign: TextAlign.center,
-            style: SDTypography.bodyMedium.copyWith(
-              color: SDColors.neutral600,
-              height: 1.5,
-            ),
-          ),
-          const SizedBox(height: 28),
-          SDButton(
-            text: 'D\'accord',
-            fullWidth: true,
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-        ],
-      ),
+        ),
+      ],
+    ];
+  }
+
+  Widget _spaceRow(
+    BuildContext context, {
+    required IconData icon,
+    Widget? leading,
+    required String title,
+    required ProfessionalProfileSnapshot snapshot,
+    VoidCallback? onTap,
+  }) {
+    final status = _statusLabel(snapshot.status);
+    final subtitle = snapshot.canOperate
+        ? (status ?? 'Actif')
+        : (status ?? 'Non opérationnel');
+    return MenuItem(
+      icon: icon,
+      leading: leading,
+      title: title,
+      subtitle: subtitle,
+      padding: _groupPadding,
+      trailing: onTap == null && status != null ? _statusChip(status) : null,
+      onTap: onTap,
     );
   }
 }

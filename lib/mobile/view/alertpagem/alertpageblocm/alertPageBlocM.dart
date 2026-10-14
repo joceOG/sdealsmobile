@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:http/http.dart' as http;
 import '../../../../data/services/api_client.dart';
 import 'alertPageEventM.dart';
 import 'alertPageStateM.dart';
@@ -7,6 +9,18 @@ import '../../../../data/models/alert.dart';
 
 class AlertPageBlocM extends Bloc<AlertPageEventM, AlertPageStateM> {
   final ApiClient _apiClient = ApiClient();
+
+  @visibleForTesting
+  static Future<http.Response> Function(String endpoint)? debugGet;
+
+  @visibleForTesting
+  static Future<http.Response> Function(String endpoint)? debugPut;
+
+  @visibleForTesting
+  static void debugReset() {
+    debugGet = null;
+    debugPut = null;
+  }
 
   AlertPageBlocM() : super(const AlertPageInitialM()) {
     // 📋 CHARGER LES ALERTES
@@ -80,26 +94,41 @@ class AlertPageBlocM extends Bloc<AlertPageEventM, AlertPageStateM> {
       if (event.periode != null)
         queryParams['periode'] = event.periode!.toString();
 
-      // Construire l'URL avec les paramètres de requête
-      String url = '/notifications';
-      if (queryParams.isNotEmpty) {
-        final queryString = queryParams.entries
-            .map((e) =>
-                '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value.toString())}')
-            .join('&');
-        url += '?$queryString';
+      String url;
+      if (event.userId != null && event.userId!.isNotEmpty) {
+        final qs = <String, String>{
+          'limit': (event.limit ?? 50).toString(),
+          if (event.statut != null) 'statut': event.statut!,
+        };
+        url =
+            '/notification/user/${event.userId}?${Uri(queryParameters: qs).query}';
+      } else {
+        url = '/notifications';
+        if (queryParams.isNotEmpty) {
+          final queryString = queryParams.entries
+              .map((e) =>
+                  '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value.toString())}')
+              .join('&');
+          url += '?$queryString';
+        }
       }
-      final response = await _apiClient.get(url);
+      final response =
+          debugGet != null ? await debugGet!(url) : await _apiClient.get(url);
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
-        final List<Alert> alerts = (responseData['notifications'] as List)
-            .map((item) => Alert.fromJson(item))
+        final List<dynamic> raw = responseData is List
+            ? responseData
+            : (responseData['notifications'] as List? ?? const []);
+        final List<Alert> alerts = raw
+            .map((item) => Alert.fromJson(item as Map<String, dynamic>))
             .toList();
 
         emit(AlertPageLoadedM(
           alerts: alerts,
-          pagination: responseData['pagination'],
+          pagination: responseData is Map
+              ? responseData['pagination'] as Map<String, dynamic>?
+              : null,
         ));
       } else {
         emit(AlertPageErrorM(
@@ -280,8 +309,10 @@ class AlertPageBlocM extends Bloc<AlertPageEventM, AlertPageStateM> {
     Emitter<AlertPageStateM> emit,
   ) async {
     try {
-      final response =
-          await _apiClient.patch('/notification/${event.alertId}/read');
+      final endpoint = '/notification/${event.alertId}/read';
+      final response = debugPut != null
+          ? await debugPut!(endpoint)
+          : await _apiClient.put(endpoint);
 
       if (response.statusCode == 200) {
         emit(AlertMarkedAsReadM(alertId: event.alertId));
@@ -304,7 +335,13 @@ class AlertPageBlocM extends Bloc<AlertPageEventM, AlertPageStateM> {
     Emitter<AlertPageStateM> emit,
   ) async {
     try {
-      final response = await _apiClient.patch('/notifications/user/read-all');
+      final userId = event.userId;
+      final endpoint = (userId != null && userId.isNotEmpty)
+          ? '/notification/user/$userId/read-all'
+          : '/notifications/user/read-all';
+      final response = debugPut != null
+          ? await debugPut!(endpoint)
+          : await _apiClient.put(endpoint);
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
@@ -329,8 +366,10 @@ class AlertPageBlocM extends Bloc<AlertPageEventM, AlertPageStateM> {
     Emitter<AlertPageStateM> emit,
   ) async {
     try {
-      final response =
-          await _apiClient.patch('/notification/${event.alertId}/archive');
+      final endpoint = '/notification/${event.alertId}/archive';
+      final response = debugPut != null
+          ? await debugPut!(endpoint)
+          : await _apiClient.put(endpoint);
 
       if (response.statusCode == 200) {
         emit(AlertArchivedM(alertId: event.alertId));
@@ -656,6 +695,3 @@ class AlertPageBlocM extends Bloc<AlertPageEventM, AlertPageStateM> {
     }
   }
 }
-
-
-

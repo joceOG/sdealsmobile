@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:sdealsmobile/data/services/api_client.dart';
 import 'package:sdealsmobile/data/services/fcm_route_policy.dart';
+import 'package:sdealsmobile/data/services/fcm_token_errors.dart';
 import 'package:sdealsmobile/data/services/token_store.dart';
 
 /// Handler background (doit être top-level).
@@ -33,6 +34,9 @@ class FcmService {
       FlutterLocalNotificationsPlugin();
 
   bool _ready = false;
+  bool _coldStartCaptured = false;
+  Future<void>? _coldStartFuture;
+  Future<bool>? _initFuture;
   String? _token;
   FcmNavigationHandler? onNavigate;
 
@@ -49,10 +53,44 @@ class FcmService {
     importance: Importance.high,
   );
 
+  /// Firebase + message ayant lancé l'app. Ne demande pas la permission ni le token.
+  /// Appelé par le splash, avec un délai borné. Pas avant [runApp].
+  Future<void> captureColdStart() {
+    return _coldStartFuture ??= _captureColdStartImpl();
+  }
+
+  Future<void> _captureColdStartImpl() async {
+    if (_coldStartCaptured) return;
+    try {
+      if (Firebase.apps.isEmpty) {
+        await Firebase.initializeApp();
+      }
+      final initial = await FirebaseMessaging.instance.getInitialMessage();
+      if (initial != null) {
+        _handleMessageNavigation(initial);
+      }
+      if (kDebugMode) {
+        print(
+            '[FCM] cold start capturé (pending=${_pendingLaunchData != null})');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('[FCM] cold start non capturé ($e)');
+      }
+    } finally {
+      _coldStartCaptured = true;
+    }
+  }
+
   /// Initialise Firebase + messaging. No-op gracieux si non configuré.
-  Future<bool> initialize({FcmNavigationHandler? onNavigate}) async {
-    this.onNavigate = onNavigate;
+  Future<bool> initialize({FcmNavigationHandler? onNavigate}) {
+    if (onNavigate != null) this.onNavigate = onNavigate;
+    return _initFuture ??= _initializeImpl();
+  }
+
+  Future<bool> _initializeImpl() async {
     if (_ready) return true;
+    await captureColdStart();
 
     try {
       if (Firebase.apps.isEmpty) {
@@ -69,63 +107,101 @@ class FcmService {
       return false;
     }
 
-    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+    try {
+      FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
-    await _initLocalNotifications();
+      await _initLocalNotifications();
 
-    final messaging = FirebaseMessaging.instance;
-    final settings = await messaging.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-      provisional: false,
-    );
-    if (kDebugMode) {
-      print('[FCM] permission: ${settings.authorizationStatus}');
-    }
-
-    if (Platform.isAndroid) {
-      await messaging.setForegroundNotificationPresentationOptions(
-        alert: false,
-        badge: true,
-        sound: false,
-      );
-    } else {
-      await messaging.setForegroundNotificationPresentationOptions(
+      final messaging = FirebaseMessaging.instance;
+      final settings = await messaging.requestPermission(
         alert: true,
         badge: true,
         sound: true,
+        provisional: false,
       );
+      if (kDebugMode) {
+        print('[FCM] permission: ${settings.authorizationStatus}');
+      }
+
+      if (Platform.isAndroid) {
+        await messaging.setForegroundNotificationPresentationOptions(
+          alert: false,
+          badge: true,
+          sound: false,
+        );
+      } else {
+        await messaging.setForegroundNotificationPresentationOptions(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
+      }
+
+      FirebaseMessaging.onMessage.listen(_onForegroundMessage);
+      FirebaseMessaging.onMessageOpenedApp.listen(_handleMessageNavigation);
+
+      messaging.onTokenRefresh.listen((t) {
+        _token = t;
+        // ignore: unawaited_futures
+        _registerTokenWithBackend(t);
+      });
+
+      _token = await _tryGetToken(messaging);
+      if (_token != null) {
+        // ignore: unawaited_futures
+        _registerTokenWithBackend(_token!);
+      } else {
+        // ignore: unawaited_futures
+        _retryGetTokenLater(messaging);
+      }
+
+      _ready = true;
+      if (kDebugMode) {
+        print('[FCM] prêt — tokenLen=${_token?.length ?? 0}');
+      }
+      return true;
+    } catch (e) {
+      if (kDebugMode) {
+        print('[FCM] init partielle ($e) — l’app démarre sans push');
+      }
+      return false;
     }
+  }
 
-    FirebaseMessaging.onMessage.listen(_onForegroundMessage);
-    FirebaseMessaging.onMessageOpenedApp.listen(_handleMessageNavigation);
-
-    final initial = await messaging.getInitialMessage();
-    if (initial != null) {
-      _handleMessageNavigation(initial);
+  Future<String?> _tryGetToken(FirebaseMessaging messaging) async {
+    try {
+      return await messaging.getToken();
+    } catch (e) {
+      if (kDebugMode) {
+        if (isTransientFcmTokenError(e)) {
+          print(
+            '[FCM] token indisponible pour l’instant ($e). '
+            'Push différé — l’app continue.',
+          );
+        } else {
+          print('[FCM] getToken: $e');
+        }
+      }
+      return null;
     }
+  }
 
-    messaging.onTokenRefresh.listen((t) {
-      _token = t;
-      // ignore: unawaited_futures
-      _registerTokenWithBackend(t);
-    });
-
-    _token = await messaging.getToken();
-    // Critique : ne PAS await le backend ici.
-    // Sinon main() reste bloqué jusqu'au timeout HTTP (ex. Render cold start 30s)
-    // → écran blanc avant même runApp / Lottie.
-    if (_token != null) {
-      // ignore: unawaited_futures
-      _registerTokenWithBackend(_token!);
+  Future<void> _retryGetTokenLater(FirebaseMessaging messaging) async {
+    const delays = [
+      Duration(seconds: 8),
+      Duration(seconds: 20),
+      Duration(seconds: 60),
+    ];
+    for (final delay in delays) {
+      await Future<void>.delayed(delay);
+      if (_token != null) return;
+      final t = await _tryGetToken(messaging);
+      if (t != null) {
+        _token = t;
+        await _registerTokenWithBackend(t);
+        return;
+      }
     }
-
-    _ready = true;
-    if (kDebugMode) {
-      print('[FCM] prêt — tokenLen=${_token?.length ?? 0}');
-    }
-    return true;
   }
 
   Future<void> _initLocalNotifications() async {
@@ -202,7 +278,7 @@ class FcmService {
     if (!_ready) {
       await initialize(onNavigate: onNavigate);
     }
-    final t = _token ?? await FirebaseMessaging.instance.getToken();
+    final t = _token ?? await _tryGetToken(FirebaseMessaging.instance);
     if (t == null) return;
     _token = t;
     await _registerTokenWithBackend(t);

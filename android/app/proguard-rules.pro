@@ -1,42 +1,28 @@
-# Flutter / Android — règles R8/ProGuard (release)
+# R8 release. Ne pas garder io.flutter.** / Firebase / Maps en bloc :
+# ces keep annulent l'obscurcissement DEX exigé par Play.
 
-# Flutter
--keep class io.flutter.app.** { *; }
--keep class io.flutter.plugin.** { *; }
--keep class io.flutter.util.** { *; }
--keep class io.flutter.view.** { *; }
--keep class io.flutter.** { *; }
--keep class io.flutter.plugins.** { *; }
--dontwarn io.flutter.embedding.**
-
-# Gson / JSON (si utilisé par plugins)
--keepattributes Signature
--keepattributes *Annotation*
--keepattributes EnclosingMethod
--keepattributes InnerClasses
+-keepattributes Signature,InnerClasses,EnclosingMethod,*Annotation*
 -keepattributes SourceFile,LineNumberTable
 -renamesourcefileattribute SourceFile
 
-# Google Play Core (deferred components / splits)
+-dontwarn io.flutter.embedding.**
 -dontwarn com.google.android.play.core.**
-
-# Firebase / Crashlytics
--keep class com.google.firebase.** { *; }
--keep class com.google.android.gms.** { *; }
 -dontwarn com.google.firebase.**
 -dontwarn com.google.android.gms.**
 
-# Google Maps
--keep class com.google.android.gms.maps.** { *; }
--keep interface com.google.android.gms.maps.** { *; }
-
-# Keep native methods
 -keepclasseswithmembernames class * {
     native <methods>;
 }
 
-# Enums
 -keepclassmembers enum * {
     public static **[] values();
     public static ** valueOf(java.lang.String);
+}
+
+# Android 15 : ces setters sont obsolètes. Les retirer du DEX
+# (Flutter, sqflite, AccessibilityBridge) pour le contrôle Play.
+-assumenosideeffects class android.view.Window {
+    public void setStatusBarColor(int);
+    public void setNavigationBarColor(int);
+    public void setNavigationBarDividerColor(int);
 }

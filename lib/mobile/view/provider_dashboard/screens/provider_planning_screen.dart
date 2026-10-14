@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 import '../bloc/planning_bloc.dart';
@@ -9,6 +10,7 @@ import '../../../../data/services/api_client.dart';
 import '../../../../data/services/authCubit.dart';
 import '../../../../data/utils/display_text.dart';
 import '../../../../design_system/design_system.dart';
+import '../models/provider_mission.dart';
 
 /// Écran Planning prestataire — layout type Figma (KPI + timeline + légende).
 class ProviderPlanningScreen extends StatefulWidget {
@@ -69,15 +71,18 @@ class ProviderPlanningScreenState extends State<ProviderPlanningScreen> {
     }
   }
 
-  /// AppBar parent — revenir à aujourd’hui.
+  /// AppBar parent — revenir à aujourd’hui (conserve la vue Jour / Semaine / Mois).
   void goToToday() {
     setState(() {
-      _focusedDay = DateTime.now();
-      _selectedDay = DateTime.now();
-      _currentView = 'day';
+      final now = DateTime.now();
+      _focusedDay = now;
+      _selectedDay = now;
     });
     _reloadPlanning();
   }
+
+  DateTime _weekStartFor(DateTime anchor) =>
+      anchor.subtract(Duration(days: anchor.weekday - 1));
 
   /// AppBar parent — disponibilités.
   void openDisponibilites() => _showDisponibilitesSheet();
@@ -124,7 +129,8 @@ class ProviderPlanningScreenState extends State<ProviderPlanningScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) {
-        return _CreneauxEditorSheet(
+        return _MesDisponibilitesSheet(
+          initialDate: _selectedDay,
           initialCreneaux: creneaux,
           jourLabels: _jourLabels,
           onSave: (updated) => _saveCreneaux(updated),
@@ -254,20 +260,46 @@ class ProviderPlanningScreenState extends State<ProviderPlanningScreen> {
     }
   }
 
+  bool _isPlannedStatus(String raw) {
+    switch (raw.toUpperCase()) {
+      case 'ACCEPTEE':
+      case 'CONFIRMEE':
+      case 'EN_COURS':
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  List<Map<String, dynamic>> _plannedForDay(List<dynamic> all, DateTime day) {
+    return all
+        .where((p) {
+          if (p is! Map) return false;
+          final map = Map<String, dynamic>.from(p);
+          final statut = (map['statut'] ?? map['status'] ?? '').toString();
+          if (!_isPlannedStatus(statut)) return false;
+          final raw = map['datePrestation'] ?? map['date'];
+          final d = DateTime.tryParse('$raw');
+          if (d == null) return false;
+          return isSameDay(d.toLocal(), day);
+        })
+        .map((p) => Map<String, dynamic>.from(p as Map))
+        .toList();
+  }
+
   List<dynamic> _prestationsForDay(List<dynamic> all, DateTime day) {
-    return all.where((p) {
-      final raw = p['datePrestation'] ?? p['createdAt'];
-      final d = DateTime.tryParse('$raw');
-      if (d == null) return false;
-      return isSameDay(d.toLocal(), day);
-    }).toList();
+    return _plannedForDay(all, day);
   }
 
   List<dynamic> _prestationsForWeek(List<dynamic> all, DateTime day) {
     final start = day.subtract(Duration(days: day.weekday - 1));
     final end = start.add(const Duration(days: 7));
     return all.where((p) {
-      final raw = p['datePrestation'] ?? p['createdAt'];
+      if (p is! Map) return false;
+      final map = Map<String, dynamic>.from(p);
+      final statut = (map['statut'] ?? map['status'] ?? '').toString();
+      if (!_isPlannedStatus(statut)) return false;
+      final raw = map['datePrestation'] ?? map['date'];
       final d = DateTime.tryParse('$raw');
       if (d == null) return false;
       final local = d.toLocal();
@@ -275,16 +307,20 @@ class ProviderPlanningScreenState extends State<ProviderPlanningScreen> {
     }).toList();
   }
 
-  Duration _missionDuration(Map<String, dynamic> p) {
+  Duration? _missionDurationIfKnown(Map<String, dynamic> p) {
     final start = _parseTime(p['heureDebut']);
     final end = _parseTime(p['heureFin']);
-    if (start == null || end == null) return const Duration(hours: 1);
-    var mins = end.difference(start).inMinutes;
-    if (mins <= 0) mins = 60;
+    if (start == null || end == null) return null;
+    final mins = end.difference(start).inMinutes;
+    if (mins <= 0) return null;
     return Duration(minutes: mins);
   }
 
-  DateTime? _parseTime(dynamic raw) {
+  Duration _missionDuration(Map<String, dynamic> p) {
+    return _missionDurationIfKnown(p) ?? const Duration(hours: 1);
+  }
+
+  DateTime? _parseTimeOnDay(dynamic raw, DateTime day) {
     if (raw == null) return null;
     final s = raw.toString().trim();
     if (s.isEmpty) return null;
@@ -293,9 +329,11 @@ class ProviderPlanningScreenState extends State<ProviderPlanningScreen> {
     final h = int.tryParse(parts[0]);
     final m = int.tryParse(parts[1]);
     if (h == null || m == null) return null;
-    final base = DateTime(_selectedDay.year, _selectedDay.month, _selectedDay.day);
+    final base = DateTime(day.year, day.month, day.day);
     return base.add(Duration(hours: h, minutes: m));
   }
+
+  DateTime? _parseTime(dynamic raw) => _parseTimeOnDay(raw, _selectedDay);
 
   String _formatDuration(Duration d) {
     final h = d.inHours;
@@ -347,27 +385,44 @@ class ProviderPlanningScreenState extends State<ProviderPlanningScreen> {
     }
   }
 
-  String _titleOf(Map<String, dynamic> p) {
-    final t = (p['titre'] ?? p['notesClient'] ?? '').toString().trim();
-    if (t.isNotEmpty) return t;
-    final u = p['utilisateur'];
-    if (u is Map) {
-      final name = personNameFromMap(
-        Map<String, dynamic>.from(u),
-        fallback: 'Client',
-      );
-      if (name.isNotEmpty) return name;
-    }
-    return 'Mission';
+  String _titleOf(Map<String, dynamic> p) => prestationServiceTitle(p);
+
+  String _locationOf(Map<String, dynamic> p) => prestationLocationLabel(p);
+
+  String? _timeRangeLabel(Map<String, dynamic> p) {
+    final start = _parseTime(p['heureDebut']);
+    final end = _parseTime(p['heureFin']);
+    if (start == null) return null;
+    final startStr = DateFormat('HH:mm').format(start);
+    if (end == null) return startStr;
+    return '$startStr — ${DateFormat('HH:mm').format(end)}';
   }
 
-  String _locationOf(Map<String, dynamic> p) {
-    final parts = <String>[
-      if ((p['adresse'] ?? '').toString().trim().isNotEmpty)
-        p['adresse'].toString(),
-      if ((p['ville'] ?? '').toString().trim().isNotEmpty) p['ville'].toString(),
-    ];
-    return parts.isEmpty ? 'Lieu non précisé' : parts.join(', ');
+  Future<void> _openMissionDetail(Map<String, dynamic> mission) async {
+    final id = prestationIdOf(mission);
+    if (id == null) return;
+    final changed = await context.push<bool>(
+      '/mission-details/$id',
+      extra: _prestataireId == null
+          ? null
+          : {'prestataireDocId': _prestataireId},
+    );
+    if (changed == true && mounted) _reloadPlanning();
+  }
+
+  Future<void> _pickMonth() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDay,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2030, 12, 31),
+      locale: const Locale('fr', 'FR'),
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _selectedDay = picked;
+      _focusedDay = picked;
+    });
   }
 
   @override
@@ -402,19 +457,36 @@ class ProviderPlanningScreenState extends State<ProviderPlanningScreen> {
                         const SizedBox(height: 16),
                         _buildViewSelector(),
                         const SizedBox(height: 12),
-                        _buildDateRow(),
-                        const SizedBox(height: 16),
-                        _buildKpiRow(prestations),
+                        if (_currentView == 'day') ...[
+                          _buildDayPlanningChrome(prestations),
+                        ] else if (_currentView == 'week') ...[
+                          _buildWeekPlanningChrome(prestations),
+                        ] else if (_currentView == 'month') ...[
+                          _buildMonthPlanningChrome(),
+                        ] else ...[
+                          _buildDateRow(),
+                          const SizedBox(height: 16),
+                          _buildKpiRow(prestations),
+                        ],
                         const SizedBox(height: 8),
                       ],
                     ),
                   ),
                 ),
-                if (state is PlanningLoading)
+                if (state is PlanningLoading && _currentView != 'day')
                   const SliverFillRemaining(
                     hasScrollBody: false,
                     child: Center(
                       child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                else if (state is PlanningLoading && _currentView == 'day')
+                  const SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(vertical: 48),
+                      child: Center(
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
                     ),
                   )
                 else if (state is PlanningError)
@@ -447,8 +519,311 @@ class ProviderPlanningScreenState extends State<ProviderPlanningScreen> {
 
   Widget _buildIntroSubtitle() {
     return Text(
-      'Gérez vos disponibilités et vos missions',
+      'Vos interventions planifiées',
       style: SDTypography.bodySmall.copyWith(color: SDColors.neutral500),
+    );
+  }
+
+  Widget _buildDayPlanningChrome(List<dynamic> all) {
+    final weekStart =
+        _selectedDay.subtract(Duration(days: _selectedDay.weekday - 1));
+    final dayPlanned = _plannedForDay(all, _selectedDay);
+    var totalDuration = Duration.zero;
+    var hasTotalDuration = false;
+    for (final p in dayPlanned) {
+      final d = _missionDurationIfKnown(p);
+      if (d != null) {
+        totalDuration += d;
+        hasTotalDuration = true;
+      }
+    }
+
+    final dayTitle = DateFormat('EEEE d MMMM', 'fr_FR').format(_selectedDay);
+    final capDay = dayTitle.isNotEmpty
+        ? '${dayTitle[0].toUpperCase()}${dayTitle.substring(1)}'
+        : dayTitle;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            InkWell(
+              onTap: _pickMonth,
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      DateFormat('MMMM yyyy', 'fr_FR').format(_selectedDay),
+                      style: SDTypography.bodyMedium.copyWith(
+                        color: SDColors.neutral900,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const Icon(Icons.keyboard_arrow_down_rounded,
+                        color: SDColors.neutral900, size: 20),
+                  ],
+                ),
+              ),
+            ),
+            const Spacer(),
+            TextButton(
+              onPressed: goToToday,
+              style: TextButton.styleFrom(
+                foregroundColor: SDColors.primary700,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+              ),
+              child: Text(
+                'Aujourd\'hui',
+                style: SDTypography.labelMedium.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 72,
+          child: Row(
+            children: List.generate(7, (i) {
+              final day = weekStart.add(Duration(days: i));
+              final selected = isSameDay(day, _selectedDay);
+              final hasEvents = _plannedForDay(all, day).isNotEmpty;
+              final weekday =
+                  DateFormat('EEE', 'fr_FR').format(day).replaceAll('.', '');
+              final weekdayCap = weekday.isNotEmpty
+                  ? '${weekday[0].toUpperCase()}${weekday.substring(1)}'
+                  : weekday;
+
+              return Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(right: i < 6 ? 6 : 0),
+                  child: Material(
+                    color: selected ? SDColors.primary700 : SDColors.neutral50,
+                    borderRadius: BorderRadius.circular(12),
+                    child: InkWell(
+                      onTap: () {
+                        setState(() {
+                          _selectedDay = day;
+                          _focusedDay = day;
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: selected
+                                ? SDColors.primary700
+                                : SDColors.neutral200,
+                          ),
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              weekdayCap,
+                              style: SDTypography.labelSmall.copyWith(
+                                color: selected
+                                    ? SDColors.white
+                                    : SDColors.neutral600,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 10,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              DateFormat('d').format(day),
+                              style: SDTypography.titleSmall.copyWith(
+                                color: selected
+                                    ? SDColors.white
+                                    : SDColors.neutral900,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            if (hasEvents) ...[
+                              const SizedBox(height: 4),
+                              Container(
+                                width: 5,
+                                height: 5,
+                                decoration: BoxDecoration(
+                                  color: selected
+                                      ? SDColors.white
+                                      : SDColors.primary600,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          capDay,
+          style: SDTypography.titleSmall.copyWith(
+            color: SDColors.neutral900,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          _daySummaryLine(dayPlanned.length, totalDuration, hasTotalDuration),
+          style: SDTypography.bodySmall.copyWith(color: SDColors.neutral500),
+        ),
+      ],
+    );
+  }
+
+  String _daySummaryLine(int count, Duration total, bool hasTotal) {
+    if (count == 0) return 'Aucune intervention ce jour';
+    final base =
+        '$count intervention${count > 1 ? 's' : ''}';
+    if (!hasTotal) return base;
+    return '$base • ${_formatDuration(total)} planifiées';
+  }
+
+  Widget _buildWeekPlanningChrome(List<dynamic> all) {
+    final weekStart = _weekStartFor(_focusedDay);
+    final weekEnd = weekStart.add(const Duration(days: 6));
+    final weekInterventions = _prestationsForWeek(all, weekStart);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            _circleNav(Icons.chevron_left_rounded, _previousPeriod),
+            Expanded(
+              child: Text(
+                '${DateFormat('d', 'fr_FR').format(weekStart)} – ${DateFormat('d MMMM yyyy', 'fr_FR').format(weekEnd)}',
+                textAlign: TextAlign.center,
+                style: SDTypography.bodyMedium.copyWith(
+                  color: SDColors.neutral900,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            _circleNav(Icons.chevron_right_rounded, _nextPeriod),
+            const SizedBox(width: 8),
+            TextButton(
+              onPressed: goToToday,
+              style: TextButton.styleFrom(
+                foregroundColor: SDColors.primary700,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+              ),
+              child: Text(
+                'Aujourd\'hui',
+                style: SDTypography.labelMedium.copyWith(
+                  fontWeight: FontWeight.w700,
+                  decoration: TextDecoration.underline,
+                  decorationColor: SDColors.primary700,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 72,
+          child: Row(
+            children: List.generate(7, (i) {
+              final day = weekStart.add(Duration(days: i));
+              final selected = isSameDay(day, _selectedDay);
+              final hasEvents = _plannedForDay(all, day).isNotEmpty;
+              final weekday =
+                  DateFormat('EEE', 'fr_FR').format(day).replaceAll('.', '');
+              final weekdayCap = weekday.isNotEmpty
+                  ? '${weekday[0].toUpperCase()}${weekday.substring(1)}'
+                  : weekday;
+
+              return Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(right: i < 6 ? 6 : 0),
+                  child: Material(
+                    color: selected ? SDColors.primary700 : SDColors.neutral50,
+                    borderRadius: BorderRadius.circular(12),
+                    child: InkWell(
+                      onTap: () {
+                        setState(() {
+                          _selectedDay = day;
+                          _focusedDay = day;
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: selected
+                                ? SDColors.primary700
+                                : SDColors.neutral200,
+                          ),
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              weekdayCap,
+                              style: SDTypography.labelSmall.copyWith(
+                                color: selected
+                                    ? SDColors.white
+                                    : SDColors.neutral600,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 10,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              DateFormat('d').format(day),
+                              style: SDTypography.titleSmall.copyWith(
+                                color: selected
+                                    ? SDColors.white
+                                    : SDColors.neutral900,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            if (hasEvents) ...[
+                              const SizedBox(height: 4),
+                              Container(
+                                width: 5,
+                                height: 5,
+                                decoration: BoxDecoration(
+                                  color: selected
+                                      ? SDColors.white
+                                      : SDColors.primary600,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          '${weekInterventions.length} intervention${weekInterventions.length > 1 ? 's' : ''} cette semaine',
+          style: SDTypography.bodySmall.copyWith(color: SDColors.neutral500),
+        ),
+      ],
     );
   }
 
@@ -635,25 +1010,20 @@ class ProviderPlanningScreenState extends State<ProviderPlanningScreen> {
         return [
           SliverToBoxAdapter(child: _buildMonthCalendar(state)),
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
             sliver: SliverToBoxAdapter(
-              child: _buildDayEventsList(
-                _prestationsForDay(state.prestations, _selectedDay),
-                heading:
-                    'Événements du ${DateFormat('d MMMM', 'fr_FR').format(_selectedDay)}',
-              ),
+              child: _buildMonthDayAgenda(state),
             ),
           ),
-          SliverToBoxAdapter(child: _buildLegend()),
+          SliverToBoxAdapter(child: _buildMonthLegend()),
           const SliverToBoxAdapter(child: SizedBox(height: 28)),
         ];
       case 'week':
         return [
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-            sliver: SliverToBoxAdapter(child: _buildWeekList(state)),
+            sliver: SliverToBoxAdapter(child: _buildWeekAgenda(state)),
           ),
-          SliverToBoxAdapter(child: _buildLegend()),
           const SliverToBoxAdapter(child: SizedBox(height: 28)),
         ];
       case 'day':
@@ -663,25 +1033,203 @@ class ProviderPlanningScreenState extends State<ProviderPlanningScreen> {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
             sliver: SliverToBoxAdapter(
               child: _buildDayTimeline(
-                _prestationsForDay(state.prestations, _selectedDay),
+                _plannedForDay(state.prestations, _selectedDay),
               ),
             ),
           ),
-          SliverToBoxAdapter(child: _buildLegend()),
           const SliverToBoxAdapter(child: SizedBox(height: 28)),
         ];
     }
+  }
+
+  Widget _buildMonthPlanningChrome() {
+    return Row(
+      children: [
+        _circleNav(Icons.chevron_left_rounded, _previousPeriod),
+        Expanded(
+          child: Text(
+            DateFormat('MMMM yyyy', 'fr_FR').format(_focusedDay),
+            textAlign: TextAlign.center,
+            style: SDTypography.bodyMedium.copyWith(
+              color: SDColors.neutral900,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        _circleNav(Icons.chevron_right_rounded, _nextPeriod),
+        const SizedBox(width: 8),
+        TextButton(
+          onPressed: goToToday,
+          style: TextButton.styleFrom(
+            foregroundColor: SDColors.primary700,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+          ),
+          child: Text(
+            'Aujourd\'hui',
+            style: SDTypography.labelMedium.copyWith(
+              fontWeight: FontWeight.w700,
+              decoration: TextDecoration.underline,
+              decorationColor: SDColors.primary700,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMonthDayAgenda(PlanningLoaded state) {
+    final events = List<Map<String, dynamic>>.from(
+      _plannedForDay(state.prestations, _selectedDay),
+    );
+    events.sort((a, b) {
+      final ta =
+          _parseTimeOnDay(a['heureDebut'], _selectedDay) ?? DateTime(0);
+      final tb =
+          _parseTimeOnDay(b['heureDebut'], _selectedDay) ?? DateTime(0);
+      return ta.compareTo(tb);
+    });
+
+    final dayTitle = DateFormat('EEEE d MMMM', 'fr_FR').format(_selectedDay);
+    final capDay = dayTitle.isNotEmpty
+        ? '${dayTitle[0].toUpperCase()}${dayTitle.substring(1)}'
+        : dayTitle;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                capDay,
+                style: SDTypography.titleSmall.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: SDColors.neutral900,
+                ),
+              ),
+            ),
+            if (events.isNotEmpty)
+              Text(
+                '${events.length} intervention${events.length > 1 ? 's' : ''}',
+                style:
+                    SDTypography.caption.copyWith(color: SDColors.neutral500),
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (events.isEmpty)
+          Text(
+            'Aucune intervention prévue',
+            style:
+                SDTypography.bodyMedium.copyWith(color: SDColors.neutral500),
+          )
+        else
+          ...events.map(
+            (mission) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _WeekInterventionCard(
+                title: _titleOf(mission),
+                location: _locationOf(mission),
+                visual: _visualForStatus('${mission['statut'] ?? ''}'),
+                timeStart: _parseTimeOnDay(mission['heureDebut'], _selectedDay),
+                timeEnd: _parseTimeOnDay(mission['heureFin'], _selectedDay),
+                onOpen: () => _openMissionDetail(mission),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildMonthLegend() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+      child: Row(
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: const BoxDecoration(
+              color: SDColors.primary600,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            'Intervention prévue',
+            style: SDTypography.labelSmall.copyWith(color: SDColors.neutral600),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _monthCalendarDayCell({
+    required DateTime day,
+    required DateTime focusedMonth,
+    required bool selected,
+    required bool todayOutline,
+    required bool hasEvents,
+  }) {
+    final outside = day.month != focusedMonth.month;
+    final textColor = selected
+        ? SDColors.white
+        : (outside ? SDColors.neutral400 : SDColors.neutral900);
+
+    BoxDecoration decoration;
+    if (selected) {
+      decoration = const BoxDecoration(
+        color: SDColors.primary700,
+        shape: BoxShape.circle,
+      );
+    } else if (todayOutline) {
+      decoration = BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: SDColors.primary600, width: 2),
+      );
+    } else {
+      decoration = const BoxDecoration(shape: BoxShape.circle);
+    }
+
+    return Container(
+      margin: const EdgeInsets.all(4),
+      alignment: Alignment.center,
+      decoration: decoration,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            '${day.day}',
+            style: SDTypography.labelLarge.copyWith(
+              color: textColor,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          if (hasEvents)
+            Container(
+              margin: const EdgeInsets.only(top: 2),
+              width: 5,
+              height: 5,
+              decoration: BoxDecoration(
+                color: selected ? SDColors.white : SDColors.primary600,
+                shape: BoxShape.circle,
+              ),
+            ),
+        ],
+      ),
+    );
   }
 
   Widget _buildMonthCalendar(PlanningLoaded state) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final maxW = constraints.maxWidth;
-        final calHeight = 280.0;
+        final calHeight = 320.0;
         final calendar = TableCalendar(
           firstDay: DateTime.utc(2020, 1, 1),
           lastDay: DateTime.utc(2030, 12, 31),
           focusedDay: _focusedDay,
+          startingDayOfWeek: StartingDayOfWeek.monday,
           sixWeekMonthsEnforced: false,
           selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
           onDaySelected: (selectedDay, focusedDay) {
@@ -696,22 +1244,62 @@ class ProviderPlanningScreenState extends State<ProviderPlanningScreen> {
                 .read<PlanningBloc>()
                 .add(LoadMonthlyPrestations(focusedDay));
           },
-          eventLoader: (day) => _prestationsForDay(state.prestations, day),
+          eventLoader: (day) => _plannedForDay(state.prestations, day),
+          calendarBuilders: CalendarBuilders(
+            defaultBuilder: (context, day, focusedDay) {
+              final selected = isSameDay(day, _selectedDay);
+              final today = isSameDay(day, DateTime.now());
+              if (selected || today) return null;
+              final hasEvents =
+                  _plannedForDay(state.prestations, day).isNotEmpty;
+              return _monthCalendarDayCell(
+                day: day,
+                focusedMonth: focusedDay,
+                selected: false,
+                todayOutline: false,
+                hasEvents: hasEvents,
+              );
+            },
+            todayBuilder: (context, day, focusedDay) {
+              final selected = isSameDay(day, _selectedDay);
+              final hasEvents =
+                  _plannedForDay(state.prestations, day).isNotEmpty;
+              return _monthCalendarDayCell(
+                day: day,
+                focusedMonth: focusedDay,
+                selected: selected,
+                todayOutline: !selected,
+                hasEvents: hasEvents,
+              );
+            },
+            selectedBuilder: (context, day, focusedDay) {
+              final hasEvents =
+                  _plannedForDay(state.prestations, day).isNotEmpty;
+              return _monthCalendarDayCell(
+                day: day,
+                focusedMonth: focusedDay,
+                selected: true,
+                todayOutline: false,
+                hasEvents: hasEvents,
+              );
+            },
+          ),
           calendarStyle: CalendarStyle(
-            outsideDaysVisible: false,
-            cellMargin: const EdgeInsets.all(4),
-            selectedDecoration: const BoxDecoration(
-              color: SDColors.primary600,
-              shape: BoxShape.circle,
+            outsideDaysVisible: true,
+            cellMargin: const EdgeInsets.all(2),
+            outsideTextStyle: SDTypography.labelLarge.copyWith(
+              color: SDColors.neutral400,
             ),
-            todayDecoration: BoxDecoration(
-              color: SDColors.primary200,
-              shape: BoxShape.circle,
+            selectedDecoration: const BoxDecoration(
+              color: Colors.transparent,
+            ),
+            todayDecoration: const BoxDecoration(
+              color: Colors.transparent,
             ),
             markerDecoration: const BoxDecoration(
-              color: SDColors.neutral900,
-              shape: BoxShape.circle,
+              color: Colors.transparent,
             ),
+            markersMaxCount: 0,
           ),
           headerStyle: const HeaderStyle(
             formatButtonVisible: false,
@@ -744,185 +1332,150 @@ class ProviderPlanningScreenState extends State<ProviderPlanningScreen> {
     );
   }
 
-  Widget _buildWeekList(PlanningLoaded state) {
-    final weekStart =
-        _focusedDay.subtract(Duration(days: _focusedDay.weekday - 1));
-    return Column(
-      children: List.generate(7, (i) {
-        final day = weekStart.add(Duration(days: i));
-        final events = _prestationsForDay(state.prestations, day);
-        final isSelected = isSameDay(day, _selectedDay);
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: Material(
-            color: isSelected ? SDColors.neutral50 : SDColors.white,
-            borderRadius: BorderRadius.circular(14),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(14),
-              onTap: () {
-                setState(() {
-                  _selectedDay = day;
-                  _focusedDay = day;
-                  _currentView = 'day';
-                });
-                _loadPrestationsForView();
-              },
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: isSelected
-                        ? SDColors.neutral900
-                        : SDColors.neutral200,
+  Widget _buildWeekAgenda(PlanningLoaded state) {
+    final weekStart = _weekStartFor(_focusedDay);
+    final sections = <Widget>[];
+
+    for (var i = 0; i < 7; i++) {
+      final day = weekStart.add(Duration(days: i));
+      final events = List<Map<String, dynamic>>.from(
+        _plannedForDay(state.prestations, day),
+      );
+      events.sort((a, b) {
+        final ta = _parseTimeOnDay(a['heureDebut'], day) ?? DateTime(0);
+        final tb = _parseTimeOnDay(b['heureDebut'], day) ?? DateTime(0);
+        return ta.compareTo(tb);
+      });
+
+      final dayTitle = DateFormat('EEEE d MMMM', 'fr_FR').format(day);
+      final capDay = dayTitle.isNotEmpty
+          ? '${dayTitle[0].toUpperCase()}${dayTitle.substring(1)}'
+          : dayTitle;
+
+      sections.add(
+        Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      capDay,
+                      style: SDTypography.titleSmall.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: SDColors.neutral900,
+                      ),
+                    ),
+                  ),
+                  if (events.isNotEmpty)
+                    Text(
+                      '${events.length} intervention${events.length > 1 ? 's' : ''}',
+                      style: SDTypography.caption
+                          .copyWith(color: SDColors.neutral500),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              if (events.isEmpty)
+                Text(
+                  'Aucune intervention prévue',
+                  style: SDTypography.bodyMedium
+                      .copyWith(color: SDColors.neutral500),
+                )
+              else
+                ...events.map(
+                  (mission) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _WeekInterventionCard(
+                      title: _titleOf(mission),
+                      location: _locationOf(mission),
+                      visual: _visualForStatus('${mission['statut'] ?? ''}'),
+                      timeStart:
+                          _parseTimeOnDay(mission['heureDebut'], day),
+                      timeEnd: _parseTimeOnDay(mission['heureFin'], day),
+                      onOpen: () => _openMissionDetail(mission),
+                    ),
                   ),
                 ),
-                child: Row(
-                  children: [
-                    SizedBox(
-                      width: 56,
-                      child: Column(
-                        children: [
-                          Text(
-                            DateFormat('EEE', 'fr_FR').format(day),
-                            style: SDTypography.labelSmall.copyWith(
-                              color: SDColors.neutral500,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          Text(
-                            '${day.day}',
-                            style: SDTypography.titleMedium.copyWith(
-                              color: SDColors.neutral900,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      child: Text(
-                        events.isEmpty
-                            ? 'Aucune mission'
-                            : '${events.length} mission${events.length > 1 ? 's' : ''}',
-                        style: SDTypography.bodyMedium.copyWith(
-                          color: SDColors.neutral700,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    const Icon(Icons.chevron_right_rounded,
-                        color: SDColors.neutral900),
-                  ],
-                ),
-              ),
-            ),
+            ],
           ),
-        );
-      }),
-    );
+        ),
+      );
+    }
+
+    return Column(children: sections);
   }
 
-  Widget _buildDayTimeline(List<dynamic> events) {
-    final now = DateTime.now();
-    final showNowLine = isSameDay(now, _selectedDay);
-
-    final sorted = List<Map<String, dynamic>>.from(
-      events.map((e) => Map<String, dynamic>.from(e as Map)),
-    )..sort((a, b) {
+  Widget _buildDayTimeline(List<Map<String, dynamic>> events) {
+    final sorted = List<Map<String, dynamic>>.from(events)
+      ..sort((a, b) {
         final ta = _parseTime(a['heureDebut']) ?? DateTime(0);
         final tb = _parseTime(b['heureDebut']) ?? DateTime(0);
         return ta.compareTo(tb);
       });
 
+    if (sorted.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 32),
+        child: Column(
+          children: [
+            Icon(Icons.event_available_outlined,
+                size: 44,
+                color: SDColors.neutral900.withValues(alpha: 0.35)),
+            const SizedBox(height: 12),
+            Text(
+              'Aucune intervention ce jour',
+              style: SDTypography.titleSmall.copyWith(
+                color: SDColors.neutral900,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Sélectionnez une autre date ou consultez vos missions à venir.',
+              textAlign: TextAlign.center,
+              style: SDTypography.bodySmall.copyWith(color: SDColors.neutral500),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Column(
       children: [
-        if (sorted.isEmpty)
+        for (var i = 0; i < sorted.length; i++)
+          _DayInterventionRow(
+            isLast: i == sorted.length - 1,
+            timeStart: _parseTime(sorted[i]['heureDebut']),
+            timeEnd: _parseTime(sorted[i]['heureFin']),
+            title: _titleOf(sorted[i]),
+            client: prestationClientName(sorted[i]),
+            location: _locationOf(sorted[i]),
+            timeRange: _timeRangeLabel(sorted[i]),
+            visual: _visualForStatus('${sorted[i]['statut'] ?? ''}'),
+            onOpen: () => _openMissionDetail(sorted[i]),
+          ),
+        if (sorted.isNotEmpty)
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 32),
-            child: Column(
+            padding: const EdgeInsets.only(top: 8, bottom: 8),
+            child: Row(
               children: [
-                Icon(Icons.event_available_outlined,
-                    size: 44,
-                    color: SDColors.neutral900.withValues(alpha: 0.35)),
-                const SizedBox(height: 12),
-                Text(
-                  'Aucuneune mission ce jour',
-                  style: SDTypography.titleSmall.copyWith(
-                    color: SDColors.neutral900,
-                    fontWeight: FontWeight.w700,
+                Icon(Icons.event_busy_outlined,
+                    size: 18, color: SDColors.neutral400),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Aucune autre intervention prévue ce jour.',
+                    style: SDTypography.bodySmall
+                        .copyWith(color: SDColors.neutral500),
                   ),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  'Aucune prestation planifiée pour ce jour. Changez de jour ou revenez plus tard.',
-                  textAlign: TextAlign.center,
-                  style: SDTypography.bodySmall
-                      .copyWith(color: SDColors.neutral500),
-                ),
               ],
             ),
-          )
-        else
-          ...sorted.map((event) {
-            final start = _parseTime(event['heureDebut']);
-            final end = _parseTime(event['heureFin']);
-            final timeLabel = [
-              if (start != null) DateFormat('HH:mm').format(start),
-              if (end != null) DateFormat('HH:mm').format(end),
-            ].join(' – ');
-
-            final afterNow = showNowLine &&
-                start != null &&
-                start.isAfter(now) &&
-                sorted.indexOf(event) ==
-                    sorted.indexWhere((e) {
-                      final s = _parseTime(e['heureDebut']);
-                      return s != null && s.isAfter(now);
-                    });
-
-            return Column(
-              children: [
-                if (afterNow) _buildNowLine(now),
-                _TimelineMissionCard(
-                  timeLabel: timeLabel.isEmpty ? '—' : timeLabel,
-                  title: _titleOf(event),
-                  location: _locationOf(event),
-                  visual: _visualForStatus('${event['statut'] ?? 'EN_ATTENTE'}'),
-                ),
-              ],
-            );
-          }),
-        if (showNowLine &&
-            sorted.every((e) {
-              final s = _parseTime(e['heureDebut']);
-              return s == null || !s.isAfter(now);
-            }))
-          _buildNowLine(now),
-        const SizedBox(height: 8),
+          ),
       ],
-    );
-  }
-
-  Widget _buildNowLine(DateTime now) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10, top: 4),
-      child: Row(
-        children: [
-          Text(
-            DateFormat('HH:mm').format(now),
-            style: SDTypography.labelSmall.copyWith(
-              color: SDColors.primary600,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Container(height: 2, color: SDColors.primary600),
-          ),
-        ],
-      ),
     );
   }
 
@@ -998,26 +1551,327 @@ class ProviderPlanningScreenState extends State<ProviderPlanningScreen> {
               ],
             ),
           ),
-          Row(
-            mainAxisSize: MainAxisSize.min,
+        ],
+      ),
+    );
+  }
+}
+
+class _WeekInterventionCard extends StatelessWidget {
+  const _WeekInterventionCard({
+    required this.title,
+    required this.location,
+    required this.visual,
+    required this.timeStart,
+    required this.timeEnd,
+    required this.onOpen,
+  });
+
+  final String title;
+  final String location;
+  final _MissionVisual visual;
+  final DateTime? timeStart;
+  final DateTime? timeEnd;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final startLabel = timeStart != null
+        ? DateFormat('HH:mm').format(timeStart!)
+        : '—';
+    final endLabel =
+        timeEnd != null ? DateFormat('HH:mm').format(timeEnd!) : null;
+
+    return Material(
+      color: SDColors.white,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onOpen,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: SDColors.neutral200),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CustomPaint(
-                size: const Size(14, 10),
-                painter: _DashedBorderPainter(
-                  color: SDColors.primary600,
-                  radius: 2,
+              SizedBox(
+                width: 48,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      startLabel,
+                      style: SDTypography.labelMedium.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: SDColors.neutral900,
+                      ),
+                    ),
+                    if (endLabel != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        endLabel,
+                        style: SDTypography.labelSmall.copyWith(
+                          color: SDColors.neutral500,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
-              const SizedBox(width: 6),
-              Text(
-                'Disponible',
-                style: SDTypography.labelSmall
-                    .copyWith(color: SDColors.neutral600),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            title,
+                            style: SDTypography.bodyMedium.copyWith(
+                              fontWeight: FontWeight.w800,
+                              color: SDColors.neutral900,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: SDColors.primary50,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            visual.label,
+                            style: SDTypography.labelSmall.copyWith(
+                              color: SDColors.primary700,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        const Icon(Icons.place_outlined,
+                            size: 14, color: SDColors.neutral500),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            location,
+                            style: SDTypography.bodySmall
+                                .copyWith(color: SDColors.neutral600),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
+              const Icon(Icons.chevron_right_rounded,
+                  color: SDColors.neutral900, size: 22),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DayInterventionRow extends StatelessWidget {
+  const _DayInterventionRow({
+    required this.isLast,
+    required this.timeStart,
+    required this.timeEnd,
+    required this.title,
+    required this.client,
+    required this.location,
+    required this.timeRange,
+    required this.visual,
+    required this.onOpen,
+  });
+
+  final bool isLast;
+  final DateTime? timeStart;
+  final DateTime? timeEnd;
+  final String title;
+  final String client;
+  final String location;
+  final String? timeRange;
+  final _MissionVisual visual;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final startLabel = timeStart != null
+        ? DateFormat('HH:mm').format(timeStart!)
+        : '—';
+    final endLabel =
+        timeEnd != null ? DateFormat('HH:mm').format(timeEnd!) : null;
+
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 48,
+            child: Column(
+              children: [
+                Text(
+                  startLabel,
+                  style: SDTypography.labelMedium.copyWith(
+                    color: SDColors.neutral900,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                if (endLabel != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    endLabel,
+                    style: SDTypography.labelSmall.copyWith(
+                      color: SDColors.neutral500,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          SizedBox(
+            width: 20,
+            child: Column(
+              children: [
+                Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: SDColors.primary600,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: SDColors.white, width: 2),
+                  ),
+                ),
+                if (!isLast)
+                  Expanded(
+                    child: Container(
+                      width: 2,
+                      color: SDColors.neutral200,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: Material(
+                color: SDColors.white,
+                borderRadius: BorderRadius.circular(14),
+                child: InkWell(
+                  onTap: onOpen,
+                  borderRadius: BorderRadius.circular(14),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: SDColors.neutral200),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                title,
+                                style: SDTypography.bodyMedium.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  color: SDColors.neutral900,
+                                ),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: SDColors.primary50,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: SDColors.primary600.withValues(
+                                    alpha: 0.35,
+                                  ),
+                                ),
+                              ),
+                              child: Text(
+                                visual.label,
+                                style: SDTypography.labelSmall.copyWith(
+                                  color: SDColors.primary700,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 10,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        _infoRow(Icons.person_outline_rounded, client),
+                        const SizedBox(height: 4),
+                        _infoRow(Icons.place_outlined, location),
+                        if (timeRange != null) ...[
+                          const SizedBox(height: 4),
+                          _infoRow(Icons.schedule_outlined, timeRange!),
+                        ],
+                        const SizedBox(height: 10),
+                        const Divider(height: 1, color: SDColors.neutral200),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            Text(
+                              'Voir la mission',
+                              style: SDTypography.labelMedium.copyWith(
+                                color: SDColors.primary700,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const Icon(Icons.chevron_right,
+                                size: 18, color: SDColors.primary700),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _infoRow(IconData icon, String text) {
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: SDColors.neutral500),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            text,
+            style: SDTypography.bodySmall.copyWith(color: SDColors.neutral600),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1191,32 +2045,74 @@ class _TimelineMissionCard extends StatelessWidget {
   }
 }
 
-/// Éditeur de créneaux récurrents (jour + heures) — sync PUT prestataire.
-class _CreneauxEditorSheet extends StatefulWidget {
+/// Panneau « Mes disponibilités » — créneaux récurrents `prestataire.creneaux` (jour + heures).
+class _MesDisponibilitesSheet extends StatefulWidget {
+  final DateTime initialDate;
   final List<Map<String, dynamic>> initialCreneaux;
   final List<String> jourLabels;
   final Future<bool> Function(List<Map<String, dynamic>>) onSave;
 
-  const _CreneauxEditorSheet({
+  const _MesDisponibilitesSheet({
+    required this.initialDate,
     required this.initialCreneaux,
     required this.jourLabels,
     required this.onSave,
   });
 
   @override
-  State<_CreneauxEditorSheet> createState() => _CreneauxEditorSheetState();
+  State<_MesDisponibilitesSheet> createState() =>
+      _MesDisponibilitesSheetState();
 }
 
-class _CreneauxEditorSheetState extends State<_CreneauxEditorSheet> {
+class _MesDisponibilitesSheetState extends State<_MesDisponibilitesSheet> {
   late List<Map<String, dynamic>> _creneaux;
+  late DateTime _date;
+  String _heureDebut = '08:00';
+  String _heureFin = '12:00';
   bool _saving = false;
+
+  int _jourFromDate(DateTime d) => d.weekday % 7;
 
   @override
   void initState() {
     super.initState();
+    _date = widget.initialDate;
     _creneaux = widget.initialCreneaux
         .map((e) => Map<String, dynamic>.from(e))
         .toList();
+    _prefillFromExistingCreneau();
+  }
+
+  void _prefillFromExistingCreneau() {
+    final jour = _jourFromDate(_date);
+    final match = _creneaux.where((c) {
+      if (c['actif'] == false) return false;
+      final j = c['jour'] is int
+          ? c['jour'] as int
+          : int.tryParse('${c['jour']}') ?? -1;
+      return j == jour;
+    }).toList();
+    if (match.isEmpty) return;
+    final c = match.first;
+    final debut = c['heureDebut']?.toString();
+    final fin = c['heureFin']?.toString();
+    if (debut != null && debut.isNotEmpty) _heureDebut = debut;
+    if (fin != null && fin.isNotEmpty) _heureFin = fin;
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _date,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2030, 12, 31),
+      locale: const Locale('fr', 'FR'),
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _date = picked;
+      _prefillFromExistingCreneau();
+    });
   }
 
   Future<void> _pickTime({
@@ -1242,89 +2138,53 @@ class _CreneauxEditorSheetState extends State<_CreneauxEditorSheet> {
     }
   }
 
-  Future<void> _addCreneau() async {
-    int jour = DateTime.now().weekday % 7; // Dim=0
-    String debut = '08:00';
-    String fin = '18:00';
-
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (dialogCtx) {
-        return StatefulBuilder(
-          builder: (dialogCtx, setDialog) {
-            return AlertDialog(
-              title: const Text('Ajouter un créneau'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  DropdownButtonFormField<int>(
-                    value: jour,
-                    decoration: const InputDecoration(labelText: 'Jour'),
-                    items: [
-                      for (var i = 0; i < widget.jourLabels.length; i++)
-                        DropdownMenuItem(
-                          value: i,
-                          child: Text(widget.jourLabels[i]),
-                        ),
-                    ],
-                    onChanged: (v) {
-                      if (v != null) setDialog(() => jour = v);
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('Heure début'),
-                    trailing: Text(debut),
-                    onTap: () => _pickTime(
-                      label: 'Début',
-                      initial: debut,
-                      onPicked: (v) => setDialog(() => debut = v),
-                    ),
-                  ),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('Heure fin'),
-                    trailing: Text(fin),
-                    onTap: () => _pickTime(
-                      label: 'Fin',
-                      initial: fin,
-                      onPicked: (v) => setDialog(() => fin = v),
-                    ),
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogCtx, false),
-                  child: const Text('Annuler'),
-                ),
-                ElevatedButton(
-                  onPressed: () => Navigator.pop(dialogCtx, true),
-                  child: const Text('Ajouter'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-
-    if (ok == true && mounted) {
-      setState(() {
-        _creneaux.add({
-          'jour': jour,
-          'heureDebut': debut,
-          'heureFin': fin,
-          'actif': true,
-        });
-      });
-    }
+  String _dateLabelLong() {
+    final raw = DateFormat('EEEE d MMMM yyyy', 'fr_FR').format(_date);
+    return raw.isNotEmpty
+        ? '${raw[0].toUpperCase()}${raw.substring(1)}'
+        : raw;
   }
 
-  Future<void> _save() async {
+  String _dateLabelShort() {
+    final raw = DateFormat('EEEE d MMMM', 'fr_FR').format(_date);
+    return raw.isNotEmpty
+        ? '${raw[0].toUpperCase()}${raw.substring(1)}'
+        : raw;
+  }
+
+  String _weekdayRecurrenceHint() {
+    final jour = _jourFromDate(_date);
+    if (jour >= 0 && jour < widget.jourLabels.length) {
+      return widget.jourLabels[jour];
+    }
+    return '';
+  }
+
+  Future<void> _saveSlot() async {
+    final jour = _jourFromDate(_date);
+    final updated = List<Map<String, dynamic>>.from(
+      _creneaux.map((e) => Map<String, dynamic>.from(e)),
+    );
+    final index = updated.indexWhere((c) {
+      final j = c['jour'] is int
+          ? c['jour'] as int
+          : int.tryParse('${c['jour']}') ?? -1;
+      return j == jour;
+    });
+    final slot = {
+      'jour': jour,
+      'heureDebut': _heureDebut,
+      'heureFin': _heureFin,
+      'actif': true,
+    };
+    if (index >= 0) {
+      updated[index] = slot;
+    } else {
+      updated.add(slot);
+    }
+
     setState(() => _saving = true);
-    final success = await widget.onSave(_creneaux);
+    final success = await widget.onSave(updated);
     if (!mounted) return;
     setState(() => _saving = false);
     if (success) Navigator.pop(context);
@@ -1332,143 +2192,270 @@ class _CreneauxEditorSheetState extends State<_CreneauxEditorSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final bottom = MediaQuery.of(context).viewInsets.bottom;
+    final bottom = SDResponsive.occupiedBottomInset(context);
+    final recurrence = _weekdayRecurrenceHint();
+
     return SafeArea(
+      top: true,
+      bottom: false,
       child: Padding(
-        padding: EdgeInsets.fromLTRB(20, 12, 20, 16 + bottom),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
+        padding: EdgeInsets.fromLTRB(20, 8, 20, 16 + bottom),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Align(
+                alignment: Alignment.centerRight,
+                child: IconButton(
+                  onPressed: _saving ? null : () => Navigator.pop(context),
+                  icon: const Icon(Icons.close),
+                ),
+              ),
+              Text(
+                'Mes disponibilités',
+                style: SDTypography.titleLarge.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: SDColors.neutral900,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Indiquez quand vous pouvez intervenir.',
+                style: SDTypography.bodyMedium
+                    .copyWith(color: SDColors.neutral500),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: SDColors.neutral300,
-                  borderRadius: BorderRadius.circular(2),
+                  color: SDColors.primary50,
+                  borderRadius: BorderRadius.circular(12),
                 ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Disponibilités',
-                    style: SDTypography.titleSmall.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: SDColors.neutral900,
-                    ),
-                  ),
-                ),
-                IconButton(
-                  onPressed: _saving ? null : _addCreneau,
-                  icon: const Icon(Icons.add_circle_outline),
-                  tooltip: 'Ajouter',
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Créneaux récurrents (jour de la semaine).',
-              style: SDTypography.bodySmall
-                  .copyWith(color: SDColors.neutral500),
-            ),
-            const SizedBox(height: 12),
-            ConstrainedBox(
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(context).size.height * 0.45,
-              ),
-              child: _creneaux.isEmpty
-                  ? Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 24),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.event_available_outlined,
+                        color: SDColors.primary700, size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
                       child: Text(
-                        'Aucun créneau. Appuyez sur + pour en ajouter.',
+                        'Un créneau disponible ne réserve aucune intervention.',
                         style: SDTypography.bodySmall
-                            .copyWith(color: SDColors.neutral500),
+                            .copyWith(color: SDColors.neutral700),
                       ),
-                    )
-                  : ListView.separated(
-                      shrinkWrap: true,
-                      itemCount: _creneaux.length,
-                      separatorBuilder: (_, __) => const Divider(height: 1),
-                      itemBuilder: (context, index) {
-                        final c = _creneaux[index];
-                        final jour = (c['jour'] is int)
-                            ? c['jour'] as int
-                            : int.tryParse('${c['jour']}') ?? 0;
-                        final label = (jour >= 0 && jour < widget.jourLabels.length)
-                            ? widget.jourLabels[jour]
-                            : 'Jour $jour';
-                        final actif = c['actif'] != false;
-                        return ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: Text(
-                            '$label · ${c['heureDebut']} – ${c['heureFin']}',
-                            style: SDTypography.bodyMedium.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: actif
-                                  ? SDColors.neutral900
-                                  : SDColors.neutral400,
-                            ),
-                          ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Switch.adaptive(
-                                value: actif,
-                                onChanged: (v) {
-                                  setState(() => _creneaux[index]['actif'] = v);
-                                },
-                              ),
-                              IconButton(
-                                icon: Icon(Icons.delete_outline,
-                                    color: Colors.red.shade400),
-                                onPressed: () {
-                                  setState(() => _creneaux.removeAt(index));
-                                },
-                              ),
-                            ],
-                          ),
-                        );
-                      },
                     ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: _saving ? null : () => Navigator.pop(context),
-                    child: const Text('Annuler'),
-                  ),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: _saving ? null : _save,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: SDColors.primary600,
-                      foregroundColor: Colors.white,
-                    ),
-                    child: _saving
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Text('Enregistrer'),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Créneau disponible',
+                style: SDTypography.labelLarge.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              if (recurrence.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'Enregistré pour chaque $recurrence (modèle actuel).',
+                  style: SDTypography.caption.copyWith(
+                    color: SDColors.neutral500,
                   ),
                 ),
               ],
-            ),
-          ],
+              const SizedBox(height: 10),
+              InkWell(
+                onTap: _pickDate,
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  width: double.infinity,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: SDColors.neutral200),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.calendar_today_outlined,
+                          size: 20, color: SDColors.neutral700),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          _dateLabelLong(),
+                          style: SDTypography.bodyMedium.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      const Icon(Icons.chevron_right,
+                          color: SDColors.neutral400),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: _timeField(
+                      label: 'Début',
+                      value: _heureDebut,
+                      onTap: () => _pickTime(
+                        label: 'Début',
+                        initial: _heureDebut,
+                        onPicked: (v) => setState(() => _heureDebut = v),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _timeField(
+                      label: 'Fin',
+                      value: _heureFin,
+                      onTap: () => _pickTime(
+                        label: 'Fin',
+                        initial: _heureFin,
+                        onPicked: (v) => setState(() => _heureFin = v),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Aperçu',
+                style: SDTypography.labelLarge.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: SDColors.neutral50,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: SDColors.neutral200),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.schedule_outlined,
+                        color: SDColors.primary700),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _dateLabelShort(),
+                            style: SDTypography.bodyMedium.copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          Text(
+                            'Disponible de $_heureDebut à $_heureFin',
+                            style: SDTypography.bodySmall
+                                .copyWith(color: SDColors.neutral600),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: SDColors.primary50,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: SDColors.primary200),
+                      ),
+                      child: Text(
+                        'Disponibilité',
+                        style: SDTypography.labelSmall.copyWith(
+                          color: SDColors.primary700,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Vos interventions déjà planifiées restent inchangées.',
+                style: SDTypography.caption.copyWith(color: SDColors.neutral500),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: _saving ? null : _saveSlot,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: SDColors.primary700,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  child: _saving
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: SDColors.white,
+                          ),
+                        )
+                      : const Text('Enregistrer le créneau'),
+                ),
+              ),
+              TextButton(
+                onPressed: _saving ? null : () => Navigator.pop(context),
+                child: const Text('Annuler'),
+              ),
+            ],
+          ),
         ),
       ),
+    );
+  }
+
+  Widget _timeField({
+    required String label,
+    required String value,
+    required VoidCallback onTap,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: SDTypography.caption.copyWith(color: SDColors.neutral600),
+        ),
+        const SizedBox(height: 6),
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: SDColors.neutral200),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.schedule_outlined,
+                    size: 18, color: SDColors.neutral600),
+                const SizedBox(width: 8),
+                Text(
+                  value,
+                  style: SDTypography.bodyLarge.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

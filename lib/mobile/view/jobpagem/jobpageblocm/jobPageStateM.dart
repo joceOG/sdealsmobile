@@ -32,7 +32,11 @@ class JobPageStateM extends Equatable {
   final double? userLongitude;
   final double searchRadius;
   final String selectedCategory;
+  final String selectedCategoryId;
   final String selectedService;
+  final String selectedServiceId;
+  final List<Service> shortcuts;
+  final String shortcutsError;
   final bool filterVerifiedOnly;
   final double? filterMinRating;
   final int providersPage;
@@ -61,7 +65,11 @@ class JobPageStateM extends Equatable {
     this.userLongitude,
     required this.searchRadius,
     required this.selectedCategory,
+    this.selectedCategoryId = '',
     required this.selectedService,
+    this.selectedServiceId = '',
+    this.shortcuts = const [],
+    this.shortcutsError = '',
     this.filterVerifiedOnly = false,
     this.filterMinRating,
     this.providersPage = 1,
@@ -101,6 +109,13 @@ class JobPageStateM extends Equatable {
     );
   }
 
+  /// Vrai seulement quand une position et des distances estimées existent.
+  /// Le rayon limite alors la liste et les pastilles. Il ne recadre pas la carte.
+  bool get appliesSearchRadius =>
+      userLatitude != null &&
+      userLongitude != null &&
+      providerDistances.isNotEmpty;
+
   /// Liste affichable (nearby prioritaire, sinon matching), après filtres chips.
   List<Prestataire> get displayProviders {
     final base =
@@ -110,6 +125,10 @@ class JobPageStateM extends Equatable {
       if (filterMinRating != null) {
         final n = double.tryParse('${p.note ?? ''}'.replaceAll(',', '.')) ?? 0;
         if (n < filterMinRating!) return false;
+      }
+      if (appliesSearchRadius) {
+        final d = providerDistances[p.idprestataire];
+        if (d == null || d > searchRadius) return false;
       }
       return true;
     }).toList();
@@ -137,7 +156,11 @@ class JobPageStateM extends Equatable {
     double? userLongitude,
     double? searchRadius,
     String? selectedCategory,
+    String? selectedCategoryId,
     String? selectedService,
+    String? selectedServiceId,
+    List<Service>? shortcuts,
+    String? shortcutsError,
     bool? filterVerifiedOnly,
     double? filterMinRating,
     bool clearMinRating = false,
@@ -167,7 +190,11 @@ class JobPageStateM extends Equatable {
       userLongitude: userLongitude ?? this.userLongitude,
       searchRadius: searchRadius ?? this.searchRadius,
       selectedCategory: selectedCategory ?? this.selectedCategory,
+      selectedCategoryId: selectedCategoryId ?? this.selectedCategoryId,
       selectedService: selectedService ?? this.selectedService,
+      selectedServiceId: selectedServiceId ?? this.selectedServiceId,
+      shortcuts: shortcuts ?? this.shortcuts,
+      shortcutsError: shortcutsError ?? this.shortcutsError,
       filterVerifiedOnly: filterVerifiedOnly ?? this.filterVerifiedOnly,
       filterMinRating:
           clearMinRating ? null : (filterMinRating ?? this.filterMinRating),
@@ -200,7 +227,11 @@ class JobPageStateM extends Equatable {
         userLongitude,
         searchRadius,
         selectedCategory,
+        selectedCategoryId,
         selectedService,
+        selectedServiceId,
+        shortcuts,
+        shortcutsError,
         filterVerifiedOnly,
         filterMinRating,
         providersPage,

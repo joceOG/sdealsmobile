@@ -37,8 +37,8 @@ class BrandIntroConfig {
   static String lottiePath({required bool full}) =>
       full ? lottieFull : lottieShort;
 
-  /// Largeur max uniquement (jamais hauteur forcée — ratio original).
-  static const double logoMaxWidth = 220;
-  static const double logoWidthFraction = 0.52;
+  /// Largeur max uniquement — alignée sur le splash natif (168 dp).
+  static const double logoMaxWidth = 168;
+  static const double logoWidthFraction = 0.46;
   static const double logoHorizontalPadding = 40;
 }

@@ -52,20 +52,33 @@ class Alert {
   });
 
   factory Alert.fromJson(Map<String, dynamic> json) {
+    final destinataire = json['destinataire'];
+    final utilisateur = json['utilisateur'];
+    final created = json['createdAt'] ?? json['dateCreation'];
+    final updated = json['updatedAt'] ?? created;
+    final readAt = json['dateLue'] ?? json['dateLecture'];
     return Alert(
       id: json['_id'],
-      utilisateur: json['utilisateur']?['_id'] ?? json['utilisateur'] ?? '',
+      utilisateur: utilisateur is Map
+          ? (utilisateur['_id'] ?? '').toString()
+          : (utilisateur ??
+                  (destinataire is Map ? destinataire['_id'] : destinataire) ??
+                  '')
+              .toString(),
       titre: json['titre'] ?? '',
-      description: json['description'] ?? '',
+      description: (json['description'] ?? json['contenu'] ?? '').toString(),
       type: json['type'] ?? '',
       sousType: json['sousType'],
-      referenceId: json['referenceId'],
+      referenceId: json['referenceId']?.toString() ??
+          (json['prestation'] is Map
+              ? json['prestation']['_id']?.toString()
+              : json['prestation']?.toString()),
       referenceType: json['referenceType'],
       statut: json['statut'] ?? 'NON_LUE',
       priorite: json['priorite'] ?? 'NORMALE',
-      dateLue: json['dateLue'] != null ? DateTime.parse(json['dateLue']) : null,
+      dateLue: readAt != null ? DateTime.parse(readAt.toString()) : null,
       dateArchivage: json['dateArchivage'] != null
-          ? DateTime.parse(json['dateArchivage'])
+          ? DateTime.parse(json['dateArchivage'].toString())
           : null,
       envoiEmail: json['envoiEmail'] ?? false,
       envoiPush: json['envoiPush'] ?? true,
@@ -77,8 +90,8 @@ class Alert {
       dateExpiration: json['dateExpiration'] != null
           ? DateTime.parse(json['dateExpiration'])
           : null,
-      createdAt: DateTime.parse(json['createdAt']),
-      updatedAt: DateTime.parse(json['updatedAt']),
+      createdAt: DateTime.parse(created.toString()),
+      updatedAt: DateTime.parse(updated.toString()),
       expediteurId: json['expediteur']?['_id'],
       expediteurNom: json['expediteur']?['nom'],
       expediteurPrenom: json['expediteur']?['prenom'],
@@ -129,6 +142,21 @@ class Alert {
 
   String get typeLabel {
     switch (type) {
+      case 'NOUVELLE_MISSION':
+        return 'Nouvelle demande';
+      case 'MISSION_ACCEPTEE':
+        return 'Demande acceptée';
+      case 'MISSION_REFUSEE':
+        return 'Demande refusée';
+      case 'MISSION_DEMARREE':
+        return 'Demande démarrée';
+      case 'MISSION_TERMINEE':
+        return 'Demande terminée';
+      case 'MESSAGE_RECU':
+      case 'MESSAGE':
+        return 'Nouveau message';
+      case 'EVALUATION_RECUE':
+        return 'Évaluation';
       case 'COMMANDE':
         return 'Commande';
       case 'PRESTATION':
@@ -137,8 +165,6 @@ class Alert {
         return 'Paiement';
       case 'VERIFICATION':
         return 'Vérification';
-      case 'MESSAGE':
-        return 'Message';
       case 'SYSTEME':
         return 'Système';
       case 'PROMOTION':
@@ -304,6 +330,3 @@ class Alert {
   bool get estUrgente => priorite == 'HAUTE' || priorite == 'CRITIQUE';
   bool get necessiteAction => urlAction != null && urlAction!.isNotEmpty;
 }
-
-
-

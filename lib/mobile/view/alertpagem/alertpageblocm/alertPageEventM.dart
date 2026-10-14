@@ -9,6 +9,7 @@ abstract class AlertPageEventM extends Equatable {
 
 // 📋 CHARGER LES ALERTES
 class LoadAlertsDataM extends AlertPageEventM {
+  final String? userId;
   final String? type;
   final String? statut;
   final String? priorite;
@@ -19,6 +20,7 @@ class LoadAlertsDataM extends AlertPageEventM {
   final int? periode;
 
   const LoadAlertsDataM({
+    this.userId,
     this.type,
     this.statut,
     this.priorite,
@@ -31,6 +33,7 @@ class LoadAlertsDataM extends AlertPageEventM {
 
   @override
   List<Object?> get props => [
+        userId,
         type,
         statut,
         priorite,
@@ -188,7 +191,12 @@ class MarkAsReadM extends AlertPageEventM {
 
 // 👁️ MARQUER TOUTES COMME LUES
 class MarkAllAsReadM extends AlertPageEventM {
-  const MarkAllAsReadM();
+  final String? userId;
+
+  const MarkAllAsReadM({this.userId});
+
+  @override
+  List<Object?> get props => [userId];
 }
 
 // 📁 ARCHIVER UNE ALERTE
@@ -305,6 +313,3 @@ class UpdateAlertPreferencesM extends AlertPageEventM {
 class LoadAlertPreferencesM extends AlertPageEventM {
   const LoadAlertPreferencesM();
 }
-
-
-
